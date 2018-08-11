@@ -1,4 +1,7 @@
 /bin/
 /develop-eggs/
+/eggs/
 /parts/
 /.installed.cfg
+*.log
+*.pyc
