@@ -1,6 +1,6 @@
 import socket
 import paramiko
-import paramiko.ssh_exception.SSHException
+from paramiko.ssh_exception import SSHException
 from app import Utils, Task, logger
 
 
@@ -69,6 +69,11 @@ class AdminServer(Task):
             logger.error(Utils.format_error(
                 e,
                 'Admin SSH error'
+            ))
+        except socket.error as e:
+            logger.error(Utils.format_error(
+                e,
+                'Admin socket error'
             ))
 
     def _finilize(self):
