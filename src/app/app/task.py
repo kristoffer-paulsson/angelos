@@ -5,7 +5,7 @@ import types
 import Queue
 from .utils import Utils
 from .common import logger
-from .ioc import Container, Service, Initializer
+from .ioc import Container, Service
 
 """
 The task.py module containes classes needed to manage multithreading and
@@ -543,18 +543,16 @@ class TaskManager(Service):
         logger.error(Utils.format_info('Couldn\'t halt all threads'))
         return False
 
-
-class TaskManagerInitializer(Initializer):
-    """@todo"""
-    def service(self, name):
-        Utils.is_type(name, types.StringType)
+    @staticmethod
+    def factory(**kwargs):
+        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs['name'], types.StringType)
+        Utils.is_type(kwargs['ioc'], Container)
+        Utils.is_type(kwargs['params'], types.DictType)
 
         return TaskManager(
-            name,
-            self._params['groups'],
-            self._params['runlevels'],
-            self._ioc
+            kwargs['name'],
+            kwargs['params']['groups'],
+            kwargs['params']['runlevels'],
+            kwargs['ioc']
         )
-
-    def _check_params(self):
-        pass

@@ -3,5 +3,6 @@
 /eggs/
 /parts/
 /.installed.cfg
+.pytest_cache/
 *.log
 *.pyc

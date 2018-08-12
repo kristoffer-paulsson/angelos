@@ -182,19 +182,8 @@ class Utils:
         c_instance = klass()
         """
         Utils.is_type(path, types.StringType)
-        klass = None
-        try:
-            pkg = path.rsplit('.', 1)
-            klass = getattr(importlib.import_module(pkg[0]), pkg[1])
-        except ImportError:
-            raise Utils.format_exception(
-                RuntimeError,
-                'Utils',
-                'Service class not found.',
-                {'path': path}
-            )
-
-        return klass
+        pkg = path.rsplit('.', 1)
+        return getattr(importlib.import_module(pkg[0]), pkg[1])
 
     @staticmethod
     def hours(seconds):
@@ -246,3 +235,9 @@ class Log():
     def bizz_logger(self):
         """Return the bizz logger that logs application business logic"""
         return self.__bizz
+
+
+class FactoryInterface:
+    @staticmethod
+    def factory(**kwargs):
+        raise NotImplementedError()

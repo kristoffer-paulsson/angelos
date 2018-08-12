@@ -1,6 +1,6 @@
 import types
 from ..utils import Utils
-from ..ioc import Service, Initializer
+from ..ioc import Service, Container
 from ..cmd import Command
 
 
@@ -47,8 +47,11 @@ class EnvCommand(Command):
                 print '{:}={:}'.format(p, self.__env.get(p))
 
     @staticmethod
-    def factory(ioc):
-        return EnvCommand(ioc.service('environment'))
+    def factory(**kwargs):
+        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs['ioc'], Container)
+
+        return EnvCommand(kwargs['ioc'].service('environment'))
 
 
 class Settings(Service):
@@ -86,9 +89,10 @@ class Settings(Service):
                 {'key': name, 'value': value}
             )
 
+    @staticmethod
+    def factory(**kwargs):
+        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs['name'], types.StringType)
+        Utils.is_type(kwargs['params'], types.DictType)
 
-class SettingsInitializer(Initializer):
-    def service(self, name):
-        Utils.is_type(name, types.StringType)
-
-        return Settings(name, self._params)
+        return Settings(kwargs['name'], kwargs['params'])

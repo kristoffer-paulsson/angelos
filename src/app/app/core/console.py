@@ -37,7 +37,7 @@ class Console(cmd.Cmd, Task):
         for c in cmds:
             klass = Utils.imp_pkg(c)
             Utils.is_class(klass, Command)
-            command = klass.factory(self.__ioc)
+            command = klass.factory(ioc=self.__ioc)
             name = command.name()
             if name in self.__cmds:
                 raise Utils.format_exception(

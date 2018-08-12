@@ -1,9 +1,9 @@
 import types
-from .utils import Utils
-from .ioc import Service, Initializer
+from .utils import Utils, FactoryInterface
+from .ioc import Service
 
 
-class Command:
+class Command(FactoryInterface):
     """command sets the 'command' in the interpreter"""
     cmd = ''
 
@@ -33,10 +33,6 @@ class Command:
     def help(self):
         return self.short
 
-    @staticmethod
-    def factory(ioc):
-        raise NotImplementedError()
-
 
 class CMD(Service):
     def __init__(self, name, commands):
@@ -47,12 +43,10 @@ class CMD(Service):
     def commands(self):
         return self.__commands
 
+    @staticmethod
+    def factory(**kwargs):
+        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs['name'], types.StringType)
+        Utils.is_type(kwargs['params'], types.DictType)
 
-class CMDInitializer(Initializer):
-    def service(self, name):
-        Utils.is_type(name, types.StringType)
-
-        return CMD(name, self._params['commands'])
-
-    def _check_params(self):
-        pass
+        return CMD(kwargs['name'], kwargs['params']['commands'])

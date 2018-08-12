@@ -1,5 +1,7 @@
 import time
+import types
 from ..common import quit, logger
+from ..ioc import Container
 from ..cmd import Command
 from ..utils import Utils
 from ..task import TaskManager
@@ -28,7 +30,7 @@ class QuitCommand(Command):
         return True
 
     @staticmethod
-    def factory(ioc):
+    def factory(**kwargs):
         return QuitCommand()
 
 
@@ -178,8 +180,11 @@ class TaskCommand(Command):
             print 'Group "' + group_name + '" isn\'t loaded'
 
     @staticmethod
-    def factory(ioc):
-        return TaskCommand(ioc.service('tasks'))
+    def factory(**kwargs):
+        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs['ioc'], Container)
+
+        return TaskCommand(kwargs['ioc'].service('tasks'))
 
 
 class RunLevelCommand(Command):
@@ -222,5 +227,8 @@ class RunLevelCommand(Command):
             print 'Run level must be equal or greater than 0'
 
     @staticmethod
-    def factory(ioc):
-        return RunLevelCommand(ioc.service('tasks'))
+    def factory(**kwargs):
+        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs['ioc'], Container)
+
+        return RunLevelCommand(kwargs['ioc'].service('tasks'))

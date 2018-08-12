@@ -1,9 +1,8 @@
 import types
-import importlib
-from .utils import Utils
+from .utils import Utils, FactoryInterface
 
 
-class Service:
+class Service(FactoryInterface):
     """
     Service is a base class for Application services.
     """
@@ -17,32 +16,6 @@ class Service:
         return    Returns a string that is the name of the service
         """
         return self.__name
-
-
-class Initializer:
-    def __init__(self, ioc, params):
-        """
-        Initializes the service Initializer class.
-        ioc        Is the the service container instance
-        config     Is a Dictionary of parameter settings for the service
-        """
-        Utils.is_type(ioc, Container)
-        Utils.is_type(params, types.DictType)
-
-        self._ioc = ioc
-        self._params = params
-        self._check_params()
-
-    def _check_params(self):
-        pass
-
-    def service(self, name):
-        """
-        service() method initializes the actual service instance, using the
-        container and config parameters.
-        return    Returns the instanciated Service
-        """
-        raise NotImplementedError()
 
 
 class Container:
@@ -83,22 +56,12 @@ class Container:
                     'Service initializer configuration class not specified',
                     {'name': name}
                 )
-            path = conf['class'] + 'Initializer'
+            path = conf['class']
             params = conf['params'] if 'params' in conf else {}
 
-            try:
-                pkg = path.rsplit('.', 1)
-                klass = getattr(importlib.import_module(pkg[0]), pkg[1])
-            except ImportError:
-                raise Utils.format_exception(
-                    RuntimeError,
-                    self.__class__.__name__,
-                    'Service class not found.',
-                    {'class': str(conf['class'])}
-                )
-
-            Utils.is_class(klass, Initializer)
-            service = klass(self, params).service(name)
+            service = Utils.imp_pkg(path).factory(name=name,
+                                                  ioc=self,
+                                                  params=params)
 
             self.__services[service.name()] = service
             return self.__services[name]
