@@ -208,6 +208,8 @@ class Log():
 
         self.__app = self.__logger('app', 'error', logging.DEBUG)
         self.__bizz = self.__logger('biz', 'bizz', logging.DEBUG)
+        logging.basicConfig(filename=self.__path + '/error.log',
+                            level=logging.DEBUG)
 
     def __logger(self, name, file, level):
         """

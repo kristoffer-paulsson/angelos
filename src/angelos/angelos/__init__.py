@@ -13,13 +13,14 @@ CONFIG = {
         'class': 'app.task.TaskManager',
         'params': {
             'groups': [
-                'app.core.core.Core',
-                'app.tasks.dummy.Dummies'
+                'app.core.Core',
+                'app.tasks.dummy.Dummies',
+                'angelos.connect.Connect'
             ],
             'runlevels': [
                 [],
                 [0],
-                [0, 1]
+                [0, 1, 2]
             ]
         }
     },
