@@ -54,15 +54,15 @@ def main():
             server.start()
         elif sys.argv[1] == 'stop':
             server.stop()
-            print 'Daemon stopped'
+            print('Daemon stopped')
         elif sys.argv[1] == 'restart':
             server.restart()
         else:
-            print 'Unknown command'
+            print('Unknown command')
             sys.exit(2)
         sys.exit(0)
     else:
-        print 'To daemonize: %s start|stop|restart' % sys.argv[0]
-        print 'Type Ctrl^C to stop execution...'
+        print(('To daemonize: %s start|stop|restart' % sys.argv[0]))
+        print('Type Ctrl^C to stop execution...')
         server.start(False)
         sys.exit(0)

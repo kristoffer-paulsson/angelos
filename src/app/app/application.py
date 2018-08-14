@@ -2,7 +2,6 @@ import time
 import os
 import sys
 import atexit
-import types
 from signal import SIGTERM
 
 from .common import quit, logger
@@ -27,7 +26,7 @@ class Application:
         Initializes the Application with application wide condig values.
         config        Dictionary of key/value pairs
         """
-        Utils.is_type(config, types.DictType)
+        Utils.is_type(config, dict)
         # Apps config data
         self._ioc = Container(config)
 
@@ -100,7 +99,7 @@ class Daemonizer:
             if pid > 0:
                 # exit first parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write(
                 'fork #1 failed: {:d} ({:})\n'.format(e.errno, e.strerror)
             )
@@ -117,7 +116,7 @@ class Daemonizer:
             if pid > 0:
                 # exit from second parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write(
                 'fork #2 failed: {:d} ({:})\n'.format(e.errno, e.strerror)
             )
@@ -147,7 +146,7 @@ class Daemonizer:
         """
         # Check for a pidfile to see if the daemon already __runs
         try:
-            pf = file(self.__pidfile, 'r')
+            pf = open(self.__pidfile, 'r')
             pid = int(pf.read().strip())
             pf.close()
         except IOError:
@@ -185,13 +184,13 @@ class Daemonizer:
             while 1:
                 os.kill(pid, SIGTERM)
                 time.sleep(0.1)
-        except OSError, err:
+        except OSError as err:
             err = str(err)
             if err.find("No such process") > 0:
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:
-                print str(err)
+                print((str(err)))
                 sys.exit(1)
 
     def restart(self):

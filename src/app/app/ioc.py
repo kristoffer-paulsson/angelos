@@ -1,4 +1,3 @@
-import types
 from .utils import Utils, FactoryInterface
 
 
@@ -7,7 +6,7 @@ class Service(FactoryInterface):
     Service is a base class for Application services.
     """
     def __init__(self, name):
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
         self.__name = name
 
     def name(self):
@@ -30,12 +29,12 @@ class Container:
         and returned.
         config        Dictionary of configuration values
         """
-        Utils.is_type(config, types.DictType)
+        Utils.is_type(config, dict)
         self.__config = config
         self.__services = {}
 
     def service(self, name):
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
 
         if name in self.__services:
             return self.__services[name]

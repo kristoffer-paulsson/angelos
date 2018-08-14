@@ -1,4 +1,3 @@
-import types
 from .utils import Utils
 
 
@@ -13,7 +12,7 @@ class ThresholdCounter:
         Initializes an instanceself.
         threshold         An integer defining the threshold.
         """
-        Utils.is_type(threshold, types.IntType)
+        Utils.is_type(threshold, int)
         self.__cnt = 0
         self.__thr = threshold
 

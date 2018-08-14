@@ -1,0 +1,17 @@
+CHANGELOG.txt
+LICENSE.txt
+MANIFEST.in
+README.rst
+setup.cfg
+setup.py
+angelos/__init__.py
+angelos/server.py
+angelos.egg-info/PKG-INFO
+angelos.egg-info/SOURCES.txt
+angelos.egg-info/dependency_links.txt
+angelos.egg-info/entry_points.txt
+angelos.egg-info/not-zip-safe
+angelos.egg-info/top_level.txt
+angelos/connect/__init__.py
+angelos/connect/admin.py
+angelos/connect/connect.py

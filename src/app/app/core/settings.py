@@ -1,4 +1,3 @@
-import types
 from ..utils import Utils
 from ..ioc import Service, Container
 from ..cmd import Command
@@ -22,33 +21,33 @@ class EnvCommand(Command):
     def _execute(self, args):
         if 'set' in args.op:
             if not args.key:
-                print 'You must enter a key'
+                print('You must enter a key')
                 return
             if not args.value:
-                print 'You must enter a value'
+                print('You must enter a value')
                 return
             if args.key in self.__env.params():
                 self.__env.set(args.key, args.value)
-                print 'Parameter {:} set to: "{:}"'.format(
+                print('Parameter {:} set to: "{:}"'.format(
                     args.key, args.value
-                )
+                ))
             else:
-                print 'Environment setting "' + args.key + '" is invalid'
+                print('Environment setting "' + args.key + '" is invalid')
         elif 'get' in args.op:
             if not args.key:
-                print 'You must enter a key'
+                print('You must enter a key')
                 return
             if args.key in self.__env.params():
-                print '{:}'.format(self.__env.get(args.key))
+                print('{:}'.format(self.__env.get(args.key)))
             else:
-                print 'Environment setting "' + args.key + '" is invalid'
+                print('Environment setting "' + args.key + '" is invalid')
         elif 'list' in args.op:
             for p in self.__env.params():
-                print '{:}={:}'.format(p, self.__env.get(p))
+                print('{:}={:}'.format(p, self.__env.get(p)))
 
     @staticmethod
     def factory(**kwargs):
-        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs, dict)
         Utils.is_type(kwargs['ioc'], Container)
 
         return EnvCommand(kwargs['ioc'].service('environment'))
@@ -56,12 +55,12 @@ class EnvCommand(Command):
 
 class Settings(Service):
     def __init__(self, name, params):
-        Utils.is_type(params, types.DictType)
+        Utils.is_type(params, dict)
         Service.__init__(self, name)
         self.__params = params
 
     def params(self):
-        return self.__params.keys()
+        return list(self.__params.keys())
 
     def get(self, name):
         """
@@ -69,15 +68,15 @@ class Settings(Service):
         name    string Name key of parameter to return
         return    Returns parameter or None if no paramater
         """
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
         if name in self.__params:
             return self.__params[name]
         return None
 
     def set(self, name, value):
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
         Utils.is_type(value,
-                      (types.StringType, types.IntType, types.FloatType))
+                      (str, int, float))
 
         if name in self.__params:
             self.__params[name] = value
@@ -91,8 +90,8 @@ class Settings(Service):
 
     @staticmethod
     def factory(**kwargs):
-        Utils.is_type(kwargs, types.DictType)
-        Utils.is_type(kwargs['name'], types.StringType)
-        Utils.is_type(kwargs['params'], types.DictType)
+        Utils.is_type(kwargs, dict)
+        Utils.is_type(kwargs['name'], str)
+        Utils.is_type(kwargs['params'], dict)
 
         return Settings(kwargs['name'], kwargs['params'])

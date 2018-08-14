@@ -1,8 +1,6 @@
 import threading
 import time
 import sys
-import types
-import Queue
 from .utils import Utils
 from .common import logger
 from .ioc import Container, Service
@@ -24,8 +22,8 @@ class Signal:
         halt    threading.Event signaling halt to all the Task threads
         run        threading.Event signaling pause/resume to all Task threads
         """
-        Utils.is_type(halt, threading._Event)
-        Utils.is_type(run, threading._Event)
+        Utils.is_type(halt, threading.Event)
+        Utils.is_type(run, threading.Event)
 
         self.__tasks = {}
         self.__ids = {}
@@ -50,29 +48,12 @@ class Signal:
     def is_paused(self):
         return not self.__run.is_set()
 
-    def register(self, task):
-        """
-        """
-        Utils.is_type(task, Task)
-
-        id = id(task)
-        name = task.name()
-        if name in self.__ids:
-            raise Utils.format_exception(
-                RuntimeError,
-                self.__class__.__name__,
-                'Task already registered with Signal',
-                {'name': task.name()}
-            )
-        self.__ids[name] = id
-        self.__tasks[id] = (Queue(), None)
-
 
 class Message:
     def __init__(self, receiver, message='', data={}):
-        Utils.is_type(receiver, types.StringType)
-        Utils.is_type(message, types.StringType)
-        Utils.is_type(data, types.DictType)
+        Utils.is_type(receiver, str)
+        Utils.is_type(message, str)
+        Utils.is_type(data, dict)
 
         self.__receiver = receiver
         self.__message = Message
@@ -106,7 +87,7 @@ class Monitor:
         return time.time()
 
     def heartbeat(self, hb=None):
-        if isinstance(hb, types.FloatType):
+        if isinstance(hb, float):
             self.__heartbeat = hb
 
         return self.__heartbeat
@@ -118,7 +99,7 @@ class Monitor:
         self.__end = time.time()
 
     def state(self, state=None):
-        Utils.is_type(state, (types.StringType, types.NoneType))
+        Utils.is_type(state, (str, type(None)))
 
         if state is not None:
             self.__state = state
@@ -126,17 +107,17 @@ class Monitor:
         return self.__state
 
     def idle(self, time):
-        Utils.is_type(time, (types.IntType, types.FloatType))
+        Utils.is_type(time, (int, float))
 
         self.__idle += time
 
     def sleep(self, time):
-        Utils.is_type(time, (types.IntType, types.FloatType))
+        Utils.is_type(time, (int, float))
 
         self.__sleep += time
 
     def sequence(self, seq):
-        Utils.is_type(seq, types.FloatType)
+        Utils.is_type(seq, float)
 
         self.__sequence.pop(0)
         self.__sequence.append(seq)
@@ -184,7 +165,7 @@ class Task:
         sig        The Signal class instance to listen too
         config    A dictionary with config values
         """
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
         Utils.is_type(sig, Signal)
 
         self.__name = name
@@ -211,7 +192,7 @@ class Task:
         """
         Instructs the run() method to sleep for "seconds" seconds.
         """
-        Utils.is_type(seconds, types.IntType)
+        Utils.is_type(seconds, int)
         self.__idle = int(seconds)
 
     def _done(self):
@@ -242,7 +223,7 @@ class Task:
         traceback. It is recommended to not handle unexpected exceptions, but
         lets the task report them in a standardized manner.
         """
-        Utils.is_type(args, types.DictType)
+        Utils.is_type(args, dict)
         self.__args = args
 
         try:
@@ -306,7 +287,7 @@ class TaskGroup:
 
     def __init__(self, name, ioc):
         Utils.is_type(ioc, Container)
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
 
         self.__name = name
         self.__tasks = {}
@@ -408,7 +389,7 @@ class TaskGroup:
         # 5. Idle
         # 6. Sleep
         # 7. Heartbeat
-        for t in self.__tasks.keys():
+        for t in list(self.__tasks.keys()):
             status[t] = [
                 self.__tasks[t]['thread'].isDaemon(),
                 self.__tasks[t]['thread'].isAlive()
@@ -438,8 +419,8 @@ class TaskManager(Service):
     KILL_RANGE = 10
 
     def __init__(self, name, groups, runlevels, ioc):
-        Utils.is_type(groups, types.ListType)
-        Utils.is_type(runlevels, types.ListType)
+        Utils.is_type(groups, list)
+        Utils.is_type(runlevels, list)
         Utils.is_type(ioc, Container)
         Service.__init__(self, name)
 
@@ -475,7 +456,7 @@ class TaskManager(Service):
         to run. Simply stops and removes groups that shouldn't run and starts
         and add groups that are expected.
         """
-        Utils.is_type(level, types.IntType)
+        Utils.is_type(level, int)
 
         if not level < len(self.__runlevels):
             raise Utils.format_exception(
@@ -497,7 +478,7 @@ class TaskManager(Service):
             classes[klass.NAME] = klass
 
         # Finalize TaskGroups that are not among classes
-        for group in self.__groups.keys():
+        for group in list(self.__groups.keys()):
             if group not in classes:
                 self.finalize(self.__groups[group])
 
@@ -511,7 +492,7 @@ class TaskManager(Service):
         Returns an instance of a TaskGroup for handling.
         Name        The name of the TaskGroup
         """
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, str)
         if name not in self.__groups:
             raise Utils.format_exception(
                 ValueError,
@@ -523,7 +504,7 @@ class TaskManager(Service):
 
     def groups(self):
         """@todo"""
-        return self.__groups.keys()
+        return list(self.__groups.keys())
 
     def stop(self):
         """
@@ -545,10 +526,10 @@ class TaskManager(Service):
 
     @staticmethod
     def factory(**kwargs):
-        Utils.is_type(kwargs, types.DictType)
-        Utils.is_type(kwargs['name'], types.StringType)
+        Utils.is_type(kwargs, dict)
+        Utils.is_type(kwargs['name'], str)
         Utils.is_type(kwargs['ioc'], Container)
-        Utils.is_type(kwargs['params'], types.DictType)
+        Utils.is_type(kwargs['params'], dict)
 
         return TaskManager(
             kwargs['name'],

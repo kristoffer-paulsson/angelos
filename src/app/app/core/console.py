@@ -66,7 +66,7 @@ class Console(cmd.Cmd, Task):
     def do_help(self, arg):
         self.stdout.write('\nThe current commands are available:')
         self.stdout.write('Enter "<command> -h" to get help.\n' + '-'*35)
-        self.stdout.write('\n'.join(self.__cmds.keys()) + '\n\n')
+        self.stdout.write('\n'.join(list(self.__cmds.keys())) + '\n\n')
 
     def emptyline(self):
         pass
@@ -85,7 +85,7 @@ class Console(cmd.Cmd, Task):
         else:
             if self.use_rawinput:
                 try:
-                    line = raw_input(self.prompt)
+                    line = input(self.prompt)
                 except EOFError:
                     line = 'EOF'
             else:

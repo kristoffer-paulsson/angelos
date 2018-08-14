@@ -1,4 +1,3 @@
-import types
 from .utils import Utils, FactoryInterface
 from .ioc import Service
 
@@ -36,7 +35,7 @@ class Command(FactoryInterface):
 
 class CMD(Service):
     def __init__(self, name, commands):
-        Utils.is_type(commands, types.ListType)
+        Utils.is_type(commands, list)
         Service.__init__(self, name)
         self.__commands = commands
 
@@ -45,8 +44,8 @@ class CMD(Service):
 
     @staticmethod
     def factory(**kwargs):
-        Utils.is_type(kwargs, types.DictType)
-        Utils.is_type(kwargs['name'], types.StringType)
-        Utils.is_type(kwargs['params'], types.DictType)
+        Utils.is_type(kwargs, dict)
+        Utils.is_type(kwargs['name'], str)
+        Utils.is_type(kwargs['params'], dict)
 
         return CMD(kwargs['name'], kwargs['params']['commands'])

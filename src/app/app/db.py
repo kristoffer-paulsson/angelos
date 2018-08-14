@@ -1,6 +1,5 @@
 import importlib
 import threading
-import types
 from peewee import SqliteDatabase, Database as PWDatabase
 from .ioc import Service
 from .utils import Utils
@@ -41,13 +40,13 @@ class DatabaseManager(Service):
     NAME = 'DatabaseManager'
 
     def __init__(self, config={}):
-        Utils.is_type(config, types.DictType)
+        Utils.is_type(config, dict)
 
         Service.__init__(self, self.NAME, config)
         self.__instances = {}
 
     def __instantiate(self, name):
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, bytes)
         if name not in self.__instances:
             c = self._config()
             cc = c[name]
@@ -104,7 +103,7 @@ class DatabaseManager(Service):
         return self.__instances[name]
 
     def get(self, name):
-        Utils.is_type(name, types.StringType)
+        Utils.is_type(name, bytes)
         if name not in self._config():
             raise Utils.format_exception(
                 RuntimeError,

@@ -1,6 +1,5 @@
 import os
 import sys
-import types
 import logging
 import importlib
 
@@ -101,9 +100,9 @@ class Utils:
         )
         """
         Utils.is_class(exception_type, Exception)
-        Utils.is_type(class_name, types.StringType)
-        Utils.is_type(message, types.StringType)
-        Utils.is_type(debug_info, types.DictType)
+        Utils.is_type(class_name, str)
+        Utils.is_type(message, str)
+        Utils.is_type(debug_info, dict)
 
         debug = []
         for k in debug_info:
@@ -131,8 +130,8 @@ class Utils:
                 e, 'Result missing from function call X'
             ), exc_info=True)
         """
-        Utils.is_type(event_str, types.StringType)
-        Utils.is_type(data, (types.DictType, types.NoneType))
+        Utils.is_type(event_str, str)
+        Utils.is_type(data, (dict, type(None)))
 
         if not data:
             return '{0}.'.format(event_str)
@@ -161,7 +160,7 @@ class Utils:
             ), exc_info=True)
         """
         Utils.is_type(caught_exception, Exception)
-        Utils.is_type(event_str, types.StringType)
+        Utils.is_type(event_str, str)
 
         return '{0}, Class: {1}:{2}'.format(
             event_str,
@@ -181,7 +180,7 @@ class Utils:
         klass = Utils.imp_pkg('module.package.Class')
         c_instance = klass()
         """
-        Utils.is_type(path, types.StringType)
+        Utils.is_type(path, str)
         pkg = path.rsplit('.', 1)
         return getattr(importlib.import_module(pkg[0]), pkg[1])
 
@@ -199,7 +198,7 @@ class Utils:
 
 class Log():
     def __init__(self, config={}):
-        Utils.is_type(config, types.DictType)
+        Utils.is_type(config, dict)
         if not os.path.exists(config['path']):
             raise ValueError('Path is not an existing file.')
 

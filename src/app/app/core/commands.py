@@ -1,5 +1,4 @@
 import time
-import types
 from ..common import quit, logger
 from ..ioc import Container
 from ..cmd import Command
@@ -20,9 +19,9 @@ class QuitCommand(Command):
 
     def _execute(self, args):
         if not args.yes:
-            print 'Shut down not confirmed'
+            print('Shut down not confirmed')
             return
-        print 'Shutting down server'
+        print('Shutting down server')
         logger.info(Utils.format_info(
             '"Quit" user command. Shutting down program')
         )
@@ -76,18 +75,18 @@ class TaskCommand(Command):
         elif bool(args.reboot):
             self.__reboot(args.reboot[0], args.yes)
         else:
-            print 'Not implemented'
+            print('Not implemented')
 
     def __status(self):
         hstr = '{:24} | {:7} | {:5} | {:8} | {:5} | {:8} | {:8} | {:5} | {:5}'
         mstr = '{:24} | {:7} | {:5} | {:>8} | {:5} | {:>8} | {:>8} | {:>5.4} | {:5}' # noqa E501
         groups = self.__task_manager.groups()
 
-        print '\nStatus of tasks:'
-        print hstr.format('Name',   'State', 'Live',
+        print('\nStatus of tasks:')
+        print(hstr.format('Name',   'State', 'Live',
                           'Uptime', 'Beat',  'Idle',
-                          'Sleep',  'Seq',   'Dmn')
-        print '-'*99
+                          'Sleep',  'Seq',   'Dmn'))
+        print('-'*99)
         # 0. Daemon
         # 1. Alive
         # 2. State
@@ -100,7 +99,7 @@ class TaskCommand(Command):
         for group_name in groups:
             info = self.__task_manager.group(group_name).monitor()
             for t in info:
-                print mstr.format(
+                print(mstr.format(
                     group_name + '.' + t,
                     str(info[t][2]).upper(),
                     str(bool(info[t][1])),
@@ -110,22 +109,22 @@ class TaskCommand(Command):
                     Utils.hours(info[t][6]),
                     info[t][3],
                     str(bool(info[t][0]))
-                )
-        print '\n'
+                ))
+        print('\n')
 
     def __kill(self, group_name, confirmed):
         if not confirmed:
-            print 'Killing task group "' + group_name + '" is not confirmed'
+            print('Killing task group "' + group_name + '" is not confirmed')
             return
         try:
             logger.info(Utils.format_info(
                 '"Task" user command. Killing task group',
                 {'group_name': group_name}
             ))
-            print 'Killing task group'
+            print('Killing task group')
             self.__task_manager.group(group_name).stop()
         except ValueError:
-            print 'Group "' + group_name + '" isn\'t loaded'
+            print('Group "' + group_name + '" isn\'t loaded')
 
     def __launch(self, group_name):
         try:
@@ -133,12 +132,12 @@ class TaskCommand(Command):
                 '"Task" user command. Launch task group',
                 {'group_name': group_name}
             ))
-            print 'Starting task group'
+            print('Starting task group')
             g = self.__task_manager.group(group_name)
             g.reset()
             g.start()
         except ValueError:
-            print 'Group "' + group_name + '" isn\'t loaded'
+            print('Group "' + group_name + '" isn\'t loaded')
 
     def __pause(self, group_name):
         try:
@@ -146,10 +145,10 @@ class TaskCommand(Command):
                 '"Task" user command. Pause task group',
                 {'group_name': group_name}
             ))
-            print 'Pause task group'
+            print('Pause task group')
             self.__task_manager.group(group_name).suspend()
         except ValueError:
-            print 'Group "' + group_name + '" isn\'t loaded'
+            print('Group "' + group_name + '" isn\'t loaded')
 
     def __continue(self, group_name):
         try:
@@ -157,17 +156,17 @@ class TaskCommand(Command):
                 '"Task" user command. Resume task group',
                 {'group_name': group_name}
             ))
-            print 'Resuming task group'
+            print('Resuming task group')
             self.__task_manager.group(group_name).resume()
         except ValueError:
-            print 'Group "' + group_name + '" isn\'t loaded'
+            print('Group "' + group_name + '" isn\'t loaded')
 
     def __reboot(self, group_name, confirmed):
         if not confirmed:
-            print 'Rebooting task group "' + group_name + '" is not confirmed'
+            print('Rebooting task group "' + group_name + '" is not confirmed')
             return
         try:
-            print 'Rebooting task group'
+            print('Rebooting task group')
             logger.info(Utils.format_info(
                 '"Task" user command. Rebooting task group',
                 {'group_name': group_name}
@@ -177,11 +176,11 @@ class TaskCommand(Command):
             g.reset()
             g.start()
         except ValueError:
-            print 'Group "' + group_name + '" isn\'t loaded'
+            print('Group "' + group_name + '" isn\'t loaded')
 
     @staticmethod
     def factory(**kwargs):
-        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs, dict)
         Utils.is_type(kwargs['ioc'], Container)
 
         return TaskCommand(kwargs['ioc'].service('tasks'))
@@ -203,7 +202,7 @@ class RunLevelCommand(Command):
     def _execute(self, args):
         lvl = self.__task_manager.level()
         if not args.level:
-            print lvl
+            print(lvl)
         elif int(args.level) >= 0:
             goto = int(args.level)
             logger.info(Utils.format_info(
@@ -222,13 +221,13 @@ class RunLevelCommand(Command):
                         self.__task_manager.level_exec(lvl)
                         time.sleep(2)
             except ValueError:
-                print 'Requested run level to high'
+                print('Requested run level to high')
         else:
-            print 'Run level must be equal or greater than 0'
+            print('Run level must be equal or greater than 0')
 
     @staticmethod
     def factory(**kwargs):
-        Utils.is_type(kwargs, types.DictType)
+        Utils.is_type(kwargs, dict)
         Utils.is_type(kwargs['ioc'], Container)
 
         return RunLevelCommand(kwargs['ioc'].service('tasks'))

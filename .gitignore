@@ -3,6 +3,16 @@
 /eggs/
 /parts/
 /.installed.cfg
+/my_project/
 .pytest_cache/
 *.log
 *.pyc
+
+/build
+/dist
+/*.egg
+/*.egg-info
+/**/__pycache__/
+*.pyc
+
+Pipfile*
