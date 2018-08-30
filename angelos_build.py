@@ -1,4 +1,4 @@
-from angelos.server.main import start
+from angelos_lib import start
 
 
 if __name__ == '__main__':

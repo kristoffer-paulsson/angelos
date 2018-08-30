@@ -3,7 +3,7 @@ from ..error import CmdShellExit
 from ..ioc import Container
 from .cmd import Command, Option, Shell
 from ..events import Events
-from .main import ServerEvent
+from .server import ServerEvent
 
 
 class ServerCommand(Command):
