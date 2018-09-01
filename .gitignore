@@ -1,4 +1,4 @@
-.env
+/venv/
 .eggs
 *.pyc
 *.c
@@ -6,9 +6,12 @@
 *.log
 *.pub
 *.app
+*.exe
 __pychache__
 /build/
 /dist/
+/*.build/
+/*.dist/
 .DS_Store
 *.spec
 MANIFEST

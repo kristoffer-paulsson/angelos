@@ -1,3 +1,4 @@
+from ..const import Const
 from ..task import TaskGroup
 from .admin import AdminServer
 
@@ -7,6 +8,6 @@ class Core(TaskGroup):
 
     def task_list(self):
         return {
-            AdminServer.NAME: lambda: AdminServer(
+            Const.W_ADMIN_NAME: lambda: AdminServer(
                 name=AdminServer.NAME, sig=self._sig, ioc=self._ioc)
         }

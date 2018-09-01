@@ -1,16 +1,5 @@
-from distutils.core import setup, Extension
-from Cython.Build import cythonize
-# from Cython.Compiler import Options
-# import numpy
+from setuptools import setup
 
-# Options.embed = 'main'
-
-extensions = [
-    Extension(
-        'angelos_lib',
-        sources=['angelos/server/main.pyx'],
-    )
-]
 
 setup(
     name='angelos',
@@ -20,5 +9,8 @@ setup(
     author_email='kristoffer.paulsson@talenten.se',
     url='https://github.com/kristoffer-paulsson/angelos',
     license='MIT',
-    ext_modules=cythonize(extensions)
+    packages=['angelos', 'angelos.server', 'angelos.client'],
+    install_requires=[
+        'asyncssh'  # six, asn1crypto, idna, pycparser, cffi, cryptography
+    ]
 )

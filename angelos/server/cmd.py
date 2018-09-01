@@ -268,7 +268,8 @@ class Shell:
         self.__ioc = ioc
 
         for cmd in commands:
-            klass = Util.imp_pkg(cmd)
+            # klass = Util.imp_pkg(cmd)
+            klass = cmd
             Util.is_class(klass, Command)
             command = klass.factory(ioc=self.__ioc)
             self._add(command)

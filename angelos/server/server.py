@@ -5,48 +5,41 @@ import time
 import threading
 import asyncio
 from signal import SIGTERM
-from ..events import Event
+from ..const import Const
 from ..worker import Worker
 from .admin import AdminServer
-
-
-class ServerEvent(Event):
-    MESSAGE_QUIT = 1
-
-    def __init__(self, sender, message, data={}):
-        Event.__init__(self, sender, Application.NAME, message, data)
+from .events import ServerEvent
 
 
 class Application(Worker):
-    NAME = 'Supervisor'
 
     def __init__(self, ioc):
         Worker.__init__(self, ioc)
-        self.ioc.workers.add(Application.NAME, 'Core', self)
+        self.ioc.workers.add(Const.W_SUPERV_NAME, Const.G_CORE_NAME, self)
 
     def start(self):
         self.run()
 
     def _initialize(self):
-        self.ioc.message.add(Application.NAME)
+        self.ioc.message.add(Const.W_SUPERV_NAME)
         self._thread = threading.currentThread()
         self._loop.create_task(self.__supervisor())
         self._loop.create_task(self.__start_server())
 
     def _finalize(self):
-        self.ioc.message.remove(Application.NAME)
+        self.ioc.message.remove(Const.W_SUPERV_NAME)
 
     @asyncio.coroutine
     def __start_server(self):
         admin = AdminServer(self.ioc)
         admin.start()
-        self.ioc.workers.add('AdminServer', 'Core', admin)
+        self.ioc.workers.add(Const.W_ADMIN_NAME, Const.G_CORE_NAME, admin)
 
     @asyncio.coroutine
     async def __supervisor(self):  # noqa E999
         while not self._halt.is_set():
             await asyncio.sleep(1)
-            e = self.ioc.message.receive(Application.NAME)
+            e = self.ioc.message.receive(Const.W_SUPERV_NAME)
             if not isinstance(e, ServerEvent):
                 continue
             if e.message == ServerEvent.MESSAGE_QUIT:

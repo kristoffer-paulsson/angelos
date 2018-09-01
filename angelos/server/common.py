@@ -1,31 +1,15 @@
 '''
 All common data and variables to be incorporated in the server  binary
 '''
-import collections
-# import configparser
-from ..utils import Util
 
 DEFAULT = {
 }
 
 IMMUTABLE = {
     'terminal': {
-        'commands': [
-            'angelos.server.commands.ServerCommand'
-        ],
         'prompt': 'Angelos 0.1dX > ',
         'message': 'Ἄγγελος safe messenging server'
     }
-}
-
-CONFIG = {
-    'workers': lambda self: Util.imp_pkg('angelos.worker.Workers')(),
-    'environment': lambda self: collections.ChainMap(
-        IMMUTABLE,
-        # configparser.ConfigParser().read(
-        #    Util.app_dir() + '/angelos.ini')._sections,
-        DEFAULT),
-    'message': lambda self: Util.imp_pkg('angelos.events.Events')()
 }
 
 

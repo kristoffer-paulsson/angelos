@@ -1,9 +1,10 @@
+from ..const import Const
 from ..utils import Util
 from ..error import CmdShellExit
 from ..ioc import Container
 from .cmd import Command, Option, Shell
 from ..events import Events
-from .server import ServerEvent
+from .events import ServerEvent
 
 
 class ServerCommand(Command):
@@ -45,7 +46,7 @@ option."""
                 self._stdout.write('Commencing operation "shutdown".' +
                                    Shell.EOL + 'Good bye!' + Shell.EOL)
                 self.__events.send(
-                    ServerEvent('AdminServer', ServerEvent.MESSAGE_QUIT))
+                    ServerEvent(Const.W_ADMIN_NAME, ServerEvent.MESSAGE_QUIT))
                 raise CmdShellExit()
             else:
                 self._stdout.write(
