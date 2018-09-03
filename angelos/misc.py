@@ -1,8 +1,5 @@
+"""Docstring"""
 from .utils import Util
-
-
-class State():
-    pass
 
 
 class ThresholdCounter:

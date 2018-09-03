@@ -3,8 +3,8 @@ PYV ="python3.7"			# Python version
 
 # --recurse-not-to
 default:
-	python -m nuitka --recurse-all --recurse-to=types --standalone angelos.py
-	python -m nuitka --recurse-all --recurse-to=types --standalone logo.py
+	python -m nuitka --recurse-all --standalone angelos.py
+	python -m nuitka --recurse-all --standalone logo.py
 
 clean:
 	rm -fr *.c *.o *.so *.app *.spec MANIFEST

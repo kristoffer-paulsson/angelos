@@ -1,3 +1,4 @@
+"""Docstring"""
 from angelos.server.main import start
 
 

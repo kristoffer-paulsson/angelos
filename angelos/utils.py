@@ -1,6 +1,6 @@
+"""Docstring"""
 import os
 import sys
-import logging
 import importlib
 from .error import ERROR_INFO
 
@@ -52,7 +52,7 @@ class Util:
         if not isinstance(instance, types):
             raise TypeError(
                 'Instance expected type {0}, but got: {1}'.format(
-                    str(types),  str(instance)))
+                    str(types), str(instance)))
 
     @staticmethod
     def is_class(instance, types):
@@ -72,9 +72,10 @@ class Util:
                     str(types), str(instance)))
 
     @staticmethod
-    def exception(error_code, debug_info={}):
+    def exception(error_code, debug_info=None):
+        """Docstring"""
         Util.is_type(error_code, int)
-        Util.is_type(debug_info, dict)
+        Util.is_type(debug_info, (dict, type(None)))
 
         debug = []
         if debug_info:
@@ -83,14 +84,15 @@ class Util:
                 debug_text = ': [{data}]'.format(data=', '.join(debug))
         else:
             debug_text = '.'
-        return ERROR_INFO[error_code][0]('{msg}{debug}'.format(
-             msg=ERROR_INFO[error_code][1], debug=debug_text))
+        return ERROR_INFO[error_code][0](
+            '{msg}{debug}'.format(
+                msg=ERROR_INFO[error_code][1], debug=debug_text))
 
     @staticmethod
     def format_exception(exception_type,
                          instance,
                          message='Formated exception',
-                         debug_info={}):
+                         debug_info=None):
         """
         format_exception is a helper function. It will populate and format an
         exception so that it is understandable and include good debug data.
@@ -116,7 +118,7 @@ class Util:
         Util.is_class(exception_type, Exception)
         Util.is_type(instance, (object, str))
         Util.is_type(message, str)
-        Util.is_type(debug_info, dict)
+        Util.is_type(debug_info, (dict, type(None)))
 
         debug = []
         for k in debug_info:
@@ -125,13 +127,12 @@ class Util:
             name = instance.__class__.__name__
         else:
             name = instance
-        exc = exception_type('{0}, "{1}" - debug: ({2})'.format(
-             name, message, ', '.join(debug)
-        ))
+        exc = exception_type(
+            '{0}, "{1}" - debug: {2}'.format(name, message, ', '.join(debug)))
         return exc
 
     @staticmethod
-    def format_info(event_str, data={}):
+    def format_info(event_str, data=None):
         """
         log_format_info is a helper function. It will format an info message
         with support for event data.
@@ -157,7 +158,7 @@ class Util:
             info = []
             for k in data:
                 info.append('{0}: {1}'.format(k, data[k]))
-                return '{0}. Info: ({1})'.format(event_str, ', '.join(info))
+            return '{0}. Info: ({1})'.format(event_str, ', '.join(info))
 
     @staticmethod
     def format_error(caught_exception, event_str):
@@ -204,104 +205,27 @@ class Util:
 
     @staticmethod
     def class_pkg(klass):
+        """Docstring"""
         return '{0}.{1}'.format(
             klass.__class__.__module__,
             klass.__class__.__name__)
 
     @staticmethod
     def hours(seconds):
+        """Docstring"""
         if seconds > 24*3600:
             return '{:>7.2}d'.format(float(seconds/(24*3600)))
         else:
             seconds = int(seconds)
-            h = int(seconds / 3600)
-            m = int(seconds / 60)
-            s = seconds - h*3600 - m*60
-            return '{:}:{:02}:{:02}'.format(h, m, s)
-
-
-class Log():
-    def __init__(self, config={}):
-        Util.is_type(config, dict)
-        if not os.path.exists(config['path']):
-            raise ValueError('Path is not an existing file.')
-
-        self.__format = '%(asctime)s %(levelname)s %(message)s'
-        self.__path = config['path']
-
-        self.__app = self.__logger('app', 'error', logging.DEBUG)
-        self.__bizz = self.__logger('biz', 'bizz', logging.DEBUG)
-        # logging.basicConfig(filename=self.__path + '/error.log',
-        #                    level=logging.DEBUG)
-
-    def __logger(self, name, file, level):
-        """
-        Created and instanciates a logger
-        name        String with name of logger
-        file        String with filename for log file
-        level        Log level
-        """
-        logger = logging.getLogger(name)
-        hdlr = logging.FileHandler(
-            self.__path + '/' + file + '.log', mode='a+'
-        )
-        formatter = logging.Formatter(self.__format)
-        hdlr.setFormatter(formatter)
-        logger.addHandler(hdlr)
-        logger.setLevel(level)
-        return logger
-
-    def app_logger(self):
-        """
-        Return the app logger that logs application execution
-        """
-        return self.__app
-
-    def bizz_logger(self):
-        """Return the bizz logger that logs application business logic"""
-        return self.__bizz
-
-
-# class BaseError:
-#    ERROR_LIST = {}
-
-#    @staticmethod
-#    def exception(error_code,
-#                  debug_info={}):
-#        """
-#        exception is a helper function. It will populate and format an
-#        exception so that it is understandable and include good debug data.
-
-#        error_code      Requiers a valid error code
-#        debug_info      A dictionary of interesting debug values
-#        returns         A string to enter into exception
-
-#        Example:
-#        raise format_exception(
-#            RuntimeError,
-#            self.__class__.__name__,
-#            'Unexpected result',
-#            {
-#                id: 45654654767,
-#                user: 'User Name'
-#            }
-#        )
-#        """
-#        Util.is_type(error_code, int)
-#        Util.is_type(debug_info, dict)
-
-#        debug = []
-#        if debug_info:
-#            for k in debug_info:
-#                debug.append('{k}: {i}'.format(k=k, i=debug_info[k]))
-#                debug_text = ': [{data}]'.format(data=', '.join(debug))
-#        else:
-#            debug_text = '.'
-#        return BaseError.ERROR_LIST[error_code][0]('{msg}{debug}'.format(
-#             msg=BaseError.ERROR_LIST[error_code][1], debug=debug_text))
+            hour = int(seconds / 3600)
+            mins = int(seconds / 60)
+            secs = seconds - hour*3600 - mins*60
+            return '{:}:{:02}:{:02}'.format(hour, mins, secs)
 
 
 class FactoryInterface:
+    """Docstring"""
     @staticmethod
     def factory(**kwargs):
+        """Docstring"""
         raise NotImplementedError()

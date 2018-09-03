@@ -2,10 +2,73 @@
 All common data and variables to be incorporated in the server  binary
 '''
 
+from ..const import Const
+
 DEFAULT = {
 }
 
 IMMUTABLE = {
+    'logger': {
+        'version': 1,
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s %(levelname)s %(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S',
+            },
+            'console': {
+                'format': '%(levelname)s %(message)s',
+            }
+        },
+        'filters': {
+            'default': {
+                'name': ''
+            }
+        },
+        'handlers': {
+            'default': {
+                'class': 'logging.FileHandler',
+                'filename': 'angelos.log',
+                'mode': 'a+',
+                'level': 'INFO',
+                'formatter': 'default',
+                'filters': []
+            },
+            'console': {
+                'class': 'logging.StreamHandler',
+                'stream': 'ext://sys.stdout',
+                'level': 'ERROR',
+                'formatter': 'console',
+                'filters': []
+            },
+        },
+        'loggers': {
+            Const.LOG_ERR: {  # LOG_ERR is used to log system errors
+                'level': 'INFO',
+                # 'propagate': None,
+                'filters': [],
+                'handlers': ['default'],
+            },
+            Const.LOG_APP: {  # LOG_APP is used to log system events
+                'level': 'INFO',
+                # 'propagate': None,
+                'filters': [],
+                'handlers': ['default'],
+            },
+            Const.LOG_BIZ: {  # LOG_BIZ is used to log business events
+                'level': 'INFO',
+                # 'propagate': None,
+                'filters': [],
+                'handlers': ['default'],
+            }
+        },
+        'root': {
+            'level': 'INFO',
+            'filters': [],
+            'handlers': ['console', 'default'],
+        },
+        # 'incrementel': False,
+        # 'disable_existing_loggings': True
+    },
     'terminal': {
         'prompt': 'Angelos 0.1dX > ',
         'message': 'Ἄγγελος safe messenging server'

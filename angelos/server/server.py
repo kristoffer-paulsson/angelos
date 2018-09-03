@@ -1,3 +1,4 @@
+"""Docstring"""
 import sys
 import os
 import atexit
@@ -8,14 +9,15 @@ from signal import SIGTERM
 from ..const import Const
 from ..worker import Worker
 from .admin import AdminServer
-from .events import ServerEvent
 
 
 class Application(Worker):
+    """Docstring"""
 
     def __init__(self, ioc):
         Worker.__init__(self, ioc)
         self.ioc.workers.add(Const.W_SUPERV_NAME, Const.G_CORE_NAME, self)
+        self.log = ioc.log.err()
 
     def start(self):
         self.run()
@@ -39,14 +41,15 @@ class Application(Worker):
     async def __supervisor(self):  # noqa E999
         while not self._halt.is_set():
             await asyncio.sleep(1)
-            e = self.ioc.message.receive(Const.W_SUPERV_NAME)
-            if not isinstance(e, ServerEvent):
+            m = self.ioc.message.receive(Const.W_SUPERV_NAME)
+            if m is None:
                 continue
-            if e.message == ServerEvent.MESSAGE_QUIT:
+            if m.message == 1:
                 self.ioc.workers.stop()
 
 
 class Server(Application):
+    """Docstring"""
     pass
 
 

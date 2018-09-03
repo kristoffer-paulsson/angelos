@@ -1,16 +1,20 @@
+"""Docstring"""
 import types
 from .utils import Util
 from .error import Error
 
 
 class Container:
+    """Docstring"""
     def __init__(self, config={}):
+        """Docstring"""
         Util.is_type(config, dict)
 
         self.__config = config
         self.__instances = {}
 
     def __getattr__(self, name):
+        """Docstring"""
         if name not in self.__instances:
             if name not in self.__config:
                 raise Util.exception(

@@ -1,4 +1,4 @@
-import logging
+"""Docstring"""
 import collections
 
 from .server import Server
@@ -7,6 +7,7 @@ from ..ioc import Container
 
 from ..worker import Workers
 from ..events import Events
+from ..logger import LogHandler
 
 
 CONFIG = {
@@ -16,11 +17,12 @@ CONFIG = {
         # configparser.ConfigParser().read(
         #    Util.app_dir() + '/angelos.ini')._sections,
         DEFAULT),
-    'message': lambda self: Events()
+    'message': lambda self: Events(),
+    'log': lambda self: LogHandler(self.environment['logger']),
 }
 
 
 def start():
-    logging.basicConfig(level=logging.DEBUG)
+    """Docstring"""
     app = Server(Container(CONFIG))
     app.start()

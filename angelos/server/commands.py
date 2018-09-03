@@ -1,13 +1,15 @@
+"""Docstring"""
+
 from ..const import Const
 from ..utils import Util
 from ..error import CmdShellExit
 from ..ioc import Container
 from .cmd import Command, Option, Shell
-from ..events import Events
-from .events import ServerEvent
+from ..events import Events, Message
 
 
 class ServerCommand(Command):
+    """Docstring"""
     short = 'Operates the servers runstate.'
     description = """With the server command you can operate the servers run
 state. you can "start", "restart" and "shutdown" the softaware using the
@@ -45,8 +47,8 @@ option."""
             if opts['yes']:
                 self._stdout.write('Commencing operation "shutdown".' +
                                    Shell.EOL + 'Good bye!' + Shell.EOL)
-                self.__events.send(
-                    ServerEvent(Const.W_ADMIN_NAME, ServerEvent.MESSAGE_QUIT))
+                self.__events.send(Message(
+                    Const.W_ADMIN_NAME, Const.W_SUPERV_NAME, 1, {}))
                 raise CmdShellExit()
             else:
                 self._stdout.write(

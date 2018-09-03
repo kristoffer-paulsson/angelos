@@ -1,3 +1,4 @@
+"""Docstring"""
 import re
 import sys
 from ..utils import Util, FactoryInterface
@@ -6,6 +7,8 @@ from ..ioc import Container
 
 
 class Option:
+    """Docstring"""
+
     TYPE_BOOL = 1
     TYPE_CHOISES = 2
     TYPE_VALUE = 3
@@ -111,6 +114,7 @@ class Option:
             {'opt': self.name, 'value': opt[0], 'type': self.type})
 
     def evaluate(self, opts):
+        """Docstring"""
         opt = []
         for r in opts:
             if r[0] == str('--'+self.name) or r[0] == ('-'+str(self.short)):
@@ -147,6 +151,7 @@ class Option:
 
 
 class Command(FactoryInterface):
+    """Docstring"""
     """A short description of the command for the list section"""
     short = ''
 
@@ -255,6 +260,8 @@ class Command(FactoryInterface):
 
 
 class Shell:
+    """Docstring"""
+
     cmd_regex = """^(\w+)"""
     opt_regex = """(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?"""  # noqa E501
     EOL = '\r\n'
@@ -287,6 +294,8 @@ class Shell:
         self.__cmds[cmd.command] = cmd
 
     def execute(self, line):
+        """Docstring"""
+
         if bool(line.strip()) is False:
             raise Util.exception(Error.CMD_SHELL_EMPTY)
 
@@ -306,6 +315,7 @@ class Shell:
         self.__cmds[cmd].execute(opts, self.__stdin, self.__stdout)
 
     def _parse(self, options):
+        """Docstring"""
         opts = []
         for opt in options:
             opts.append((opt[0],
@@ -313,6 +323,8 @@ class Shell:
         return opts
 
     class HelpCommand(Command):
+        """Docstring"""
+
         short = 'Prints available commands and how to use them.'
         description = """Help will print all the available commands loaded in
 the console shell"""
@@ -335,6 +347,8 @@ the console shell"""
             self._stdout.write(b)
 
     class ExitCommand(Command):
+        """Docstring"""
+
         short = 'Exits the current terminal session.'
         description = """Exit will exit the console session and restore the
 screen"""
@@ -346,6 +360,8 @@ screen"""
             raise Util.exception(Error.CMD_SHELL_EXIT)
 
     class ClearCommand(Command):
+        """Docstring"""
+
         short = 'Clears the terminal window.'
         description = """Clear clears the console screen/window"""
 

@@ -1,3 +1,4 @@
+"""Docstring"""
 import asyncio
 import asyncssh
 import sys
@@ -9,11 +10,13 @@ from .commands import ServerCommand
 
 
 class AdminConsole(Shell):
+    """Docstring"""
     def __init__(self, ioc, stdin=sys.stdin, stdout=sys.stdout):
         Shell.__init__(self, [ServerCommand], ioc, stdin, stdout)
 
 
 class AdminServer(Worker):
+    """Docstring"""
     def _initialize(self):
         self._loop.create_task(self.__server())
 
