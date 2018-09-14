@@ -3,7 +3,6 @@ import threading
 import asyncio
 import collections
 import logging
-import traceback
 from .utils import Util
 from .error import Error
 from .ioc import Container
@@ -26,8 +25,8 @@ class Worker:
     def _setup(self):
         """Docstring"""
         self._loop = asyncio.new_event_loop()
-        self._loop.set_exception_handler(self._exception_handler)
         self._loop.set_debug(True)
+        self._loop.set_exception_handler(self._exception_handler)
 
     def _teardown(self):
         """Docstring"""
@@ -36,21 +35,7 @@ class Worker:
     def _exception_handler(self, loop, context):
         """Docstring"""
         loop.default_exception_handler(context)
-        exc = context.get('exception')
-        if isinstance(exc, Exception):
-            ftr_exc = context.get('future').exception()
-            ftr_trb = 'Traceback (task exception):\n{0}{1} {2}'.format(
-                ''.join(traceback.format_tb(ftr_exc.__traceback__)),
-                str(type(ftr_exc)), str(ftr_exc))
-
-            logging.critical(
-                '%s\n%s\n%s',
-                'Unhandled exception in worker',
-                context.get('message'),
-                ftr_trb)
-        else:
-            logging.critical('An unknown exception in worker')
-        loop.stop()
+        # self._loop.run_until_complete(self._loop.shutdown_asyncgens())
         self._panic()
 
     def _initialize(self):
@@ -72,19 +57,33 @@ class Worker:
         self._initialize()
         try:
             self._loop.run_forever()
-            tasks = asyncio.Task.all_tasks(self._loop)
-            for t in [t for t in tasks if not (t.done() or t.cancelled())]:
-                self._loop.run_until_complete(t)
-        except KeyboardInterrupt as e:
-            logging.exception(e)
+        except KeyboardInterrupt:
             self._panic()
         except Exception as e:
             logging.exception(e)
-            self._loop.run_until_complete(self._loop.shutdown_asyncgens())
             self._panic()
+
+        # tasks = asyncio.Task.all_tasks(self._loop)
+        # for t in [t for t in tasks if not (t.done() or t.cancelled())]:
+        #    self._loop.run_until_complete(t)
+        # self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+
         self._finalize()
         self._teardown()
         logging.info('Exiting worker %s', id(self))
+
+    def task(self, coroutine):
+        """Docstring"""
+        @asyncio.coroutine
+        async def coro_wrapper():
+            try:
+                await coroutine()
+            except Exception as exc:
+                if not isinstance(exc, KeyboardInterrupt):
+                    logging.exception('Unhandled exception in coroutine.')
+                self._panic()
+
+        self._loop.create_task(coro_wrapper())
 
     def start(self):
         """Docstring"""

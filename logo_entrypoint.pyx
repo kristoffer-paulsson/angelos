@@ -1,4 +1,4 @@
 from angelos.client.main import LogoApp
 
-if __name__ == '__main__':
+cdef api void start():
     LogoApp().run()

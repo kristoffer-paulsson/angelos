@@ -1,5 +1,6 @@
 """Docstring"""
 import collections
+import yaml
 
 from .server import Server
 from .common import IMMUTABLE, DEFAULT
@@ -9,13 +10,14 @@ from ..worker import Workers
 from ..events import Events
 from ..logger import LogHandler
 
+with open('default.yaml') as yc:
+    LOADED = yaml.load(yc.read())
 
 CONFIG = {
     'workers': lambda self: Workers(),
     'environment': lambda self: collections.ChainMap(
         IMMUTABLE,
-        # configparser.ConfigParser().read(
-        #    Util.app_dir() + '/angelos.ini')._sections,
+        LOADED,
         DEFAULT),
     'message': lambda self: Events(),
     'log': lambda self: LogHandler(self.environment['logger']),
@@ -24,5 +26,4 @@ CONFIG = {
 
 def start():
     """Docstring"""
-    app = Server(Container(CONFIG))
-    app.start()
+    Server(Container(CONFIG)).start()

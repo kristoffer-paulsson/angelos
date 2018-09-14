@@ -1,7 +1,6 @@
 /venv/
 .eggs
 *.pyc
-*.c
 *.so
 *.log
 *.pub
@@ -15,3 +14,13 @@ __pychache__
 .DS_Store
 *.spec
 MANIFEST
+
+# Keep the C entrypoints
+*.c
+!/angelos_main.c
+!/logo_main.c
+
+# Keep all the secondary makefiles for including
+!/include/
+/include/**
+!/include/*.mk

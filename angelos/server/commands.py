@@ -1,5 +1,6 @@
 """Docstring"""
 
+import time
 from ..const import Const
 from ..utils import Util
 from ..error import CmdShellExit
@@ -49,6 +50,9 @@ option."""
                                    Shell.EOL + 'Good bye!' + Shell.EOL)
                 self.__events.send(Message(
                     Const.W_ADMIN_NAME, Const.W_SUPERV_NAME, 1, {}))
+                for r in range(5):
+                    self._stdout.write('.')
+                    time.sleep(1)
                 raise CmdShellExit()
             else:
                 self._stdout.write(

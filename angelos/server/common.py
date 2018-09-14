@@ -12,7 +12,7 @@ IMMUTABLE = {
         'version': 1,
         'formatters': {
             'default': {
-                'format': '%(asctime)s %(levelname)s %(message)s',
+                'format': '%(asctime)s:%(name)s:%(levelname)s %(message)s',
                 'datefmt': '%Y-%m-%d %H:%M:%S',
             },
             'console': {
@@ -56,6 +56,12 @@ IMMUTABLE = {
             },
             Const.LOG_BIZ: {  # LOG_BIZ is used to log business events
                 'level': 'INFO',
+                # 'propagate': None,
+                'filters': [],
+                'handlers': ['default'],
+            },
+            'asyncio': {  # 'asyncio' is used to log business events
+                'level': 'WARNING',
                 # 'propagate': None,
                 'filters': [],
                 'handlers': ['default'],

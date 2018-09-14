@@ -1,5 +1,10 @@
-from setuptools import setup
+from distutils.core import setup
+from Cython.Build import cythonize
+from distutils.extension import Extension
 
+
+sourcefiles = ['logo.py']
+extensions = [Extension("logo", sourcefiles)]
 
 setup(
     name='angelos',
@@ -11,6 +16,11 @@ setup(
     license='MIT',
     packages=['angelos', 'angelos.server', 'angelos.client'],
     install_requires=[
-        'asyncssh'  # six, asn1crypto, idna, pycparser, cffi, cryptography
-    ]
+        'asyncssh',  # six, asn1crypto, idna, pycparser, cffi, cryptography
+        'libnacl',
+        'pyyaml',
+        'peewee',
+        'pysqlcipher3'
+    ],
+    ext_modules=cythonize(extensions)
 )

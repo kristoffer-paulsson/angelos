@@ -25,6 +25,7 @@ class CmdShellExit(CmdShellException): pass  # noqa E302
 class EventsAddressTaken(AngelosException): pass  # noqa E302
 class EventsAddressRemoved(AngelosException): pass  # noqa E302
 class EventsAddressMissing(AngelosException): pass  # noqa E302
+class IssuanceInvalid(AngelosException): pass  # noqa E302
 
 
 class LogoException(Exception):
@@ -54,6 +55,7 @@ ERROR_INFO = {
     540: (EventsAddressTaken, 'The sender address is already taken'),  # noqa E501
     541: (EventsAddressRemoved, 'The sender address is already removed'),  # noqa E501
     542: (EventsAddressMissing, 'The sender/recepient address doesn\'t exist'),  # noqa E501
+    550: (IssuanceInvalid, 'The signature for the issue is invalid'),  # noqa E501
 }
 
 
@@ -81,3 +83,5 @@ class Error(IntEnum):
     EVENT_ADDRESS_TAKEN = 540  # 10 error codes for events
     EVENT_ADDRESS_REMOVED = 541
     EVENT_ADDRESS_MISSING = 542
+
+    ISSUANCE_INVALID_ISSUE = 550

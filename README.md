@@ -1,3 +1,5 @@
+README is a matter of @todo
+
 # angelos
 
 Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."
@@ -36,3 +38,32 @@ To run the tests:
 ```
     $ pytest
 ```
+
+
+## Links'n'stuff
+https://git-scm.com/docs/gitmodules
+
+https://wiki.python.org/moin/BuildStatically
+http://mdqinc.com/blog/2011/08/statically-linking-python-with-cython-generated-modules-and-packages/
+https://stackoverflow.com/questions/1150373/compile-the-python-interpreter-statically
+https://groups.google.com/forum/?hl=en#!topic/comp.lang.python/66fDI6AiG5c
+
+https://github.com/sqlcipher/sqlcipher
+https://github.com/rigglemania/pysqlcipher3
+
+### Python
+git clone -b 3.7 https://github.com/python/cpython.git
+./configure --disable-shared && make
+
+### Nuitka
+pip install -U 'http://nuitka.net/gitweb/?p=Nuitka.git;a=snapshot;h=refs/heads/develop;sf=tgz'
+pip install nuitka-setuptools # tools
+
+### cython-stuff
+https://cython.readthedocs.io/en/latest/src/tutorial/clibraries.html
+
+### kivy / garden / KivyMD
+
+pip install kivy
+pip install kivy-garden
+pip install -U 'https://gitlab.com/kivymd/KivyMD/-/archive/master/KivyMD-master.tar.bz2'

@@ -37,7 +37,7 @@ class Events:
             if message.recipient not in self.__queues:
                 raise Util.exception(
                     Error.EVENT_ADDRESS_MISSING,
-                    {'recipient', message.recipient})
+                    {'recipient': message.recipient})
             self.__queues[message.recipient].appendleft(message)
 
     def receive(self, name):
@@ -46,7 +46,7 @@ class Events:
         with self.__lock:
             if name not in self.__queues:
                 raise Util.exception(
-                    Error.EVENT_ADDRESS_MISSING, {'recipient', name})
+                    Error.EVENT_ADDRESS_MISSING, {'recipient': name})
             try:
                 return self.__queues[name].pop()
             except IndexError:

@@ -72,10 +72,10 @@ class Util:
                     str(types), str(instance)))
 
     @staticmethod
-    def exception(error_code, debug_info=None):
+    def exception(error_code, debug_info={}):
         """Docstring"""
         Util.is_type(error_code, int)
-        Util.is_type(debug_info, (dict, type(None)))
+        Util.is_type(debug_info, dict)
 
         debug = []
         if debug_info:
@@ -92,7 +92,7 @@ class Util:
     def format_exception(exception_type,
                          instance,
                          message='Formated exception',
-                         debug_info=None):
+                         debug_info={}):
         """
         format_exception is a helper function. It will populate and format an
         exception so that it is understandable and include good debug data.
@@ -118,7 +118,7 @@ class Util:
         Util.is_class(exception_type, Exception)
         Util.is_type(instance, (object, str))
         Util.is_type(message, str)
-        Util.is_type(debug_info, (dict, type(None)))
+        Util.is_type(debug_info, dict)
 
         debug = []
         for k in debug_info:

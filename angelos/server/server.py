@@ -5,9 +5,11 @@ import atexit
 import time
 import threading
 import asyncio
+import logging
 from signal import SIGTERM
 from ..const import Const
 from ..worker import Worker
+from ..events import Message
 from .admin import AdminServer
 
 
@@ -23,29 +25,41 @@ class Application(Worker):
         self.run()
 
     def _initialize(self):
+        logging.info('#'*10 + 'Entering ' + self.__class__.__name__ + '#'*10)
         self.ioc.message.add(Const.W_SUPERV_NAME)
         self._thread = threading.currentThread()
-        self._loop.create_task(self.__supervisor())
-        self._loop.create_task(self.__start_server())
+        self.task(self.__supervisor)
+        self.task(self.__start_server)
 
     def _finalize(self):
         self.ioc.message.remove(Const.W_SUPERV_NAME)
+        logging.info('#'*10 + 'Leaving ' + self.__class__.__name__ + '#'*10)
+
+    def _panic(self):
+        logging.info('#'*10 + 'Panic ' + self.__class__.__name__ + '#'*10)
+        self.ioc.message.send(Message(
+            Const.W_ADMIN_NAME, Const.W_SUPERV_NAME, 1, {}))
 
     @asyncio.coroutine
     def __start_server(self):
+        logging.info('#'*10 + 'Entering __start_server' + '#'*10)
         admin = AdminServer(self.ioc)
         admin.start()
         self.ioc.workers.add(Const.W_ADMIN_NAME, Const.G_CORE_NAME, admin)
+        logging.info('#'*10 + 'Leaving __start_server' + '#'*10)
 
     @asyncio.coroutine
     async def __supervisor(self):  # noqa E999
+        logging.info('#'*10 + 'Entering __supervisor' + '#'*10)
         while not self._halt.is_set():
             await asyncio.sleep(1)
             m = self.ioc.message.receive(Const.W_SUPERV_NAME)
+            logging.info(m)
             if m is None:
                 continue
             if m.message == 1:
                 self.ioc.workers.stop()
+        logging.info('#'*10 + 'Leaving __supervisor' + '#'*10)
 
 
 class Server(Application):
