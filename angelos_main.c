@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[]) {
     PyImport_AppendInittab("angelos", PyInit_angelos);
-	Py_Initialize();
+    Py_Initialize();
     start() // Imported from angelos_entrypoint
-	Py_Finalize();
+    Py_Finalize();
 }

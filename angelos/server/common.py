@@ -3,8 +3,17 @@ All common data and variables to be incorporated in the server  binary
 '''
 
 from ..const import Const
+from ..utils import Util
 
 DEFAULT = {
+    'runtime': {
+        'root': Util.app_dir() + '/serverroot',
+        'mode': Const.R_MODE_DEV,
+        'type': Const.R_TYPE_SERVER,
+        'role': Const.R_ROLE_NORMAL,
+        'platform': Const.R_PLATFORM_NIX
+    },
+    'configured': True
 }
 
 IMMUTABLE = {

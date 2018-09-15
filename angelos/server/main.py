@@ -9,9 +9,13 @@ from ..ioc import Container
 from ..worker import Workers
 from ..events import Events
 from ..logger import LogHandler
+from ..runtime import Runtime
 
-with open('default.yaml') as yc:
-    LOADED = yaml.load(yc.read())
+try:
+    with open(DEFAULT['runtime']['root'] + '/default.yml') as yc:
+        LOADED = yaml.load(yc.read())
+except FileNotFoundError:
+    LOADED = {'configured': False}
 
 CONFIG = {
     'workers': lambda self: Workers(),
@@ -21,6 +25,7 @@ CONFIG = {
         DEFAULT),
     'message': lambda self: Events(),
     'log': lambda self: LogHandler(self.environment['logger']),
+    'runtime': lambda self: Runtime(self.environment['runtime']),
 }
 
 
