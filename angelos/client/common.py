@@ -21,7 +21,7 @@ IMMUTABLE = {
         'version': 1,
         'formatters': {
             'default': {
-                'format': '%(asctime)s:%(name)s:%(levelname)s %(message)s',
+                'format': '%(asctime)s %(name)s:%(levelname)s %(message)s',
                 'datefmt': '%Y-%m-%d %H:%M:%S',
             },
             'console': {
@@ -70,6 +70,12 @@ IMMUTABLE = {
                 'handlers': ['default'],
             },
             'asyncio': {  # 'asyncio' is used to log business events
+                'level': 'WARNING',
+                # 'propagate': None,
+                'filters': [],
+                'handlers': ['default'],
+            },
+            'kivy': {  # 'kivy' is used to log business events
                 'level': 'WARNING',
                 # 'propagate': None,
                 'filters': [],

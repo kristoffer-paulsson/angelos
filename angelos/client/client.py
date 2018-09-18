@@ -9,16 +9,20 @@ from ..const import Const
 from ..worker import Worker
 
 from .ui import UI
+from .entity import ENTITY_PERSON_KV
 
 
 class LogoApp(App):
     theme_cls = ThemeManager()
     title = "Logo"
+    ioc = None
 
     def build(self):
-        main_widget = Builder.load_string(UI)
+        if self.ioc.environment['configured']:
+            return Builder.load_string(UI)
+        else:
+            return Builder.load_string(ENTITY_PERSON_KV)
         # self.theme_cls.theme_style = 'Dark'
-        return main_widget
 
     def on_pause(self):
         return True
@@ -51,7 +55,9 @@ class Application(Worker):
         logging.info('Starting worker %s', id(self))
         self._initialize()
         try:
-            LogoApp().run()
+            app = LogoApp()
+            app.ioc = self.ioc
+            app.run()
         except KeyboardInterrupt:
             pass
         except Exception as e:

@@ -1,123 +1,109 @@
+from datetime import date
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.properties import ObjectProperty
-from kivy.uix.image import Image
-from kivy.uix.boxlayout import BoxLayout
-
-from kivymd.bottomsheet import MDListBottomSheet, MDGridBottomSheet
-from kivymd.button import MDIconButton
-from kivymd.date_picker import MDDatePicker
-from kivymd.dialog import MDDialog
+from kivy.uix.screenmanager import Screen
 from kivymd.label import MDLabel
-from kivymd.list import ILeftBody, ILeftBodyTouch, IRightBodyTouch, BaseListItem
-from kivymd.material_resources import DEVICE_TYPE
-from kivymd.navigationdrawer import MDNavigationDrawer, NavigationDrawerHeaderBase
-from kivymd.selectioncontrols import MDCheckbox
-from kivymd.snackbar import Snackbar
+from kivymd.dialog import MDDialog
+from kivymd.date_picker import MDDatePicker
 from kivymd.theming import ThemeManager
-from kivymd.time_picker import MDTimePicker
+
 
 main_widget_kv = '''
-#:import Toolbar kivymd.toolbar.Toolbar
 #:import ThemeManager kivymd.theming.ThemeManager
-#:import MDNavigationDrawer kivymd.navigationdrawer.MDNavigationDrawer
-#:import NavigationLayout kivymd.navigationdrawer.NavigationLayout
-#:import NavigationDrawerDivider kivymd.navigationdrawer.NavigationDrawerDivider
-#:import NavigationDrawerToolbar kivymd.navigationdrawer.NavigationDrawerToolbar
-#:import NavigationDrawerSubheader kivymd.navigationdrawer.NavigationDrawerSubheader
 #:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
-#:import MDSwitch kivymd.selectioncontrols.MDSwitch
-#:import MDList kivymd.list.MDList
-#:import OneLineListItem kivymd.list.OneLineListItem
-#:import TwoLineListItem kivymd.list.TwoLineListItem
-#:import ThreeLineListItem kivymd.list.ThreeLineListItem
-#:import OneLineAvatarListItem kivymd.list.OneLineAvatarListItem
-#:import OneLineIconListItem kivymd.list.OneLineIconListItem
-#:import OneLineAvatarIconListItem kivymd.list.OneLineAvatarIconListItem
 #:import MDTextField kivymd.textfields.MDTextField
-#:import MDSpinner kivymd.spinner.MDSpinner
-#:import MDCard kivymd.card.MDCard
-#:import MDSeparator kivymd.card.MDSeparator
-#:import MDDropdownMenu kivymd.menu.MDDropdownMenu
 #:import get_color_from_hex kivy.utils.get_color_from_hex
 #:import colors kivymd.color_definitions.colors
-#:import SmartTile kivymd.grid.SmartTile
-#:import MDSlider kivymd.slider.MDSlider
 #:import MDTabbedPanel kivymd.tabs.MDTabbedPanel
 #:import MDTab kivymd.tabs.MDTab
-#:import MDProgressBar kivymd.progressbar.MDProgressBar
-#:import MDAccordion kivymd.accordion.MDAccordion
-#:import MDAccordionItem kivymd.accordion.MDAccordionItem
-#:import MDAccordionSubItem kivymd.accordion.MDAccordionSubItem
-#:import MDThemePicker kivymd.theme_picker.MDThemePicker
-#:import MDBottomNavigation kivymd.tabs.MDBottomNavigation
-#:import MDBottomNavigationItem kivymd.tabs.MDBottomNavigationItem
 
-BoxLayout:
-    orientation: 'vertical'
+<EntityPersonGuide>:
     MDTabbedPanel
         id: person
-        tab_display_mode: 'text'
+        tab_display_mode: 'icons'
         MDTab:
             name: 'info'
             text: "Person"
-            icon: 'account'
+            icon: 'information-outline'
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_x: None
                 width: root.width
                 padding: '25dp'
-                spacing: 25
+                spacing: '25dp'
+                valign: 'top'
                 MDLabel:
                     font_style: 'Headline'
                     theme_text_color: 'Primary'
                     text: "Welcome!"
                     halign: 'left'
+                    valign: 'top'
                 MDLabel:
                     font_style: 'Body1'
                     theme_text_color: 'Primary'
                     text: "You have just installed the client app Logo, which is a part of the Angelos city church network. This network is for Christians and Seekers, to communicate with each other in a safe and secure manner."
-                    halign: 'left'
+                    halign: 'justify'
+                    valign: 'top'
                 MDLabel:
                     font_style: 'Body1'
                     theme_text_color: 'Primary'
                     text: "This network prioritizes kindness, honesty and safety. That implies that the focus is on privazy and verifiability, but not anonymity!"
-                    halign: 'left'
+                    halign: 'justify'
+                    valign: 'top'
                 MDLabel:
                     font_style: 'Headline'
                     theme_text_color: 'Primary'
                     text: "Who are you?"
-                    halign: 'left'
+                    halign: 'justify'
+                    valign: 'top'
                 MDLabel:
                     font_style: 'Body1'
                     theme_text_color: 'Primary'
                     text: "It is necessary to create a digital identity for you. You need to fill out the form in this guide. It can not be changed later! This guide will produce a unique identity for you, which is known to the network as an Entity document of type Person."
-                    halign: 'left'
+                    halign: 'justify'
+                    valign: 'top'
                 MDLabel:
                     font_style: 'Body1'
                     theme_text_color: 'Error'
                     text: "Truthfulness is expected of you. False identities are forbidden!"
-                    halign: 'left'
+                    halign: 'justify'
+                    valign: 'top'
                 BoxLayout:
                     orientation: 'horizontal'
                     size_hint_y: None
-                    spacing: 25
+                    spacing: '25dp'
                     MDRaisedButton:
                         text: "I agree"
+                        on_release: app.root.ids.person.current = 'name'
                     MDFlatButton:
                         text: "Decline"
+                        on_release: app.stop()
 
         MDTab:
             name: 'name'
             text: "Name"
-            icon: 'account'
+            icon: 'account-outline'
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_x: None
                 width: root.width
                 padding: '25dp'
-                spacing: 25
+                spacing: '25dp'
+                valign: 'top'
+                MDLabel:
+                    font_style: 'Headline'
+                    theme_text_color: 'Primary'
+                    text: "Name"
+                    halign: 'justify'
+                    valign: 'top'
+                MDLabel:
+                    font_style: 'Body1'
+                    theme_text_color: 'Primary'
+                    text: "The name is very important for other people to know who you are. We ask that you be completely truthful about this."
+                    halign: 'justify'
+                    valign: 'top'
                 MDTextField:
                     id: given_name
                     hint_text: "Given name"
@@ -127,6 +113,7 @@ BoxLayout:
                     multiline: False
                     color_mode: 'custom'
                     line_color_focus: self.theme_cls.opposite_bg_normal
+                    valign: 'top'
                 MDTextField:
                     id: names
                     hint_text: "Names"
@@ -136,6 +123,7 @@ BoxLayout:
                     multiline: False
                     color_mode: 'custom'
                     line_color_focus: self.theme_cls.opposite_bg_normal
+                    valign: 'top'
                 MDTextField:
                     id: family_name
                     hint_text: "Family name"
@@ -145,18 +133,32 @@ BoxLayout:
                     multiline: False
                     color_mode: 'custom'
                     line_color_focus: self.theme_cls.opposite_bg_normal
+                    valign: 'top'
                 MDRaisedButton:
                     text: "Next"
+                    on_release: app.name_validate()
         MDTab:
             name: 'gender'
             text: "Gender"
-            icon: 'account'
+            icon: 'gender-male-female'
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_x: None
                 width: root.width
                 padding: '25dp'
-                spacing: 25
+                spacing: '25dp'
+                MDLabel:
+                    font_style: 'Headline'
+                    theme_text_color: 'Primary'
+                    text: "Gender"
+                    halign: 'justify'
+                    valign: 'top'
+                MDLabel:
+                    font_style: 'Body1'
+                    theme_text_color: 'Primary'
+                    text: "About gender in question, others needs to know if you are a man or a woman. Only if you don't know you may choose Undefined. What is your biological sex?"
+                    halign: 'justify'
+                    valign: 'top'
                 GridLayout:
                     cols: 3
                     MDLabel:
@@ -179,19 +181,34 @@ BoxLayout:
                         group: 'gender'
                 MDRaisedButton:
                     text: "Next"
+                    on_release: app.gender_validate()
         MDTab:
             name: 'birth'
             text: "Birth"
-            icon: 'account'
+            icon: 'calendar'
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_x: None
                 width: root.width
                 padding: '25dp'
-                spacing: 25
+                spacing: '25dp'
+                valign: 'top'
+                MDLabel:
+                    font_style: 'Headline'
+                    theme_text_color: 'Primary'
+                    text: "Date of birth"
+                    halign: 'justify'
+                    valign: 'top'
+                MDLabel:
+                    font_style: 'Body1'
+                    theme_text_color: 'Primary'
+                    text: "Your date of birth is needed."
+                    halign: 'justify'
+                    valign: 'top'
                 BoxLayout:
                     orientation: 'horizontal'
                     spacing: '25dp'
+                    valign: 'top'
                     MDTextField:
                         id: born
                         hint_text: "Date of birth"
@@ -201,51 +218,158 @@ BoxLayout:
                         multiline: False
                         color_mode: 'custom'
                         line_color_focus: self.theme_cls.opposite_bg_normal
+                        valign: 'top'
                     MDRaisedButton:
                         text: "Date"
-                        on_release: app.show_example_date_picker()
+                        on_release: app.born_datepicker()
+                        valign: 'top'
+                MDLabel:
+                    font_style: 'Headline'
+                    theme_text_color: 'Primary'
+                    text: "Confirmation"
+                    halign: 'justify'
+                    valign: 'top'
+                MDLabel:
+                    font_style: 'Body1'
+                    theme_text_color: 'Primary'
+                    text: "Please confirm that all information you have given is truthful and correct. If you are not sure you can go back and take an extra look on the other tabs."
+                    halign: 'justify'
+                    valign: 'top'
                 MDRaisedButton:
                     text: "Confirm"
+                    on_release: app.confirm()
 
+EntityPersonGuide:
+    name: 'person'
 '''
+
+
+class EntityPersonGuide(Screen):
+    pass
 
 
 class KitchenSink(App):
     theme_cls = ThemeManager()
     previous_date = ObjectProperty()
     title = "KivyMD Kitchen Sink"
+    person = {'given_name': None, 'family_name': None, 'names': None, 'gender': None, 'born': None}
 
     def build(self):
         main_widget = Builder.load_string(main_widget_kv)
         #self.theme_cls.theme_style = 'Dark'
+        print(main_widget)
         return main_widget
 
-    def get_time_picker_data(self, instance, time):
-        self.root.ids.time_picker_label.text = str(time)
-        self.previous_time = time
+    def show_alert(self, title, message):
+        content = MDLabel(
+            font_style='Body1', theme_text_color='Error',
+            text=message, size_hint_y=None, valign='top')
+        content.bind(texture_size=content.setter('size'))
 
-    def show_example_time_picker(self):
-        self.time_dialog = MDTimePicker()
-        self.time_dialog.bind(time=self.get_time_picker_data)
-        if self.root.ids.time_picker_use_previous_time.active:
-            try:
-                self.time_dialog.set_time(self.previous_time)
-            except AttributeError:
-                pass
-        self.time_dialog.open()
+        self.dialog = MDDialog(
+            title=title, content=content, size_hint=(.8, None),
+            height=dp(200), auto_dismiss=False)
 
-    def set_previous_date(self, date_obj):
-        print(date_obj)
-        self.previous_date = date_obj
+        self.dialog.add_action_button(
+            "Dismiss", action=lambda *x: self.dialog.dismiss())
+        self.dialog.open()
+
+    def show_confirm(self, title, message):
+        pass
+
+    def show_prompt(self, title, message):
+        pass
+
+    def name_validate(self):
+        self.person['given_name'] = self.root.ids.given_name.text.strip()
+        self.person['names'] = self.root.ids.names.text.strip().split(' ')
+        self.person['family_name'] = self.root.ids.family_name.text.strip()
+        err = False
+        if not bool(self.person['given_name']):
+            err = True
+        if not bool(self.person['family_name']):
+            err = True
+        if not bool(self.person['names']):
+            err = True
+        if self.person['given_name'] not in self.person['names']:
+            err = True
+        if err:
+            self.show_alert('Error', 'The names given are either incomplete ' +
+                            'or your given name is not mentioned in the ' +
+                            'names field!')
+        else:
+            self.root.ids.person.current = 'gender'
+
+    def gender_validate(self):
+        if self.root.ids.woman.active:
+            self.person['gender'] = 'woman'
+        elif self.root.ids.man.active:
+            self.person['gender'] = 'man'
+        elif self.root.ids["3rd"].active:
+            self.person['gender'] = 'undefined'
+        else:
+            self.person['gender'] = None
+        err = False
+        if not bool(self.person['gender']):
+            err = True
+        if err:
+            self.show_alert('Error', 'There is not gender set!')
+        else:
+            self.root.ids.person.current = 'birth'
+
+    def confirm(self):
+        self.person['given_name'] = self.root.ids.given_name.text.strip()
+        self.person['names'] = self.root.ids.names.text.strip().split(' ')
+        self.person['family_name'] = self.root.ids.family_name.text.strip()
+        if self.root.ids.woman.active:
+            self.person['gender'] = 'woman'
+        elif self.root.ids.man.active:
+            self.person['gender'] = 'man'
+        elif self.root.ids["3rd"].active:
+            self.person['gender'] = 'undefined'
+        else:
+            self.person['gender'] = None
+        self.person['born'] = self.root.ids.born.text.strip()
+
+        err = False
+        if not bool(self.person['given_name']):
+            err = True
+        if not bool(self.person['family_name']):
+            err = True
+        if not bool(self.person['names']):
+            err = True
+        if not bool(self.person['gender']):
+            err = True
+        if not bool(self.person['born']):
+            err = True
+
+        if self.person['given_name'] not in self.person['names']:
+            err = True
+        if self.person['gender'] not in ['woman', 'man', 'undefined']:
+            err = True
+        try:
+            date.fromisoformat(self.person['born'])
+        except ValueError:
+            err = True
+
+        if err:
+            self.show_alert('Error', 'The information you have given is ' +
+                            'either invalid or incomplete. Please review ' +
+                            'the form again!')
+        else:
+            return True  # Implement next step
+
+    def set_born(self, date_obj):
+        self.person['born'] = date_obj
         self.root.ids.born.text = str(date_obj)
 
-    def show_example_date_picker(self):
-            pd = self.previous_date
+    def born_datepicker(self):
             try:
-                MDDatePicker(self.set_previous_date,
+                pd = date.fromisoformat(self.root.ids.born.text)
+                MDDatePicker(self.set_born,
                              pd.year, pd.month, pd.day).open()
-            except AttributeError:
-                MDDatePicker(self.set_previous_date).open()
+            except (AttributeError, ValueError):
+                MDDatePicker(self.set_born).open()
 
     def on_pause(self):
         return True

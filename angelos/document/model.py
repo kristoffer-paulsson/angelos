@@ -13,7 +13,8 @@ class BaseDocument:
     def __init__(self, data={}):
         self.__readonly = False
         for k in data.items():
-            self.__dict__[k] = data[k]
+            # setattr(self, k, data[k])
+            self[k] = data[k]
 
         if not self.id:
             self.id = uuid.uuid4().urn[9:]

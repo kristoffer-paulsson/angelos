@@ -1,3 +1,4 @@
+from datetime import date
 import types
 from ..utils import Util
 from .model import BaseDocument
@@ -20,7 +21,7 @@ Ministry = type(
         'ministry': None, 'vision': None})
 
 Person = type(
-    'Person', (Entity), {
+    'Person', (Entity, ), {
         'given_name': None, 'family_name': None, 'names': [], 'born': None,
         'gender': None})
 
@@ -63,9 +64,28 @@ class EntityFactory:
         Util.is_type(names, list)
         Util.is_type(born, str)
         Util.is_type(gender, str)
+
+        if not bool(given_name):
+            raise ValueError()
+        if not bool(family_name):
+            raise ValueError()
+        if not bool(names):
+            raise ValueError()
+        if not bool(gender):
+            raise ValueError()
+        if not bool(born):
+            raise ValueError()
+
+        if given_name not in names:
+            raise ValueError()
+        if gender not in ['woman', 'man', 'undefined']:
+            raise ValueError()
+
+        date.fromisoformat(born)
+
         p = {
             'updated': None,
-            'type': 'entity.ministry',
+            'type': 'entity.person',
             'given_name': given_name,
             'family_name': family_name,
             'names': names,
