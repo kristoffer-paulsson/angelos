@@ -7,6 +7,7 @@ from kivymd.date_picker import MDDatePicker
 
 from ..const import Const
 from ..setup import Setup
+from ..document.entity import Person
 
 ENTITY_PERSON_KV = '''
 #:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
@@ -239,11 +240,10 @@ Screen:
 
 
 class EntityPersonGuide(MDTabbedPanel):
-    person = {'given_name': None, 'family_name': None, 'names': None,
-              'gender': None, 'born': None}
+    entity = Person()
 
     def set_born(self, date_obj):
-        self.person['born'] = date_obj
+        self.entity.born = date_obj
         self.ids.born.text = str(date_obj)
 
     def born_datepicker(self):
@@ -269,18 +269,17 @@ class EntityPersonGuide(MDTabbedPanel):
         self.dialog.open()
 
     def name_validate(self):
-        self.person['given_name'] = self.ids.given_name.text.strip()
-        self.person['names'] = self.ids.names.text.strip().split(' ')
-        self.person['family_name'] = self.ids.family_name.text.strip()
         err = False
-        if not bool(self.person['given_name']):
+        try:
+            self.entity.given_name = self.ids.given_name.text.strip()
+            self.entity.names = self.ids.names.text.strip().split(' ')
+            self.entity.family_name = self.ids.family_name.text.strip()
+
+            if self.entity.given_name not in self.entity.names:
+                err = True
+        except (AttributeError, TypeError):
             err = True
-        if not bool(self.person['family_name']):
-            err = True
-        if not bool(self.person['names']):
-            err = True
-        if self.person['given_name'] not in self.person['names']:
-            err = True
+
         if err:
             self.show_alert('Error', 'The names given are either incomplete ' +
                             'or your given name is not mentioned in the ' +
@@ -289,55 +288,45 @@ class EntityPersonGuide(MDTabbedPanel):
             self.current = 'gender'
 
     def gender_validate(self):
-        if self.ids.woman.active:
-            self.person['gender'] = 'woman'
-        elif self.ids.man.active:
-            self.person['gender'] = 'man'
-        elif self.ids["3rd"].active:
-            self.person['gender'] = 'undefined'
-        else:
-            self.person['gender'] = None
         err = False
-        if not bool(self.person['gender']):
+        try:
+            if self.ids.woman.active:
+                self.entity.gender = 'woman'
+            elif self.ids.man.active:
+                self.entity.gender = 'man'
+            elif self.ids["3rd"].active:
+                self.entity.gender = 'undefined'
+            else:
+                self.entity.gender = None
+        except AttributeError:
             err = True
+        # if not bool(self.entity.gender):
+        #    err = True
         if err:
             self.show_alert('Error', 'There is not gender set!')
         else:
             self.current = 'birth'
 
     def confirm(self):
-        self.person['given_name'] = self.ids.given_name.text.strip()
-        self.person['names'] = self.ids.names.text.strip().split(' ')
-        self.person['family_name'] = self.ids.family_name.text.strip()
-        if self.ids.woman.active:
-            self.person['gender'] = 'woman'
-        elif self.ids.man.active:
-            self.person['gender'] = 'man'
-        elif self.ids["3rd"].active:
-            self.person['gender'] = 'undefined'
-        else:
-            self.person['gender'] = None
-        self.person['born'] = self.ids.born.text.strip()
-
         err = False
-        if not bool(self.person['given_name']):
-            err = True
-        if not bool(self.person['family_name']):
-            err = True
-        if not bool(self.person['names']):
-            err = True
-        if not bool(self.person['gender']):
-            err = True
-        if not bool(self.person['born']):
-            err = True
-
-        if self.person['given_name'] not in self.person['names']:
-            err = True
-        if self.person['gender'] not in ['woman', 'man', 'undefined']:
-            err = True
         try:
-            date.fromisoformat(self.person['born'])
-        except ValueError:
+            self.entity.given_name = self.ids.given_name.text.strip()
+            self.entity.names = self.ids.names.text.strip().split(' ')
+            self.entity.family_name = self.ids.family_name.text.strip()
+            if self.ids.woman.active:
+                self.entity.gender = 'woman'
+            elif self.ids.man.active:
+                self.entity.gender = 'man'
+            elif self.ids["3rd"].active:
+                self.entity.gender = 'undefined'
+            else:
+                self.entity.gender = None
+
+            self.entity.born = self.ids.born.text.strip()
+
+            if self.entity.given_name not in self.entity.names:
+                err = True
+        except (AttributeError, ValueError, TypeError):
             err = True
 
         if err:
@@ -345,4 +334,5 @@ class EntityPersonGuide(MDTabbedPanel):
                             'either invalid or incomplete. Please review ' +
                             'the form again!')
         else:
-            s = Setup(type=Const.R_TYPE_CLIENT, entity=self.person)
+            print(self.entity.export())
+            s = Setup(type=Const.R_TYPE_CLIENT, entity=self.entity)

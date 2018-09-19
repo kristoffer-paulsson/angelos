@@ -1,9 +1,10 @@
+import base64
 from ..utils import Util
 from ..error import Error
-from .model import BaseDocumentMixin
+from .model import DocumentMeta, StringField, UuidField
 
 
-class IssuerMixin(BaseDocumentMixin):
+class IssuerMixin:
     def issue(self, issue, private_key, signer):
         data = str(self.id) + issue._data()
         issue.sign(self.id, signer.sign(data))
@@ -17,28 +18,22 @@ class IssuerMixin(BaseDocumentMixin):
                  'public_key': signee.public_key()})
 
 
-class IssueMixin(BaseDocumentMixin):
-    def _data(self):
-        concat = ''
-        for k in sorted(self.__dict__, key=str.lower):
-            if k == ['signature', 'issuer'] or k.startswith('_'):
-                continue
+class IssueMixin(metaclass=DocumentMeta):
+    signature = StringField()
+    issuer = UuidField()
 
-            if isinstance(self.__dict__[k], list):
-                for i in self.__dict__[k].sort():
-                    concat += str(i)
-            else:
-                concat += str(self.__dict__[k])
+    def data_msg(self):
+        concat = ''
+        for field, data in sorted(self.export(), key=str.lower):
+            if field in ['signature', 'issuer']:
+                continue
+            concat += str(data)
 
         return bytes(concat, 'utf-8')
 
     def sign(self, issuer_id, signature):
         self.issuer = issuer_id
-        self.signature.append(signature)
-
-    @staticmethod
-    def properties():
-        return {'issuer': None, 'signature': []}
+        self.signature = str(base64.b64encode(signature))
 
 
 class AbstractSigner:
