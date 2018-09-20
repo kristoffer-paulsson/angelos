@@ -5,17 +5,20 @@ import uuid
 class Field:
     def __init__(self, value=None, required=True, multiple=False, init=None):
         self.value = value
-        self._required = required
-        self._multiple = multiple
+        self.required = required
+        self.multiple = multiple
         self.init = init
 
     def validate(self, value):
-        if self._required and not bool(value):
+        if self.required and not bool(value):
             return False
-        if not self._multiple:
+        if not self.multiple:
             if isinstance(value, list):
                 return False
         return True
+
+    def to_str(self, value):
+        return value
 
 
 class UuidField(Field):
@@ -28,11 +31,11 @@ class UuidField(Field):
 
         for v in value:
             if not isinstance(v, uuid.UUID):
-                try:
-                    uuid.UUID(str(v))
-                except TypeError:
-                    err = True
+                err = True
         return not err
+
+    def to_str(self, value):
+        return str(value)
 
 
 class DateField(Field):
@@ -45,10 +48,7 @@ class DateField(Field):
 
         for v in value:
             if not isinstance(v, datetime.date):
-                try:
-                    datetime.date.fromisoformat(str(v))
-                except TypeError:
-                    err = True
+                err = True
         return not err
 
 
@@ -70,7 +70,7 @@ class ChoiceField(Field):
     def __init__(self, value=None, required=True,
                  multiple=False, init=None, choices=[]):
         Field.__init__(self, value, required, multiple, init)
-        self._choices = choices
+        self.choices = choices
 
     def validate(self, value):
         err = False
@@ -80,7 +80,7 @@ class ChoiceField(Field):
             value = [value]
 
         for v in value:
-            if v not in self._choices:
+            if v not in self.choices:
                 err = True
         return not err
 
@@ -127,6 +127,5 @@ class BaseDocument(metaclass=DocumentMeta):
     def export(self):
         nd = {}
         for name in self._fields.keys():
-            nd[name] = getattr(self, name)
-
+            nd[name] = self._fields[name].to_str(getattr(self, name))
         return nd

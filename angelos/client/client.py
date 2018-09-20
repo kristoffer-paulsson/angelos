@@ -10,6 +10,7 @@ from ..worker import Worker
 
 from .ui import UI
 from .entity import ENTITY_PERSON_KV
+from .backend import Backend
 
 
 class LogoApp(App):
@@ -45,6 +46,7 @@ class Application(Worker):
     def _initialize(self):
         logging.info('#'*10 + 'Entering ' + self.__class__.__name__ + '#'*10)
         self._thread = threading.currentThread()
+        self.__start_backend()
 
     def _finalize(self):
         self.ioc.message.remove(Const.W_SUPERV_NAME)
@@ -65,6 +67,13 @@ class Application(Worker):
 
         self._finalize()
         logging.info('Exiting worker %s', id(self))
+
+    def __start_backend(self):
+        logging.info('#'*10 + 'Entering __start_backend' + '#'*10)
+        be = Backend(self.ioc)
+        be.start()
+        self.ioc.workers.add(Const.W_BACKEND_NAME, Const.G_CORE_NAME, be)
+        logging.info('#'*10 + 'Leaving __start_Backend' + '#'*10)
 
 
 class Client(Application):

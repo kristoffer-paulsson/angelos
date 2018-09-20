@@ -3,9 +3,11 @@
 
 class Const:
     """Docstring"""
-    W_SUPERV_NAME = 'Supervisor'
-    W_ADMIN_NAME = 'AdminServer'
+    W_SUPERV_NAME = 'Supervisor'  # Server Supervisor worker
+    W_ADMIN_NAME = 'AdminServer'  # Server Admin worker
     G_CORE_NAME = 'Core'
+    W_CLIENT_NAME = 'Client'  # Client main worker
+    W_BACKEND_NAME = 'Backend'  # Client backend worker
 
     LOG_ERR = 'err'
     LOG_APP = 'app'

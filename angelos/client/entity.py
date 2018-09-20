@@ -1,4 +1,4 @@
-from datetime import date
+import datetime
 from kivy.metrics import dp
 from kivymd.tabs import MDTabbedPanel
 from kivymd.label import MDLabel
@@ -6,17 +6,18 @@ from kivymd.dialog import MDDialog
 from kivymd.date_picker import MDDatePicker
 
 from ..const import Const
-from ..setup import Setup
 from ..document.entity import Person
+from .events import Messages
 
 ENTITY_PERSON_KV = '''
 #:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
 #:import MDTextField kivymd.textfields.MDTextField
 #:import MDTabbedPanel kivymd.tabs.MDTabbedPanel
 #:import MDTab kivymd.tabs.MDTab
+#:import MDSpinner kivymd.spinner.MDSpinner
 
 <EntityPersonGuide>:
-    id: person
+    id: person_entity
     tab_display_mode: 'icons'
     MDTab:
         name: 'info'
@@ -71,7 +72,7 @@ ENTITY_PERSON_KV = '''
                 spacing: '25dp'
                 MDRaisedButton:
                     text: "I agree"
-                    on_release: person.current = 'name'
+                    on_release: person_entity.current = 'name'
                 MDFlatButton:
                     text: "Decline"
                     on_release: app.stop()
@@ -131,7 +132,7 @@ ENTITY_PERSON_KV = '''
                 valign: 'top'
             MDRaisedButton:
                 text: "Next"
-                on_release: person.name_validate()
+                on_release: person_entity.name_validate()
     MDTab:
         name: 'gender'
         text: "Gender"
@@ -176,7 +177,7 @@ ENTITY_PERSON_KV = '''
                     group: 'gender'
             MDRaisedButton:
                 text: "Next"
-                on_release: person.gender_validate()
+                on_release: person_entity.gender_validate()
     MDTab:
         name: 'birth'
         text: "Birth"
@@ -216,7 +217,7 @@ ENTITY_PERSON_KV = '''
                     valign: 'top'
                 MDRaisedButton:
                     text: "Date"
-                    on_release: person.born_datepicker()
+                    on_release: person_entity.born_datepicker()
                     valign: 'top'
             MDLabel:
                 font_style: 'Headline'
@@ -232,27 +233,52 @@ ENTITY_PERSON_KV = '''
                 valign: 'top'
             MDRaisedButton:
                 text: "Confirm"
-                on_release: person.confirm()
+                on_release: person_entity.confirm(app)
 
-Screen:
-    EntityPersonGuide:
-'''
+ScreenManager:
+    id: scm_setup
+    Screen:
+        name: 'guide'
+        EntityPersonGuide:
+    Screen:
+        name: 'spinner'
+        BoxLayout:
+            orientation: 'vertical'
+            padding: '50dp'
+            MDLabel:
+                font_style: 'Display1'
+                theme_text_color: 'Primary'
+                text: "Setup"
+                halign: 'center'
+            MDSpinner:
+                size: dp(100), dp(100)
+                size_hint: None, None
+                pos_hint: {'center_x': 0.5}
+                halign: 'center'
+                active: True
+            MDLabel:
+                font_style: 'Body1'
+                theme_text_color: 'Primary'
+                text: "Your installation of Logo is being configured. Please wait!"
+                halign: 'center'
+'''  # noqa E501
 
 
 class EntityPersonGuide(MDTabbedPanel):
     entity = Person()
+    confirmed = False
 
     def set_born(self, date_obj):
         self.entity.born = date_obj
         self.ids.born.text = str(date_obj)
 
     def born_datepicker(self):
-            try:
-                pd = date.fromisoformat(self.ids.born.text)
-                MDDatePicker(self.set_born,
-                             pd.year, pd.month, pd.day).open()
-            except (AttributeError, ValueError):
-                MDDatePicker(self.set_born).open()
+        try:
+            pd = datetime.date.fromisoformat(self.ids.born.text)
+            MDDatePicker(self.set_born,
+                         pd.year, pd.month, pd.day).open()
+        except (AttributeError, ValueError):
+            MDDatePicker(self.set_born).open()
 
     def show_alert(self, title, message):
         content = MDLabel(
@@ -307,7 +333,7 @@ class EntityPersonGuide(MDTabbedPanel):
         else:
             self.current = 'birth'
 
-    def confirm(self):
+    def confirm(self, app):
         err = False
         try:
             self.entity.given_name = self.ids.given_name.text.strip()
@@ -322,7 +348,8 @@ class EntityPersonGuide(MDTabbedPanel):
             else:
                 self.entity.gender = None
 
-            self.entity.born = self.ids.born.text.strip()
+            self.entity.born = datetime.date.fromisoformat(
+                self.ids.born.text.strip())
 
             if self.entity.given_name not in self.entity.names:
                 err = True
@@ -334,5 +361,7 @@ class EntityPersonGuide(MDTabbedPanel):
                             'either invalid or incomplete. Please review ' +
                             'the form again!')
         else:
-            print(self.entity.export())
-            s = Setup(type=Const.R_TYPE_CLIENT, entity=self.entity)
+            self.confirmed = True
+            app.ioc.message.send(
+                Messages.setup(
+                    Const.W_CLIENT_NAME, self.entity, Const.R_TYPE_CLIENT))

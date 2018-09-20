@@ -24,16 +24,20 @@ class IssueMixin(metaclass=DocumentMeta):
 
     def data_msg(self):
         concat = ''
-        for field, data in sorted(self.export(), key=str.lower):
+        for field, data in sorted(self.export().items()):
             if field in ['signature', 'issuer']:
                 continue
-            concat += str(data)
+            if isinstance(data, list):
+                data_str = ''.join(data)
+            else:
+                data_str = str(data)
+            concat += data_str
 
-        return bytes(concat, 'utf-8')
+        return concat
 
     def sign(self, issuer_id, signature):
         self.issuer = issuer_id
-        self.signature = str(base64.b64encode(signature))
+        self.signature = base64.standard_b64encode(signature).decode('utf-8')
 
 
 class AbstractSigner:

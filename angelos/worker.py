@@ -72,12 +72,12 @@ class Worker:
         self._teardown()
         logging.info('Exiting worker %s', id(self))
 
-    def task(self, coroutine):
+    def task(self, coroutine, kwargs={}):
         """Docstring"""
         @asyncio.coroutine
         async def coro_wrapper():
             try:
-                await coroutine()
+                await coroutine(**kwargs)
             except Exception as exc:
                 if not isinstance(exc, KeyboardInterrupt):
                     logging.exception('Unhandled exception in coroutine.')

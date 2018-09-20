@@ -30,3 +30,9 @@ class Person(Entity):
     names = StringField(multiple=True)
     born = DateField()
     gender = ChoiceField(choices=['man', 'woman', 'undefined'])
+
+
+class Keys(Document):
+    type = StringField(value='cert.keys')
+    verify = StringField()
+    public = StringField()
