@@ -10,6 +10,8 @@ from ..worker import Workers
 from ..events import Events
 from ..logger import LogHandler
 from ..runtime import Runtime
+from ..db.person import PersonDatabase
+from ..facade.person import PersonFacade
 
 try:
     with open(DEFAULT['runtime']['root'] + '/default.yml') as yc:
@@ -26,6 +28,8 @@ CONFIG = {
     'message': lambda self: Events(),
     'log': lambda self: LogHandler(self.environment['logger']),
     'runtime': lambda self: Runtime(self.environment['runtime']),
+    'entity': lambda self: PersonDatabase(self.runtime.root() + '/default.db'),
+    'facade': lambda self: PersonFacade()
 }
 
 

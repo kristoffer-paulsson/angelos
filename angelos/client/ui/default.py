@@ -1,9 +1,12 @@
-UI = """
+from kivy.lang import Builder
+from kivymd.navigationdrawer import NavigationLayout
+
+
+Builder.load_string('''
 #:import MDNavigationDrawer kivymd.navigationdrawer.MDNavigationDrawer
-#:import NavigationLayout kivymd.navigationdrawer.NavigationLayout
 
 
-NavigationLayout:
+<DefaultNavigation>:
     id: nav_layout
     MDNavigationDrawer:
         id: nav_drawer
@@ -72,4 +75,8 @@ NavigationLayout:
                         text: "Page 3"
                         size_hint_x:None
                         width: '56dp'
-"""
+''')
+
+
+class DefaultNavigation(NavigationLayout):
+    pass

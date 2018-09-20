@@ -2,15 +2,12 @@
 import threading
 import logging
 from kivy.app import App
-from kivy.lang import Builder
 from kivymd.theming import ThemeManager
 
 from ..const import Const
 from ..worker import Worker
-
-from .ui import UI
-from .entity import ENTITY_PERSON_KV
 from .backend import Backend
+from .ui.manager import InterfaceManager
 
 
 class LogoApp(App):
@@ -19,17 +16,14 @@ class LogoApp(App):
     ioc = None
 
     def build(self):
-        if self.ioc.environment['configured']:
-            return Builder.load_string(UI)
-        else:
-            return Builder.load_string(ENTITY_PERSON_KV)
+        return InterfaceManager(configured=self.ioc.environment['configured'])
         # self.theme_cls.theme_style = 'Dark'
 
     def on_pause(self):
         return True
 
     def on_stop(self):
-        pass
+        self.ioc.workers.stop()
 
 
 class Application(Worker):
@@ -39,6 +33,7 @@ class Application(Worker):
         Worker.__init__(self, ioc)
         self.ioc.workers.add(Const.W_SUPERV_NAME, Const.G_CORE_NAME, self)
         self.log = ioc.log.err()
+        self.app = None
 
     def start(self):
         self.run()
@@ -57,9 +52,9 @@ class Application(Worker):
         logging.info('Starting worker %s', id(self))
         self._initialize()
         try:
-            app = LogoApp()
-            app.ioc = self.ioc
-            app.run()
+            self.app = LogoApp()
+            self.app.ioc = self.ioc
+            self.app.run()
         except KeyboardInterrupt:
             pass
         except Exception as e:
@@ -74,6 +69,10 @@ class Application(Worker):
         be.start()
         self.ioc.workers.add(Const.W_BACKEND_NAME, Const.G_CORE_NAME, be)
         logging.info('#'*10 + 'Leaving __start_Backend' + '#'*10)
+
+    def stop(self):
+        """Docstring"""
+        self._halt.set()
 
 
 class Client(Application):

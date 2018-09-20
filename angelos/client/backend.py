@@ -39,7 +39,7 @@ class Backend(Worker):
         logging.info('#'*10 + 'Entering __setup' + '#'*10)
 
         logging.info('{}, {}'.format(entity, type))
-        su = Setup(entity=entity, type=type)
+        su = Setup(entity=entity, type=type, db=self.ioc.entity)
         su.make_home()
 
         logging.info('#'*10 + 'Leaving __setup' + '#'*10)

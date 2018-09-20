@@ -2,12 +2,15 @@ import yaml
 import libnacl.dual
 from .utils import Util
 from .document.entity import Person, Keys
+from .db.person import PersonDatabase
 
 
 class Setup:
-    def __init__(self, type, entity):
+    def __init__(self, type, entity, db):
         Util.is_type(entity, Person)
+        Util.is_type(db, PersonDatabase)
 
+        self.__db = db
         self.__keys = libnacl.dual.DualSecret()
 
         self.__entity = self.sign_entity(entity)
@@ -39,7 +42,7 @@ class Setup:
         return keys
 
     def make_home(self):
-        pass
+        self.__db
 
     def export_yaml(self, data={}):
         print(yaml.dump(data,

@@ -23,7 +23,7 @@ openssl:
 # python -m nuitka --recurse-all --standalone logo.py
 
 clean:
-	rm -fr *.c *.o *.so *.app *.spec MANIFEST *.build /build/ *.dist /dist/
+	rm -fr *.o *.so *.app *.spec MANIFEST *.build /build/ *.dist /dist/
 
 env:
 	# --relocatable --python=$(PYV)
