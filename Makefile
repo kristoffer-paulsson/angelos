@@ -35,3 +35,4 @@ setup:
 	pip install asyncssh # dependencies
 	pip install kivy
 	pip install -U 'https://gitlab.com/kivymd/KivyMD/-/archive/master/KivyMD-master.tar.bz2'
+	pip install -U 'https://codeload.github.com/kivy/plyer/zip/1.3.0'

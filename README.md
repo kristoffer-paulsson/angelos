@@ -50,14 +50,11 @@ https://groups.google.com/forum/?hl=en#!topic/comp.lang.python/66fDI6AiG5c
 
 https://github.com/sqlcipher/sqlcipher
 https://github.com/rigglemania/pysqlcipher3
+http://charlesleifer.com/blog/encrypted-sqlite-databases-with-python-and-sqlcipher/
 
 ### Python
 git clone -b 3.7 https://github.com/python/cpython.git
 ./configure --disable-shared && make
-
-### Nuitka
-pip install -U 'http://nuitka.net/gitweb/?p=Nuitka.git;a=snapshot;h=refs/heads/develop;sf=tgz'
-pip install nuitka-setuptools # tools
 
 ### cython-stuff
 https://cython.readthedocs.io/en/latest/src/tutorial/clibraries.html

@@ -39,7 +39,10 @@ class Backend(Worker):
         logging.info('#'*10 + 'Entering __setup' + '#'*10)
 
         logging.info('{}, {}'.format(entity, type))
-        su = Setup(entity=entity, type=type, db=self.ioc.entity)
-        su.make_home()
+        setup = Setup(db=self.ioc.entity)
+        setup.make_home(entity, self.ioc.runtime.root())
+        await asyncio.sleep(3)
+        self.ioc.message.send(
+            Messages.interface(Const.W_BACKEND_NAME, Const.I_DEFAULT))
 
         logging.info('#'*10 + 'Leaving __setup' + '#'*10)

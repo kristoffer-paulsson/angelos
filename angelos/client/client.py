@@ -2,8 +2,10 @@
 import threading
 import logging
 from kivy.app import App
+from kivy.clock import Clock
 from kivymd.theming import ThemeManager
 
+from .events import Messages
 from ..const import Const
 from ..worker import Worker
 from .backend import Backend
@@ -16,8 +18,8 @@ class LogoApp(App):
     ioc = None
 
     def build(self):
-        return InterfaceManager(configured=self.ioc.environment['configured'])
         # self.theme_cls.theme_style = 'Dark'
+        return InterfaceManager(configured=self.ioc.environment['configured'])
 
     def on_pause(self):
         return True
@@ -31,7 +33,7 @@ class Application(Worker):
 
     def __init__(self, ioc):
         Worker.__init__(self, ioc)
-        self.ioc.workers.add(Const.W_SUPERV_NAME, Const.G_CORE_NAME, self)
+        self.ioc.workers.add(Const.W_CLIENT_NAME, Const.G_CORE_NAME, self)
         self.log = ioc.log.err()
         self.app = None
 
@@ -40,11 +42,12 @@ class Application(Worker):
 
     def _initialize(self):
         logging.info('#'*10 + 'Entering ' + self.__class__.__name__ + '#'*10)
+        self.ioc.message.add(Const.W_CLIENT_NAME)
         self._thread = threading.currentThread()
         self.__start_backend()
 
     def _finalize(self):
-        self.ioc.message.remove(Const.W_SUPERV_NAME)
+        self.ioc.message.remove(Const.W_CLIENT_NAME)
         logging.info('#'*10 + 'Leaving ' + self.__class__.__name__ + '#'*10)
 
     def run(self):
@@ -53,6 +56,7 @@ class Application(Worker):
         self._initialize()
         try:
             self.app = LogoApp()
+            Clock.schedule_interval(self.event_callback(), 1 / 10.)
             self.app.ioc = self.ioc
             self.app.run()
         except KeyboardInterrupt:
@@ -73,6 +77,24 @@ class Application(Worker):
     def stop(self):
         """Docstring"""
         self._halt.set()
+
+    def event_callback(self):
+        def event_reader(dt):
+            event = self.ioc.message.receive(Const.W_CLIENT_NAME)
+
+            if event is None:
+                return not self._halt.is_set()
+            else:
+                logging.info(event)
+
+            if event.message == Messages.NEW_INTERFACE:
+                if event.data['ui'] is 'default':
+                    self.app.root.show_default()
+                elif event.data['ui'] is 'spinner':
+                    self.app.root.show_spinner()
+
+            return not self._halt.is_set()
+        return event_reader
 
 
 class Client(Application):

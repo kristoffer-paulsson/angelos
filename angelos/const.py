@@ -28,3 +28,8 @@ class Const:
     R_PLATFORM_MACOS = 'macos'
     R_PLATFORM_ANDROID = 'android'
     R_PLATFORM_IOS = 'ios'
+
+    I_SPLASH = 'splash'
+    I_DEFAULT = 'default'
+    I_SETUP = 'setup'
+    I_SPINNER = 'spinner'

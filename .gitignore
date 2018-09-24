@@ -24,3 +24,11 @@ MANIFEST
 !/include/
 /include/**
 !/include/*.mk
+
+!/serverroot/
+/serverroot/**
+!/serverroot/.gitkeep
+
+!/clientroot/
+/clientroot/**
+!/clientroot/.gitkeep

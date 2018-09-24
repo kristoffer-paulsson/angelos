@@ -129,3 +129,13 @@ class BaseDocument(metaclass=DocumentMeta):
         for name in self._fields.keys():
             nd[name] = self._fields[name].to_str(getattr(self, name))
         return nd
+
+    def export_str(self):
+        nd = {}
+        for name in self._fields.keys():
+            attr = self._fields[name].to_str(getattr(self, name))
+            if isinstance(attr, list):
+                nd[name] = ' '.join(attr)
+            else:
+                nd[name] = str()
+        return nd
