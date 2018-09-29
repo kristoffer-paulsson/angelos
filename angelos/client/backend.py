@@ -2,7 +2,6 @@ import asyncio
 import logging
 from ..const import Const
 from ..worker import Worker
-from ..setup import Setup
 from .events import Messages
 
 
@@ -39,8 +38,7 @@ class Backend(Worker):
         logging.info('#'*10 + 'Entering __setup' + '#'*10)
 
         logging.info('{}, {}'.format(entity, type))
-        setup = Setup(db=self.ioc.entity)
-        setup.make_home(entity, self.ioc.runtime.root())
+        self.ioc.facade.create(entity)
         await asyncio.sleep(3)
         self.ioc.message.send(
             Messages.interface(Const.W_BACKEND_NAME, Const.I_DEFAULT))

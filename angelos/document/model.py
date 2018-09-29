@@ -106,13 +106,17 @@ class DocumentMeta(type):
 
 
 class BaseDocument(metaclass=DocumentMeta):
-    def __init__(self, nd={}):
+    def __init__(self, nd={}, strict=True):
         for name, field in self._fields.items():
             object.__setattr__(self, name, field.init() if (
                 bool(field.init) and not bool(field.value)) else field.value)
 
         for key, value in nd.items():
-            setattr(self, key, value)
+            try:
+                setattr(self, key, value)
+            except AttributeError:
+                if strict:
+                    raise
 
     def __setattr__(self, key, value):
         if key in self._fields:
@@ -137,5 +141,16 @@ class BaseDocument(metaclass=DocumentMeta):
             if isinstance(attr, list):
                 nd[name] = ' '.join(attr)
             else:
-                nd[name] = str()
+                nd[name] = str(attr)
         return nd
+
+    def _validate(self):
+        validate = True
+        for name in self._fields.keys():
+            if not self._fields[name].validate(getattr(self, name)):
+                validate = False
+
+        return validate
+
+    def validate(self):
+        raise NotImplementedError()

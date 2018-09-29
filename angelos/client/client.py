@@ -42,6 +42,8 @@ class Application(Worker):
 
     def _initialize(self):
         logging.info('#'*10 + 'Entering ' + self.__class__.__name__ + '#'*10)
+        if self.ioc.environment['configured']:
+            self.ioc.facade.initialize()
         self.ioc.message.add(Const.W_CLIENT_NAME)
         self._thread = threading.currentThread()
         self.__start_backend()
@@ -94,6 +96,7 @@ class Application(Worker):
                     self.app.root.show_spinner()
 
             return not self._halt.is_set()
+
         return event_reader
 
 

@@ -64,3 +64,7 @@ https://cython.readthedocs.io/en/latest/src/tutorial/clibraries.html
 pip install kivy
 pip install kivy-garden
 pip install -U 'https://gitlab.com/kivymd/KivyMD/-/archive/master/KivyMD-master.tar.bz2'
+
+### qrcode
+pip install qrcode
+./venv/bin/garden install qrcode

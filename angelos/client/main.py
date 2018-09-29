@@ -29,7 +29,7 @@ CONFIG = {
     'log': lambda self: LogHandler(self.environment['logger']),
     'runtime': lambda self: Runtime(self.environment['runtime']),
     'entity': lambda self: PersonDatabase(self.runtime.root()),
-    'facade': lambda self: PersonFacade()
+    'facade': lambda self: PersonFacade(self.entity, self.runtime.root())
 }
 
 
