@@ -1,5 +1,7 @@
 import datetime
 
+from ..utils import Util
+from ..error import Error
 from .model import BaseDocument
 from .document import Document
 from .model import DateField, StringField, ChoiceField
@@ -9,16 +11,15 @@ class Entity(Document):
     updated = DateField(required=False)
 
     def _validate(self):
-        validate = True
-
         # Validate that "expires" is at least 13 months in the future compared
         # to "updated"
         if bool(self.updated):
-            if not (self.expires - self.updated >=
-                    datetime.timedelta(13*365/12)):
-                validate = False
-
-        return validate
+            if self.expires - self.updated > datetime.timedelta(13*365/12):
+                raise Util.exception(
+                    Error.DOCUMENT_SHORT_EXPIREY,
+                    {'expected': datetime.timedelta(13*365/12),
+                     'current': self.expires - self.created})
+        return True
 
 
 class VirtualPerson(Entity):
@@ -47,17 +48,20 @@ class Person(Entity):
     gender = ChoiceField(choices=['man', 'woman', 'undefined'])
 
     def _validate(self):
-        validate = True
-
         # Validate that "type" is of correct type
         if not self.type == 'entity.person':
-            validate = False
+            raise Util.exception(
+                Error.DOCUMENT_INVALID_TYPE,
+                {'expected': 'entity.person',
+                 'current': self.type})
 
         # Validate that "given_name" is present in "names"
         if self.given_name not in self.names:
-            validate = False
-
-        return validate
+            raise Util.exception(
+                Error.DOCUMENT_PERSON_NAMES,
+                {'name': self.given_name,
+                 'not_in': self.names})
+        return True
 
     def validate(self):
         validate = True
@@ -74,13 +78,13 @@ class Keys(Document):
     public = StringField()
 
     def _validate(self):
-        validate = True
-
         # Validate that "type" is of correct type
         if not self.type == 'cert.keys':
-            validate = False
-
-        return validate
+            raise Util.exception(
+                Error.DOCUMENT_INVALID_TYPE,
+                {'expected': 'cert.keys',
+                 'current': self.type})
+        return True
 
     def validate(self):
         validate = True

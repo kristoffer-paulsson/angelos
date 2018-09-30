@@ -80,6 +80,12 @@ IMMUTABLE = {
                 # 'propagate': None,
                 'filters': [],
                 'handlers': ['default'],
+            },
+            'peewee': {  # 'kivy' is used to log business events
+                'level': 'WARNING',
+                # 'propagate': None,
+                'filters': [],
+                'handlers': ['default'],
             }
         },
         'root': {

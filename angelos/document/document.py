@@ -1,5 +1,8 @@
 import datetime
 import uuid
+
+from ..utils import Util
+from ..error import Error
 from .model import BaseDocument, UuidField, DateField, StringField
 from .issuance import IssueMixin
 
@@ -12,13 +15,15 @@ class Document(IssueMixin, BaseDocument):
     type = StringField()
 
     def _validate(self):
-        validate = True
-
         # Validate that "expires" is at least 13 months in the future compared
         # to "created" if "updated" is null
-        if not bool(self.updated):
-            if not (self.expires - self.created >=
-                    datetime.timedelta(13*365/12)):
-                validate = False
-
-        return validate
+        try:
+            if not bool(self.updated):
+                if self.expires - self.created > datetime.timedelta(13*365/12):
+                    raise Util.exception(
+                        Error.DOCUMENT_SHORT_EXPIREY,
+                        {'expected': datetime.timedelta(13*365/12),
+                         'current': self.expires - self.created})
+        except AttributeError:
+            pass
+        return True

@@ -1,8 +1,9 @@
 import collections
 import uuid
 import base64
+import datetime
+import types
 import yaml
-import datetime.date
 import libnacl.dual
 import libnacl.sign
 import libnacl.encode
@@ -42,16 +43,36 @@ class PersonFacade:
     def id(self):
         return self.__facade.id
 
-    class Facade(collections.namedtuple('Facade', [
-        'id',
-        'entity'
+    class Address(collections.namedtuple('Address', [
+        'street',
+        'number',
+        'address2',
+        'zip',
+        'city',
+        'state',
+        'country'
     ])):
         __slots__ = ()
+
+    @property
+    def address(self):
+        return self.__facade.address
+
+    @address.setter
+    def address(self, address):
+        Util.is_type(address, self.Address)
+        self.__facade.address = address
+
+    class Facade(types.SimpleNamespace):
+        pass
 
     def initialize(self):
         """Initializes the Facade with the entity data from the database"""
         record = self.__load_identity()
         self.__configure(record.data)
+
+    def save(self):
+        self.__save_identity()
 
     def create(self, entity):
         Util.is_type(entity, Person)
@@ -72,9 +93,17 @@ class PersonFacade:
         self.import_new_person(entity, keys)
 
         # Configuring the facade and saving settings
+        data = entity.export_str()
         self.__configure({
             'id': str(entity.id),
-            'entity': entity.export_str(),
+            'entity': {
+                'given_name': data['given_name'],
+                'names': data['names'],
+                'family_name': data['family_name'],
+                'born': data['born'],
+                'gender': data['gender'],
+                'type': 'person'
+            },
             'keys': {
                 'secret': self.__keys.hex_sk().decode('utf-8'),
                 'seed': self.__keys.hex_seed().decode('utf-8'),
@@ -90,15 +119,15 @@ class PersonFacade:
     def __configure(self, data):
         Util.is_type(data, dict)
 
+        try:
+            address = self.Address(**data['address'])
+        except (KeyError, TypeError):
+            address = None
+
         self.__facade = self.Facade(
             id=str(uuid.UUID(data['id'])),
-            entity=self.Entity(
-                given_name=data['entity']['given_name'],
-                names=data['entity']['names'],
-                family_name=data['entity']['family_name'],
-                born=data['entity']['born'],
-                gender=data['entity']['gender'],
-                type=data['entity']['type']))
+            entity=self.Entity(**data['entity']),
+            address=address)
 
         self.__keys = libnacl.dual.DualSecret(
             libnacl.encode.hex_decode(data['keys']['secret']),
@@ -110,20 +139,26 @@ class PersonFacade:
         return PersonDatabase.Identity.get(pk='i')
 
     def __save_identity(self):
+        if bool(self.__facade.address):
+            address = self.__facade.address._asdict()
+        else:
+            address = None
+
         data = {
             'id': str(self.__facade.id),
             'entity': self.__facade.entity._asdict(),
+            'address': address,
             'keys': {
                 'secret': self.__keys.hex_sk().decode('utf-8'),
                 'seed': self.__keys.hex_seed().decode('utf-8'),
             }
         }
         try:
-            PersonDatabase.Identity().get(
-                id=str(self.__facade.id)).update(data=data)
+            (PersonDatabase.Identity().get(
+                pk='i').update(data=data)).execute()
         except PersonDatabase.Identity.DoesNotExist:
             PersonDatabase.Identity().create(
-                id=str(self.__facade.id), data=data)
+                id=uuid.UUID(self.__facade.id), data=data)
 
     def __issue(self, id, document):
         Util.is_type(id, uuid.UUID)
@@ -179,11 +214,11 @@ class PersonFacade:
         today = datetime.date.today()
 
         # Evaluate the entity expiery date
-        if not entity.expired > today:
+        if not entity.expires > today:
             raise Exception()
 
         # Evaluate the keys expiery date
-        if not keys.expired > today:
+        if not keys.expires > today:
             raise Exception()
 
         # Validate the entity document

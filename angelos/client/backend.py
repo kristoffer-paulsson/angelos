@@ -21,7 +21,7 @@ class Backend(Worker):
 
         while not self._halt.is_set():
 
-            await asyncio.sleep(0)
+            await asyncio.sleep(Const.LOOP_SLEEP)
             event = self.ioc.message.receive(Const.W_BACKEND_NAME)
 
             if event is None:

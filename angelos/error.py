@@ -27,6 +27,14 @@ class EventsAddressRemoved(AngelosException): pass  # noqa E302
 class EventsAddressMissing(AngelosException): pass  # noqa E302
 class IssuanceInvalid(AngelosException): pass  # noqa E302
 
+class FieldRequiredNotSet(AngelosException): pass  # noqa E302
+class FieldNotMultiple(AngelosException): pass  # noqa E302
+class FieldInvalidType(AngelosException): pass  # noqa E302
+class FieldInvalidChoice(AngelosException): pass  # noqa E302
+class DocumentShortExpiery(AngelosException): pass  # noqa E302
+class DocumentInvalidType(AngelosException): pass  # noqa E302
+class DocumentPersonNotInNames(AngelosException): pass  # noqa E302
+
 
 class LogoException(Exception):
     pass
@@ -56,6 +64,15 @@ ERROR_INFO = {
     541: (EventsAddressRemoved, 'The sender address is already removed'),  # noqa E501
     542: (EventsAddressMissing, 'The sender/recepient address doesn\'t exist'),  # noqa E501
     550: (IssuanceInvalid, 'The signature for the issue is invalid'),  # noqa E501
+
+    600: (FieldRequiredNotSet, 'Required value is not set'),  # noqa E501
+    601: (FieldNotMultiple, 'Value is list, but not set to multiple'),  # noqa E501
+    602: (FieldInvalidType, 'Value type is invalid'),  # noqa E501
+    603: (FieldInvalidChoice, 'Value not among acceptable choices'),  # noqa E501
+    604: (DocumentShortExpiery, 'Expiery date to short'),  # noqa E501
+    605: (DocumentInvalidType, 'Invalid type set'),  # noqa E501
+    606: (DocumentPersonNotInNames, 'Given name not in names'),  # noqa E501
+
 }
 
 
@@ -85,3 +102,11 @@ class Error(IntEnum):
     EVENT_ADDRESS_MISSING = 542
 
     ISSUANCE_INVALID_ISSUE = 550
+
+    FIELD_NOT_SET = 600  # 100 error codes for models and facade
+    FIELD_NOT_MULTIPLE = 601
+    FIELD_INVALID_TYPE = 602
+    FIELD_INVALID_CHOICE = 603
+    DOCUMENT_SHORT_EXPIREY = 604
+    DOCUMENT_INVALID_TYPE = 605
+    DOCUMENT_PERSON_NAMES = 606

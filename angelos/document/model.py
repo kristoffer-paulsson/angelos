@@ -1,6 +1,9 @@
 import datetime
 import uuid
 
+from ..utils import Util
+from ..error import Error
+
 
 class Field:
     def __init__(self, value=None, required=True, multiple=False, init=None):
@@ -11,10 +14,10 @@ class Field:
 
     def validate(self, value):
         if self.required and not bool(value):
-            return False
+            raise Util.exception(Error.FIELD_NOT_SET)
         if not self.multiple:
             if isinstance(value, list):
-                return False
+                raise Util.exception(Error.FIELD_NOT_MULTIPLE)
         return True
 
     def to_str(self, value):
@@ -23,16 +26,17 @@ class Field:
 
 class UuidField(Field):
     def validate(self, value):
-        err = False
-        err = not Field.validate(self, value)
+        Field.validate(self, value)
 
         if not isinstance(value, list):
             value = [value]
 
         for v in value:
-            if not isinstance(v, uuid.UUID):
-                err = True
-        return not err
+            if not isinstance(v, (uuid.UUID, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'uuid.UUID', 'current': type(v)})
+        return True
 
     def to_str(self, value):
         return str(value)
@@ -40,30 +44,32 @@ class UuidField(Field):
 
 class DateField(Field):
     def validate(self, value):
-        err = False
-        err = not Field.validate(self, value)
+        Field.validate(self, value)
 
         if not isinstance(value, list):
             value = [value]
 
         for v in value:
-            if not isinstance(v, datetime.date):
-                err = True
-        return not err
+            if not isinstance(v, (datetime.date, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'datetime.date', 'current': type(v)})
+        return True
 
 
 class StringField(Field):
     def validate(self, value):
-        err = False
-        err = not Field.validate(self, value)
+        Field.validate(self, value)
 
         if not isinstance(value, list):
             value = [value]
 
         for v in value:
-            if not (isinstance(v, str) or bool(str(value))):
-                err = True
-        return not err
+            if not (isinstance(v, (str, type(None))) or bool(str(value))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'str', 'current': type(v)})
+        return True
 
 
 class ChoiceField(Field):
@@ -73,16 +79,17 @@ class ChoiceField(Field):
         self.choices = choices
 
     def validate(self, value):
-        err = False
-        err = not Field.validate(self, value)
+        Field.validate(self, value)
 
         if not isinstance(value, list):
             value = [value]
 
         for v in value:
             if v not in self.choices:
-                err = True
-        return not err
+                raise Util.exception(
+                    Error.FIELD_INVALID_CHOICE,
+                    {'expected': self.choices, 'current': v})
+        return True
 
 
 class DocumentMeta(type):
@@ -145,12 +152,9 @@ class BaseDocument(metaclass=DocumentMeta):
         return nd
 
     def _validate(self):
-        validate = True
         for name in self._fields.keys():
-            if not self._fields[name].validate(getattr(self, name)):
-                validate = False
-
-        return validate
+            self._fields[name].validate(getattr(self, name))
+        return True
 
     def validate(self):
         raise NotImplementedError()

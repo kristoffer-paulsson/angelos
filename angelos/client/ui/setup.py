@@ -77,7 +77,7 @@ Builder.load_string('''
                 MDFlatButton:
                     text: "Decline"
                     on_release: app.stop()
-
+        BoxLayout:
     MDTab:
         name: 'name'
         text: "Name"
@@ -109,7 +109,6 @@ Builder.load_string('''
                 required: True
                 multiline: False
                 color_mode: 'custom'
-                line_color_focus: self.theme_cls.opposite_bg_normal
                 valign: 'top'
             MDTextField:
                 id: names
@@ -119,7 +118,6 @@ Builder.load_string('''
                 required: True
                 multiline: False
                 color_mode: 'custom'
-                line_color_focus: self.theme_cls.opposite_bg_normal
                 valign: 'top'
             MDTextField:
                 id: family_name
@@ -129,11 +127,11 @@ Builder.load_string('''
                 required: True
                 multiline: False
                 color_mode: 'custom'
-                line_color_focus: self.theme_cls.opposite_bg_normal
                 valign: 'top'
             MDRaisedButton:
                 text: "Next"
                 on_release: person_entity.name_validate()
+        BoxLayout:
     MDTab:
         name: 'gender'
         text: "Gender"
@@ -179,6 +177,7 @@ Builder.load_string('''
             MDRaisedButton:
                 text: "Next"
                 on_release: person_entity.gender_validate()
+        BoxLayout:
     MDTab:
         name: 'birth'
         text: "Birth"
@@ -214,7 +213,6 @@ Builder.load_string('''
                     required: True
                     multiline: False
                     color_mode: 'custom'
-                    line_color_focus: self.theme_cls.opposite_bg_normal
                     valign: 'top'
                 MDRaisedButton:
                     text: "Date"
@@ -235,6 +233,7 @@ Builder.load_string('''
             MDRaisedButton:
                 text: "Confirm"
                 on_release: person_entity.confirm(app)
+        BoxLayout:
 
 
 <Setup>:
@@ -287,7 +286,8 @@ class EntityPersonGuide(MDTabbedPanel):
 
             if self.entity.given_name not in self.entity.names:
                 err = True
-        except (AttributeError, TypeError):
+        except (AttributeError, TypeError) as e:
+            raise e
             err = True
 
         if err:
