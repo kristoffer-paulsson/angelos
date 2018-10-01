@@ -357,7 +357,10 @@ class Profile(MDList):
         if isinstance(address, PersonFacade.Address):
             addr_li = ThreeLineIconListItem(
                 text=address.street + ' ' + address.number + '\n' +
-                address.zip + ' ' + address.city, secondary_text='Address')
+                address.zip + ' ' + address.city,
+                secondary_text='Address',
+                on_release=lambda x: self.address_dialog(
+                    app, data=app.ioc.facade.address) if self.edit else None)
             addr_li.add_widget(IconLeftWidget(icon='map-marker'))
             self.add_widget(addr_li, 5)
         else:
@@ -394,7 +397,6 @@ class Profile(MDList):
 
     def toggle(self, t):
         self.edit = not t
-        print('Toggle', self.edit)
 
     def idqr_dialog(self, id, app):
         f = app.ioc.facade
@@ -415,10 +417,10 @@ class Profile(MDList):
             pos_hint={'center_x': .5, 'center_y': .5},
             size_hint=(1, None))
 
-        # if bool(data):
-        #    address.populate(data)
-
         dialog = MDDialog(title='Address', content=address)
+        if bool(data):
+            dialog.add_action_button(
+                'Delete', action=lambda *x: self.address_delete(app, dialog))
         dialog.add_action_button('Cancel', action=lambda *x: dialog.dismiss())
         dialog.add_action_button(
             'Save', action=lambda *x: self.address_save(app, dialog, x))
@@ -435,6 +437,13 @@ class Profile(MDList):
             state=str(ids.state.text).strip(),
             country=str(ids.country.text).strip()
         )
+        app.ioc.facade.save()
+        dialog.dismiss()
+        self.load(app)
+
+    def address_delete(self, app, dialog):
+        ids = dialog.content.ids
+        app.ioc.facade.address = None
         app.ioc.facade.save()
         dialog.dismiss()
         self.load(app)
@@ -461,6 +470,7 @@ Builder.load_string('''
         spacing: dp(25)
         MDTextField:
             id: street
+            text: root.data.street if bool(root.data) else ''
             hint_text: "Street"
             helper_text: "Street name"
             helper_text_mode: "persistent"
@@ -470,6 +480,7 @@ Builder.load_string('''
             valign: 'top'
         MDTextField:
             id: number
+            text: root.data.number if bool(root.data) else ''
             hint_text: "No #"
             helper_text: "Number"
             helper_text_mode: "persistent"
@@ -479,8 +490,9 @@ Builder.load_string('''
             valign: 'top'
     MDTextField:
         id: address2
+        text: root.data.address2 if bool(root.data) else ''
         hint_text: "2nd"
-        helper_text: "Address 2nd (if applicable)"
+        helper_text: "2nd address line (if applicable)"
         helper_text_mode: "persistent"
         multiline: False
         color_mode: 'custom'
@@ -490,6 +502,7 @@ Builder.load_string('''
         spacing:  dp(25)
         MDTextField:
             id: zip
+            text: root.data.zip if bool(root.data) else ''
             hint_text: "Zip"
             helper_text: "Zip code"
             helper_text_mode: "persistent"
@@ -499,6 +512,7 @@ Builder.load_string('''
             valign: 'top'
         MDTextField:
             id: city
+            text: root.data.city if bool(root.data) else ''
             hint_text: "City"
             helper_text: ""
             helper_text_mode: "persistent"
@@ -511,6 +525,7 @@ Builder.load_string('''
         spacing:  dp(25)
         MDTextField:
             id: state
+            text: root.data.state if bool(root.data) else ''
             hint_text: "State"
             helper_text: "(if applicable)"
             helper_text_mode: "persistent"
@@ -520,6 +535,7 @@ Builder.load_string('''
             valign: 'top'
         MDTextField:
             id: country
+            text: root.data.country if bool(root.data) else ''
             hint_text: "Country"
             helper_text: ""
             helper_text_mode: "persistent"
@@ -532,7 +548,9 @@ Builder.load_string('''
 
 
 class AddressDialog(BoxLayout):
-    data = None
+    def __init__(self, data, **kwargs):
+        self.data = data
+        BoxLayout.__init__(self, **kwargs)
 
 
 class IconLeftWidget(ILeftBodyTouch, MDIconButton):

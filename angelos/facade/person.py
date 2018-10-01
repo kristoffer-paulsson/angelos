@@ -60,7 +60,7 @@ class PersonFacade:
 
     @address.setter
     def address(self, address):
-        Util.is_type(address, self.Address)
+        Util.is_type(address, (self.Address, type(None)))
         self.__facade.address = address
 
     class Facade(types.SimpleNamespace):
