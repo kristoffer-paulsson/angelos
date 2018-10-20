@@ -34,6 +34,7 @@ class FieldInvalidChoice(AngelosException): pass  # noqa E302
 class DocumentShortExpiery(AngelosException): pass  # noqa E302
 class DocumentInvalidType(AngelosException): pass  # noqa E302
 class DocumentPersonNotInNames(AngelosException): pass  # noqa E302
+class FieldInvalidEmail(AngelosException): pass  # noqa E302
 
 
 class LogoException(Exception):
@@ -72,6 +73,7 @@ ERROR_INFO = {
     604: (DocumentShortExpiery, 'Expiery date to short'),  # noqa E501
     605: (DocumentInvalidType, 'Invalid type set'),  # noqa E501
     606: (DocumentPersonNotInNames, 'Given name not in names'),  # noqa E501
+    607: (FieldInvalidEmail, 'Given email not a regular email address'),  # noqa E501
 
 }
 
@@ -110,3 +112,4 @@ class Error(IntEnum):
     DOCUMENT_SHORT_EXPIREY = 604
     DOCUMENT_INVALID_TYPE = 605
     DOCUMENT_PERSON_NAMES = 606
+    FIELD_INVALID_EMAIL = 607

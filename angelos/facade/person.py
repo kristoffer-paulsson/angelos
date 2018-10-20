@@ -63,6 +63,62 @@ class PersonFacade:
         Util.is_type(address, (self.Address, type(None)))
         self.__facade.address = address
 
+    @property
+    def email(self):
+        return self.__facade.email
+
+    @email.setter
+    def email(self, email):
+        Util.is_type(email, (str, type(None)))
+        self.__facade.email = email
+
+    @property
+    def mobile(self):
+        return self.__facade.mobile
+
+    @mobile.setter
+    def mobile(self, mobile):
+        Util.is_type(mobile, (str, type(None)))
+        self.__facade.mobile = mobile
+
+    @property
+    def phone(self):
+        return self.__facade.phone
+
+    @phone.setter
+    def phone(self, phone):
+        Util.is_type(phone, (str, type(None)))
+        self.__facade.phone = phone
+
+    class Social(collections.namedtuple('Social', [
+        'token',
+        'media',
+    ])):
+        __slots__ = ()
+
+    @property
+    def social(self):
+        return self.__facade.social
+
+    def add_social(self, media):
+        Util.is_type(media, (self.Social))
+        self.__facade.social[media.media.lower()] = media
+
+    def del_social(self, media):
+        try:
+            del self.__facade.social[media.media.lower()]
+        except KeyError:
+            pass
+
+    class Contacts(collections.namedtuple('Address', [
+        'favorites',
+        'friends',
+        'family',
+        'blocked',
+        'all',
+    ], defaults=([], [], [], [], []))):
+        __slots__ = ()
+
     class Facade(types.SimpleNamespace):
         pass
 
@@ -124,10 +180,44 @@ class PersonFacade:
         except (KeyError, TypeError):
             address = None
 
+        try:
+            email = data['email']
+        except (KeyError, TypeError):
+            email = None
+
+        try:
+            mobile = data['mobile']
+        except (KeyError, TypeError):
+            mobile = None
+
+        try:
+            phone = data['phone']
+        except (KeyError, TypeError):
+            phone = None
+
+        try:
+            social = {}
+            for media in data['social']:
+                social[data['social'][media]['media'].lower()] = self.Social(
+                    data['social'][media]['token'],
+                    data['social'][media]['media'])
+        except (KeyError, TypeError):
+            social = {}
+
+        try:
+            contacts = self.Contacts(**data['contacts'])
+        except (KeyError):
+            contacts = self.Contacts()
+
         self.__facade = self.Facade(
             id=str(uuid.UUID(data['id'])),
             entity=self.Entity(**data['entity']),
-            address=address)
+            address=address,
+            email=email,
+            mobile=mobile,
+            phone=phone,
+            social=social,
+            contacts=contacts)
 
         self.__keys = libnacl.dual.DualSecret(
             libnacl.encode.hex_decode(data['keys']['secret']),
@@ -144,10 +234,22 @@ class PersonFacade:
         else:
             address = None
 
+        if bool(self.__facade.social):
+            social = {}
+            for media in self.__facade.social:
+                social[media] = self.__facade.social[media]._asdict()
+        else:
+            social = {}
+
         data = {
             'id': str(self.__facade.id),
             'entity': self.__facade.entity._asdict(),
             'address': address,
+            'email': self.__facade.email,
+            'mobile': self.__facade.mobile,
+            'phone': self.__facade.phone,
+            'social': social,
+            'contacts': self.__facade.contacts._asdict(),
             'keys': {
                 'secret': self.__keys.hex_sk().decode('utf-8'),
                 'seed': self.__keys.hex_seed().decode('utf-8'),

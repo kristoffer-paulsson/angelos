@@ -27,3 +27,11 @@ class Document(IssueMixin, BaseDocument):
         except AttributeError:
             pass
         return True
+
+
+class File(BaseDocument):
+    id = UuidField(init=uuid.uuid4)
+    created = DateField(init=datetime.date.today)
+    mime = StringField()
+    data = StringField()
+    issuer = UuidField()

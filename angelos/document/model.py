@@ -1,3 +1,4 @@
+import re
 import datetime
 import uuid
 
@@ -65,7 +66,7 @@ class StringField(Field):
             value = [value]
 
         for v in value:
-            if not (isinstance(v, (str, type(None))) or bool(str(value))):
+            if not (isinstance(v, (str, type(None))) or bool(str(v))):
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'str', 'current': type(v)})
@@ -89,6 +90,34 @@ class ChoiceField(Field):
                 raise Util.exception(
                     Error.FIELD_INVALID_CHOICE,
                     {'expected': self.choices, 'current': v})
+        return True
+
+
+e_re = '^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$'
+
+
+class EmailField(Field):
+    def __init__(self, value=None, required=True,
+                 multiple=False, init=None, choices=[]):
+        Field.__init__(self, value, required, multiple, init)
+        self.choices = choices
+
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not (isinstance(v, (str, type(None))) or bool(str(v))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'str', 'current': type(v)})
+
+            if not bool(re.match(e_re, v)):
+                raise Util.exception(
+                    Error.FIELD_INVALID_EMAIL,
+                    {'email': v})
         return True
 
 

@@ -88,31 +88,6 @@ Builder.load_string('''
                             do_scroll_x: False
                             Profile:
                                 id: profile
-                                ThreeLineIconListItem:
-                                    text: "Berzeliigatan 15" + '\\n' + "412 53 GÖTEBORG"
-                                    secondary_text: "Address"
-                                    IconLeftSampleWidget:
-                                        icon: 'map-marker'
-                                TwoLineIconListItem:
-                                    text: "herbert.gustafsson@example.com"
-                                    secondary_text: "Email"
-                                    IconLeftSampleWidget:
-                                        icon: 'email-outline'
-                                TwoLineIconListItem:
-                                    text: "+46 (0)73-45 67 890"
-                                    secondary_text: "Cellphone"
-                                    IconLeftSampleWidget:
-                                        icon: 'cellphone'
-                                TwoLineIconListItem:
-                                    text: "+46 (0)31-23 45 67"
-                                    secondary_text: 'Landline'
-                                    IconLeftSampleWidget:
-                                        icon: 'phone'
-                                TwoLineIconListItem:
-                                    text: "@herbert_gustafsson"
-                                    secondary_text: 'Twitter'
-                                    IconLeftSampleWidget:
-                                        icon: 'robot'
                                 TwoLineIconListItem:
                                     text: "Swedish, English"
                                     secondary_text: "Languages"
@@ -325,12 +300,16 @@ class Profile(MDList):
         eid = app.ioc.facade.id
         entity = app.ioc.facade.entity
         address = app.ioc.facade.address
+        email = app.ioc.facade.email
+        mobile = app.ioc.facade.mobile
+        phone = app.ioc.facade.phone
+        social = app.ioc.facade.social
 
         # Unlock
         lock_li = OneLineAvatarIconListItem(text='Unlock edit mode')
         lock_li.add_widget(IconLeftWidget(icon='lock-open'))
         lock_li.add_widget(IconRightSwitch(
-            on_press=lambda x: self.toggle(x.active)))
+            on_press=lambda x: self.toggle(x.active), active=self.edit))
         self.add_widget(lock_li, 0)
 
         # Id
@@ -341,7 +320,7 @@ class Profile(MDList):
 
         # Gendeer
         gender_li = TwoLineIconListItem(
-            text=entity.gender,
+            text=entity.gender.capitalize(),
             secondary_text='Gender')
         gender_li.add_widget(IconLeftWidget(icon='human'))
         self.add_widget(gender_li, 3)
@@ -359,30 +338,77 @@ class Profile(MDList):
                 text=address.street + ' ' + address.number + '\n' +
                 address.zip + ' ' + address.city,
                 secondary_text='Address',
-                on_release=lambda x: self.address_dialog(
-                    app, data=app.ioc.facade.address) if self.edit else None)
+                on_release=lambda x: AddressDialog(
+                    app, self, data=app.ioc.facade.address
+                    ) if self.edit else None)
             addr_li.add_widget(IconLeftWidget(icon='map-marker'))
             self.add_widget(addr_li, 5)
         else:
             self.menu_items.append({
                 'viewclass': 'MDMenuItem', 'text': 'Add an address',
-                'on_release': lambda: self.address_dialog(app)})
+                'on_release': lambda: AddressDialog(app, self)})
+
         # Email
-        self.menu_items.append({
-            'viewclass': 'MDMenuItem', 'text': 'Add an email',
-            'on_release': lambda: print('Implement email dialog')})
+        if bool(email):
+            mail_li = TwoLineIconListItem(
+                text=email,
+                secondary_text='Email',
+                on_release=lambda x: EmailDialog(
+                    app, self, data=app.ioc.facade.email
+                    ) if self.edit else None)
+            mail_li.add_widget(IconLeftWidget(icon='email-outline'))
+            self.add_widget(mail_li, 6)
+        else:
+            self.menu_items.append({
+                'viewclass': 'MDMenuItem', 'text': 'Add an email',
+                'on_release': lambda: EmailDialog(app, self)})
+
         # Cellphone
-        self.menu_items.append({
-            'viewclass': 'MDMenuItem', 'text': 'Add cellphone',
-            'on_release': lambda: print('Implement cellphone dialog')})
+        if bool(mobile):
+            mob_li = TwoLineIconListItem(
+                text=mobile,
+                secondary_text='Mobile',
+                on_release=lambda x: MobileDialog(
+                    app, self, data=app.ioc.facade.mobile
+                    ) if self.edit else None)
+            mob_li.add_widget(IconLeftWidget(icon='cellphone'))
+            self.add_widget(mob_li, 7)
+        else:
+            self.menu_items.append({
+                'viewclass': 'MDMenuItem', 'text': 'Add mobile',
+                'on_release': lambda: MobileDialog(app, self)})
+
         # Landline
-        self.menu_items.append({
-            'viewclass': 'MDMenuItem', 'text': 'Add landline phone',
-            'on_release': lambda: print('Implement landline dialog')})
+        if bool(phone):
+            phon_li = TwoLineIconListItem(
+                text=phone,
+                secondary_text='Phone',
+                on_release=lambda x: PhoneDialog(
+                    app, self, data=app.ioc.facade.phone
+                    ) if self.edit else None)
+            phon_li.add_widget(IconLeftWidget(icon='phone'))
+            self.add_widget(phon_li, 8)
+        else:
+            self.menu_items.append({
+                'viewclass': 'MDMenuItem', 'text': 'Add phone',
+                'on_release': lambda: PhoneDialog(app, self)})
+
         # Social
+        if bool(social):
+            for media in social:
+                soc_li = TwoLineIconListItem(
+                    text=social[media].token,
+                    secondary_text=social[media].media,
+                    on_release=lambda x: SocialMediaDialog(
+                        app, self, data=social[media]
+                        ) if self.edit else None)
+                soc_li.add_widget(IconLeftWidget(icon='android'))
+                self.add_widget(soc_li, 300)
+
         self.menu_items.append({
-            'viewclass': 'MDMenuItem', 'text': 'Add Social networks',
-            'on_release': lambda: print('Implement social dialog')})
+            'viewclass': 'MDMenuItem', 'text': 'Add Social',
+            'on_release': lambda: SocialMediaDialog(app, self)})
+
         # Languages
         self.menu_items.append({
             'viewclass': 'MDMenuItem', 'text': 'Add languages',
@@ -410,50 +436,12 @@ class Profile(MDList):
             'Dismiss', action=lambda *x: dialog.dismiss())
         dialog.open()
 
-    def address_dialog(self, app, data=None):
-        address = AddressDialog(
-            data=data,
-            height=dp(500),
-            pos_hint={'center_x': .5, 'center_y': .5},
-            size_hint=(1, None))
-
-        dialog = MDDialog(title='Address', content=address)
-        if bool(data):
-            dialog.add_action_button(
-                'Delete', action=lambda *x: self.address_delete(app, dialog))
-        dialog.add_action_button('Cancel', action=lambda *x: dialog.dismiss())
-        dialog.add_action_button(
-            'Save', action=lambda *x: self.address_save(app, dialog, x))
-        dialog.open()
-
-    def address_save(self, app, dialog, content):
-        ids = dialog.content.ids
-        app.ioc.facade.address = PersonFacade.Address(
-            street=str(ids.street.text).strip(),
-            number=str(ids.number.text).strip(),
-            address2=str(ids.address2.text).strip(),
-            zip=str(ids.zip.text).strip(),
-            city=str(ids.city.text).strip(),
-            state=str(ids.state.text).strip(),
-            country=str(ids.country.text).strip()
-        )
-        app.ioc.facade.save()
-        dialog.dismiss()
-        self.load(app)
-
-    def address_delete(self, app, dialog):
-        ids = dialog.content.ids
-        app.ioc.facade.address = None
-        app.ioc.facade.save()
-        dialog.dismiss()
-        self.load(app)
-
     def open_menu(self, anchor):
         MDDropdownMenu(items=self.menu_items, width_mult=4).open(anchor)
 
 
 Builder.load_string('''
-<AddressDialog>:
+<AddressContent>:
     orientation: 'vertical'
     MDLabel:
         text: "You may fill in your address. If you do, please fill in the information truthfully. If you for any reason don\'t want to give certain information, you are free to leave it blank."
@@ -475,27 +463,24 @@ Builder.load_string('''
             helper_text: "Street name"
             helper_text_mode: "persistent"
             multiline: False
-            color_mode: 'custom'
             size_hint: .8, None
             valign: 'top'
         MDTextField:
             id: number
             text: root.data.number if bool(root.data) else ''
-            hint_text: "No #"
+            hint_text: "No.#"
             helper_text: "Number"
             helper_text_mode: "persistent"
             multiline: False
-            color_mode: 'custom'
             size_hint: .2, None
             valign: 'top'
     MDTextField:
         id: address2
         text: root.data.address2 if bool(root.data) else ''
-        hint_text: "2nd"
+        hint_text: "Address 2"
         helper_text: "2nd address line (if applicable)"
         helper_text_mode: "persistent"
         multiline: False
-        color_mode: 'custom'
         valign: 'top'
     BoxLayout:
         orientation: 'horizontal'
@@ -507,7 +492,6 @@ Builder.load_string('''
             helper_text: "Zip code"
             helper_text_mode: "persistent"
             multiline: False
-            color_mode: 'custom'
             size_hint: .4, None
             valign: 'top'
         MDTextField:
@@ -517,7 +501,6 @@ Builder.load_string('''
             helper_text: ""
             helper_text_mode: "persistent"
             multiline: False
-            color_mode: 'custom'
             size_hint: .6, None
             valign: 'top'
     BoxLayout:
@@ -530,7 +513,6 @@ Builder.load_string('''
             helper_text: "(if applicable)"
             helper_text_mode: "persistent"
             multiline: False
-            color_mode: 'custom'
             size_hint: .3, None
             valign: 'top'
         MDTextField:
@@ -540,17 +522,341 @@ Builder.load_string('''
             helper_text: ""
             helper_text_mode: "persistent"
             multiline: False
-            color_mode: 'custom'
             size_hint: .7, None
             valign: 'top'
     BoxLayout:
 ''')  # noqa E501
 
 
-class AddressDialog(BoxLayout):
-    def __init__(self, data, **kwargs):
-        self.data = data
-        BoxLayout.__init__(self, **kwargs)
+class AddressDialog:
+    def __init__(self, app, parent, data=None):
+        self.__app = app
+        self.__parent = parent
+
+        content = AddressDialog.AddressContent(
+            data=data,
+            height=dp(500),
+            pos_hint={'center_x': .5, 'center_y': .5},
+            size_hint=(1, None))
+
+        self.__dialog = MDDialog(title='Address', content=content)
+        if bool(data):
+            self.__dialog.add_action_button(
+                'Delete', action=lambda *x: self.delete())
+        self.__dialog.add_action_button(
+            'Cancel', action=lambda *x: self.__dialog.dismiss())
+        self.__dialog.add_action_button(
+            'Save', action=lambda *x: self.save())
+        self.__dialog.open()
+
+    def save(self):
+        ids = self.__dialog.content.ids
+        self.__app.ioc.facade.address = PersonFacade.Address(
+            street=str(ids.street.text).strip(),
+            number=str(ids.number.text).strip(),
+            address2=str(ids.address2.text).strip(),
+            zip=str(ids.zip.text).strip(),
+            city=str(ids.city.text).strip(),
+            state=str(ids.state.text).strip(),
+            country=str(ids.country.text).strip()
+        )
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    def delete(self):
+        self.__app.ioc.facade.address = None
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    class AddressContent(BoxLayout):
+        def __init__(self, data, **kwargs):
+            self.data = data
+            BoxLayout.__init__(self, **kwargs)
+
+
+Builder.load_string('''
+<EmailContent>:
+    orientation: 'vertical'
+    MDLabel:
+        text: "You may fill in your Email address. If you do, please fill in the information truthfully. If you for any reason don\'t want to give certain information, you are free to leave it blank."
+        font_style: 'Body1'
+        theme_text_color: 'Primary'
+        halign: 'left'
+    MDLabel:
+        text: "This information remains private to you. You have to make a wilful choice in order to share with others."
+        font_style: 'Body1'
+        theme_text_color: 'Error'
+        halign: 'left'
+    MDTextField:
+        id: email
+        text: root.data if bool(root.data) else ''
+        hint_text: "Email"
+        helper_text: "Valid email address"
+        helper_text_mode: "persistent"
+        multiline: False
+        color_mode: 'custom'
+        valign: 'top'
+    BoxLayout:
+''')  # noqa E501
+
+
+class EmailDialog:
+    def __init__(self, app, parent, data=None):
+        self.__app = app
+        self.__parent = parent
+
+        content = EmailDialog.EmailContent(
+            data=data,
+            height=dp(500),
+            pos_hint={'center_x': .5, 'center_y': .5},
+            size_hint=(1, None))
+
+        self.__dialog = MDDialog(title='Email', content=content)
+        if bool(data):
+            self.__dialog.add_action_button(
+                'Delete', action=lambda *x: self.delete())
+        self.__dialog.add_action_button(
+            'Cancel', action=lambda *x: self.__dialog.dismiss())
+        self.__dialog.add_action_button(
+            'Save', action=lambda *x: self.save())
+        self.__dialog.open()
+
+    def save(self):
+        ids = self.__dialog.content.ids
+        self.__app.ioc.facade.email = str(ids.email.text).strip()
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    def delete(self):
+        self.__app.ioc.facade.email = None
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    class EmailContent(BoxLayout):
+        def __init__(self, data, **kwargs):
+            self.data = data
+            BoxLayout.__init__(self, **kwargs)
+
+
+Builder.load_string('''
+<MobileContent>:
+    orientation: 'vertical'
+    MDLabel:
+        text: "You may fill in your Mobile number. If you do, please fill in the information truthfully. If you for any reason don\'t want to give certain information, you are free to leave it blank."
+        font_style: 'Body1'
+        theme_text_color: 'Primary'
+        halign: 'left'
+    MDLabel:
+        text: "This information remains private to you. You have to make a wilful choice in order to share with others."
+        font_style: 'Body1'
+        theme_text_color: 'Error'
+        halign: 'left'
+    MDTextField:
+        id: mobile
+        text: root.data if bool(root.data) else ''
+        hint_text: "Mobile"
+        helper_text: "Valid mobile number"
+        helper_text_mode: "persistent"
+        multiline: False
+        color_mode: 'custom'
+        valign: 'top'
+    BoxLayout:
+''')  # noqa E501
+
+
+class MobileDialog:
+    def __init__(self, app, parent, data=None):
+        self.__app = app
+        self.__parent = parent
+
+        content = MobileDialog.MobileContent(
+            data=data,
+            height=dp(500),
+            pos_hint={'center_x': .5, 'center_y': .5},
+            size_hint=(1, None))
+
+        self.__dialog = MDDialog(title='Mobile', content=content)
+        if bool(data):
+            self.__dialog.add_action_button(
+                'Delete', action=lambda *x: self.delete())
+        self.__dialog.add_action_button(
+            'Cancel', action=lambda *x: self.__dialog.dismiss())
+        self.__dialog.add_action_button(
+            'Save', action=lambda *x: self.save())
+        self.__dialog.open()
+
+    def save(self):
+        ids = self.__dialog.content.ids
+        self.__app.ioc.facade.mobile = str(ids.mobile.text).strip()
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    def delete(self):
+        self.__app.ioc.facade.mobile = None
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    class MobileContent(BoxLayout):
+        def __init__(self, data, **kwargs):
+            self.data = data
+            BoxLayout.__init__(self, **kwargs)
+
+
+Builder.load_string('''
+<PhoneContent>:
+    orientation: 'vertical'
+    MDLabel:
+        text: "You may fill in your Phone number. If you do, please fill in the information truthfully. If you for any reason don\'t want to give certain information, you are free to leave it blank."
+        font_style: 'Body1'
+        theme_text_color: 'Primary'
+        halign: 'left'
+    MDLabel:
+        text: "This information remains private to you. You have to make a wilful choice in order to share with others."
+        font_style: 'Body1'
+        theme_text_color: 'Error'
+        halign: 'left'
+    MDTextField:
+        id: phone
+        text: root.data if bool(root.data) else ''
+        hint_text: "Phone"
+        helper_text: "Valid phone number"
+        helper_text_mode: "persistent"
+        multiline: False
+        color_mode: 'custom'
+        valign: 'top'
+    BoxLayout:
+''')  # noqa E501
+
+
+class PhoneDialog:
+    def __init__(self, app, parent, data=None):
+        self.__app = app
+        self.__parent = parent
+
+        content = PhoneDialog.PhoneContent(
+            data=data,
+            height=dp(500),
+            pos_hint={'center_x': .5, 'center_y': .5},
+            size_hint=(1, None))
+
+        self.__dialog = MDDialog(title='Phone', content=content)
+        if bool(data):
+            self.__dialog.add_action_button(
+                'Delete', action=lambda *x: self.delete())
+        self.__dialog.add_action_button(
+            'Cancel', action=lambda *x: self.__dialog.dismiss())
+        self.__dialog.add_action_button(
+            'Save', action=lambda *x: self.save())
+        self.__dialog.open()
+
+    def save(self):
+        ids = self.__dialog.content.ids
+        self.__app.ioc.facade.phone = str(ids.phone.text).strip()
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    def delete(self):
+        self.__app.ioc.facade.phone = None
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    class PhoneContent(BoxLayout):
+        def __init__(self, data, **kwargs):
+            self.data = data
+            BoxLayout.__init__(self, **kwargs)
+
+
+Builder.load_string('''
+<SocialMediaContent>:
+    orientation: 'vertical'
+    MDLabel:
+        text: "You may fill in your Social. If you do, please fill in the information truthfully. If you for any reason don\'t want to give certain information, you are free to leave it blank."
+        font_style: 'Body1'
+        theme_text_color: 'Primary'
+        halign: 'left'
+    MDLabel:
+        text: "This information remains private to you. You have to make a wilful choice in order to share with others."
+        font_style: 'Body1'
+        theme_text_color: 'Error'
+        halign: 'left'
+    MDTextField:
+        id: token
+        text: root.data.token if bool(root.data) else ''
+        hint_text: "Token"
+        helper_text: "Token/username/profile page"
+        helper_text_mode: "persistent"
+        multiline: False
+        color_mode: 'custom'
+        valign: 'top'
+    MDTextField:
+        id: media
+        text: root.data.media if bool(root.data) else ''
+        hint_text: "Social media"
+        helper_text: "Social media name"
+        helper_text_mode: "persistent"
+        multiline: False
+        color_mode: 'custom'
+        valign: 'top'
+    BoxLayout:
+''')  # noqa E501
+
+
+class SocialMediaDialog:
+    def __init__(self, app, parent, data=None):
+        self.__app = app
+        self.__parent = parent
+
+        content = SocialMediaDialog.SocialMediaContent(
+            data=data,
+            height=dp(500),
+            pos_hint={'center_x': .5, 'center_y': .5},
+            size_hint=(1, None))
+
+        self.__dialog = MDDialog(title='Social media', content=content)
+        if bool(data):
+            self.__dialog.add_action_button(
+                'Delete', action=lambda *x: self.delete())
+        self.__dialog.add_action_button(
+            'Cancel', action=lambda *x: self.__dialog.dismiss())
+        self.__dialog.add_action_button(
+            'Save', action=lambda *x: self.save())
+        self.__dialog.open()
+
+    def save(self):
+        ids = self.__dialog.content.ids
+        media = PersonFacade.Social(
+            token=str(ids.token.text).strip(),
+            media=list(filter(
+                None, ids.media.text.strip().split(' ')))[0].capitalize())
+        self.__app.ioc.facade.del_social(media)
+        self.__app.ioc.facade.add_social(media)
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    def delete(self):
+        ids = self.__dialog.content.ids
+        media = PersonFacade.Social(
+            token=str(ids.token.text).strip(),
+            media=list(filter(
+                None, ids.media.text.strip().split(' ')))[0].capitalize())
+        self.__app.ioc.facade.del_social(media)
+        self.__app.ioc.facade.save()
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    class SocialMediaContent(BoxLayout):
+        def __init__(self, data, **kwargs):
+            self.data = data
+            BoxLayout.__init__(self, **kwargs)
 
 
 class IconLeftWidget(ILeftBodyTouch, MDIconButton):
