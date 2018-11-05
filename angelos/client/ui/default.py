@@ -9,7 +9,7 @@ from kivy.garden.qrcode import QRCodeWidget
 from kivymd.list import (
     MDList, TwoLineIconListItem, OneLineAvatarIconListItem,
     ThreeLineIconListItem, OneLineIconListItem, ILeftBody, ILeftBodyTouch,
-    IRightBodyTouch)
+    IRightBodyTouch, BaseListItem, ContainerSupport)
 from kivymd.selectioncontrols import MDCheckbox, MDSwitch
 from kivymd.bottomsheet import MDListBottomSheet
 from kivymd.button import MDIconButton
@@ -417,7 +417,8 @@ class Profile(MDList):
         # Name
         name_li = TwoLineIconListItem(
             text=entity.given_name + ' ' + entity.family_name,
-            secondary_text='Full name')
+            secondary_text='Name',
+            on_press=lambda x: CameraDialog(app, self) if self.edit else None)
         name_li.add_widget(IconLeftWidget(icon='face-profile'))
         self.add_widget(name_li, 1000)
 
@@ -854,6 +855,74 @@ class SocialMediaDialog:
         self.__parent.load(self.__app)
 
     class SocialMediaContent(BoxLayout):
+        def __init__(self, data, **kwargs):
+            self.data = data
+            BoxLayout.__init__(self, **kwargs)
+
+
+Builder.load_string('''
+<ProfilePhoto>:
+    BoxLayout:
+        id: _text_container
+        orientation: 'vertical'
+        pos: root.pos
+        padding: root._txt_left_pad, root._txt_top_pad, root._txt_right_pad, root._txt_bot_pad
+        Image:
+
+''')  # noqa E501
+
+
+class ProfilePhoto(ContainerSupport, BaseListItem):
+    pass
+
+
+Builder.load_string('''
+<CameraContent>:
+    orientation: 'vertical'
+    Camera:
+        id: camera
+        resolution: (0, 0)
+        play: True
+        allow_stretch: True
+        keep_ration: False
+    BoxLayout:
+''')  # noqa E501
+
+
+class CameraDialog:
+    def __init__(self, app, parent, data=None):
+        self.__app = app
+        self.__parent = parent
+
+        content = CameraDialog.CameraContent(
+            data=data,
+            height=dp(500),
+            pos_hint={'center_x': .5, 'center_y': .5},
+            size_hint=(2, None))
+
+        self.__dialog = MDDialog(title='Camera', content=content)
+        self.__dialog.add_action_button(
+            'Capture', action=lambda *x: self.save())
+        self.__dialog.add_action_button(
+            'Cancel', action=lambda *x: self.cancel())
+        self.__dialog.open()
+
+    def save(self):
+        camera = self.__dialog.content.ids['camera']
+        tex = camera.texture
+        camera.play = False
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    def cancel(self):
+        ids = self.__dialog.content.ids
+        # self.__app.ioc.facade.save()
+        print(ids['camera'])
+        ids['camera'].play = False
+        self.__dialog.dismiss()
+        self.__parent.load(self.__app)
+
+    class CameraContent(BoxLayout):
         def __init__(self, data, **kwargs):
             self.data = data
             BoxLayout.__init__(self, **kwargs)

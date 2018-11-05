@@ -5,16 +5,20 @@ import enum
 class Eidon:
     "εἶδον - Eidon"
     SIZES = (0, 1, 1, 3, 3, 4, 4)
-    QUALITY = (0, 3, 6, 10, 15)
+    QUALITY = (0, 3, 6, 10, 15, 64)
     EMPTY = [[[0. for _ in range(8)] for _ in range(8)] for _ in range(3)]
     PI_D_16 = math.pi / 16.0
     ONE_D_SQRT2 = 1.0 / math.sqrt(2.0)
+
+    HEADER_FORMAT = '!BBHH'
+    HEADER_LENGTH = 6
 
     class Quality(enum.IntEnum):
         BAD = 1
         GOOD = 2
         BETTER = 3
         BEST = 4
+        MAX = 5
 
     class Format(enum.IntEnum):
         NONE = 0

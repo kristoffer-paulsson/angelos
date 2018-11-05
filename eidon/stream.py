@@ -1,4 +1,6 @@
 import math
+import struct
+import bz2
 from .eidon import Eidon
 
 
@@ -45,6 +47,31 @@ class EidonStream:
     @staticmethod
     def preferred(width, height, data=None):
         return StreamYCBCR(width, height, Eidon.Quality.GOOD, data)
+
+    @staticmethod
+    def load(data):
+        tpl = struct.unpack(
+            Eidon.HEADER_FORMAT, data[:Eidon.HEADER_LENGTH])
+        if tpl[0] == Eidon.Format.RGB: klass = StreamRGB   # noqa E701
+        elif tpl[0] == Eidon.Format.YCBCR: klass = StreamYCBCR  # noqa E701
+        else: raise TypeError(tpl[0])  # noqa E701
+
+        return klass(tpl[2], tpl[3], tpl[1], bytearray(bz2.decompress(
+            data[Eidon.HEADER_LENGTH:])))
+
+    @staticmethod
+    def dump(stream):
+        if isinstance(stream, StreamRGB): format = Eidon.Format.RGB  # noqa E701
+        elif isinstance(stream, StreamYCBCR): format = Eidon.Format.YCBCR  # noqa E701
+        else: raise TypeError()  # noqa E701
+
+        return bytearray(struct.pack(
+            Eidon.HEADER_FORMAT,
+            format,
+            stream.quality,
+            stream.width,
+            stream.height
+        ) + bz2.compress(stream.data))
 
 
 class Stream24Bit(EidonStream):

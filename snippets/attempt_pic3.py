@@ -1,5 +1,4 @@
 import io
-import bz2
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -11,6 +10,8 @@ from kivymd.theming import ThemeManager
 from eidon.codec import EidonEncoder, EidonDecoder
 from eidon.image import EidonImage, ImageRGB, ImageRGBA
 from eidon.stream import EidonStream
+
+# from dahuffman import HuffmanCodec
 
 """
 def __init__(self, **kwargs):
@@ -36,7 +37,7 @@ Builder.load_string('''
         id: picture
     Image:
         id: loaded
-        source: 'image.png'
+        source: 'image5.png'
         size_hint: .2, .2
         pos_hint: {'top':.9,'right':.9}
         MDFloatingActionButton:
@@ -49,16 +50,16 @@ Builder.load_string('''
 
 class ImageWidget(BoxLayout):
     def capture(self):
-        self.ids['loaded'].export_to_png("original-image.png")
         image = self.extract()
         print(len(image.pixels))
-        stream = EidonEncoder(image, EidonStream.preferred(
-            image.width, image.height)).run()
-        print(len(stream.data))
-        print(len(bz2.compress(stream.data)))
+        encoder = EidonEncoder(image, EidonStream.preferred(
+            image.width, image.height))
+        stream = encoder.run()
+        data = EidonStream.dump(stream)
+        print(len(data))
+        stream = EidonStream.load(data)
         self.insert(EidonDecoder(stream, EidonImage.rgb(
             stream.width, stream.height)).run())
-        self.ids['picture'].export_to_png("converted-image.png")
 
     def extract(self):
         tex = self.ids['loaded'].texture

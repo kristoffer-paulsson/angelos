@@ -1,6 +1,5 @@
 import io
-import random
-import math
+import bz2
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -9,7 +8,12 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.graphics.texture import Texture
 from kivymd.theming import ThemeManager
 
-from attempt_color import Eidon
+from eidon.codec import EidonEncoder, EidonDecoder
+from eidon.image import EidonImage, ImageRGB, ImageRGBA
+from eidon.stream import EidonStream
+from eidon.delta import EliasDeltaEncoder
+from eidon.compressor import ArithmeticCompressor
+
 
 """
 def __init__(self, **kwargs):
@@ -49,37 +53,44 @@ Builder.load_string('''
 
 class CameraWidget(BoxLayout):
     def capture(self):
-        data = self.extract()
-        print(len(data.data))
-        image = Eidon.encode(data, None)
-        print(len(image))
-        self.insert(Eidon.decode(image, 1280, 720))
+        image = self.extract()
+        print(len(image.pixels))
+        encoder = EidonEncoder(image, EidonStream.preferred(
+            image.width, image.height))
+        stream = encoder.run()
+        print(len(stream.data))
+        compressor = ArithmeticCompressor()
+        elias = compressor.run(stream.data.obj)
+        print(len(elias))
+        print(len(bz2.compress(elias)))
+        print(len(bz2.compress(stream.data.obj)))
+        # compressor = EliasDeltaEncoder()
+        # elias = compressor.run(stream.data.obj)
+        # print(len(elias))
+        self.insert(EidonDecoder(stream, EidonImage.rgb(
+            stream.width, stream.height)).run())
 
     def extract(self):
         tex = self.ids['camera'].texture
-        if tex.colorfmt == 'rgba':
-            fmt = Eidon.Format.RGBA
-        elif tex.colorfmt == 'rgb':
-            fmt = Eidon.Format.RGB
-
-        # tex.flip_vertical()
         data = io.BytesIO(tex.pixels)
         data.seek(0)
-        return Eidon.Image(
-            fmt,
-            tex.size[0],
-            tex.size[1],
-            data.getvalue()
-        )
+        if tex.colorfmt == 'rgba':
+            image = EidonImage.rgba(tex.width,
+                                    tex.height,
+                                    bytearray(data.getvalue()))
+        elif tex.colorfmt == 'rgb':
+            image = EidonImage.rgb(tex.width,
+                                   tex.height,
+                                   bytearray(data.getvalue()))
+        return image
 
     def insert(self, input):
-        if input.format == Eidon.Format.RGBA:
+        if isinstance(input, ImageRGBA):
             fmt = 'rgba'
-        elif input.format == Eidon.Format.RGB:
+        elif isinstance(input, ImageRGB):
             fmt = 'rgb'
-
         tex = Texture.create(size=(input.width, input.height), colorfmt=fmt)
-        tex.blit_buffer(input.data, colorfmt=fmt, bufferfmt='ubyte')
+        tex.blit_buffer(input.pixels, colorfmt=fmt, bufferfmt='ubyte')
         with self.ids['picture'].canvas:
             Rectangle(texture=tex, size=self.ids['camera'].texture.size)
 
