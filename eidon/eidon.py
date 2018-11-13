@@ -10,8 +10,8 @@ class Eidon:
     PI_D_16 = math.pi / 16.0
     ONE_D_SQRT2 = 1.0 / math.sqrt(2.0)
 
-    HEADER_FORMAT = '!BBHH'
-    HEADER_LENGTH = 6
+    HEADER_FORMAT = '!BBBHH'
+    HEADER_LENGTH = 7
 
     class Quality(enum.IntEnum):
         BAD = 1
@@ -28,3 +28,8 @@ class Eidon:
         YCBCR = 4
         RGBA = 5
         YCBCRA = 6
+
+    class Signal(enum.IntEnum):
+        NONE = 0
+        COMPOSITE = 1
+        COMPONENT = 2

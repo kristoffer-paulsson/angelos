@@ -1,11 +1,15 @@
 import math
+import struct
 import asyncio
 
 from .eidon import Eidon
 from .image import EidonImage
-from .stream import EidonStream, StreamRGB
+from .stream import EidonStream, StreamRGB, StreamYCBCR, StreamIndexed
 from .palettes import Palette
 from .matrix import Matrix
+from .compressor import (
+    AdaptiveArithmethicCompressor,
+    AdaptiveArithmethicDecompressor)
 
 
 class EidonEncoder:
@@ -19,11 +23,11 @@ class EidonEncoder:
         self._m_height = int(math.floor(image.height / 8))
         self._dither = []
         self._palette = [
-            Palette.RGB676,
-            Palette.RGB676
-        ] if isinstance(stream, StreamRGB) else [
             Palette.YCBCR766RGB,
             Palette.YCBCR766
+        ] if isinstance(stream, StreamYCBCR) else [
+            Palette.RGB676SORT,
+            Palette.RGB676SORT
         ]
         self._factor = [
             Matrix.QUANTITY_Y,
@@ -37,23 +41,37 @@ class EidonEncoder:
         stream.clear()
 
     def run(self, _async=False):
+        stock = [bytearray() for _ in range(self._stream._quality)]
         size = self._stream.size()
+
         for iteration in range(self._m_height):
             lines = self.dither(iteration * 8, 8)
 
             for block in range(self._m_width):
-                matrix = self.get_matrix(lines, 0, block * 8)
+                if self._stream.signal is Eidon.Signal.COMPONENT:
+                    matrix = self.get_component_matrix(lines, 0, block * 8)
+                elif self._stream.signal is Eidon.Signal.COMPOSITE:
+                    matrix = self.get_composite_matrix(lines, 0, block * 8)
 
                 for d in range(size):
                     transform = self.dct(matrix[d])
                     quantity = self.quantize(
                         transform, self._factor[d])
                     entropy = self.entropize(quantity)
-                    self._stream.pack(entropy)
+                    self.split(entropy, stock)
 
             if _async:
                 asyncio.sleep(.1)
 
+        self._stream.data = bytearray()
+        for i in range(self._stream._quality):
+            uncomp = len(stock[i])
+            block = AdaptiveArithmethicCompressor().run(stock[i])
+            blklen = len(block)
+            self._stream.data += bytearray(
+                struct.pack('!I', len(block)) + block)
+            print('Block frequencies:', uncomp, blklen)
+        print('1', len(self._stream.data))
         return self._stream
 
     def dither(self, offset=0, rows=0):
@@ -115,7 +133,7 @@ class EidonEncoder:
     def distance(self, p1, p2):
         return math.sqrt((p2[0]-p1[0])**2+(p2[1]-p1[1])**2+(p2[2]-p1[2])**2)
 
-    def get_matrix(self, lines, y_pos, x_pos):
+    def get_component_matrix(self, lines, y_pos, x_pos):
         matrix = [[[0. for _ in range(8)] for _ in range(8)] for _ in range(3)]
         for y in range(8):
             for x in range(8):
@@ -123,6 +141,14 @@ class EidonEncoder:
                 matrix[0][y][x] = pixel[0]
                 matrix[1][y][x] = pixel[1]
                 matrix[2][y][x] = pixel[2]
+        return matrix
+
+    def get_composite_matrix(self, lines, y_pos, x_pos):
+        matrix = [[[0. for _ in range(8)] for _ in range(8)]]
+        for y in range(8):
+            for x in range(8):
+                pixel = lines[y_pos+y][x_pos+x]
+                matrix[0][y][x] = pixel
         return matrix
 
     def dct(self, matrix):
@@ -158,6 +184,16 @@ class EidonEncoder:
             line[i] = int(matrix[p[i][1]][p[i][0]] + 128)
         return line
 
+    def split(self, entropy, stock):
+        for i in range(self._stream._quality):
+            stock[i].append(entropy[i])
+
+    def frequency(self, block):
+        freqs = [0 for _ in range(256)]
+        for i in block:
+            freqs[i] += 1
+        return freqs
+
 
 class EidonDecoder:
     def __init__(self, stream, image):
@@ -178,29 +214,50 @@ class EidonDecoder:
             Matrix.QUANTITY_C
         ]
 
-        self._converter = self.none2none if isinstance(
-            stream, StreamRGB) else self.ycbcr2rgb
+        if isinstance(stream, StreamYCBCR):
+            self._converter = self.ycbcr2rgb
+        elif isinstance(stream, StreamIndexed):
+            self._converter = self.index2rgb
+        else:
+            self._converter = self.none2none
 
         stream.clear()
 
     def run(self, _async=False):
+        stock = []
+        stock_cnt = 0
+        stock_idx = 0
+        for i in range(self._stream._quality):
+            length = struct.unpack(
+                '!I', self._stream.data[stock_idx:stock_idx + 4])[0]
+            stock_idx += 4
+            stock.append(AdaptiveArithmethicDecompressor().run(
+                self._stream.data[stock_idx:stock_idx+length]))
+            stock_idx += length
+
         size = self._stream.size()
         for y_block in range(self._m_height):
             for x_block in range(self._m_width):
-
                 matrix = list(range(size))
                 for c in range(size):
-                    entropy = self.deentropize(self._stream.unpack())
+                    entropy = self.deentropize(self.join(stock_cnt, stock))
+                    stock_cnt += 1
                     quantity = self.dequantize(entropy, self._factor[c])
                     matrix[c] = self.idct(quantity)
-                self.set_matrix(matrix, y_block*8, x_block*8)
-
+                if self._stream.signal is Eidon.Signal.COMPONENT:
+                    self.set_component_matrix(matrix, y_block*8, x_block*8)
+                elif self._stream.signal is Eidon.Signal.COMPOSITE:
+                    self.set_composite_matrix(matrix, y_block*8, x_block*8)
             if _async:
                 asyncio.sleep(.1)
+
         return self._image
 
     def none2none(self, w):
         return w
+
+    def index2rgb(self, c):
+        return Palette.RGB676SORT[int(min(max(0, c), 255))]
 
     def ycbcr2rgb(self, c):
         return (
@@ -244,7 +301,7 @@ class EidonDecoder:
                 data[y][x] = int(z)
         return data
 
-    def set_matrix(self, matrix, y_pos, x_pos):
+    def set_component_matrix(self, matrix, y_pos, x_pos):
         for y in range(8):
             for x in range(8):
                 self._image.set(
@@ -255,3 +312,18 @@ class EidonDecoder:
                         matrix[2][y][x]
                     ))
                 )
+
+    def set_composite_matrix(self, matrix, y_pos, x_pos):
+        for y in range(8):
+            for x in range(8):
+                pixel = matrix[0][y][x]
+                self._image.set(
+                    x_pos + x, y_pos + y,
+                    self._converter((pixel))
+                )
+
+    def join(self, cnt, stock):
+        block = bytearray()
+        for i in range(self._stream._quality):
+            block.append(stock[i][cnt])
+        return block

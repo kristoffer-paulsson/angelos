@@ -1,5 +1,4 @@
 import io
-import bz2
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -11,8 +10,6 @@ from kivymd.theming import ThemeManager
 from eidon.codec import EidonEncoder, EidonDecoder
 from eidon.image import EidonImage, ImageRGB, ImageRGBA
 from eidon.stream import EidonStream
-from eidon.delta import EliasDeltaEncoder
-from eidon.compressor import ArithmeticCompressor
 
 
 """
@@ -58,15 +55,9 @@ class CameraWidget(BoxLayout):
         encoder = EidonEncoder(image, EidonStream.preferred(
             image.width, image.height))
         stream = encoder.run()
-        print(len(stream.data))
-        compressor = ArithmeticCompressor()
-        elias = compressor.run(stream.data.obj)
-        print(len(elias))
-        print(len(bz2.compress(elias)))
-        print(len(bz2.compress(stream.data.obj)))
-        # compressor = EliasDeltaEncoder()
-        # elias = compressor.run(stream.data.obj)
-        # print(len(elias))
+        data = EidonStream.dump(stream)
+        print(len(data))
+        stream = EidonStream.load(data)
         self.insert(EidonDecoder(stream, EidonImage.rgb(
             stream.width, stream.height)).run())
 

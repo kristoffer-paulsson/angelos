@@ -1,6 +1,5 @@
 import math
 import struct
-import bz2
 from .eidon import Eidon
 
 
@@ -11,18 +10,20 @@ class EidonStream:
     signal = None
     quality = None
 
-    def __init__(self, width, height, quality, data):
+    def __init__(self, width, height, signal, quality, data):
         if not isinstance(width, int): raise TypeError()  # noqa E701
         if not 65535 >= width >= 0: raise ValueError()  # noqa E701
         if not isinstance(height, int): raise TypeError()  # noqa E701
         if not 65535 >= height >= 0: raise ValueError()  # noqa E701
+        if not isinstance(signal, int): raise TypeError()  # noqa E701
         if not isinstance(quality, int): raise TypeError()  # noqa E701
         if not isinstance(data, bytearray): raise TypeError()  # noqa E701
 
         self.width = width
         self.height = height
-        self.data = memoryview(data)
+        self.data = data
         self.quality = quality
+        self.signal = signal
         self._quality = Eidon.QUALITY[quality]
         self._counter = 0
 
@@ -46,7 +47,7 @@ class EidonStream:
 
     @staticmethod
     def preferred(width, height, data=None):
-        return StreamYCBCR(width, height, Eidon.Quality.GOOD, data)
+        return StreamIndexed(width, height, Eidon.Quality.GOOD, data)
 
     @staticmethod
     def load(data):
@@ -54,24 +55,44 @@ class EidonStream:
             Eidon.HEADER_FORMAT, data[:Eidon.HEADER_LENGTH])
         if tpl[0] == Eidon.Format.RGB: klass = StreamRGB   # noqa E701
         elif tpl[0] == Eidon.Format.YCBCR: klass = StreamYCBCR  # noqa E701
+        elif tpl[0] == Eidon.Format.INDEX: klass = StreamIndexed  # noqa E701
         else: raise TypeError(tpl[0])  # noqa E701
 
-        return klass(tpl[2], tpl[3], tpl[1], bytearray(bz2.decompress(
-            data[Eidon.HEADER_LENGTH:])))
+        return klass(tpl[3], tpl[4], tpl[1], bytearray(
+            data[Eidon.HEADER_LENGTH:]))
 
     @staticmethod
     def dump(stream):
         if isinstance(stream, StreamRGB): format = Eidon.Format.RGB  # noqa E701
         elif isinstance(stream, StreamYCBCR): format = Eidon.Format.YCBCR  # noqa E701
+        elif isinstance(stream, StreamIndexed): format = Eidon.Format.INDEX  # noqa E701
         else: raise TypeError()  # noqa E701
 
         return bytearray(struct.pack(
             Eidon.HEADER_FORMAT,
             format,
             stream.quality,
+            stream.signal,
             stream.width,
-            stream.height
-        ) + bz2.compress(stream.data))
+            stream.height,
+        ) + stream.data)
+
+
+class Stream8Bit(EidonStream):
+    def __init__(self, width, height, quality, data=None):
+        self._size = 1
+        if not bool(data):
+            data = bytearray(
+                b'\x00' *
+                int(math.floor(width / 8)) *
+                int(math.floor(height / 8)) *
+                Eidon.QUALITY[quality])
+        EidonStream.__init__(self, width, height,
+                             Eidon.Signal.COMPOSITE, quality, data)
+
+
+class StreamIndexed(Stream8Bit):
+    pass
 
 
 class Stream24Bit(EidonStream):
@@ -82,8 +103,9 @@ class Stream24Bit(EidonStream):
                 b'\x00' *
                 int(math.floor(width / 8)) *
                 int(math.floor(height / 8)) *
-                self._size*Eidon.QUALITY[quality])
-        EidonStream.__init__(self, width, height, quality, data)
+                self._size * Eidon.QUALITY[quality])
+        EidonStream.__init__(self, width, height,
+                             Eidon.Signal.COMPONENT, quality, data)
 
 
 class StreamRGB(Stream24Bit):

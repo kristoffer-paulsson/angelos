@@ -2,8 +2,8 @@ import os.path
 import sys
 
 
-from eidon.compressor import ArithmeticCompressor
-from eidon.delta import EliasDeltaEncoder, Delta
+# from eidon.compressor import ArithmeticCompressor
+from eidon.delta import Delta
 
 
 path = os.path.realpath(
@@ -11,13 +11,10 @@ path = os.path.realpath(
 with open(path, 'rb') as file:
     input = bytearray(file.read())
 
+print(len(input))
+output = Delta.encode(input)
+print(len(output))
 
-#print(len(input))
-#encoder = EliasDeltaEncoder()
-#encoded = encoder.run(input)
-#compressor = ArithmeticCompressor()
-#output = compressor.run(encoded)
-#print(len(output))
 
-for i in range(1, 257):
-    print(i, Delta._gamma(i))
+# for i in range(1, 257):
+#    print(i, Delta._gamma(i))

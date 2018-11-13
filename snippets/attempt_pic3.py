@@ -37,7 +37,7 @@ Builder.load_string('''
         id: picture
     Image:
         id: loaded
-        source: 'image5.png'
+        source: 'image3.png'
         size_hint: .2, .2
         pos_hint: {'top':.9,'right':.9}
         MDFloatingActionButton:
@@ -51,12 +51,12 @@ Builder.load_string('''
 class ImageWidget(BoxLayout):
     def capture(self):
         image = self.extract()
-        print(len(image.pixels))
+        print('0', len(image.pixels))
         encoder = EidonEncoder(image, EidonStream.preferred(
             image.width, image.height))
         stream = encoder.run()
         data = EidonStream.dump(stream)
-        print(len(data))
+        print('2', len(data))
         stream = EidonStream.load(data)
         self.insert(EidonDecoder(stream, EidonImage.rgb(
             stream.width, stream.height)).run())
@@ -66,13 +66,11 @@ class ImageWidget(BoxLayout):
         data = io.BytesIO(tex.pixels)
         data.seek(0)
         if tex.colorfmt == 'rgba':
-            image = EidonImage.rgba(tex.width,
-                                    tex.height,
-                                    bytearray(data.getvalue()))
+            image = EidonImage.rgba(
+                tex.width, tex.height, bytearray(data.getvalue()))
         elif tex.colorfmt == 'rgb':
-            image = EidonImage.rgb(tex.width,
-                                   tex.height,
-                                   bytearray(data.getvalue()))
+            image = EidonImage.rgb(
+                tex.width, tex.height, bytearray(data.getvalue()))
         return image
 
     def insert(self, input):
