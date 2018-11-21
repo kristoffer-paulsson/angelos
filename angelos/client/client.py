@@ -95,6 +95,9 @@ class Application(Worker):
                 elif event.data['ui'] is 'spinner':
                     self.app.root.show_spinner()
 
+            if event.message == Messages.MSG_FLASH:
+                self.app.root.show_flash(event.data['msg'])
+
             return not self._halt.is_set()
 
         return event_reader

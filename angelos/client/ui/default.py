@@ -1,8 +1,13 @@
+import math
+
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.uix.image import Image
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.screenmanager import Screen
+
+from kivy.graphics.fbo import Fbo
+from kivy.graphics import ClearColor, ClearBuffers, Scale, Translate
 
 from kivy.garden.qrcode import QRCodeWidget
 
@@ -17,7 +22,9 @@ from kivymd.dialog import MDDialog
 from kivymd.menu import MDDropdownMenu
 # from kivymd.label import MDLabel
 
+from ...const import Const
 from ...facade.person import PersonFacade
+from ..events import Messages
 
 
 Builder.load_string('''
@@ -908,16 +915,44 @@ class CameraDialog:
         self.__dialog.open()
 
     def save(self):
+        width = 512
         camera = self.__dialog.content.ids['camera']
         tex = camera.texture
+
+        size = tex.size[0] if tex.size[0] < tex.size[1] else tex.size[1]
+        scale = width / size
+
+        fbo = Fbo(size=(tex.size[0] * scale, tex.size[1] * scale),
+                  with_stencilbuffer=True)
+
+        with fbo:
+            ClearColor(0, 0, 0, 0)
+            ClearBuffers()
+            Scale(1, -1, 1)
+            Scale(scale, scale, 1)
+            Translate(-camera.x, -camera.y - tex.size[1], 0)
+
+        fbo.add(camera.canvas)
+        fbo.draw()
+        subregion = fbo.texture.get_region(
+            math.floor((fbo.texture.size[0] - size) / 2), 0, width, width)
+
+        pixels = bytearray()
+        rowlen = width*4
+        fullen = width*width*4
+        for r in range(fullen, -1, -rowlen):
+            pixels += bytearray(subregion.pixels[r:r+rowlen])
+        fbo.remove(camera.canvas)
+
+        self.__app.ioc.message.send(
+            Messages.profile_picture(Const.W_CLIENT_NAME, pixels, width))
+
         camera.play = False
         self.__dialog.dismiss()
         self.__parent.load(self.__app)
 
     def cancel(self):
         ids = self.__dialog.content.ids
-        # self.__app.ioc.facade.save()
-        print(ids['camera'])
         ids['camera'].play = False
         self.__dialog.dismiss()
         self.__parent.load(self.__app)

@@ -119,6 +119,15 @@ class PersonFacade:
     ], defaults=([], [], [], [], []))):
         __slots__ = ()
 
+    @property
+    def picture(self):
+        return self.__facade.picture
+
+    @picture.setter
+    def picture(self, picture):
+        Util.is_type(picture, (bytearray, type(None)))
+        self.__facade.picture = picture
+
     class Facade(types.SimpleNamespace):
         pass
 
@@ -209,6 +218,11 @@ class PersonFacade:
         except (KeyError):
             contacts = self.Contacts()
 
+        try:
+            picture = data['picture']
+        except (KeyError, TypeError):
+            picture = None
+
         self.__facade = self.Facade(
             id=str(uuid.UUID(data['id'])),
             entity=self.Entity(**data['entity']),
@@ -217,7 +231,8 @@ class PersonFacade:
             mobile=mobile,
             phone=phone,
             social=social,
-            contacts=contacts)
+            contacts=contacts,
+            picture=picture)
 
         self.__keys = libnacl.dual.DualSecret(
             libnacl.encode.hex_decode(data['keys']['secret']),
@@ -250,6 +265,7 @@ class PersonFacade:
             'phone': self.__facade.phone,
             'social': social,
             'contacts': self.__facade.contacts._asdict(),
+            'picture':  self.__facade.picture,
             'keys': {
                 'secret': self.__keys.hex_sk().decode('utf-8'),
                 'seed': self.__keys.hex_seed().decode('utf-8'),

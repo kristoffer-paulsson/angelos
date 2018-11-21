@@ -47,7 +47,7 @@ class EidonStream:
 
     @staticmethod
     def preferred(width, height, data=None):
-        return StreamIndexed(width, height, Eidon.Quality.GOOD, data)
+        return StreamRGB(width, height, Eidon.Quality.GOOD, data)
 
     @staticmethod
     def load(data):

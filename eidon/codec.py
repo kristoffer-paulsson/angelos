@@ -60,18 +60,14 @@ class EidonEncoder:
                     entropy = self.entropize(quantity)
                     self.split(entropy, stock)
 
-            if _async:
-                asyncio.sleep(.1)
+            if _async: asyncio.sleep(.1)  # noqa E701
 
         self._stream.data = bytearray()
         for i in range(self._stream._quality):
-            uncomp = len(stock[i])
+            if _async: asyncio.sleep(.1)  # noqa E701
             block = AdaptiveArithmethicCompressor().run(stock[i])
-            blklen = len(block)
             self._stream.data += bytearray(
                 struct.pack('!I', len(block)) + block)
-            print('Block frequencies:', uncomp, blklen)
-        print('1', len(self._stream.data))
         return self._stream
 
     def dither(self, offset=0, rows=0):

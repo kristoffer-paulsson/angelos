@@ -35,3 +35,4 @@ class Const:
     I_DEFAULT = 'default'
     I_SETUP = 'setup'
     I_SPINNER = 'spinner'
+    I_FLASH = 'flash'

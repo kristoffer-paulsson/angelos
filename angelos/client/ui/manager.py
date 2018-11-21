@@ -1,5 +1,7 @@
 from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager, Screen
+from kivymd.snackbar import Snackbar
+
 from ...const import Const
 from ...utils import Util
 
@@ -40,3 +42,6 @@ class InterfaceManager(ScreenManager):
 
     def show_setup(self):
         self.change(Setup(name=Const.I_SETUP))
+
+    def show_flash(self, msg):
+        Snackbar(text=msg).show()

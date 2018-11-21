@@ -4,6 +4,10 @@ from ..const import Const
 from ..worker import Worker
 from .events import Messages
 
+from eidon.stream import EidonStream
+from eidon.codec import EidonEncoder
+from eidon.image import EidonImage
+
 
 class Backend(Worker):
     """Docstring"""
@@ -32,6 +36,9 @@ class Backend(Worker):
             if event.message == Messages.DO_SETUP:
                 self.task(self.__setup, event.data)
 
+            if event.message == Messages.DO_PICTURE:
+                self.task(self.__picture, event.data)
+
         logging.info('#'*10 + 'Leaving __backend' + '#'*10)
 
     async def __setup(self, entity, type):
@@ -44,3 +51,22 @@ class Backend(Worker):
             Messages.interface(Const.W_BACKEND_NAME, Const.I_DEFAULT))
 
         logging.info('#'*10 + 'Leaving __setup' + '#'*10)
+
+    async def __picture(self, pixels, width):
+        logging.info('#'*10 + 'Entering __picture' + '#'*10)
+
+        def encode(pixels, width, height):
+            encoder = EidonEncoder(
+                EidonImage.rgba(width, height, pixels),
+                EidonStream.preferred(width, height))
+            stream = encoder.run(_async=True)
+            return EidonStream.dump(stream)
+
+        print('ENCODING STARTED')
+        self.ioc.facade.picture = encode(pixels, width, width)
+        await asyncio.sleep(3)
+        print('ENCODING DONE')
+        self.ioc.message.send(
+            Messages.flash(Const.W_BACKEND_NAME, 'Profile picture saved'))
+
+        logging.info('#'*10 + 'Leaving __picture' + '#'*10)
