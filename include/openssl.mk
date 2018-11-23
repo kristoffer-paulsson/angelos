@@ -27,3 +27,5 @@ clone:
 		$(GIT) clone $(REPO); \
 		$(GIT) checkout master; \
 	fi
+
+test

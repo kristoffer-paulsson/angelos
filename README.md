@@ -39,6 +39,11 @@ To run the tests:
     $ pytest
 ```
 
+## Static compile and link
+
+https://stackoverflow.com/questions/5105482/compile-main-python-program-using-cython
+https://stackoverflow.com/questions/48703423/cython-compile-a-standalone-static-executable
+
 
 ## Links'n'stuff
 https://git-scm.com/docs/gitmodules
@@ -51,6 +56,7 @@ https://groups.google.com/forum/?hl=en#!topic/comp.lang.python/66fDI6AiG5c
 https://github.com/sqlcipher/sqlcipher
 https://github.com/rigglemania/pysqlcipher3
 http://charlesleifer.com/blog/encrypted-sqlite-databases-with-python-and-sqlcipher/
+
 
 ### Python
 git clone -b 3.7 https://github.com/python/cpython.git

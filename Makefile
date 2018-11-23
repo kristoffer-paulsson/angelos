@@ -18,6 +18,10 @@ openssl:
 	$(MAKE) -C $(INC_PATH) -f $@.mk -e
 	@echo ========================= openssl SUCCESS =========================
 
+test:
+	$(MAKE) -C $(INC_PATH) -f $@.mk -e
+	@echo ========================= test SUCCESS =========================
+
 # --recurse-not-to
 # python -m nuitka --recurse-all --standalone --show-progress --verbose angelos.py
 # python -m nuitka --recurse-all --standalone logo.py
