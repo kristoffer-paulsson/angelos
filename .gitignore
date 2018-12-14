@@ -6,6 +6,7 @@
 *.pub
 *.app
 *.exe
+*.cnl
 __pychache__
 /build/
 /dist/
