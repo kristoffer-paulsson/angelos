@@ -144,17 +144,17 @@ class ConcealIO(io.RawIOBase):
 
     def close(self):
         if not self.closed:
-            self._save()
-            self.__length(self.__len)
             fcntl.flock(self.__file, fcntl.LOCK_UN)
-            self.__file.close()
             io.RawIOBase.close(self)
+            self.__file.close()
 
     def fileno(self):
         return self.__file.fileno()
 
     def flush(self):
-        pass
+        self._save()
+        self.__length(self.__len)
+        io.RawIOBase.flush(self)
 
     def isatty(self):
         return False
@@ -183,16 +183,16 @@ class ConcealIO(io.RawIOBase):
         return True
 
     def readall(self):
-        pass
+        raise NotImplementedError()
 
     def readinto(self, b):
-        pass
+        raise NotImplementedError()
 
     def readline(self, size=-1):
-        pass
+        raise NotImplementedError()
 
     def readlines(self, hint=-1):
-        pass
+        raise NotImplementedError()
 
     def seek(self, offset, whence=io.SEEK_SET):
         if whence == io.SEEK_SET:
@@ -223,7 +223,7 @@ class ConcealIO(io.RawIOBase):
         return self.__cursor
 
     def truncate(self, size=None):
-        pass
+        raise NotImplementedError()
 
     def writable(self):
         return True
@@ -259,7 +259,7 @@ class ConcealIO(io.RawIOBase):
         return cursor if cursor else None
 
     def writelines(self, lines):
-        pass
+        raise NotImplementedError()
 
     def __del__(self):
         self.close()
