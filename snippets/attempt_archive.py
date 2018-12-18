@@ -7,9 +7,9 @@ import datetime
 
 
 class Header(collections.namedtuple('Header', field_names=[
-    'type',         # 1
     'major',        # 2
     'minor',        # 2
+    'type',         # 1
     'role',         # 1
     'use',          # 1
     'id',           # 16
@@ -35,6 +35,39 @@ class Header(collections.namedtuple('Header', field_names=[
 ))):
     __slots__ = ()
     FORMAT = '!8sHHbbb16s16s16s16sQ128sL805x'
+
+    @staticmethod
+    def header(owner, id=None, node=None, network=None, title=None, _type=None,
+               role=None, use=None, major=1, minor=0, entries=8):
+        if not isinstance(owner, uuid.UUID): raise TypeError()  # noqa E701
+        if not isinstance(id, (uuid.UUID, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(node, (uuid.UUID, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(network, (uuid.UUID, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(title, (bytes, bytearray, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(_type, (int, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(role, (int, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(use, (int, type(None))): raise TypeError()  # noqa E701
+        if not isinstance(major, int): raise TypeError()  # noqa E701
+        if not isinstance(minor, int): raise TypeError()  # noqa E701
+        if not isinstance(entries, int): raise TypeError()  # noqa E701
+
+        if not id:
+            id = uuid.uuid4()
+
+        return Header(
+            major=major,
+            minor=minor,
+            type=_type,
+            role=role,
+            use=use,
+            id=id,
+            owner=owner,
+            network=network,
+            node=node,
+            created=datetime.datetime.now(),
+            title=title,
+            entries=entries
+        )
 
     def serialize(self):
         return struct.pack(
@@ -88,7 +121,7 @@ class Header(collections.namedtuple('Header', field_names=[
         )
 
 
-class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
+class Entry(collections.namedtuple('Entry', field_names=[
     'type',         # 1
     'id',           # 16
     'parent',       # 16
@@ -132,8 +165,8 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
 
     @staticmethod
     def blank():
-        return EntryPoint(
-            type=EntryPoint.TYPE_BLANK,
+        return Entry(
+            type=Entry.TYPE_BLANK,
             id=uuid.uuid4(),
             parent=None,
             owner=None,
@@ -142,7 +175,7 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
             offset=None,
             size=None,
             length=None,
-            compression=EntryPoint.COMP_NONE,
+            compression=Entry.COMP_NONE,
             deleted=None,
             digest=None,
             name=None
@@ -153,8 +186,8 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
         if not isinstance(offset, int): raise TypeError()  # noqa E701
         if not isinstance(size, int): raise TypeError()  # noqa E701
 
-        return EntryPoint(
-            type=EntryPoint.TYPE_EMPTY,
+        return Entry(
+            type=Entry.TYPE_EMPTY,
             id=uuid.uuid4(),
             parent=None,
             owner=None,
@@ -163,7 +196,7 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
             offset=offset,
             size=size,
             length=None,
-            compression=EntryPoint.COMP_NONE,
+            compression=Entry.COMP_NONE,
             deleted=None,
             digest=None,
             name=None
@@ -182,8 +215,8 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
         if not modified:
             modified = datetime.datetime.now()
 
-        return EntryPoint(
-            type=EntryPoint.TYPE_DIR,
+        return Entry(
+            type=Entry.TYPE_DIR,
             id=uuid.uuid4(),
             parent=parent,
             owner=owner,
@@ -192,7 +225,7 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
             offset=None,
             size=None,
             length=None,
-            compression=EntryPoint.COMP_NONE,
+            compression=Entry.COMP_NONE,
             deleted=None,
             digest=None,
             name=name.encode('utf-8')[:128]
@@ -223,12 +256,12 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
 
         if not compression:
             length = size
-            compression = EntryPoint.COMP_NONE
+            compression = Entry.COMP_NONE
         elif 1 <= compression <= 3 and not isinstance(length, int):
             raise ValueError()
 
-        return EntryPoint(
-            type=EntryPoint.TYPE_FILE,
+        return Entry(
+            type=Entry.TYPE_FILE,
             id=id,
             parent=parent,
             owner=owner,
@@ -245,9 +278,9 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
 
     def serialize(self):
         return struct.pack(
-            EntryPoint.FORMAT,
+            Entry.FORMAT,
             self.type if not isinstance(
-                self.type, type(None)) else EntryPoint.TYPE_BLANK,
+                self.type, type(None)) else Entry.TYPE_BLANK,
             self.id.bytes if isinstance(
                 self.id, uuid.UUID) else uuid.uuid4().bytes,
             self.parent.bytes if isinstance(
@@ -266,7 +299,7 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
             self.size if isinstance(self.size, int) else 0,
             self.length if isinstance(self.length, int) else 0,
             self.compression if isinstance(
-                self.compression, int) else EntryPoint.COMP_NONE,
+                self.compression, int) else Entry.COMP_NONE,
             self.deleted if isinstance(self.deleted, bool) else False,
             # b'\x00'*17,
             self.digest if isinstance(
@@ -277,8 +310,8 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
 
     @staticmethod
     def deserialize(data):
-        t = struct.unpack(EntryPoint.FORMAT, data)
-        return EntryPoint(
+        t = struct.unpack(Entry.FORMAT, data)
+        return Entry(
             type=t[0],
             id=uuid.UUID(bytes=t[1]),
             parent=uuid.UUID(bytes=t[2]),
@@ -298,28 +331,45 @@ class EntryPoint(collections.namedtuple('EntryPoint', field_names=[
 class Archive:
     def __init__(self, fileobj):
         self.__file = fileobj
-        size = os.path.getsize(self.__file.name)
+        self.__header = None
+        self.__entries = []
+        self.__size = os.path.getsize(self.__file.name)
         self.__index = 0
 
-    def create(self, name):
-        pass
+        self.__load()
 
-    def _header():
-        return Header()
+    def __load(self):
+        self.__file.seek(0)
+        self.__header = Header.unserialize(
+            struct.unpack(Header.FORMAT, self.__file.read(
+                struct.calcsize(Header.FORMAT))))
+
+        self.__file.seek(self._entry_offset(self.__index))
+        for i in range(self.__header.entries):
+            self.entries.append(Entry.unserialize(
+                struct.unpack(Entry.FORMAT, self.__file.read(
+                    struct.calcsize(Entry.FORMAT)))))
 
     def _entry_offset(self, index):
         return 1024 + index * 256
 
+    @staticmethod
+    def create(path, owner, node=None, title=None,
+               network=None, _type=None, role=None, use=None):
+        if not os.path.isfile(path):
+            open(path, 'a').close()
 
-ep = EntryPoint.file(
-    'Just_a_stupid_file_name.txt', 0, 1024, b'63870259301694503019')
-s = ep.serialize()
-ep2 = EntryPoint.deserialize(s)
-s2 = ep2.serialize()
-print(s == s2)
+        fileobj = open(path, 'rb+')
+        header = Header.header(
+            owner=owner, node=node, title=title,
+            network=network, _type=_type, role=role, use=use)
 
-hp = Header(title='Database_file.cnl')
-s3 = hp.serialize()
-hp2 = Header.deserialize(s3)
-s4 = hp2.serialize()
-print(s3 == s4)
+        fileobj.write(header.serialize())
+        for i in range(header.entries):
+            fileobj.write(Entry.blank().serialize())
+        fileobj.seek(0)
+
+        return Archive(fileobj)
+
+
+archive = Archive.create(path='./test.ar7', owner=uuid.UUID(bytes=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00'))
