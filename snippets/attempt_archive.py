@@ -4,6 +4,7 @@ import collections
 import uuid
 import time
 import datetime
+import enum
 
 
 class Header(collections.namedtuple('Header', field_names=[
@@ -328,13 +329,20 @@ class Entry(collections.namedtuple('Entry', field_names=[
         )
 
 
+class DelMode(enum.IntEnum):
+    SOFT = 1  # Raise file delete flag
+    HARD = 2  # Raise  file delete flag, set size and offset to zero, add empty block.  # noqa #E501
+    ERASE = 3  # Replace file with empty block
+
+
 class Archive:
     def __init__(self, fileobj):
         self.__file = fileobj
         self.__header = None
-        self.__entries = []
+        self.__entries = None
         self.__size = os.path.getsize(self.__file.name)
         self.__index = 0
+        self.__hierarchy = None
 
         self.__load()
 
@@ -345,10 +353,14 @@ class Archive:
                 struct.calcsize(Header.FORMAT))))
 
         self.__file.seek(self._entry_offset(self.__index))
+        entries = []
         for i in range(self.__header.entries):
-            self.entries.append(Entry.unserialize(
+            entries.append(Entry.unserialize(
                 struct.unpack(Entry.FORMAT, self.__file.read(
                     struct.calcsize(Entry.FORMAT)))))
+
+        self.__entries = Archive.Entries(entries)
+        self.__hierarchy = Archive.Hierarchy(self._entreiss.__dirs)
 
     def _entry_offset(self, index):
         return 1024 + index * 256
@@ -371,5 +383,80 @@ class Archive:
 
         return Archive(fileobj)
 
+    class Entries:
+        def __init__(self, entries):
+            self.__all = entries
+            self.__files = []
+            self.__dirs = []
+            self.__empties = []
+            self.__blanks = []
 
-archive = Archive.create(path='./test.ar7', owner=uuid.UUID(bytes=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00'))
+            for i in range(self.__all):
+                if self.__entries[i].type == Entry.TYPE_FILE:
+                    self.__files.append(i)
+                elif self.__entries[i].type == Entry.TYPE_DIR:
+                    self.__dirs.append(i)
+                elif self.__entries[i].type == Entry.TYPE_EMPTY:
+                    self.__empties.append(i)
+                elif self.__entries[i].type == Entry.TYPE_BLANK:
+                    self.__blanks.append(i)
+                else:
+                    raise OSError('Unknown entry type: {}'.format(
+                        self.__entries[i].type))
+
+        @property
+        def files(self):
+            return self.__files
+
+        @property
+        def dirs(self):
+            return self.__dirs
+
+        @property
+        def empties(self):
+            return self.__empties
+
+        @property
+        def blanks(self):
+            return self.__blanks
+
+    class Hierarchy:
+        def __init__(self, dirs):
+            self.__paths = {}
+            self.__ids = {}
+            zero = uuid.UUID(bytes=b'\x00'*16)
+
+            for i in range(len(dirs)):
+                path = []
+                search_path = ''
+                path.append(dirs[i])
+                current = dirs[i]
+
+                while current.parent.int is not zero.int:
+                    parents = self._parent(dirs, current)
+
+                    if len(parents) == 0:
+                        raise RuntimeError(
+                            'Directory doesn\'t reach root!', current)
+                    elif len(parents) > 1:
+                        raise ValueError(
+                            'Multiple directories with same ID', current)
+                    path.append(parents[0])
+                    current = parents[0]
+
+                    cid = current.id
+                    for j in range(len(path), 0, -1):
+                        search_path += '/'+path[i].name
+
+                    self.__paths[search_path] = cid
+                    self.__ids[cid] = search_path
+
+        def _parent(self, lst, current):
+            return filter(lambda x: x.id.int == current.parent.int, lst)
+
+    class Operation:
+        pass
+
+
+archive = Archive.create(path='./test.ar7', owner=uuid.UUID(
+    bytes=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00'))
