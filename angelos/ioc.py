@@ -25,3 +25,12 @@ class Container:
                 raise Util.exception(
                     Error.IOC_LAMBDA_EXPECTED, {'service': name})
         return self.__instances[name]
+
+
+class ContainerAware:
+    def __init__(self, ioc):
+        self.__ioc = ioc
+
+    @property
+    def ioc(self):
+        return self.__ioc
