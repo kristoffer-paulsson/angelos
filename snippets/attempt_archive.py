@@ -10,8 +10,42 @@ import hashlib
 import sys
 import math
 import threading
+import random
+import string
 
-from ..angelos.ioc import Container, ContainerAware
+import types
+
+# from angelos.ioc import Container, ContainerAware
+
+
+class Container:
+    """Docstring"""
+    def __init__(self, config={}):
+        """Docstring"""
+        if not isinstance(config, dict): raise TypeError()  # noqa E501
+
+        self.__config = config
+        self.__instances = {}
+
+    def __getattr__(self, name):
+        """Docstring"""
+        if name not in self.__instances:
+            if name not in self.__config:
+                raise IndexError()
+            elif isinstance(self.__config[name], types.LambdaType):
+                self.__instances[name] = self.__config[name](self)
+            else:
+                raise TypeError()
+        return self.__instances[name]
+
+
+class ContainerAware:
+    def __init__(self, ioc):
+        self.__ioc = ioc
+
+    @property
+    def ioc(self):
+        return self.__ioc
 
 
 class Header(collections.namedtuple('Header', field_names=[
@@ -80,7 +114,7 @@ class Header(collections.namedtuple('Header', field_names=[
     def serialize(self):
         return struct.pack(
             Header.FORMAT,
-            b'archive\x07',
+            b'archive7',
             1,
             0,
             self.type if not isinstance(
@@ -108,9 +142,10 @@ class Header(collections.namedtuple('Header', field_names=[
 
     @staticmethod
     def deserialize(data):
+        if not isinstance(data, (bytes, bytearray)): raise TypeError()  # noqa E701
         t = struct.unpack(Header.FORMAT, data)
 
-        if t[0] != b'archive\x07':
+        if t[0] != b'archive7':
             raise OSError()
 
         return Header(
@@ -318,6 +353,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def deserialize(data):
+        if not isinstance(data, (bytes, bytearray)): raise TypeError()  # noqa E701
         t = struct.unpack(Entry.FORMAT, data)
         return Entry(
             type=t[0],
@@ -347,19 +383,17 @@ class Archive(ContainerAware):
         self.__delete = Archive.Delete.ERASE
 
         self.__file.seek(0)
-        self.__header = Header.deserialize(
-            struct.unpack(Header.FORMAT, self.__file.read(
-                struct.calcsize(Header.FORMAT))))
+        self.__header = Header.deserialize(self.__file.read(
+                struct.calcsize(Header.FORMAT)))
 
         self.__file.seek(1024)
         entries = []
         for i in range(self.__header.entries):
-            entries.append(Entry.unserialize(
-                struct.unpack(Entry.FORMAT, self.__file.read(
-                    struct.calcsize(Entry.FORMAT)))))
+            entries.append(Entry.deserialize(self.__file.read(
+                    struct.calcsize(Entry.FORMAT))))
 
         ContainerAware.__init__(self, Container(config={
-            'archive': self,
+            'archive': lambda s: self,
             'entries': lambda s: Archive.Entries(s, entries),
             'hierarchy': lambda s: Archive.Hierarchy(s),
             'operations': lambda s: Archive.Operations(s),
@@ -367,8 +401,8 @@ class Archive(ContainerAware):
         }))
 
     def _update_header(self, cnt):
-        header = self.__header.asdict()
-        header = header.entries = cnt
+        header = self.__header._asdict()
+        header['entries'] = cnt
         self.__header = Header(**header)
         self.ioc.operations.write_data(0, self.__header.serialize())
 
@@ -402,7 +436,7 @@ class Archive(ContainerAware):
 
             files = []
             for i in idxs:
-                entry = entries.get_entry(i)
+                idx, entry = i
                 files.append(ids[entry.parent]+'/'+entry.name)
             return files
 
@@ -425,6 +459,8 @@ class Archive(ContainerAware):
                 Archive.Search(name=name).parent(pid))
             if not len(midx):
                 raise OSError('File not found in directory.')
+            else:
+                midx, entry = midx.pop(0)
 
             didx = entries.search(
                 Archive.Search(name=name).parent(did))
@@ -436,13 +472,12 @@ class Archive(ContainerAware):
             if len(tidx):
                 raise OSError('Name taken in target directory.')
 
-            entry = entries.get_entry(midx)
-            entry = entry.asdict()
-            entry.parent = did
+            entry = entry._asdict()
+            entry['parent'] = did
             entry = Entry(**entry)
             entries.update(entry, midx)
 
-    def chmod(self, name, id=None, owner=None, compression=None):
+    def chmod(self, name, id=None, owner=None, deleted=None, compression=None):
         with self.__lock:
             dirname = os.path.dirname(name)
             name = os.path.basename(name)
@@ -457,13 +492,16 @@ class Archive(ContainerAware):
                 Archive.Search(name=name).parent(pid))
             if not len(chidx):
                 raise OSError('File not found in directory.')
+            else:
+                chidx, entry = chidx.pop(0)
 
-            entry = entries.get_entry(chidx)
-            entry = entry.asdict()
+            entry = entry._asdict()
             if id:
-                entry.id = id
+                entry['id'] = id
             if owner:
-                entry.owner = owner
+                entry['owner'] = owner
+            if deleted:
+                entry['deleted'] = deleted
             entry = Entry(**entry)
             entries.update(entry, chidx)
 
@@ -482,8 +520,8 @@ class Archive(ContainerAware):
                 Archive.Search(name=name).parent(pid))
             if not len(ridx):
                 raise OSError('File not found in directory.')
-
-            entry = entries.get_entry(ridx)
+            else:
+                ridx, entry = ridx.pop(0)
 
             if entry.type is Entry.TYPE_FILE:
                 entries.update(Entry.empty(
@@ -492,9 +530,10 @@ class Archive(ContainerAware):
             elif entry.type is Entry.TYPE_DIR:
                 cidx = entries.search(
                     Archive.Search().parent(entry.id))
-                if not len(cidx):
+                if len(cidx):
                     raise OSError('Directory not empty.')
                 entries.update(Entry.blank(), ridx)
+                self.ioc.hierarchy.upgrade()
             else:
                 raise OSError('Unkown entry type.')
 
@@ -513,15 +552,16 @@ class Archive(ContainerAware):
                 Archive.Search(name=name).parent(pid))
             if not len(oidx):
                 raise OSError('File not found in directory.')
+            else:
+                oidx, entry = oidx.pop(0)
 
             didx = entries.search(
                 Archive.Search(name=new_name).parent(pid))
             if len(didx):
                 raise OSError('File name already taken in directory.')
 
-            entry = entries.get_entry(oidx)
-            entry = entry.asdict()
-            entry.name = name
+            entry = entry._asdict()
+            entry['name'] = name
             entry = Entry(**entry)
             entries.update(entry, oidx)
 
@@ -553,6 +593,7 @@ class Archive(ContainerAware):
             # Generate entry for new directory
             entry = Entry.dir(name=name, parent=pid)
             self.ioc.entries.add(entry)
+            self.ioc.hierarchy.upgrade()
 
         return entry.id
 
@@ -561,6 +602,7 @@ class Archive(ContainerAware):
         with self.__lock:
             dirname = os.path.dirname(name)
             name = os.path.basename(name)
+            pid = None
 
             if parent:
                 ids = self.ioc.hierarchy.ids
@@ -569,12 +611,12 @@ class Archive(ContainerAware):
             elif dirname:
                 paths = self.ioc.hierarchy.paths
                 if dirname in paths.keys():
-                    parent = paths[dirname]
+                    pid = paths[dirname]
 
             entry = Entry.file(
                 name=name, size=len(data), offset=0,
                 digest=hashlib.sha1(data).digest(),
-                id=id, parent=parent, owner=owner, created=created,
+                id=id, parent=pid, owner=owner, created=created,
                 modified=modified, length=len(data))
 
         return self.ioc.entries.add(entry, data)
@@ -594,8 +636,9 @@ class Archive(ContainerAware):
                 Archive.Search(name=name).parent(pid))
             if not len(sidx):
                 raise OSError('File not found in directory.')
+            else:
+                sidx, entry = sidx.pop(0)
 
-            entry = entries.get_entry(sidx)
             osize = int(math.ceil(entry.size/512)*512)
             nsize = int(math.ceil(len(data)/512)*512)
 
@@ -605,11 +648,11 @@ class Archive(ContainerAware):
                 new_offset = int(math.ceil((last.offset+last.size)/512)*512)
                 self.ioc.operations.write_data(new_offset, data)
 
-                entry = entry.asdict()
-                entry.digest = hashlib.sha1(data).digest()
-                entry.offset = new_offset
-                entry.size = len(data)
-                entry.modified = datetime.datetime.now()
+                entry = entry._asdict()
+                entry['digest'] = hashlib.sha1(data).digest()
+                entry['offset'] = new_offset
+                entry['size'] = len(data)
+                entry['modified'] = datetime.datetime.now()
                 entry = Entry(**entry)
                 entries.update(entry, sidx)
 
@@ -620,19 +663,19 @@ class Archive(ContainerAware):
             elif osize == nsize:
                 self.ioc.operations.write_data(entry.offset, data)
 
-                entry = entry.asdict()
-                entry.digest = hashlib.sha1(data).digest()
-                entry.size = len(data)
-                entry.modified = datetime.datetime.now()
+                entry = entry._asdict()
+                entry['digest'] = hashlib.sha1(data).digest()
+                entry['size'] = len(data)
+                entry['modified'] = datetime.datetime.now()
                 entry = Entry(**entry)
                 entries.update(entry, sidx)
             elif osize > nsize:
                 self.ioc.operations.write_data(entry.offset, data)
 
-                entry = entry.asdict()
-                entry.digest = hashlib.sha1(data).digest()
-                entry.size = len(data)
-                entry.modified = datetime.datetime.now()
+                entry = entry._asdict()
+                entry['digest'] = hashlib.sha1(data).digest()
+                entry['size'] = len(data)
+                entry['modified'] = datetime.datetime.now()
                 entry = Entry(**entry)
                 entries.update(entry, sidx)
 
@@ -658,25 +701,26 @@ class Archive(ContainerAware):
                 Archive.Search(name=name).parent(pid))
             if not len(lidx):
                 raise OSError('File not found in directory.')
+            else:
+                lidx, entry = lidx.pop(0)
 
-            entry = entries.get_entry(lidx)
             data = self.ioc.operations.load_data(entry)
             if entry.digest is not hashlib.sha1(data).digest():
-                raise OSError('Hash doesn\'t match. File is corrupt.')
+                raise OSError('Hash digest doesn\'t match. File is corrupt.')
             return data
 
     class Entries(ContainerAware):
         def __init__(self, ioc, entries):
             ContainerAware.__init__(self, ioc)
             self.__all = entries
-            self.__files = filter(
-                lambda x: x.type == Entry.TYPE_FILE, entries)
-            self.__dirs = filter(
-                lambda x: x.type == Entry.TYPE_DIR, entries)
-            self.__empties = filter(
-                lambda x: x.type == Entry.TYPE_EMPTY, entries)
-            self.__blanks = filter(
-                lambda x: x.type == Entry.TYPE_BLANK, entries)
+            self.__files = [i for i in range(
+                len(entries)) if entries[i].type == Entry.TYPE_FILE]
+            self.__dirs = [i for i in range(
+                len(entries)) if entries[i].type == Entry.TYPE_DIR]
+            self.__empties = [i for i in range(
+                len(entries)) if entries[i].type == Entry.TYPE_EMPTY]
+            self.__blanks = [i for i in range(
+                len(entries)) if entries[i].type == Entry.TYPE_BLANK]
 
         def get_entry(self, index):
             return self.__all[index]
@@ -687,7 +731,7 @@ class Archive(ContainerAware):
             Returns entry index or None
             """
             current = None
-            current_size = sys.maxint
+            current_size = sys.maxsize
 
             for i in self.__empties:
                 if current_size >= self.__all[i].size >= size:
@@ -707,7 +751,7 @@ class Archive(ContainerAware):
             Returns     index or None
             """
             if len(self.__blanks) >= 1:
-                return self.__blanks.popleft()
+                return self.__blanks.pop(0)
             else:
                 return None
 
@@ -723,9 +767,9 @@ class Archive(ContainerAware):
         def _add_blank(self):
             entry = Entry.blank()
             self.__all.append(entry)
-            index = len(self.__all) - 1
+            index = self.__all.index(entry)
             self.__blanks.append(index)
-            self.ioc.operation.write_entry(entry, index)
+            self.ioc.operations.write_entry(entry, index)
 
         def make_blanks(self, num=8):
             """
@@ -746,8 +790,9 @@ class Archive(ContainerAware):
                     hithermost = self.__all[idx]
                     if hithermost.type == Entry.TYPE_EMPTY:
                         if hithermost.size > num * 256:
-                            hithermost = hithermost.asdict()
-                            hithermost.offset = hithermost.offset + num * 256
+                            hithermost = hithermost._asdict()
+                            hithermost['offset'] = (hithermost['offset'] +
+                                                    num * 256)
                             hithermost = Entry(**hithermost)
                             for i in range(num):
                                 num -= 1
@@ -763,8 +808,8 @@ class Archive(ContainerAware):
                     elif hithermost.type == Entry.TYPE_FILE:
                         empty = self.ioc.operations.move_end(idx)
                         if empty.size > num * 256:
-                            empty = empty.asdict()
-                            empty.offset = empty.offset + num * 256
+                            empty = empty._asdict()
+                            empty['offset'] = empty['offset'] + num * 256
                             empty = Entry(**empty)
                             for i in range(num):
                                 num -= 1
@@ -782,12 +827,11 @@ class Archive(ContainerAware):
 
         def get_hithermost(self):
             idx = None
-            offset = sys.maxint
+            offset = sys.maxsize
 
-            for i in range(len(self.__all)):
-                if offset > self.__all[i].offset > 0 and (
-                        self.__all[i].type == Entry.TYPE_FILE or
-                        self.__all[i].type == Entry.TYPE_EMPTY):
+            idxs = set(self.__files + self.__empties)
+            for i in idxs:
+                if offset > self.__all[i].offset > 0:
                     idx = i
                     offset = self.__all[i].offset
 
@@ -795,12 +839,11 @@ class Archive(ContainerAware):
 
         def get_thithermost(self):
             idx = None
-            offset = sys.minint
+            offset = 0
 
-            for i in range(len(self.__all)):
-                if offset < self.__all[i].offset < sys.maxint and (
-                        self.__all[i].type == Entry.TYPE_FILE or
-                        self.__all[i].type == Entry.TYPE_EMPTY):
+            idxs = set(self.__files + self.__empties)
+            for i in idxs:
+                if offset < self.__all[i].offset < sys.maxsize:
                     idx = i
                     offset = self.__all[i].offset
 
@@ -848,29 +891,31 @@ class Archive(ContainerAware):
             elif entry.type == Entry.TYPE_FILE:
                 if isinstance(data, type(None)) or not len(data):
                     raise OSError('No file data.')
+                if not len(self.__blanks):
+                    self.make_blanks()
+                bidx = self.get_blank()
                 space = int(math.ceil(len(data)/512)*512)
                 eidx = self.get_empty(space)
                 if isinstance(eidx, int):
                     empty = self.__all[eidx]
                     offset = empty.offset
                     if empty.size > space:
-                        empty = empty.asdict()
-                        empty.offset = offset + space
+                        empty = empty._asdict()
+                        empty['offset'] = offset + space
                         empty = Entry(**empty)
                         self.update(empty, eidx)
                     else:
                         self.update(Entry.blank(), eidx)
-                else:
+                elif (len(self.__files) + len(self.__empties)) > 0:
                     last = self.__all[self.get_thithermost()]
                     offset = last.offset + last.size
+                else:
+                    offset = 1024 + len(self.__all) * 256
 
-                entry = entry.asdict()
-                entry.offset = offset
-                entry = Entry.empty(**entry)
+                entry = entry._asdict()
+                entry['offset'] = offset
+                entry = Entry(**entry)
 
-                if not len(self.__blanks):
-                    self.make_blanks()
-                bidx = self.get_blank()
                 self.ioc.operations.write_data(offset, data)
                 self.update(entry, bidx)
 
@@ -881,7 +926,7 @@ class Archive(ContainerAware):
             if not isinstance(
                 query, Archive.Search): raise TypeError()  # noqa E501
             qfilter = query.query()
-            return filter(qfilter, self.__all)
+            return list(filter(qfilter, enumerate(self.__all)))
 
         @property
         def files(self):
@@ -902,38 +947,44 @@ class Archive(ContainerAware):
     class Hierarchy(ContainerAware):
         def __init__(self, ioc):
             ContainerAware.__init__(self, ioc)
-            self.__paths = {}
-            self.__ids = {}
-            dirs = self.ioc.entries.dirs
+            self.upgrade()
+
+        def upgrade(self):
+            entries = self.ioc.entries
+            dirs = entries.dirs
             zero = uuid.UUID(bytes=b'\x00'*16)
+            self.__paths = {'/': zero}
+            self.__ids = {zero: '/'}
 
             for i in range(len(dirs)):
                 path = []
                 search_path = ''
-                path.append(dirs[i])
-                current = dirs[i]
+                current = entries.get_entry(dirs[i])
+                path.append(current)
 
-                while current.parent.int is not zero.int:
-                    parents = self._parent(dirs, current)
+                while current.parent.int != zero.int:
+                    parent = None
+                    for i in range(len(dirs)):
+                        entry = entries.get_entry(dirs[i])
+                        if entry.id.int == current.parent.int:
+                            parent = entry
+                            break
 
-                    if len(parents) == 0:
+                    if not parent:
                         raise RuntimeError(
                             'Directory doesn\'t reach root!', current)
-                    elif len(parents) > 1:
-                        raise ValueError(
-                            'Multiple directories with same ID', current)
-                    path.append(parents[0])
-                    current = parents[0]
 
-                    cid = current.id
-                    for j in range(len(path), 0, -1):
-                        search_path += '/'+path[i].name
+                    current = parent
+                    path.append(current)
 
-                    self.__paths[search_path] = cid
-                    self.__ids[cid] = search_path
+                cid = current.id
+                search_path = ''
+                path.reverse()
+                for j in range(len(path)):
+                    search_path += '/' + str(path[j].name, 'utf-8')
 
-        def _parent(self, lst, current):
-            return filter(lambda x: x.id.int == current.parent.int, lst)
+                self.__paths[search_path] = cid
+                self.__ids[cid] = search_path
 
         @property
         def paths(self):
@@ -943,7 +994,7 @@ class Archive(ContainerAware):
         def ids(self):
             return self.__ids
 
-    class Operation(ContainerAware):
+    class Operations(ContainerAware):
         def write_entry(self, entry, index):
             if not isinstance(entry, Entry): raise TypeError()  # noqa E701
             if not isinstance(index, int): raise TypeError()  # noqa E701
@@ -973,18 +1024,18 @@ class Archive(ContainerAware):
             returns     Non-registered empty entry
             """
             entries = self.ioc.entries
-            entry = entries.all[idx]
+            entry = entries.get_entry(idx)
             if not entry.type == Entry.TYPE_FILE:
                 raise OSError()
 
-            last = entries.all[entries.get_thithermost()]
+            last = entries.get_entry(entries.get_thithermost())
             data = self.load_data(entry)
             self.write_data(int(
                 math.ceil((last.offset+last.size)/512)*512), data)
             empty = Entry.empty(entry.offset, entry.size)
 
-            entry = entry.asdict()
-            entry.offset = int(math.ceil((last.offset+last.size)/512)*512)
+            entry = entry._asdict()
+            entry['offset'] = int(math.ceil((last.offset+last.size)/512)*512)
             entry = Entry(**entry)
             entries.update(entry, idx)
 
@@ -997,7 +1048,7 @@ class Archive(ContainerAware):
                 self.__name = None
             else:
                 self.__name = name
-                self.__regex = re.compile(name)
+                self.__regex = re.compile(bytes(name, 'utf-8'))
             self.__id = None
             self.__parent = None
             self.__owner = None
@@ -1134,7 +1185,7 @@ class Archive(ContainerAware):
 
             def query(x):
                 for q in qualifiers:
-                    if not q(x):
+                    if not q(x[1]):
                         return False
                 return True
 
@@ -1146,5 +1197,49 @@ class Archive(ContainerAware):
         ERASE = 3  # Replace file with empty block
 
 
-# archive = Archive.create(path='./test.ar7', owner=uuid.UUID(
-#    bytes=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00'))
+LOREM = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla mollis tincidunt arcu, vitae pulvinar lorem aliquet porta. Nam sit amet diam in sem laoreet dignissim. Nulla eu sapien semper orci porta consequat id vel purus. Vivamus diam lectus, sodales id condimentum eu, cursus sed ipsum. Nam a sapien laoreet, lobortis diam sit amet, pulvinar nisi. In venenatis elementum dolor, non sodales est suscipit ac. Curabitur vitae ligula semper, luctus ante id, tincidunt ante. Suspendisse aliquam nullam."""  # noqa E501
+
+IPSUM = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam ut ipsum semper, semper est nec, varius lorem. Donec mollis libero at turpis semper molestie. Aliquam tristique rhoncus lacus at ullamcorper. Curabitur pretium sapien vitae eleifend cursus. Aliquam blandit neque sit amet quam suscipit blandit. Curabitur id lectus velit. Integer vehicula eget nulla vitae ultrices. Pellentesque condimentum lacus sed odio posuere, ac luctus mi dignissim. Morbi hendrerit neque pellentesque varius condimentum. Nullam arcu quam, mattis id ultrices ac, molestie non arcu. Nulla tristique in lacus quis consequat. Phasellus luctus faucibus gravida. Aenean lacinia tempus mi, porta pellentesque sapien scelerisque quis. Cras nec libero vel velit dictum pharetra non sollicitudin arcu.
+
+Integer eu sagittis risus. Praesent tempor semper sapien in ultrices. Aenean purus ipsum, ornare in libero vel, porta porta leo. Maecenas pretium sollicitudin tortor, sit amet porttitor ligula mollis at. Class aptent metus."""  # noqa E501
+
+DOLOR = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam vel nisl et felis porta malesuada. Maecenas finibus faucibus sem commodo ultrices. Pellentesque sed erat eu dui consectetur tincidunt vel ac leo. Fusce sodales rutrum nisi, luctus vulputate magna ullamcorper ut. Nulla facilisi. Aenean molestie orci leo, nec ultrices leo laoreet eget. Aliquam dui purus, vehicula eu molestie ac, aliquam et neque.
+
+Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Vivamus efficitur eros at sodales venenatis. Suspendisse nec nisi vel tellus suscipit porttitor. Fusce at venenatis orci. Ut hendrerit sodales pulvinar. Nulla vitae hendrerit nisl. Suspendisse nec est hendrerit, consectetur dolor ac, luctus massa. Donec dictum, ipsum ac pulvinar ultricies, orci odio iaculis libero, vel ullamcorper sem nibh sit amet mi. Sed molestie lacinia dui sed efficitur. Fusce sed felis ex. Vivamus mauris massa, sodales id egestas et, accumsan nec leo. Nulla nec libero diam. Vivamus euismod sollicitudin magna vitae laoreet. Nulla ac purus feugiat metus mollis condimentum at non erat. Sed et aliquam diam.
+
+Vestibulum suscipit id massa eu condimentum. Quisque euismod, tellus eget convallis vulputate, magna velit posuere urna, non volutpat augue odio eu eros. Etiam malesuada sapien magna, at porta mi aliquam in. Nullam vehicula dui a tellus sollicitudin ultricies eget et risus. Suspendisse eget pulvinar arcu, eu cursus turpis. Nunc non velit porta, egestas ipsum vitae, efficitur elit. Curabitur non tempor eros. Aliquam vehicula sodales erat vel consectetur. Suspendisse consectetur, mi in maximus efficitur, mauris neque pulvinar diam, quis scelerisque enim magna vitae sapien. Proin at euismod neque. Maecenas blandit tortor ex, in accumsan diam volutpat sed. Duis eget leo ac tortor ultrices faucibus sed in diam.
+
+Ut vitae neque mi. Nulla pellentesque turpis sed nisl congue semper. In tincidunt, ipsum nec blandit hendrerit, ex erat dictum libero, eu cursus justo amet."""  # noqa E501
+
+LOREM_DIGEST = hashlib.sha1(bytes(LOREM, 'utf-8')).digest()
+IPSUM_DIGEST = hashlib.sha1(bytes(IPSUM, 'utf-8')).digest()
+DOLOR_DIGEST = hashlib.sha1(bytes(DOLOR, 'utf-8')).digest()
+
+alphabet = 'abcdefghijklmnopqrstuvwxyz'
+
+archive = Archive.create(path='./test.ar7', owner=uuid.UUID(
+    bytes=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00'))
+
+hierarchy = (
+    '/',
+    '/cache',
+    '/facade',
+    '/facade/churches',
+    '/facade/identity',
+    '/facade/ministries',
+    '/facade/keys',
+    '/facade/persons',
+    '/facade/profiles',
+    '/facade/settings',
+)
+
+for i in hierarchy:
+    print(i, ':', os.path.dirname(i), ':', os.path.basename(i))
+    archive.mkdir(i)
+archive.remove('/facade/profiles')
+
+for i in range(random.randrange(100, 200)):
+    archive.mkfile(
+        ''.join(random.choices(string.ascii_lowercase + string.digits, k=random.randrange(5, 10))) + '.txt',  # noqa E501
+        bytes(random.choices([LOREM, IPSUM, DOLOR], k=1)[0], 'utf-8')
+    )
