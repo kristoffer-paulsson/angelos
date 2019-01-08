@@ -191,7 +191,25 @@ class ConcealIO(io.RawIOBase):
         return self.__cursor
 
     def truncate(self, size=None):
-        raise NotImplementedError()
+        if size:
+            blk = int(math.floor(size / self.ABLK_SIZE))
+            if self.__block_idx != blk:
+                self._save()
+                self._load(blk)
+            blk_cursor = size - (blk * self.ABLK_SIZE)
+            self.__len = size
+        else:
+            blk_cursor = self.__blk_cursor
+            self.__len = self.__cursor
+
+        self.__save = True
+        space = ConcealIO.ABLK_SIZE - blk_cursor
+        self.__buffer[self.__blk_cursor:ConcealIO.ABLK_SIZE] = b'\x00' * space
+        self._save()
+        self.__block_cnt = self.__block_idx+1
+
+        self.__length(self.__len)
+        self.__file.truncate(self.__block_cnt * ConcealIO.TOT_SIZE)
 
     def writable(self):
         return True

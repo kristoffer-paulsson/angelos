@@ -7,6 +7,7 @@
 *.app
 *.exe
 *.cnl
+*.ar7
 __pychache__
 /build/
 /dist/

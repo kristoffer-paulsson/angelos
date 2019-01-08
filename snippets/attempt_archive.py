@@ -13,6 +13,10 @@ import threading
 import random
 import string
 import types
+import copy
+import zlib
+import gzip
+import bz2
 
 
 class Container:
@@ -380,14 +384,12 @@ class Entry(collections.namedtuple('Entry', field_names=[
 class Archive(ContainerAware):
     BLOCK_SIZE = 512
 
-    def __init__(self, fileobj):
+    def __init__(self, fileobj, delete=3):
         self.__closed = False
         self.__lock = threading.Lock()
         self.__file = fileobj
-        self.__header = None
         self.__size = os.path.getsize(self.__file.name)
-        self.__delete = Archive.Delete.ERASE
-
+        self.__delete = delete if delete else Archive.Delete.ERASE
         self.__file.seek(0)
         self.__header = Header.deserialize(self.__file.read(
                 struct.calcsize(Header.FORMAT)))
@@ -459,8 +461,8 @@ class Archive(ContainerAware):
                 self.__file.close()
 
     def stats(self):
-        with self.__lock:
-            pass
+        # with self.__lock:
+        return copy.deepcopy(self.__header)
 
     def info(self, path):
         with self.__lock:
@@ -470,9 +472,7 @@ class Archive(ContainerAware):
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(name, pid)
 
-            return (
-                idx, entry.type, entry.id, entry.name, dirname, entry.length,
-                entry.created, entry.modfied, entry.digest, entry.deleted)
+            return copy.deepcopy(entry)
 
     def glob(self, name='*', id=None, parent=None,
              owner=None, created=None, modified=None, deleted=None):
@@ -521,7 +521,7 @@ class Archive(ContainerAware):
             entry = Entry(**entry)
             self.ioc.entries.update(entry, idx)
 
-    def chmod(self, path, id=None, owner=None, deleted=None, compression=None):
+    def chmod(self, path, id=None, owner=None, deleted=None):
         with self.__lock:
             ops = self.ioc.operations
 
@@ -548,20 +548,56 @@ class Archive(ContainerAware):
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(name, pid)
 
-            if entry.type is Entry.TYPE_FILE:
-                entries.update(
-                    Entry.empty(
-                        offset=entry.offset,
-                        size=entries._sector(entry.size)),
-                    idx)
-            elif entry.type is Entry.TYPE_DIR:
+            # Check for unsupported types
+            if entry.type not in (
+                    Entry.TYPE_FILE, Entry.TYPE_DIR, Entry.TYPE_LINK):
+                raise self.ioc.err.set(Archive.Errno.UNKNOWN_TYPE, entry.type)
+
+            # If directory is up for removal, check that it is empty or abort
+            if entry.type is Entry.TYPE_DIR:
                 cidx = entries.search(
                     Archive.Query().parent(entry.id))
                 if len(cidx):
                     raise self.ioc.err.set(Archive.Errno.NOT_EMPTY, cidx)
-                entries.update(Entry.blank(), idx)
+
+            if self.__delete == Archive.Delete.ERASE:
+                if entry.type == Entry.TYPE_FILE:
+                    entries.update(
+                        Entry.empty(
+                            offset=entry.offset,
+                            size=entries._sector(entry.size)),
+                        idx)
+                elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
+                    entries.update(Entry.blank(), idx)
+            elif self.__delete == Archive.Delete.SOFT:
+                entry = entry._asdict()
+                entry['deleted'] = True
+                entry = Entry(**entry)
+                self.ioc.entries.update(entry, idx)
+            elif self.__delete == Archive.Delete.HARD:
+                if entry.type == Entry.TYPE_FILE:
+                    if not entries.find_blank():
+                        entries.make_blanks()
+                    bidx = entries.get_blank()
+                    entries.update(
+                        Entry.empty(
+                            offset=entry.offset,
+                            size=entries._sector(entry.size)),
+                        bidx)
+                    entry = entry._asdict()
+                    entry['deleted'] = True
+                    entry['size'] = 0
+                    entry['length'] = 0
+                    entry['offset'] = 0
+                    entry = Entry(**entry)
+                    self.ioc.entries.update(entry, idx)
+                elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
+                    entry = entry._asdict()
+                    entry['deleted'] = True
+                    entry = Entry(**entry)
+                    self.ioc.entries.update(entry, idx)
             else:
-                raise self.ioc.err.set(Archive.Errno.UNKNOWN_TYPE, cidx)
+                raise OSError('Unkown delete mode')
 
     def rename(self, path, dest):
         with self.__lock:
@@ -625,11 +661,16 @@ class Archive(ContainerAware):
 
             ops.is_available(name, pid)
 
+            length = len(data)
+            digest = hashlib.sha1(data).digest()
+            if compression:
+                data = ops.compress(data, compression)
+            size = len(data)
+
             entry = Entry.file(
-                name=name, size=len(data), offset=0,
-                digest=hashlib.sha1(data).digest(),
+                name=name, size=size, offset=0, digest=digest,
                 id=id, parent=pid, owner=owner, created=created,
-                modified=modified, length=len(data))
+                modified=modified, length=length)
 
         return self.ioc.entries.add(entry, data)
 
@@ -653,7 +694,7 @@ class Archive(ContainerAware):
 
         return self.ioc.entries.add(entry)
 
-    def save(self, path, data):
+    def save(self, path, data, compression=Entry.COMP_NONE):
         with self.__lock:
             ops = self.ioc.operations
             entries = self.ioc.entries
@@ -671,6 +712,9 @@ class Archive(ContainerAware):
 
             length = len(data)
             digest = hashlib.sha1(data).digest()
+            if compression:
+                data = ops.compress(data, compression)
+            size = len(data)
 
             osize = entries._sector(entry.size)
             nsize = entries._sector(len(data))
@@ -684,9 +728,10 @@ class Archive(ContainerAware):
                 entry = entry._asdict()
                 entry['digest'] = digest
                 entry['offset'] = new_offset
-                entry['size'] = length
+                entry['size'] = size
                 entry['length'] = length
                 entry['modified'] = datetime.datetime.now()
+                entry['compression'] = compression
                 entry = Entry(**entry)
                 entries.update(entry, idx)
 
@@ -697,9 +742,10 @@ class Archive(ContainerAware):
 
                 entry = entry._asdict()
                 entry['digest'] = digest
-                entry['size'] = length
+                entry['size'] = size
                 entry['length'] = length
                 entry['modified'] = datetime.datetime.now()
+                entry['compression'] = compression
                 entry = Entry(**entry)
                 entries.update(entry, idx)
             elif osize > nsize:
@@ -707,9 +753,10 @@ class Archive(ContainerAware):
 
                 entry = entry._asdict()
                 entry['digest'] = digest
-                entry['size'] = length
+                entry['size'] = size
                 entry['length'] = length
                 entry['modified'] = datetime.datetime.now()
+                entry['compression'] = compression
                 entry = Entry(**entry)
                 entries.update(entry, idx)
 
@@ -731,6 +778,10 @@ class Archive(ContainerAware):
                 entry, idx = ops.follow_link(entry)
 
             data = self.ioc.operations.load_data(entry)
+
+            if entry.compression:
+                data = ops.decompress(data, entry.compression)
+
             if entry.digest != hashlib.sha1(data).digest():
                 raise OSError('Hash digest doesn\'t match. File is corrupt.')
             return data
@@ -738,6 +789,20 @@ class Archive(ContainerAware):
     class Entries(ContainerAware):
         def __init__(self, ioc, entries):
             ContainerAware.__init__(self, ioc)
+            self.reload()
+
+        def reload(self):
+            entries = []
+            length = struct.calcsize(Entry.FORMAT)
+            header = self.ioc.archive.stats()
+            fileobj = self.ioc.fileobj
+            fileobj.seek(1024)
+
+            for i in range(header.entries):
+                entries.append(
+                    Entry.deserialize(
+                        fileobj.read(length)))
+
             self.__all = entries
             self.__files = [i for i in range(
                 len(entries)) if entries[i].type == Entry.TYPE_FILE]
@@ -865,25 +930,25 @@ class Archive(ContainerAware):
 
             return cnt
 
-        def get_hithermost(self):
+        def get_hithermost(self, limit=0):
             idx = None
             offset = sys.maxsize
 
             idxs = set(self.__files + self.__empties)
             for i in idxs:
-                if offset > self.__all[i].offset > 0:
+                if offset > self.__all[i].offset > limit:
                     idx = i
                     offset = self.__all[i].offset
 
             return idx
 
-        def get_thithermost(self):
+        def get_thithermost(self, limit=sys.maxsize):
             idx = None
             offset = 0
 
             idxs = set(self.__files + self.__empties)
             for i in idxs:
-                if offset < self.__all[i].offset < sys.maxsize:
+                if offset < self.__all[i].offset < limit:
                     idx = i
                     offset = self.__all[i].offset
 
@@ -1014,7 +1079,7 @@ class Archive(ContainerAware):
         def _build(self):
             pass
 
-        def reload(self):
+        def reload(self, deleted=False):
             entries = self.ioc.entries
             dirs = entries.dirs
             zero = uuid.UUID(bytes=b'\x00'*16)
@@ -1027,6 +1092,9 @@ class Archive(ContainerAware):
                 current = entries.get_entry(dirs[i])
                 cid = current.id
                 path.append(current)
+
+                if not deleted and current.deleted is True:
+                    break
 
                 while current.parent.int != zero.int:
                     parent = None
@@ -1051,13 +1119,16 @@ class Archive(ContainerAware):
                 self.__paths[search_path] = cid
                 self.__ids[cid] = search_path
 
-        def add(self, entry):
+        def add(self, entry, deleted=False):
             entries = self.ioc.entries
             dirs = entries.dirs
             path = []
             current = entry
             cid = current.id
             path.append(current)
+
+            if not deleted and current.deleted is True:
+                return
 
             while current.parent.int != 0:
                 parent = None
@@ -1118,7 +1189,8 @@ class Archive(ContainerAware):
         def find_entry(self, name, pid, types=None):
             entries = self.ioc.entries
             idx = entries.search(
-                Archive.Query(name=name).parent(pid).type(types))
+                Archive.Query(name=name).parent(pid).type(
+                    types).deleted(False))
             if not len(idx):
                 raise self.ioc.err.set(Archive.Errno.INVALID_FILE, (pid, name))
             else:
@@ -1178,15 +1250,68 @@ class Archive(ContainerAware):
 
         def is_available(self, name, pid):
             idx = self.ioc.entries.search(
-                Archive.Query(name=name).parent(pid))
+                Archive.Query(name=name).parent(pid).deleted(False))
             if len(idx):
                 raise self.ioc.err.set(Archive.Errno.NAME_TAKEN, (
                     name, pid, idx))
             return True
 
+        def zip(self, data, compression):
+            if compression == Entry.COMP_ZIP:
+                return zlib.compress(data)
+            elif compression == Entry.COMP_GZIP:
+                return gzip.compress(data)
+            elif compression == Entry.COMP_BZIP2:
+                return bz2.compress(data)
+            else:
+                raise TypeError('Invalid compression format')
+
+        def unzip(self, data, compression):
+            if compression == Entry.COMP_ZIP:
+                return zlib.decompress(data)
+            elif compression == Entry.COMP_GZIP:
+                return gzip.decompress(data)
+            elif compression == Entry.COMP_BZIP2:
+                return bz2.decompress(data)
+            else:
+                raise TypeError('Invalid compression format')
+
+        def vacuum(self):
+            entries = self.ioc.entries
+            all = entries.dirs + entries.files + entries.links
+            cnt = len(all)
+
+            if cnt != len(set(all)):
+                raise ValueError('The number of entries is corrupted.')
+
+            self.ioc.archive._update_header(cnt)
+
+            for i in range(len(all)):
+                self.write_entry(entries.get_entry(all[i]), i)
+
+            entries.reload()
+            self.ioc.hierarchy.reload()
+
+            offset = entries._sector(cnt * 256 + 1024)
+            hidx = entries.get_hithermost(offset)
+            while(hidx):
+                entry = entries.get_entry(hidx)
+                data = self.load_data(entry)
+                self.write_data(data, offset)
+
+                entry = entry._asdict()
+                entry['offset'] = offset
+                entry = Entry(**entry)
+                entries.update(entry, hidx)
+
+                offset = entries._sector(offset + entry.size)
+                hidx = entries.get_hithermost(offset)
+
+            self.ioc.fileobj.truncate(offset)
+
     class Query:
         EQ = '='
-        NOT = '≠'
+        NE = '≠'
         GT = '>'
         LT = '<'
 
