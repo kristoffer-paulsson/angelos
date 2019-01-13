@@ -20,11 +20,6 @@ class ConcealIO(io.RawIOBase):
 
         self.__path = path
         self.__mode = mode[0]
-        isnew = False
-
-        if not os.path.isfile(self.__path):
-            open(self.__path, 'a').close()
-            isnew = True
 
         if self.__mode == 'r':
             self.__file = open(self.__path, 'rb')
@@ -36,9 +31,9 @@ class ConcealIO(io.RawIOBase):
         fcntl.flock(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
         self.__box = libnacl.secret.SecretBox(secret)
-        self.__len = 0 if isnew else self.__length()
         self.__block_cnt = int(os.stat(
             self.__path).st_size / ConcealIO.TOT_SIZE)
+        self.__len = 0 if self.__block_cnt == 0 else self.__length()
         self.__size = self.__block_cnt * ConcealIO.ABLK_SIZE
         self.__block_idx = 0
         self.__cursor = 0
@@ -76,8 +71,8 @@ class ConcealIO(io.RawIOBase):
             raise OSError()
 
         if self.__block_cnt >= blk:
-            self.__buffer = self.__box.decrypt(
-                self.__file.read(ConcealIO.CBLK_SIZE))
+            self.__buffer = bytearray(self.__box.decrypt(
+                self.__file.read(ConcealIO.CBLK_SIZE)))
         else:
             self.__buffer = bytearray(b'\x00' * ConcealIO.ABLK_SIZE)
 
@@ -249,3 +244,7 @@ class ConcealIO(io.RawIOBase):
 
     def __del__(self):
         self.close()
+
+    @property
+    def name(self):
+        return self.__path

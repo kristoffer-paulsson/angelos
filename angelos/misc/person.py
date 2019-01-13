@@ -1,42 +1,30 @@
 import collections
-import pickle
 import uuid
 import base64
 import datetime
 import types
-import platform
 import yaml
 import libnacl.dual
 import libnacl.sign
 import libnacl.encode
-import libnacl.utils
-import plyer
+from playhouse.shortcuts import model_to_dict
 
 from ..utils import Util
+from ..db.person import PersonDatabase
 from ..document.issuance import IssueMixin
 from ..document.entity import Person, Keys
 from ..document.document import Document
-from ..document.network import Network, Node
 from .facade import BaseFacade
-from .archive import Entity as EntityArchive
 
 
 class PersonFacade(BaseFacade):
-    def __init__(self, path, secret):
+    def __init__(self, db, path):
+        Util.is_type(db, PersonDatabase)
         self.__configured = False
         self.__path = path
 
-        self.__entity = None
-
         self.__facade = None
         self.__keys = None
-        self.__secret = None
-
-        if secret:
-            box = libnacl.secret.SecretBox(
-                libnacl.encode.hex_decode(
-                    plyer.keystore.get_key('Λόγῳ', 'conceal')))
-            self.__secret = base64.b64decode(box.decrypt(secret))
 
     class Entity(collections.namedtuple('Entity', [
         'given_name',
@@ -146,7 +134,6 @@ class PersonFacade(BaseFacade):
 
     def initialize(self):
         """Initializes the Facade with the entity data from the database"""
-        self.__archive = EntityArchive(self.__path, self.__secret)
         record = self.__load_identity()
         self.__configure(record.data)
 
@@ -165,42 +152,11 @@ class PersonFacade(BaseFacade):
         keys.verify = self.__keys.hex_vk().decode('utf-8')
         keys = self.__issue(entity.id, keys)
 
-        # Createing and signing the network document
-        network = Network()
-        network.owner = entity.id
-        network = self.__issue(entity.id, network)
-
-        # Creating and signing the node document
-        node = Node()
-        node.owner = entity.id
-        node.network = network.id
-        node.role = 'client'
-        node.device = platform.platform()
-        node.serial = plyer.uniqueid.id
-        node = self.__issue(entity.id, node)
-
         # Signing the owners identity
         entity = self.__issue(entity.id, entity)
 
-        # Setting up the concealed archives.
-        box = libnacl.secret.SecretBox()
-        skey = str(box.hex_sk(), 'utf_8')
-        plyer.keystore.set_key('Λόγῳ', 'conceal', skey)
-
-        self.__secret = libnacl.secret.SecretBox().sk
-        with open(self.__path + '/default.yml', 'w') as config:
-            config.write(yaml.dump({
-                'configured': True, 'key': base64.b64encode(
-                    box.encrypt(self.__secret))},
-                default_flow_style=False, allow_unicode=True,
-                explicit_start=True, explicit_end=True))
-        self.__archive = EntityArchive.setup(
-            self.__path, self.__secret, entity, network)
-
         # Importing the new identity
         self.import_new_person(entity, keys)
-        self.set_network(network, keys)
-        self.import_new_node(node, network, keys)
 
         # Configuring the facade and saving settings
         data = entity.export_str()
@@ -220,6 +176,11 @@ class PersonFacade(BaseFacade):
             }
         })
         self.__save_identity()
+
+        with open(self.__path + '/default.yml', 'w') as config:
+            config.write(yaml.dump(
+                {'configured': True}, default_flow_style=False,
+                allow_unicode=True, explicit_start=True, explicit_end=True))
 
     def __configure(self, data):
         Util.is_type(data, dict)
@@ -281,7 +242,7 @@ class PersonFacade(BaseFacade):
         self.__configured = True
 
     def __load_identity(self):
-        return pickle.loads(self.__archive.archive.load('/identity.pickle'))
+        return PersonDatabase.Identity.get(pk='i')
 
     def __save_identity(self):
         if bool(self.__facade.address):
@@ -311,14 +272,12 @@ class PersonFacade(BaseFacade):
                 'seed': self.__keys.hex_seed().decode('utf-8'),
             }
         }
-
         try:
-            self.__archive.archive.info('/identity.pickle')
-            pckl = pickle.dumps(data, pickle.DEFAULT_PROTOCOL)
-            self.__archive.archive.mkfile(
-                '/identity.pickle', data=pckl, owner=self.__facade.id)
-        except Exception:
-            self.__archive.archive.save('/identity.pickle', data=pckl)
+            (PersonDatabase.Identity().get(
+                pk='i').update(data=data)).execute()
+        except PersonDatabase.Identity.DoesNotExist:
+            PersonDatabase.Identity().create(
+                id=uuid.UUID(self.__facade.id), data=data)
 
     def __issue(self, id, document):
         Util.is_type(id, uuid.UUID)
@@ -406,102 +365,33 @@ class PersonFacade(BaseFacade):
             raise Exception()
 
         # Importing the identitys public keys
-        self.__archive.create(
-            '/keys/'+str(keys.id)+'.pickle', keys)
+        PersonDatabase.Keys().create(
+            **PersonDatabase.prepare(keys.export()))
 
         # Importing the owners identity
-        self.__archive.create(
-            '/entities/persons/'+str(entity.id)+'.pickle', entity)
-
-    def set_network(self, network, keys):
-        Util.is_type(network, Network)
-
-        # Evaluate the network expiery date
-        today = datetime.date.today()
-        if not network.expires > today:
-            raise Exception()
-
-        # Validate the network document
-        if not network.validate():
-            raise Exception()
-
-        # Make sure that the key is issued by the network owner
-        if not network.owner == keys.issuer:
-            raise Exception()
-
-        # Make sure that the key is issued by the key issuer
-        if not network.issuer == keys.issuer:
-            raise Exception()
-
-        # Verify the signed network
-        if not self.__verify(network, keys):
-            raise Exception()
-
-        # Importing the identitys public keys
-        self.__archive.create(
-            '/settings/network.pickle', network)
-
-    def import_new_node(self, node, network, keys):
-        Util.is_type(node, Node)
-        Util.is_type(network, Network)
-        Util.is_type(keys, Keys)
-
-        today = datetime.date.today()
-
-        # Evaluate the node expiery date
-        if not node.expires > today:
-            raise Exception()
-
-        # Validate the node document
-        if not node.validate():
-            raise Exception()
-
-        # Make sure that the nodes owner is the keys issuer
-        if not node.owner == keys.issuer:
-            raise Exception()
-
-        # Make sure that the node is issued by the key issuer
-        if not node.issuer == keys.issuer:
-            raise Exception()
-
-        # Make sure that the network is issued by the keys owner
-        if not network.owner == keys.issuer:
-            raise Exception()
-
-        # Make sure that the issuer is issued by the key issuer
-        if not network.issuer == keys.issuer:
-            raise Exception()
-
-        # Make sure that the node belong to the network
-        if not node.network == network.id:
-            raise Exception()
-
-        # Verify the entity-signed key
-        if not self.__verify(node, keys):
-            raise Exception()
-
-        # Importing the identitys public keys
-        self.__archive.create(
-            '/settings/nodes/'+str(node.id)+'.pickle', node)
+        PersonDatabase.Person().create(
+            **PersonDatabase.prepare(entity.export()))
 
     def find_person(self, issuer):
-        res = self.__archive.search('/entities/persons', issuer)
+        res = (PersonDatabase.Person.select().where(
+            PersonDatabase.Person.issuer == issuer)).execute()
         output = ''
         for doc in res:
-            output += yaml.dump(
-                Person(doc, False).export(),
-                default_flow_style=False, allow_unicode=True,
-                explicit_start=True, explicit_end=True)
+            output += yaml.dump(Person(
+                model_to_dict(doc), False).export(), default_flow_style=False,
+                      allow_unicode=True, explicit_start=True,
+                      explicit_end=True)
         return output
 
     def find_keys(self, issuer):
-        res = self.__archive.search('/keys', issuer)
+        res = (PersonDatabase.Keys.select().where(
+            PersonDatabase.Keys.issuer == issuer)).execute()
         output = ''
         for doc in res:
-            output += yaml.dump(
-                Person(doc, False).export(),
-                default_flow_style=False, allow_unicode=True,
-                explicit_start=True, explicit_end=True)
+            output += yaml.dump(Keys(
+                model_to_dict(doc), False).export(), default_flow_style=False,
+                      allow_unicode=True, explicit_start=True,
+                      explicit_end=True)
         return output
 
     def export_yaml(self, data={}):

@@ -13,7 +13,8 @@ DEFAULT = {
         'role': Const.R_ROLE_NORMAL,
         'platform': Const.R_PLATFORM_ANDROID
     },
-    'configured': True
+    'configured': True,
+    'key': None
 }
 
 IMMUTABLE = {

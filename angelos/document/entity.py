@@ -28,7 +28,7 @@ class VirtualPerson(Entity):
 
 class Church(VirtualPerson):
     type = StringField(value='entity.church')
-    nation = StringField()
+    nation = StringField(required=False)
     state = StringField(required=False)
     city = StringField()
 
@@ -36,7 +36,7 @@ class Church(VirtualPerson):
 class Ministry(VirtualPerson):
     type = StringField(value='entity.ministry')
     ministry = StringField()
-    vision = StringField()
+    vision = StringField(required=False)
 
 
 class Person(Entity):

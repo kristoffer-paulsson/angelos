@@ -10,7 +10,6 @@ from ..worker import Workers
 from ..events import Events
 from ..logger import LogHandler
 from ..runtime import Runtime
-from ..db.person import PersonDatabase
 from ..facade.person import PersonFacade
 
 try:
@@ -28,8 +27,8 @@ CONFIG = {
     'message': lambda self: Events(),
     'log': lambda self: LogHandler(self.environment['logger']),
     'runtime': lambda self: Runtime(self.environment['runtime']),
-    'entity': lambda self: PersonDatabase(self.runtime.root()),
-    'facade': lambda self: PersonFacade(self.entity, self.runtime.root())
+    'facade': lambda self: PersonFacade(
+        self.runtime.root(), self.environment['key'])  # noqa E501
 }
 
 

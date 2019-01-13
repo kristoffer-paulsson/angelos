@@ -10,43 +10,12 @@ import hashlib
 import sys
 import math
 import threading
-import random
-import string
-import types
 import copy
 import zlib
 import gzip
 import bz2
 
-
-class Container:
-    """Docstring"""
-    def __init__(self, config={}):
-        """Docstring"""
-        if not isinstance(config, dict): raise TypeError()  # noqa E501
-
-        self.__config = config
-        self.__instances = {}
-
-    def __getattr__(self, name):
-        """Docstring"""
-        if name not in self.__instances:
-            if name not in self.__config:
-                raise IndexError()
-            elif isinstance(self.__config[name], types.LambdaType):
-                self.__instances[name] = self.__config[name](self)
-            else:
-                raise TypeError()
-        return self.__instances[name]
-
-
-class ContainerAware:
-    def __init__(self, ioc):
-        self.__ioc = ioc
-
-    @property
-    def ioc(self):
-        return self.__ioc
+from ..ioc import Container, ContainerAware
 
 
 class Header(collections.namedtuple('Header', field_names=[
@@ -430,12 +399,8 @@ class Archive(ContainerAware):
         self.ioc.operations.write_data(0, self.__header.serialize())
 
     @staticmethod
-    def create(path, owner, node=None, title=None,
-               network=None, _type=None, role=None, use=None):
-        if not os.path.isfile(path):
-            open(path, 'a').close()
-
-        fileobj = open(path, 'rb+')
+    def setup(fileobj, owner=None, node=None, title=None,
+              network=None, _type=None, role=None, use=None):
         header = Header.header(
             owner=owner, node=node, title=title,
             network=network, _type=_type, role=role, use=use)
@@ -461,7 +426,6 @@ class Archive(ContainerAware):
                 self.__file.close()
 
     def stats(self):
-        # with self.__lock:
         return copy.deepcopy(self.__header)
 
     def info(self, path):
@@ -614,7 +578,7 @@ class Archive(ContainerAware):
             entry = Entry(**entry)
             entries.update(entry, idx)
 
-    def mkdir(self, name):
+    def mkdir(self, path):
         """
         Make a new directory in the archive hierarchy.
             name        The full path and name of new directory
@@ -623,12 +587,12 @@ class Archive(ContainerAware):
         with self.__lock:
             paths = self.ioc.hierarchy.paths
             # If path already exists return id
-            if name in paths.keys():
-                return paths[name]
+            if path in paths.keys():
+                return paths[path]
 
             # separate new dir name and path to
-            dirname = os.path.dirname(name)
-            name = os.path.basename(name)
+            dirname = os.path.dirname(path)
+            name = os.path.basename(path)
 
             # Check if path has an ID or is on root level
             if len(dirname):
@@ -645,11 +609,11 @@ class Archive(ContainerAware):
 
         return entry.id
 
-    def mkfile(self, name, data, created=None, modified=None, owner=None,
+    def mkfile(self, path, data, created=None, modified=None, owner=None,
                parent=None, id=None, compression=Entry.COMP_NONE):
         with self.__lock:
             ops = self.ioc.operations
-            name, dirname = ops.path(name)
+            name, dirname = ops.path(path)
             pid = None
 
             if parent:
@@ -723,7 +687,7 @@ class Archive(ContainerAware):
                 empty = Entry.empty(offset=entry.offset, size=osize)
                 last = entries.get_entry(entries.get_thithermost())
                 new_offset = entries._sector(last.offset+last.size)
-                self.ioc.operations.write_data(new_offset, data)
+                ops.write_data(new_offset, data + ops.filler(data))
 
                 entry = entry._asdict()
                 entry['digest'] = digest
@@ -738,7 +702,7 @@ class Archive(ContainerAware):
                 bidx = entries.get_blank()
                 entries.update(empty, bidx)
             elif osize == nsize:
-                self.ioc.operations.write_data(entry.offset, data)
+                ops.write_data(entry.offset, data + ops.filler(data))
 
                 entry = entry._asdict()
                 entry['digest'] = digest
@@ -749,7 +713,7 @@ class Archive(ContainerAware):
                 entry = Entry(**entry)
                 entries.update(entry, idx)
             elif osize > nsize:
-                self.ioc.operations.write_data(entry.offset, data)
+                ops.write_data(entry.offset, data + ops.filler(data))
 
                 entry = entry._asdict()
                 entry['digest'] = digest
@@ -1031,7 +995,8 @@ class Archive(ContainerAware):
                 entry['offset'] = offset
                 entry = Entry(**entry)
 
-                self.ioc.operations.write_data(offset, data)
+                ops = self.ioc.operations
+                ops.write_data(offset, data + ops.filler(data))
                 bidx = self.get_blank()
                 self.update(entry, bidx)
 
@@ -1172,6 +1137,10 @@ class Archive(ContainerAware):
             return self.__ids
 
     class Operations(ContainerAware):
+        def filler(self, data):
+            length = len(data)
+            return b'\x00' * (int(math.ceil(length/512)*512) - length)
+
         def path(self, path):
             return os.path.basename(path), os.path.dirname(path)
 
@@ -1223,6 +1192,7 @@ class Archive(ContainerAware):
         def write_data(self, offset, data):
             fileobj = self.ioc.fileobj
             if fileobj.seek(offset) != offset:
+                print(offset)
                 raise OSError('Could not seek to new offset')
             fileobj.write(data)
 
@@ -1240,7 +1210,7 @@ class Archive(ContainerAware):
             last = entries.get_entry(entries.get_thithermost())
             data = self.load_data(entry)
             noffset = entries._sector(last.offset+last.size)
-            self.write_data(noffset, data)
+            self.write_data(noffset, data + self.filler(data))
             empty = Entry.empty(entry.offset, entries._sector(entry.size))
 
             entry = entry._asdict()
@@ -1289,7 +1259,7 @@ class Archive(ContainerAware):
             if cnt != len(set(all)):
                 raise ValueError('The number of entries is corrupted.')
 
-            self.ioc.archive._update_header(cnt)
+            self.ioc.archive._update_header(self.ioc.entries.count)
 
             for i in range(len(all)):
                 self.write_entry(entries.get_entry(all[i]), i)
@@ -1302,7 +1272,7 @@ class Archive(ContainerAware):
             while(hidx):
                 entry = entries.get_entry(hidx)
                 data = self.load_data(entry)
-                self.write_data(data, offset)
+                self.write_data(offset, data + self.filler(data))
 
                 entry = entry._asdict()
                 entry['offset'] = offset
@@ -1535,123 +1505,3 @@ class Archive(ContainerAware):
 
     def __del__(self):
         self.close()
-
-
-LOREM = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla mollis tincidunt arcu, vitae pulvinar lorem aliquet porta. Nam sit amet diam in sem laoreet dignissim. Nulla eu sapien semper orci porta consequat id vel purus. Vivamus diam lectus, sodales id condimentum eu, cursus sed ipsum. Nam a sapien laoreet, lobortis diam sit amet, pulvinar nisi. In venenatis elementum dolor, non sodales est suscipit ac. Curabitur vitae ligula semper, luctus ante id, tincidunt ante. Suspendisse aliquam nullam."""  # noqa E501
-
-IPSUM = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam ut ipsum semper, semper est nec, varius lorem. Donec mollis libero at turpis semper molestie. Aliquam tristique rhoncus lacus at ullamcorper. Curabitur pretium sapien vitae eleifend cursus. Aliquam blandit neque sit amet quam suscipit blandit. Curabitur id lectus velit. Integer vehicula eget nulla vitae ultrices. Pellentesque condimentum lacus sed odio posuere, ac luctus mi dignissim. Morbi hendrerit neque pellentesque varius condimentum. Nullam arcu quam, mattis id ultrices ac, molestie non arcu. Nulla tristique in lacus quis consequat. Phasellus luctus faucibus gravida. Aenean lacinia tempus mi, porta pellentesque sapien scelerisque quis. Cras nec libero vel velit dictum pharetra non sollicitudin arcu.
-
-Integer eu sagittis risus. Praesent tempor semper sapien in ultrices. Aenean purus ipsum, ornare in libero vel, porta porta leo. Maecenas pretium sollicitudin tortor, sit amet porttitor ligula mollis at. Class aptent metus."""  # noqa E501
-
-DOLOR = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam vel nisl et felis porta malesuada. Maecenas finibus faucibus sem commodo ultrices. Pellentesque sed erat eu dui consectetur tincidunt vel ac leo. Fusce sodales rutrum nisi, luctus vulputate magna ullamcorper ut. Nulla facilisi. Aenean molestie orci leo, nec ultrices leo laoreet eget. Aliquam dui purus, vehicula eu molestie ac, aliquam et neque.
-
-Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Vivamus efficitur eros at sodales venenatis. Suspendisse nec nisi vel tellus suscipit porttitor. Fusce at venenatis orci. Ut hendrerit sodales pulvinar. Nulla vitae hendrerit nisl. Suspendisse nec est hendrerit, consectetur dolor ac, luctus massa. Donec dictum, ipsum ac pulvinar ultricies, orci odio iaculis libero, vel ullamcorper sem nibh sit amet mi. Sed molestie lacinia dui sed efficitur. Fusce sed felis ex. Vivamus mauris massa, sodales id egestas et, accumsan nec leo. Nulla nec libero diam. Vivamus euismod sollicitudin magna vitae laoreet. Nulla ac purus feugiat metus mollis condimentum at non erat. Sed et aliquam diam.
-
-Vestibulum suscipit id massa eu condimentum. Quisque euismod, tellus eget convallis vulputate, magna velit posuere urna, non volutpat augue odio eu eros. Etiam malesuada sapien magna, at porta mi aliquam in. Nullam vehicula dui a tellus sollicitudin ultricies eget et risus. Suspendisse eget pulvinar arcu, eu cursus turpis. Nunc non velit porta, egestas ipsum vitae, efficitur elit. Curabitur non tempor eros. Aliquam vehicula sodales erat vel consectetur. Suspendisse consectetur, mi in maximus efficitur, mauris neque pulvinar diam, quis scelerisque enim magna vitae sapien. Proin at euismod neque. Maecenas blandit tortor ex, in accumsan diam volutpat sed. Duis eget leo ac tortor ultrices faucibus sed in diam.
-
-Ut vitae neque mi. Nulla pellentesque turpis sed nisl congue semper. In tincidunt, ipsum nec blandit hendrerit, ex erat dictum libero, eu cursus justo amet."""  # noqa E501
-
-LIPSUM = [LOREM, IPSUM, DOLOR]
-
-alphabet = 'abcdefghijklmnopqrstuvwxyz'
-
-archive = Archive.create(path='./test.ar7', owner=uuid.UUID(
-    bytes=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00'))
-
-hierarchy = (
-    '/',
-    '/cache',
-    '/cache/junk',
-    '/facade',
-    '/facade/churches',
-    '/facade/identity',
-    '/facade/ministries',
-    '/facade/keys',
-    '/facade/persons',
-    '/facade/profiles',
-    '/facade/settings',
-)
-
-animals = (
-    '/animal',
-    '/animal/elephant',
-    '/animal/kangaroo',
-    '/animal/girafe',
-    '/animal/hippo',
-    '/animal/horse',
-    '/pet',
-    '/pet/hamster',
-    '/pet/cat',
-    '/pet/dog',
-    '/pet/parrott',
-)
-
-for i in hierarchy:
-    archive.mkdir(i)
-for i in animals:
-    archive.mkdir(i)
-archive.remove('/cache/junk')
-
-for i in range(random.randrange(100, 200)):
-    archive.mkfile(
-        random.choices(animals, k=1)[0] + '/' +
-        ''.join(random.choices(
-            string.ascii_lowercase + string.digits,
-            k=random.randrange(5, 10))) + '.txt',
-        bytes(random.choices(LIPSUM, k=1)[0], 'utf-8')
-    )
-
-archive.mkfile('/facade/lorem.txt', bytes(LOREM, 'utf-8'))
-archive.mkfile('/facade/persons/dolor.txt', bytes(DOLOR, 'utf-8'))
-archive.mkfile('/facade/churches/ipsum.txt', bytes(LOREM, 'utf-8'))
-
-archive.link('/facade/lipsum.txt', '/facade/churches/ipsum.txt')
-
-len(archive.load('/facade/lorem.txt'))
-len(archive.load('/facade/churches/ipsum.txt'))
-len(archive.load('/facade/persons/dolor.txt'))
-
-archive.save('/facade/lorem.txt', bytes(DOLOR, 'utf-8'))
-archive.save('/facade/lipsum.txt', bytes(DOLOR, 'utf-8'))
-archive.save('/facade/persons/dolor.txt', bytes(IPSUM, 'utf-8'))
-
-len(archive.load('/facade/lorem.txt'))
-len(archive.load('/facade/churches/ipsum.txt'))
-len(archive.load('/facade/persons/dolor.txt'))
-
-archive.move('/facade/lorem.txt', '/cache')
-archive.move('/facade/churches/ipsum.txt', '/cache')
-archive.move('/facade/persons/dolor.txt', '/cache')
-
-archive.rename('/cache/lorem.txt', 'foo.txt')
-archive.rename('/cache/dolor.txt', 'baz.txt')
-
-archive.chmod('/cache/foo.txt')
-archive.chmod('/cache/baz.txt')
-
-archive.move('/cache', '/facade')
-
-archive.remove('/facade/cache/foo.txt')
-archive.remove('/facade/cache/baz.txt')
-
-for i in range(random.randrange(100, 200)):
-    archive.mkfile(
-         random.choices(animals, k=1)[0] + '/' +
-         ''.join(random.choices(
-             string.ascii_lowercase + string.digits,
-             k=random.randrange(5, 10))) + '.txt',
-         bytes(random.choices(LIPSUM, k=1)[0], 'utf-8')
-     )
-
-archive.close()
-
-archive = Archive(open('./test.ar7', 'rb+'))
-
-entries = archive.glob()
-for i in entries:
-    try:
-        print('Load:', i)
-        archive.load(i)
-    except OSError as e:
-        print(e, i)
-archive.close()
