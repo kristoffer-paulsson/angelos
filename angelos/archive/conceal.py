@@ -6,6 +6,7 @@ import math
 import libnacl
 
 from ..utils import Util
+from ..error import Error
 
 
 class ConcealIO(io.RawIOBase):
@@ -26,7 +27,7 @@ class ConcealIO(io.RawIOBase):
         elif self.__mode in ('w', 'a'):
             self.__file = open(self.__path, 'rb+')
         else:
-            raise TypeError()
+            raise Util.exception(Error.CONCEAL_UNKOWN_MODE, {'mode', mode})
 
         fcntl.flock(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
@@ -68,7 +69,8 @@ class ConcealIO(io.RawIOBase):
         res = self.__file.seek(pos)
 
         if pos != res:
-            raise OSError()
+            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
+                'position': pos, 'result': res})
 
         if self.__block_cnt >= blk:
             self.__buffer = bytearray(self.__box.decrypt(
@@ -88,7 +90,8 @@ class ConcealIO(io.RawIOBase):
         res = self.__file.seek(pos)
 
         if pos != res:
-            raise OSError()
+            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
+                'position': pos, 'result': res})
 
         if self.__block_idx is 0:
             filler = b''
@@ -107,6 +110,7 @@ class ConcealIO(io.RawIOBase):
 
     def close(self):
         if not self.closed:
+            self.__length(self.__len)
             fcntl.flock(self.__file, fcntl.LOCK_UN)
             io.RawIOBase.close(self)
             self.__file.close()
@@ -168,7 +172,8 @@ class ConcealIO(io.RawIOBase):
         elif whence == io.SEEK_END:
             cursor = max(min(self.__len + offset, self.__len), 0)
         else:
-            raise ValueError("Invalid argument")
+            raise Util.exception(Error.CONCEAL_INVALID_SEEK, {
+                'whence': whence})
 
         blk = int(math.floor(cursor / self.ABLK_SIZE))
         if self.__block_idx != blk:
@@ -230,6 +235,7 @@ class ConcealIO(io.RawIOBase):
             self.__cursor += numcpy
             if self.__cursor > self.__len:
                 self.__len = self.__cursor
+                # self.__length(self.__len)
 
             if self.__blk_cursor >= ConcealIO.ABLK_SIZE:
                 self._save()

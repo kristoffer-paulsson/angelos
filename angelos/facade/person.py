@@ -13,6 +13,7 @@ import libnacl.utils
 import plyer
 
 from ..utils import Util
+from ..error import ArchiveInvalidFile
 from ..document.issuance import IssueMixin
 from ..document.entity import Person, Keys
 from ..document.document import Document
@@ -36,7 +37,7 @@ class PersonFacade(BaseFacade):
             box = libnacl.secret.SecretBox(
                 libnacl.encode.hex_decode(
                     plyer.keystore.get_key('Λόγῳ', 'conceal')))
-            self.__secret = base64.b64decode(box.decrypt(secret))
+            self.__secret = box.decrypt(base64.b64decode(secret))
 
     class Entity(collections.namedtuple('Entity', [
         'given_name',
@@ -146,9 +147,9 @@ class PersonFacade(BaseFacade):
 
     def initialize(self):
         """Initializes the Facade with the entity data from the database"""
-        self.__archive = EntityArchive(self.__path, self.__secret)
-        record = self.__load_identity()
-        self.__configure(record.data)
+        self.__entity = EntityArchive(self.__path, self.__secret)
+        data = self.__load_identity()
+        self.__configure(data)
 
     def save(self):
         self.__save_identity()
@@ -194,7 +195,7 @@ class PersonFacade(BaseFacade):
                     box.encrypt(self.__secret))},
                 default_flow_style=False, allow_unicode=True,
                 explicit_start=True, explicit_end=True))
-        self.__archive = EntityArchive.setup(
+        self.__entity = EntityArchive.setup(
             self.__path, self.__secret, entity, network)
 
         # Importing the new identity
@@ -281,7 +282,7 @@ class PersonFacade(BaseFacade):
         self.__configured = True
 
     def __load_identity(self):
-        return pickle.loads(self.__archive.archive.load('/identity.pickle'))
+        return self.__entity.read('/identity.pickle')
 
     def __save_identity(self):
         if bool(self.__facade.address):
@@ -297,7 +298,7 @@ class PersonFacade(BaseFacade):
             social = {}
 
         data = {
-            'id': str(self.__facade.id),
+            'id': str(uuid.UUID(self.__facade.id)),
             'entity': self.__facade.entity._asdict(),
             'address': address,
             'email': self.__facade.email,
@@ -312,13 +313,15 @@ class PersonFacade(BaseFacade):
             }
         }
 
+        pckl = pickle.dumps(data, pickle.DEFAULT_PROTOCOL)
         try:
-            self.__archive.archive.info('/identity.pickle')
-            pckl = pickle.dumps(data, pickle.DEFAULT_PROTOCOL)
-            self.__archive.archive.mkfile(
-                '/identity.pickle', data=pckl, owner=self.__facade.id)
-        except Exception:
-            self.__archive.archive.save('/identity.pickle', data=pckl)
+            self.__entity.archive.info('/identity.pickle')
+            self.__entity.archive.save('/identity.pickle', data=pckl)
+        except ArchiveInvalidFile as e:
+            self.__entity.archive.mkfile(
+                '/identity.pickle', data=pckl,
+                owner=uuid.UUID(self.__facade.id))
+
 
     def __issue(self, id, document):
         Util.is_type(id, uuid.UUID)
@@ -406,11 +409,11 @@ class PersonFacade(BaseFacade):
             raise Exception()
 
         # Importing the identitys public keys
-        self.__archive.create(
+        self.__entity.create(
             '/keys/'+str(keys.id)+'.pickle', keys)
 
         # Importing the owners identity
-        self.__archive.create(
+        self.__entity.create(
             '/entities/persons/'+str(entity.id)+'.pickle', entity)
 
     def set_network(self, network, keys):
@@ -438,7 +441,7 @@ class PersonFacade(BaseFacade):
             raise Exception()
 
         # Importing the identitys public keys
-        self.__archive.create(
+        self.__entity.create(
             '/settings/network.pickle', network)
 
     def import_new_node(self, node, network, keys):
@@ -481,32 +484,37 @@ class PersonFacade(BaseFacade):
             raise Exception()
 
         # Importing the identitys public keys
-        self.__archive.create(
+        self.__entity.create(
             '/settings/nodes/'+str(node.id)+'.pickle', node)
 
     def find_person(self, issuer):
-        res = self.__archive.search('/entities/persons', issuer)
+        res = self.__entity.search('/entities/persons', uuid.UUID(issuer))
         output = ''
         for doc in res:
             output += yaml.dump(
-                Person(doc, False).export(),
+                Person(doc, False).export_yaml(),
                 default_flow_style=False, allow_unicode=True,
                 explicit_start=True, explicit_end=True)
         return output
 
     def find_keys(self, issuer):
-        res = self.__archive.search('/keys', issuer)
+        res = self.__entity.search('/keys', uuid.UUID(issuer))
         output = ''
         for doc in res:
             output += yaml.dump(
-                Person(doc, False).export(),
+                Keys(doc, False).export_yaml(),
                 default_flow_style=False, allow_unicode=True,
                 explicit_start=True, explicit_end=True)
         return output
 
     def export_yaml(self, data={}):
-        print(yaml.dump(data, default_flow_style=False, allow_unicode=True,
-                        explicit_start=True, explicit_end=True))
+        return yaml.dump(data, default_flow_style=False, allow_unicode=True,
+                        explicit_start=True, explicit_end=True)
+
+    def _finalize(self):
+        print('Run finalize')
+        if self.__entity:
+            self.__entity.archive.close()
 
     class PolicyValidator:
         pass

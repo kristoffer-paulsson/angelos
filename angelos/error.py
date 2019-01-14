@@ -36,6 +36,31 @@ class DocumentInvalidType(AngelosException): pass  # noqa E302
 class DocumentPersonNotInNames(AngelosException): pass  # noqa E302
 class FieldInvalidEmail(AngelosException): pass  # noqa E302
 
+class ConcealException(AngelosException): pass  # noqa E302
+class ConcealUnkownMode(ConcealException): pass  # noqa E302
+class ConcealPositionError(ConcealException): pass  # noqa E302
+class ConcealInvalidSeek(ConcealException): pass  # noqa E302
+
+class Archive7Exception(AngelosException): pass  # noqa E302
+class ArchiveInvalidFormat(Archive7Exception): pass  # noqa E302
+class ArchiveInvalidCompression(Archive7Exception): pass  # noqa E302
+class ArchiveNotFound(Archive7Exception): pass  # noqa E302
+class ArchiveWrongEntry(Archive7Exception): pass  # noqa E302
+class ArchiveInvalidDelMode(Archive7Exception): pass  # noqa E302
+class ArchivePathInvalid(Archive7Exception): pass  # noqa E302
+class ArchiveLink2Link(Archive7Exception): pass  # noqa E302
+class ArchiveDigestInvalid(Archive7Exception): pass  # noqa E302
+class ArchiveBlankFailure(Archive7Exception): pass  # noqa E302
+class ArchiveDataMissing(Archive7Exception): pass  # noqa E302
+class ArchiveInvalidDir(Archive7Exception): pass  # noqa E302
+class ArchivePathBroken(Archive7Exception): pass  # noqa E302
+class ArchiveLinkBroken(Archive7Exception): pass  # noqa E302
+class ArchiveInvalidFile(Archive7Exception): pass  # noqa E302
+class ArchiveInvalidSeek(Archive7Exception): pass  # noqa E302
+class ArchiveOperandInvalid(Archive7Exception): pass  # noqa E302
+class ArchiveNameTaken(Archive7Exception): pass  # noqa E302
+class ArchiveNotEmpty(Archive7Exception): pass  # noqa E302
+
 
 class LogoException(Exception):
     pass
@@ -75,6 +100,28 @@ ERROR_INFO = {
     606: (DocumentPersonNotInNames, 'Given name not in names'),  # noqa E501
     607: (FieldInvalidEmail, 'Given email not a regular email address'),  # noqa E501
 
+    700: (ConcealUnkownMode, 'Conceal doesn\'t support unkown format'),  # noqa E501
+    701: (ConcealPositionError, 'Error when seeking in underlying file object'),  # noqa E501
+    702: (ConcealInvalidSeek, 'The given seek method is invalid'),  # noqa E501
+
+    720: (ArchiveInvalidFormat, 'Invalid identifier, not an Archive7 file'),
+    721: (ArchiveInvalidCompression, 'Invalid or unknown compression type'),
+    722: (ArchiveNotFound, 'Archive file not found'),
+    723: (ArchiveWrongEntry, 'Wrong entry type, another type expected'),
+    724: (ArchiveInvalidDelMode, 'Invalid or unknown delete mode'),
+    725: (ArchivePathInvalid, 'No such path in archive'),
+    726: (ArchiveLink2Link, 'Invalid link to another link entry'),
+    727: (ArchiveDigestInvalid, 'Checksum is invalid for file entry'),
+    728: (ArchiveBlankFailure, 'Failed making new blank entries'),
+    729: (ArchiveDataMissing, 'No file data to save'),
+    730: (ArchiveInvalidDir, 'Invalid directory'),
+    731: (ArchivePathBroken, 'Existing path of outside hierarchy'),
+    732: (ArchiveLinkBroken, 'Link is broken'),
+    733: (ArchiveInvalidFile, 'File not in directory'),
+    734: (ArchiveInvalidSeek, 'Failed to seek to position in file'),
+    735: (ArchiveOperandInvalid, 'Invalid or unsupported operand'),
+    736: (ArchiveNameTaken, 'Name is taken in directory'),
+    737: (ArchiveNotEmpty, 'Directory is not empty.'),
 }
 
 
@@ -113,3 +160,28 @@ class Error(IntEnum):
     DOCUMENT_INVALID_TYPE = 605
     DOCUMENT_PERSON_NAMES = 606
     FIELD_INVALID_EMAIL = 607
+
+    # 20 error codes for Conceal
+    CONCEAL_UNKOWN_MODE = 700
+    CONCEAL_POSITION_ERROR = 701
+    CONCEAL_INVALID_SEEK = 702
+
+    # 20 error codes for Archive7
+    AR7_INVALID_FORMAT = 720
+    AR7_INVALID_COMPRESSION = 721
+    AR7_NOT_FOUND = 722
+    AR7_WRONG_ENTRY = 723
+    AR7_INVALID_DELMODE = 724
+    AR7_PATH_INVALID = 725
+    AR7_LINK_2_LINK = 726
+    AR7_DIGEST_INVALID = 727
+    AR7_BLANK_FAILURE = 728
+    AR7_DATA_MISSING = 729
+    AR7_INVALID_DIR = 730
+    AR7_PATH_BROKEN = 731
+    AR7_LINK_BROKEN = 732
+    AR7_INVALID_FILE = 733
+    AR7_INVALID_SEEK = 734
+    AR7_OPERAND_INVALID = 735
+    AR7_NAME_TAKEN = 736
+    AR7_NOT_EMPTY = 737

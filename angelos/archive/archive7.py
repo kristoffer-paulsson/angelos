@@ -16,6 +16,8 @@ import gzip
 import bz2
 
 from ..ioc import Container, ContainerAware
+from ..utils import Util
+from ..error import Error
 
 
 class Header(collections.namedtuple('Header', field_names=[
@@ -51,17 +53,17 @@ class Header(collections.namedtuple('Header', field_names=[
     @staticmethod
     def header(owner, id=None, node=None, network=None, title=None, _type=None,
                role=None, use=None, major=1, minor=0, entries=8):
-        if not isinstance(owner, uuid.UUID): raise TypeError()  # noqa E701
-        if not isinstance(id, (uuid.UUID, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(node, (uuid.UUID, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(network, (uuid.UUID, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(title, (bytes, bytearray, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(_type, (int, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(role, (int, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(use, (int, type(None))): raise TypeError()  # noqa E701
-        if not isinstance(major, int): raise TypeError()  # noqa E701
-        if not isinstance(minor, int): raise TypeError()  # noqa E701
-        if not isinstance(entries, int): raise TypeError()  # noqa E701
+        Util.is_type(owner, uuid.UUID)
+        Util.is_type(id, (uuid.UUID, type(None)))
+        Util.is_type(node, (uuid.UUID, type(None)))
+        Util.is_type(network, (uuid.UUID, type(None)))
+        Util.is_type(title, (bytes, bytearray, type(None)))
+        Util.is_type(_type, (int, type(None)))
+        Util.is_type(role, (int, type(None)))
+        Util.is_type(use, (int, type(None)))
+        Util.is_type(major, int)
+        Util.is_type(minor, int)
+        Util.is_type(entries, int)
 
         if not id:
             id = uuid.uuid4()
@@ -112,11 +114,11 @@ class Header(collections.namedtuple('Header', field_names=[
 
     @staticmethod
     def deserialize(data):
-        if not isinstance(data, (bytes, bytearray)): raise TypeError()  # noqa E701
+        Util.is_type(data, (bytes, bytearray))
         t = struct.unpack(Header.FORMAT, data)
 
         if t[0] != b'archive7':
-            raise OSError()
+            raise Util.exception(Error.AR7_INVALID_FORMAT, {'format': t[0]})
 
         return Header(
             major=t[1],
@@ -187,8 +189,8 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def empty(offset, size):
-        if not isinstance(offset, int): raise TypeError()  # noqa E701
-        if not isinstance(size, int): raise TypeError()  # noqa E701
+        Util.is_type(offset, int)
+        Util.is_type(size, int)
 
         kwargs = {
             'type': Entry.TYPE_EMPTY,
@@ -200,11 +202,11 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def dir(name, parent=None, owner=None, created=None, modified=None):
-        if not isinstance(name, str): raise TypeError()  # noqa E701
-        if not isinstance(parent, (type(None), uuid.UUID)): raise TypeError()  # noqa E701
-        if not isinstance(owner, (type(None), uuid.UUID)): raise TypeError()  # noqa E701
-        if not isinstance(created, (type(None), datetime.datetime)): raise TypeError()  # noqa E701
-        if not isinstance(modified, (type(None), datetime.datetime)): raise TypeError()  # noqa E701
+        Util.is_type(name, str)
+        Util.is_type(parent, (type(None), uuid.UUID))
+        Util.is_type(owner, (type(None), uuid.UUID))
+        Util.is_type(created, (type(None), datetime.datetime))
+        Util.is_type(modified, (type(None), datetime.datetime))
 
         kwargs = {
             'type': Entry.TYPE_DIR,
@@ -227,11 +229,11 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def link(name, link, parent=None, created=None, modified=None):
-        if not isinstance(name, str): raise TypeError()  # noqa E701
-        if not isinstance(parent, (type(None), uuid.UUID)): raise TypeError()  # noqa E701
-        if not isinstance(link, uuid.UUID): raise TypeError()  # noqa E701
-        if not isinstance(created, (type(None), datetime.datetime)): raise TypeError()  # noqa E701
-        if not isinstance(modified, (type(None), datetime.datetime)): raise TypeError()  # noqa E701
+        Util.is_type(name, str)
+        Util.is_type(parent, (type(None), uuid.UUID))
+        Util.is_type(link, uuid.UUID)
+        Util.is_type(created, (type(None), datetime.datetime))
+        Util.is_type(modified, (type(None), datetime.datetime))
 
         kwargs = {
             'type': Entry.TYPE_LINK,
@@ -254,17 +256,17 @@ class Entry(collections.namedtuple('Entry', field_names=[
     @staticmethod
     def file(name, offset, size, digest, id=None, parent=None, owner=None,
              created=None, modified=None, compression=None, length=None):
-        if not isinstance(name, str): raise TypeError()  # noqa E701
-        if not isinstance(offset, int): raise TypeError()  # noqa E701
-        if not isinstance(size, int): raise TypeError()  # noqa E701
-        if not isinstance(digest, bytes): raise TypeError()  # noqa E701
-        if not isinstance(id, (type(None), uuid.UUID)): raise TypeError()  # noqa E701
-        if not isinstance(parent, (type(None), uuid.UUID)): raise TypeError()  # noqa E701
-        if not isinstance(owner, (type(None), uuid.UUID)): raise TypeError()  # noqa E701
-        if not isinstance(created, (type(None), datetime.datetime)): raise TypeError()  # noqa E701
-        if not isinstance(modified, (type(None), datetime.datetime)): raise TypeError()  # noqa E701
-        if not isinstance(compression, (type(None), int)): raise TypeError()  # noqa E701
-        if not isinstance(length, (type(None), int)): raise TypeError()  # noqa E701
+        Util.is_type(name, str)
+        Util.is_type(offset, int)
+        Util.is_type(size, int)
+        Util.is_type(digest, bytes)
+        Util.is_type(id, (type(None), uuid.UUID))
+        Util.is_type(parent, (type(None), uuid.UUID))
+        Util.is_type(owner, (type(None), uuid.UUID))
+        Util.is_type(created, (type(None), datetime.datetime))
+        Util.is_type(modified, (type(None), datetime.datetime))
+        Util.is_type(compression, (type(None), int))
+        Util.is_type(length, (type(None), int))
 
         kwargs = {
             'type': Entry.TYPE_FILE,
@@ -289,7 +291,8 @@ class Entry(collections.namedtuple('Entry', field_names=[
             kwargs['modified'] = modified
         if compression and length:
             if 1 <= compression <= 3 and not isinstance(length, int):
-                raise ValueError()
+                raise Util.exception(Error.AR7_INVALID_COMPRESSION, {
+                    'compression': compression})
             kwargs['compression'] = compression
             kwargs['length'] = length
         else:
@@ -331,7 +334,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def deserialize(data):
-        if not isinstance(data, (bytes, bytearray)): raise TypeError()  # noqa E701
+        Util.is_type(data, (bytes, bytearray))
         t = struct.unpack(Entry.FORMAT, data)
         return Entry(
             type=t[0],
@@ -374,7 +377,6 @@ class Archive(ContainerAware):
             'entries': lambda s: Archive.Entries(s, entries),
             'hierarchy': lambda s: Archive.Hierarchy(s),
             'operations': lambda s: Archive.Operations(s),
-            'err': lambda s: Archive.Error(),
             'fileobj': lambda s: self.__file
         }))
 
@@ -415,7 +417,7 @@ class Archive(ContainerAware):
     @staticmethod
     def open(path):
         if not os.path.isfile(path):
-            raise FileNotFoundError()
+            raise Util.exception(Error.AR7_NOT_FOUND, {'path': path})
 
         fileobj = open(path, 'rb+')
         return Archive(fileobj)
@@ -515,14 +517,16 @@ class Archive(ContainerAware):
             # Check for unsupported types
             if entry.type not in (
                     Entry.TYPE_FILE, Entry.TYPE_DIR, Entry.TYPE_LINK):
-                raise self.ioc.err.set(Archive.Errno.UNKNOWN_TYPE, entry.type)
+                raise Util.exception(Error.AR7_WRONG_ENTRY, {
+                    'type': entry.type, 'id': entry.id})
 
             # If directory is up for removal, check that it is empty or abort
-            if entry.type is Entry.TYPE_DIR:
+            if entry.type == Entry.TYPE_DIR:
                 cidx = entries.search(
                     Archive.Query().parent(entry.id))
                 if len(cidx):
-                    raise self.ioc.err.set(Archive.Errno.NOT_EMPTY, cidx)
+                    raise Util.exception(Error.AR7_NOT_EMPTY, {
+                        'index': cidx})
 
             if self.__delete == Archive.Delete.ERASE:
                 if entry.type == Entry.TYPE_FILE:
@@ -561,7 +565,8 @@ class Archive(ContainerAware):
                     entry = Entry(**entry)
                     self.ioc.entries.update(entry, idx)
             else:
-                raise OSError('Unkown delete mode')
+                raise Util.exception(Error.AR7_INVALID_DELMODE, {
+                    'mode': self.__delete})
 
     def rename(self, path, dest):
         with self.__lock:
@@ -599,7 +604,7 @@ class Archive(ContainerAware):
                 if dirname in paths.keys():
                     pid = paths[dirname]
                 else:
-                    raise OSError('Path doesn\'t exist.', dirname)
+                    Util.exception(Error.AR7_PATH_INVALID, {'path': path})
             else:
                 pid = None
 
@@ -619,7 +624,8 @@ class Archive(ContainerAware):
             if parent:
                 ids = self.ioc.hierarchy.ids
                 if parent not in ids.keys():
-                    raise OSError('Parent folder doesn\'t exist')
+                    raise Util.exception(Error.AR7_PATH_INVALID, {
+                        'parent': parent})
             elif dirname:
                 pid = ops.get_pid(dirname)
 
@@ -634,7 +640,7 @@ class Archive(ContainerAware):
             entry = Entry.file(
                 name=name, size=size, offset=0, digest=digest,
                 id=id, parent=pid, owner=owner, created=created,
-                modified=modified, length=length)
+                modified=modified, length=length, compression=compression)
 
         return self.ioc.entries.add(entry, data)
 
@@ -650,7 +656,8 @@ class Archive(ContainerAware):
             target, tidx = ops.find_entry(lname, lpid)
 
             if target.type == Entry.TYPE_LINK:
-                raise OSError('You can not link to a link')
+                raise Util.exception(Error.AR7_LINK_2_LINK, {
+                    'path': path, 'link': target})
 
             entry = Entry.link(
                 name=name, link=target.id, parent=pid, created=created,
@@ -741,13 +748,16 @@ class Archive(ContainerAware):
             if entry.type == Entry.TYPE_LINK:
                 entry, idx = ops.follow_link(entry)
 
+            print(entry)
+
             data = self.ioc.operations.load_data(entry)
 
             if entry.compression:
                 data = ops.unzip(data, entry.compression)
 
             if entry.digest != hashlib.sha1(data).digest():
-                raise OSError('Hash digest doesn\'t match. File is corrupt.')
+                raise Util.exception(Error.AR7_DIGEST_INVALID, {
+                    'path': path, 'id': entry.id})
             return data
 
     class Entries(ContainerAware):
@@ -890,7 +900,7 @@ class Archive(ContainerAware):
                         cnt -= 1
 
             if cnt == 0:
-                raise OSError('Failed making blank entries.')
+                raise Util.exception(Error.AR7_BLANK_FAILURE)
 
             self.ioc.archive._update_header(len(self.__all))
             return cnt
@@ -922,34 +932,34 @@ class Archive(ContainerAware):
         def update(self, entry, index):
             """Updates an entry, saves it and keep hierachy clean."""
             old = self.__all[index]
-            if entry.type is not old.type:
+            if entry.type != old.type:
 
                 # Remove index
-                if old.type is Entry.TYPE_FILE:
+                if old.type == Entry.TYPE_FILE:
                     self.__files = [x for x in self.__files if x != index]
-                elif old.type is Entry.TYPE_LINK:
+                elif old.type == Entry.TYPE_LINK:
                     self.__links = [x for x in self.__links if x != index]
-                elif old.type is Entry.TYPE_DIR:
+                elif old.type == Entry.TYPE_DIR:
                     self.__dirs = [x for x in self.__dirs if x != index]
                     self.ioc.hierarchy.remove(old)
-                elif old.type is Entry.TYPE_BLANK:
+                elif old.type == Entry.TYPE_BLANK:
                     self.__blanks = [x for x in self.__blanks if x != index]
-                elif old.type is Entry.TYPE_EMPTY:
+                elif old.type == Entry.TYPE_EMPTY:
                     self.__empties = [x for x in self.__empties if x != index]
                 else:
                     OSError('Unknown entry type', old.type)
 
                 # Add index
-                if entry.type is Entry.TYPE_FILE:
+                if entry.type == Entry.TYPE_FILE:
                     self.__files.append(index)
-                elif entry.type is Entry.TYPE_LINK:
+                elif entry.type == Entry.TYPE_LINK:
                     self.__links.append(index)
-                elif entry.type is Entry.TYPE_DIR:
+                elif entry.type == Entry.TYPE_DIR:
                     self.__dirs.append(index)
                     self.ioc.hierarchy.add(entry)
-                elif entry.type is Entry.TYPE_BLANK:
+                elif entry.type == Entry.TYPE_BLANK:
                     self.__blanks.append(index)
-                elif entry.type is Entry.TYPE_EMPTY:
+                elif entry.type == Entry.TYPE_EMPTY:
                     self.__empties.append(index)
                 else:
                     OSError('Unknown entry type', entry.type)
@@ -971,7 +981,8 @@ class Archive(ContainerAware):
 
             elif entry.type == Entry.TYPE_FILE:
                 if isinstance(data, type(None)) or not len(data):
-                    raise OSError('No file data.')
+                    raise Util.exception(Error.AR7_DATA_MISSING, {
+                        'id': entry.id})
                 space = self._sector(len(data))
                 eidx = self.get_empty(space)
                 if isinstance(eidx, int):
@@ -1001,11 +1012,11 @@ class Archive(ContainerAware):
                 self.update(entry, bidx)
 
             else:
-                raise ValueError('Unkown entry type.', entry.type)
+                raise Util.exception(Error.AR7_WRONG_ENTRY, {
+                    'type': entry.type, 'id': entry.id})
 
         def search(self, query, raw=False):
-            if not isinstance(
-                query, Archive.Query): raise TypeError()  # noqa E501
+            Util.is_type(query, Archive.Query)
             filterator = filter(query.build(), enumerate(self.__all))
             if not raw:
                 return list(filterator)
@@ -1013,7 +1024,9 @@ class Archive(ContainerAware):
                 return filterator
 
         def follow(self, entry):
-            if entry.type != Entry.TYPE_LINK: raise ValueError()  # noqa E501
+            if entry.type != Entry.TYPE_LINK:
+                raise Util.exception(Error.AR7_WRONG_ENTRY, {
+                    'type': entry.type, 'id': entry.id})
             query = Archive.Query().id(entry.owner)
             return list(filter(query.build(), enumerate(self.__all)))
 
@@ -1075,8 +1088,8 @@ class Archive(ContainerAware):
                             break
 
                     if not parent:
-                        raise RuntimeError(
-                            'Directory doesn\'t reach root!', current)
+                        raise Util.exception(Error.AR7_PATH_BROKEN, {
+                            'id': current.id})
 
                     current = parent
                     path.append(current)
@@ -1109,8 +1122,8 @@ class Archive(ContainerAware):
                         break
 
                 if not parent:
-                    raise RuntimeError(
-                        'Directory doesn\'t reach root!', current)
+                    raise Util.exception(Error.AR7_PATH_BROKEN, {
+                        'id': current.id})
 
                 current = parent
                 path.append(current)
@@ -1147,18 +1160,20 @@ class Archive(ContainerAware):
         def get_pid(self, dirname):
             paths = self.ioc.hierarchy.paths
             if dirname not in paths.keys():
-                raise self.ioc.err.set(Archive.Errno.INVALID_DIR, dirname)
+                raise Util.exception(Error.AR7_INVALID_DIR, {
+                    'dirname': dirname})
             return paths[dirname]
 
         def follow_link(self, entry):
             idxs = self.ioc.entries.follow(entry)
             if not len(idxs):
-                raise OSError('Link is broken.')
+                raise Util.exception(Error.AR7_LINK_BROKEN, {'id': entry.id})
             else:
-                idx, entry = idxs.pop(0)
-                if entry.type != Entry.TYPE_FILE:
-                    raise OSError('Link to non-file.')
-            return entry, idx
+                idx, link = idxs.pop(0)
+                if link.type != Entry.TYPE_FILE:
+                    raise Util.exception(Error.AR7_WRONG_ENTRY, {
+                        'id': entry.id, 'link': link.id})
+            return link, idx
 
         def find_entry(self, name, pid, types=None):
             entries = self.ioc.entries
@@ -1166,34 +1181,39 @@ class Archive(ContainerAware):
                 Archive.Query(name=name).parent(pid).type(
                     types).deleted(False))
             if not len(idx):
-                raise self.ioc.err.set(Archive.Errno.INVALID_FILE, (pid, name))
+                raise Util.exception(Error.AR7_INVALID_FILE, {
+                    'name':name, 'pid': pid})
             else:
                 idx, entry = idx.pop(0)
             return entry, idx
 
         def write_entry(self, entry, index):
-            if not isinstance(entry, Entry): raise TypeError()  # noqa E701
-            if not isinstance(index, int): raise TypeError()  # noqa E701
+            Util.is_type(entry, Entry)
+            Util.is_type(index, int)
 
             offset = index * 256 + 1024
             fileobj = self.ioc.fileobj
             if offset != fileobj.seek(offset):
-                raise OSError()
+                raise Util.exception(Error.AR7_INVALID_SEEK, {
+                    'position': offset})
+
             fileobj.write(entry.serialize())
 
         def load_data(self, entry):
-            if entry.type is not Entry.TYPE_FILE:
-                raise OSError('Can\'t read non-file.')
+            if entry.type != Entry.TYPE_FILE:
+                raise Util.exception(Error.AR7_WRONG_ENTRY, {
+                    'type': entry.type, 'id': entry.id})
             fileobj = self.ioc.fileobj
             if fileobj.seek(entry.offset) != entry.offset:
-                raise OSError('Could not seek to new offset')
+                raise Util.exception(Error.AR7_INVALID_SEEK, {
+                    'position': entry.offset})
             return fileobj.read(entry.size)
 
         def write_data(self, offset, data):
             fileobj = self.ioc.fileobj
             if fileobj.seek(offset) != offset:
-                print(offset)
-                raise OSError('Could not seek to new offset')
+                raise Util.exception(Error.AR7_INVALID_SEEK, {
+                    'position': offset})
             fileobj.write(data)
 
         def move_end(self, idx):
@@ -1205,7 +1225,8 @@ class Archive(ContainerAware):
             entries = self.ioc.entries
             entry = entries.get_entry(idx)
             if not entry.type == Entry.TYPE_FILE:
-                raise OSError()
+                raise Util.exception(Error.AR7_WRONG_ENTRY, {
+                    'type': entry.type, 'id': entry.id})
 
             last = entries.get_entry(entries.get_thithermost())
             data = self.load_data(entry)
@@ -1227,8 +1248,8 @@ class Archive(ContainerAware):
             idx = self.ioc.entries.search(
                 Archive.Query(name=name).parent(pid).deleted(False))
             if len(idx):
-                raise self.ioc.err.set(Archive.Errno.NAME_TAKEN, (
-                    name, pid, idx))
+                raise Util.exception(Error.AR7_NAME_TAKEN, {
+                    'name': name, 'pid': pid, 'index': idx})
             return True
 
         def zip(self, data, compression):
@@ -1239,7 +1260,8 @@ class Archive(ContainerAware):
             elif compression == Entry.COMP_BZIP2:
                 return bz2.compress(data)
             else:
-                raise TypeError('Invalid compression format')
+                raise Util.exception(Error.AR7_INVALID_COMPRESSION, {
+                    'compression': compression})
 
         def unzip(self, data, compression):
             if compression == Entry.COMP_ZIP:
@@ -1249,7 +1271,8 @@ class Archive(ContainerAware):
             elif compression == Entry.COMP_BZIP2:
                 return bz2.decompress(data)
             else:
-                raise TypeError('Invalid compression format')
+                raise Util.exception(Error.AR7_INVALID_COMPRESSION, {
+                    'compression': compression})
 
         def vacuum(self):
             entries = self.ioc.entries
@@ -1257,7 +1280,7 @@ class Archive(ContainerAware):
             cnt = len(all)
 
             if cnt != len(set(all)):
-                raise ValueError('The number of entries is corrupted.')
+                raise Util.exception(Error.AR7_ENTRIES_CORRUPT)
 
             self.ioc.archive._update_header(self.ioc.entries.count)
 
@@ -1309,23 +1332,23 @@ class Archive(ContainerAware):
             return self.__type
 
         def type(self, _type=None, operand='='):
+            Util.is_type(_type, (tuple, bytes, type(None)))
             if isinstance(_type, tuple):
                 self.__type = _type
             elif isinstance(_type, bytes):
                 self.__type = (_type, )
-            elif isinstance(_type, type(None)):
-                pass
-            else:
-                raise TypeError()
             return self
 
         def id(self, id=None):
-            if not isinstance(id, uuid.UUID): raise TypeError()  # noqa E701
+            Util.is_type(id, uuid.UUID)
             self.__id = id
             return self
 
         def parent(self, parent, operand='='):
-            if not operand in ['=', '≠']: raise ValueError()  # noqa E701
+            Util.is_type(parent, (uuid.UUID, tuple, type(None)))
+            if not operand in ['=', '≠']:
+                raise Util.exception(Error.AR7_OPERAND_INVALID, {
+                    'operand': operand})
             if isinstance(parent, uuid.UUID):
                 self.__parent = ([parent.int], operand)
             elif isinstance(parent, tuple):
@@ -1333,12 +1356,13 @@ class Archive(ContainerAware):
                 for i in parent:
                     ints.append(i.int)
                 self.__parent = (ints, operand)
-            else:
-                raise TypeError()
             return self
 
         def owner(self, owner, operand='='):
-            if not operand in ['=', '≠']: raise ValueError()  # noqa E701
+            Util.is_type(owner, (uuid.UUID, tuple, type(None)))
+            if not operand in ['=', '≠']:
+                raise Util.exception(Error.AR7_OPERAND_INVALID, {
+                    'operand': operand})
             if isinstance(owner, uuid.UUID):
                 self.__owner = ([owner.int], operand)
             elif isinstance(owner, tuple):
@@ -1346,14 +1370,13 @@ class Archive(ContainerAware):
                 for i in owner:
                     ints.append(i.int)
                 self.__owner = (ints, operand)
-            else:
-                raise TypeError()
             return self
 
         def created(self, created, operand='>'):
-            if not isinstance(created, (
-                int, str, datetime.datetime)): raise TypeError()  # noqa E701
-            if not operand in ['=', '>', '<']: raise ValueError()  # noqa E701
+            Util.is_type(created, (int, str, datetime.datetime))
+            if not operand in ['=', '>', '<']:
+                raise Util.exception(Error.AR7_OPERAND_INVALID, {
+                    'operand': operand})
             if isinstance(created, int):
                 created = datetime.datetime.fromtimestamp(created)
             elif isinstance(created, str):
@@ -1362,9 +1385,10 @@ class Archive(ContainerAware):
             return self
 
         def modified(self, modified, operand='>'):
-            if not isinstance(modified, (
-                int, str, datetime.datetime)): raise TypeError()  # noqa E701
-            if not operand in ['=', '>', '<']: raise ValueError()  # noqa E701
+            Util.is_type(modified, (int, str, datetime.datetime))
+            if not operand in ['=', '>', '<']:
+                raise Util.exception(Error.AR7_OPERAND_INVALID, {
+                    'operand': operand})
             if isinstance(modified, int):
                 modified = datetime.datetime.fromtimestamp(modified)
             elif isinstance(modified, str):
@@ -1373,7 +1397,7 @@ class Archive(ContainerAware):
             return self
 
         def deleted(self, deleted):
-            if not isinstance(deleted, bool): raise TypeError()  # noqa E701
+            Util.is_type(deleted, bool)
             self.__deleted = deleted
             return self
 
@@ -1471,37 +1495,6 @@ class Archive(ContainerAware):
         SOFT = 1  # Raise file delete flag
         HARD = 2  # Raise  file delete flag, set size and offset to zero, add empty block.  # noqa #E501
         ERASE = 3  # Replace file with empty block
-
-    class Error:
-        def __init__(self):
-            self.__errno = 0
-            self.__error = None
-            self.__data = None
-
-        @property
-        def error(self):
-            return self.__errno > 0
-
-        def set(self, err, data=None):
-            self.__errno = err[0]
-            self.__error = err[2]
-            self.__data = data
-            return err[1](err[2])
-
-        def get(self):
-            msg = (self.__errno, self.__error, self.__data)
-            self.__errno = 0
-            self.__error = None
-            self.__data = None
-            return msg
-
-    class Errno:
-        INVALID_DIR = (500, OSError, 'Invalid directory.')
-        INVALID_FILE = (501, OSError, 'File not in directory.')
-        NO_TARGET_DIR = (502, OSError, 'Invalid target directory.')
-        NAME_TAKEN = (503, OSError, 'Name is taken in directory.')
-        NOT_EMPTY = (504, OSError, 'Directory is not empty.')
-        UNKNOWN_TYPE = (505, OSError, 'Unknown entry type.')
 
     def __del__(self):
         self.close()

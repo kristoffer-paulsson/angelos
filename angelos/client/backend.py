@@ -17,6 +17,7 @@ class Backend(Worker):
         self.task(self.__backend)
 
     def _finalize(self):
+        self.ioc.facade._finalize()
         self.ioc.message.remove(Const.W_BACKEND_NAME)
         logging.info('#'*10 + 'Leaving ' + self.__class__.__name__ + '#'*10)
 

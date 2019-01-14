@@ -63,11 +63,6 @@ class Worker:
             logging.exception(e)
             self._panic()
 
-        # tasks = asyncio.Task.all_tasks(self._loop)
-        # for t in [t for t in tasks if not (t.done() or t.cancelled())]:
-        #    self._loop.run_until_complete(t)
-        # self._loop.run_until_complete(self._loop.shutdown_asyncgens())
-
         self._finalize()
         self._teardown()
         logging.info('Exiting worker %s', id(self))

@@ -2,9 +2,10 @@ import threading
 import uuid
 import pickle
 import datetime
+import hashlib
 
-from .archive7 import Archive, Entry
-from .conceal import ConcealIO
+from ..archive.archive7 import Archive, Entry
+from ..archive.conceal import ConcealIO
 
 
 class BaseArchive:
@@ -83,7 +84,7 @@ class Entity(BaseArchive):
             compression=Entry.COMP_BZIP2)
 
     def read(self, path):
-        return self._archive.load(path)
+        return pickle.loads(self._archive.load(path))
 
     def update(self, path, obj):
         self._archive.save(
@@ -93,17 +94,27 @@ class Entity(BaseArchive):
     def delete(self, path):
         self._archive.remove(path)
 
+    # Rewrite to comply with the the load function
     def search(self, path, owner):
-        pid = self._archive.ioc.operations.get_pid(path)
+        ops = self._archive.ioc.operations
+        pid = ops.get_pid(path)
         query = Archive.Query().parent(pid).owner(owner).deleted(False)
         entries = self._archive.ioc.entries.search(query)
+
         objects = []
         for i in entries:
-            objects.append(
-                pickle.loads(
-                    self._archive.ioc.operations.load_data(i[1])))
-        return objects
+            entry = i[1]
+            data = ops.load_data(entry)
 
+            if entry.compression:
+                data = ops.unzip(data, entry.compression)
+
+            if entry.digest != hashlib.sha1(data).digest():
+                raise Util.exception(Error.AR7_DIGEST_INVALID, {
+                    'path': path, 'name': entry.name, 'id': entry.id})
+
+            objects.append(pickle.loads(data))
+        return objects
 
 class Files(BaseArchive):
     def _name(self):
