@@ -72,7 +72,8 @@ class ConcealIO(io.RawIOBase):
             raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
                 'position': pos, 'result': res})
 
-        if self.__block_cnt >= blk:
+        # if self.__block_cnt >= blk:
+        if self.__block_cnt > blk:
             self.__buffer = bytearray(self.__box.decrypt(
                 self.__file.read(ConcealIO.CBLK_SIZE)))
         else:

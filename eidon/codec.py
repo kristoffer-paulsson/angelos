@@ -60,11 +60,11 @@ class EidonEncoder:
                     entropy = self.entropize(quantity)
                     self.split(entropy, stock)
 
-            if _async: asyncio.sleep(.1)  # noqa E701
+            # if _async: await asyncio.sleep(.1)  # noqa E701
 
         self._stream.data = bytearray()
         for i in range(self._stream._quality):
-            if _async: asyncio.sleep(.1)  # noqa E701
+            # if _async: await asyncio.sleep(.1)  # noqa E701
             block = AdaptiveArithmethicCompressor().run(stock[i])
             self._stream.data += bytearray(
                 struct.pack('!I', len(block)) + block)
@@ -244,8 +244,8 @@ class EidonDecoder:
                     self.set_component_matrix(matrix, y_block*8, x_block*8)
                 elif self._stream.signal is Eidon.Signal.COMPOSITE:
                     self.set_composite_matrix(matrix, y_block*8, x_block*8)
-            if _async:
-                asyncio.sleep(.1)
+            # if _async:
+            #     asyncio.sleep(.1)
 
         return self._image
 

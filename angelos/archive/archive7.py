@@ -748,8 +748,6 @@ class Archive(ContainerAware):
             if entry.type == Entry.TYPE_LINK:
                 entry, idx = ops.follow_link(entry)
 
-            print(entry)
-
             data = self.ioc.operations.load_data(entry)
 
             if entry.compression:

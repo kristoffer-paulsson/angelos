@@ -322,7 +322,6 @@ class PersonFacade(BaseFacade):
                 '/identity.pickle', data=pckl,
                 owner=uuid.UUID(self.__facade.id))
 
-
     def __issue(self, id, document):
         Util.is_type(id, uuid.UUID)
         Util.is_type(document, Document)
@@ -492,7 +491,7 @@ class PersonFacade(BaseFacade):
         output = ''
         for doc in res:
             output += yaml.dump(
-                Person(doc, False).export_yaml(),
+                Person(doc, False).export_conf(),
                 default_flow_style=False, allow_unicode=True,
                 explicit_start=True, explicit_end=True)
         return output
@@ -502,17 +501,16 @@ class PersonFacade(BaseFacade):
         output = ''
         for doc in res:
             output += yaml.dump(
-                Keys(doc, False).export_yaml(),
+                Keys(doc, False).export_conf(),
                 default_flow_style=False, allow_unicode=True,
                 explicit_start=True, explicit_end=True)
         return output
 
     def export_yaml(self, data={}):
         return yaml.dump(data, default_flow_style=False, allow_unicode=True,
-                        explicit_start=True, explicit_end=True)
+                         explicit_start=True, explicit_end=True)
 
     def _finalize(self):
-        print('Run finalize')
         if self.__entity:
             self.__entity.archive.close()
 

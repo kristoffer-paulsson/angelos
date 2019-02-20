@@ -170,7 +170,7 @@ class BaseDocument(metaclass=DocumentMeta):
             nd[name] = getattr(self, name)
         return nd
 
-    def export_yaml(self):
+    def export_conf(self):
         nd = {}
         for name in self._fields.keys():
             nd[name] = self._fields[name].to_str(getattr(self, name))

@@ -96,6 +96,7 @@ class Entity(BaseArchive):
 
     # Rewrite to comply with the the load function
     def search(self, path, owner):
+        self._archive._lock()
         ops = self._archive.ioc.operations
         pid = ops.get_pid(path)
         query = Archive.Query().parent(pid).owner(owner).deleted(False)
@@ -114,6 +115,7 @@ class Entity(BaseArchive):
                     'path': path, 'name': entry.name, 'id': entry.id})
 
             objects.append(pickle.loads(data))
+        self._archive._unlock()
         return objects
 
 class Files(BaseArchive):

@@ -63,10 +63,10 @@ class Backend(Worker):
             stream = encoder.run(_async=True)
             return EidonStream.dump(stream)
 
-        print('ENCODING STARTED')
         self.ioc.facade.picture = encode(pixels, width, width)
+        self.ioc.facade.save()
+
         await asyncio.sleep(3)
-        print('ENCODING DONE')
         self.ioc.message.send(
             Messages.flash(Const.W_BACKEND_NAME, 'Profile picture saved'))
 
