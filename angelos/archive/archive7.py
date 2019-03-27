@@ -18,6 +18,7 @@ import bz2
 from ..ioc import Container, ContainerAware
 from ..utils import Util
 from ..error import Error
+from .conceal import ConcealIO
 
 
 class Header(collections.namedtuple('Header', field_names=[
@@ -353,7 +354,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
         )
 
 
-class Archive(ContainerAware):
+class Archive7(ContainerAware):
     BLOCK_SIZE = 512
 
     def __init__(self, fileobj, delete=3):
@@ -361,7 +362,7 @@ class Archive(ContainerAware):
         self.__lock = threading.Lock()
         self.__file = fileobj
         self.__size = os.path.getsize(self.__file.name)
-        self.__delete = delete if delete else Archive.Delete.ERASE
+        self.__delete = delete if delete else Archive7.Delete.ERASE
         self.__file.seek(0)
         self.__header = Header.deserialize(self.__file.read(
                 struct.calcsize(Header.FORMAT)))
@@ -374,11 +375,51 @@ class Archive(ContainerAware):
 
         ContainerAware.__init__(self, Container(config={
             'archive': lambda s: self,
-            'entries': lambda s: Archive.Entries(s, entries),
-            'hierarchy': lambda s: Archive.Hierarchy(s),
-            'operations': lambda s: Archive.Operations(s),
+            'entries': lambda s: Archive7.Entries(s, entries),
+            'hierarchy': lambda s: Archive7.Hierarchy(s),
+            'operations': lambda s: Archive7.Operations(s),
             'fileobj': lambda s: self.__file
         }))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    @staticmethod
+    def setup(filename, secret, owner=None, node=None, title=None,
+              network=None, _type=None, role=None, use=None):
+        Util.is_type(filename, (str, bytes))
+        Util.is_type(secret, (str, bytes))
+
+        with open(filename, 'wb'):
+            pass
+        # fileobj = ConcealIO(filename, 'rb+', secret=secret)
+        fileobj = open(filename, 'rb+')
+
+        header = Header.header(
+            owner=owner, node=node, title=title,
+            network=network, _type=_type, role=role, use=use)
+
+        fileobj.write(header.serialize())
+        for i in range(header.entries):
+            fileobj.write(Entry.blank().serialize())
+        fileobj.seek(0)
+
+        return Archive7(fileobj)
+
+    @staticmethod
+    def open(filename, secret, delete=3):
+        Util.is_type(filename, (str, bytes))
+        Util.is_type(secret, (str, bytes))
+
+        if not os.path.isfile(filename):
+            raise Util.exception(Error.AR7_NOT_FOUND, {'path': filename})
+
+        # fileobj = ConcealIO(filename, 'rb+', secret=secret)
+        fileobj = open(filename, 'rb+')
+        return Archive7(fileobj, delete)
 
     @property
     def closed(self):
@@ -399,28 +440,6 @@ class Archive(ContainerAware):
         header['entries'] = cnt
         self.__header = Header(**header)
         self.ioc.operations.write_data(0, self.__header.serialize())
-
-    @staticmethod
-    def setup(fileobj, owner=None, node=None, title=None,
-              network=None, _type=None, role=None, use=None):
-        header = Header.header(
-            owner=owner, node=node, title=title,
-            network=network, _type=_type, role=role, use=use)
-
-        fileobj.write(header.serialize())
-        for i in range(header.entries):
-            fileobj.write(Entry.blank().serialize())
-        fileobj.seek(0)
-
-        return Archive(fileobj)
-
-    @staticmethod
-    def open(path):
-        if not os.path.isfile(path):
-            raise Util.exception(Error.AR7_NOT_FOUND, {'path': path})
-
-        fileobj = open(path, 'rb+')
-        return Archive(fileobj)
 
     def close(self):
         with self.__lock:
@@ -446,7 +465,7 @@ class Archive(ContainerAware):
             entries = self.ioc.entries
             ids = self.ioc.hierarchy.ids
 
-            sq = Archive.Query(name=name)
+            sq = Archive7.Query(name=name)
             if id:
                 sq.id(id)
             if parent:
@@ -523,12 +542,12 @@ class Archive(ContainerAware):
             # If directory is up for removal, check that it is empty or abort
             if entry.type == Entry.TYPE_DIR:
                 cidx = entries.search(
-                    Archive.Query().parent(entry.id))
+                    Archive7.Query().parent(entry.id))
                 if len(cidx):
                     raise Util.exception(Error.AR7_NOT_EMPTY, {
                         'index': cidx})
 
-            if self.__delete == Archive.Delete.ERASE:
+            if self.__delete == Archive7.Delete.ERASE:
                 if entry.type == Entry.TYPE_FILE:
                     entries.update(
                         Entry.empty(
@@ -537,12 +556,12 @@ class Archive(ContainerAware):
                         idx)
                 elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
                     entries.update(Entry.blank(), idx)
-            elif self.__delete == Archive.Delete.SOFT:
+            elif self.__delete == Archive7.Delete.SOFT:
                 entry = entry._asdict()
                 entry['deleted'] = True
                 entry = Entry(**entry)
                 self.ioc.entries.update(entry, idx)
-            elif self.__delete == Archive.Delete.HARD:
+            elif self.__delete == Archive7.Delete.HARD:
                 if entry.type == Entry.TYPE_FILE:
                     if not entries.find_blank():
                         entries.make_blanks()
@@ -604,7 +623,8 @@ class Archive(ContainerAware):
                 if dirname in paths.keys():
                     pid = paths[dirname]
                 else:
-                    Util.exception(Error.AR7_PATH_INVALID, {'path': path})
+                    raise Util.exception(
+                        Error.AR7_PATH_INVALID, {'path': path})
             else:
                 pid = None
 
@@ -688,7 +708,7 @@ class Archive(ContainerAware):
             size = len(data)
 
             osize = entries._sector(entry.size)
-            nsize = entries._sector(len(data))
+            nsize = entries._sector(size)
 
             if osize < nsize:
                 empty = Entry.empty(offset=entry.offset, size=osize)
@@ -754,6 +774,7 @@ class Archive(ContainerAware):
                 data = ops.unzip(data, entry.compression)
 
             if entry.digest != hashlib.sha1(data).digest():
+                print(data)
                 raise Util.exception(Error.AR7_DIGEST_INVALID, {
                     'path': path, 'id': entry.id})
             return data
@@ -847,20 +868,23 @@ class Archive(ContainerAware):
             """
             cnt = 0
             idx = self.get_hithermost()
+            print(idx)
             if not idx:
                 for i in range(8):
                     self._add_blank()
                     cnt += 1
+                print('No idx', cnt)
             else:
                 hithermost = self.__all[idx]
                 length = len(self.__all)*256 + 1024
                 space = self._sector(hithermost.offset - length)
 
-                if space:
+                if space > 0:
                     # If there is enough space in between, use it!
                     for _ in range(int(space / 256)):
                         self._add_blank()
                         cnt += 1
+                    print('Invisible space', cnt, space, length, hithermost.offset)
                 elif hithermost.type == Entry.TYPE_EMPTY:
                     # If empty, use parts of it!
                     space = self._sector(
@@ -879,6 +903,7 @@ class Archive(ContainerAware):
                     else:  # If full save blank
                         self.update(Entry.blank(), idx)
                         cnt += 1
+                    print('Empty', cnt)
                 elif hithermost.type == Entry.TYPE_FILE:
                     # If file, move and fill!
                     empty = self.ioc.operations.move_end(idx)
@@ -887,6 +912,7 @@ class Archive(ContainerAware):
                     for _ in range(min(8, num)):
                         self._add_blank()
                         cnt += 1
+                        print('Blank added')
                     if num > cnt:  # If not full, save new empty
                         entry = empty._asdict()
                         entry['offset'] = self._sector(
@@ -896,6 +922,8 @@ class Archive(ContainerAware):
                         bidx = self.get_blank()
                         self.update(entry, bidx)
                         cnt -= 1
+                        print('Blank reduced')
+                    print('File', cnt, space, empty.offset + empty.size, empty.size, length)
 
             if cnt == 0:
                 raise Util.exception(Error.AR7_BLANK_FAILURE)
@@ -945,7 +973,7 @@ class Archive(ContainerAware):
                 elif old.type == Entry.TYPE_EMPTY:
                     self.__empties = [x for x in self.__empties if x != index]
                 else:
-                    OSError('Unknown entry type', old.type)
+                    raise OSError('Unknown entry type', old.type)
 
                 # Add index
                 if entry.type == Entry.TYPE_FILE:
@@ -960,7 +988,7 @@ class Archive(ContainerAware):
                 elif entry.type == Entry.TYPE_EMPTY:
                     self.__empties.append(index)
                 else:
-                    OSError('Unknown entry type', entry.type)
+                    raise OSError('Unknown entry type', entry.type)
 
             elif entry.type == Entry.TYPE_DIR:
                 self.ioc.hierarchy.remove(old)
@@ -1009,12 +1037,15 @@ class Archive(ContainerAware):
                 bidx = self.get_blank()
                 self.update(entry, bidx)
 
+                print('Save file: %s: (%s, %s)' % (
+                    bidx, entry.offset, entry.offset+entry.size))
+
             else:
                 raise Util.exception(Error.AR7_WRONG_ENTRY, {
                     'type': entry.type, 'id': entry.id})
 
         def search(self, query, raw=False):
-            Util.is_type(query, Archive.Query)
+            Util.is_type(query, Archive7.Query)
             filterator = filter(query.build(), enumerate(self.__all))
             if not raw:
                 return list(filterator)
@@ -1025,7 +1056,7 @@ class Archive(ContainerAware):
             if entry.type != Entry.TYPE_LINK:
                 raise Util.exception(Error.AR7_WRONG_ENTRY, {
                     'type': entry.type, 'id': entry.id})
-            query = Archive.Query().id(entry.owner)
+            query = Archive7.Query().id(entry.owner)
             return list(filter(query.build(), enumerate(self.__all)))
 
         @property
@@ -1176,11 +1207,11 @@ class Archive(ContainerAware):
         def find_entry(self, name, pid, types=None):
             entries = self.ioc.entries
             idx = entries.search(
-                Archive.Query(name=name).parent(pid).type(
+                Archive7.Query(name=name).parent(pid).type(
                     types).deleted(False))
             if not len(idx):
                 raise Util.exception(Error.AR7_INVALID_FILE, {
-                    'name':name, 'pid': pid})
+                    'name': name, 'pid': pid})
             else:
                 idx, entry = idx.pop(0)
             return entry, idx
@@ -1237,6 +1268,9 @@ class Archive(ContainerAware):
             entry = Entry(**entry)
             entries.update(entry, idx)
 
+            print('Move end: %s: (%s, %s)' % (
+                idx, entry.offset, entry.offset+entry.size))
+
             return empty
 
         def check(self, entry, data):
@@ -1244,7 +1278,7 @@ class Archive(ContainerAware):
 
         def is_available(self, name, pid):
             idx = self.ioc.entries.search(
-                Archive.Query(name=name).parent(pid).deleted(False))
+                Archive7.Query(name=name).parent(pid).deleted(False))
             if len(idx):
                 raise Util.exception(Error.AR7_NAME_TAKEN, {
                     'name': name, 'pid': pid, 'index': idx})
@@ -1344,7 +1378,7 @@ class Archive(ContainerAware):
 
         def parent(self, parent, operand='='):
             Util.is_type(parent, (uuid.UUID, tuple, type(None)))
-            if not operand in ['=', '≠']:
+            if operand not in ['=', '≠']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
                     'operand': operand})
             if isinstance(parent, uuid.UUID):
@@ -1358,7 +1392,7 @@ class Archive(ContainerAware):
 
         def owner(self, owner, operand='='):
             Util.is_type(owner, (uuid.UUID, tuple, type(None)))
-            if not operand in ['=', '≠']:
+            if operand not in ['=', '≠']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
                     'operand': operand})
             if isinstance(owner, uuid.UUID):
@@ -1372,7 +1406,7 @@ class Archive(ContainerAware):
 
         def created(self, created, operand='>'):
             Util.is_type(created, (int, str, datetime.datetime))
-            if not operand in ['=', '>', '<']:
+            if operand not in ['=', '>', '<']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
                     'operand': operand})
             if isinstance(created, int):
@@ -1384,7 +1418,7 @@ class Archive(ContainerAware):
 
         def modified(self, modified, operand='>'):
             Util.is_type(modified, (int, str, datetime.datetime))
-            if not operand in ['=', '>', '<']:
+            if operand not in ['=', '>', '<']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
                     'operand': operand})
             if isinstance(modified, int):
