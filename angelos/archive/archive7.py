@@ -393,10 +393,9 @@ class Archive7(ContainerAware):
         Util.is_type(filename, (str, bytes))
         Util.is_type(secret, (str, bytes))
 
-        with open(filename, 'wb'):
+        with ConcealIO(filename, 'wb', secret=secret):
             pass
-        # fileobj = ConcealIO(filename, 'rb+', secret=secret)
-        fileobj = open(filename, 'rb+')
+        fileobj = ConcealIO(filename, 'rb+', secret=secret)
 
         header = Header.header(
             owner=owner, node=node, title=title,
@@ -417,8 +416,7 @@ class Archive7(ContainerAware):
         if not os.path.isfile(filename):
             raise Util.exception(Error.AR7_NOT_FOUND, {'path': filename})
 
-        # fileobj = ConcealIO(filename, 'rb+', secret=secret)
-        fileobj = open(filename, 'rb+')
+        fileobj = ConcealIO(filename, 'rb+', secret=secret)
         return Archive7(fileobj, delete)
 
     @property
@@ -774,7 +772,6 @@ class Archive7(ContainerAware):
                 data = ops.unzip(data, entry.compression)
 
             if entry.digest != hashlib.sha1(data).digest():
-                print(data)
                 raise Util.exception(Error.AR7_DIGEST_INVALID, {
                     'path': path, 'id': entry.id})
             return data
@@ -860,73 +857,65 @@ class Archive7(ContainerAware):
             self.__blanks.append(index)
             self.ioc.operations.write_entry(entry, index)
 
-        def make_blanks(self):
+        def make_blanks(self, num=8):
             """
             Create more blank entries by allocating more space in the beginning
             of the file.
             num     Number of new blanks
             """
             cnt = 0
-            idx = self.get_hithermost()
-            print(idx)
-            if not idx:
-                for i in range(8):
-                    self._add_blank()
-                    cnt += 1
-                print('No idx', cnt)
-            else:
-                hithermost = self.__all[idx]
-                length = len(self.__all)*256 + 1024
-                space = self._sector(hithermost.offset - length)
+            space = 0
+            need = max(num, 8) * 256
+            length = len(self.__all)*256 + 1024
+            hithermost = None
+            nempty = None
 
-                if space > 0:
-                    # If there is enough space in between, use it!
-                    for _ in range(int(space / 256)):
-                        self._add_blank()
-                        cnt += 1
-                    print('Invisible space', cnt, space, length, hithermost.offset)
-                elif hithermost.type == Entry.TYPE_EMPTY:
-                    # If empty, use parts of it!
-                    space = self._sector(
-                        hithermost.offset + hithermost.size - length)
-                    num = int(space / 256)
-                    for _ in range(min(8, num)):
-                        self._add_blank()
-                        cnt += 1
-                    if num > cnt:  # If not full, resize and sava empty
+            while space < need:
+                idx = self.get_hithermost()
+                if not idx:
+                    space = need
+                    continue
+
+                hithermost = self.__all[idx]
+                if hithermost.type not in [Entry.TYPE_EMPTY, Entry.TYPE_FILE]:
+                    raise Util.exception(Error.AR7_BLANK_FAILURE)
+
+                if hithermost.type == Entry.TYPE_EMPTY:
+                    empty = hithermost
+                if hithermost.type == Entry.TYPE_FILE:
+                    empty = self.ioc.operations.move_end(idx)
+
+                total = self._sector(empty.offset+empty.size) - length
+                if hithermost.type == Entry.TYPE_EMPTY:
+                    if total >= (need + 512):
                         entry = hithermost._asdict()
-                        entry['offset'] = self._sector(
-                            (num - cnt) * 256 + entry['offset'])
-                        entry['size'] = self._sector((num - cnt) * 256)
+                        entry['offset'] = self._sector(length + need)
+                        entry['size'] = self._sector(total - need)
                         entry = Entry(**entry)
                         self.update(entry, idx)
-                    else:  # If full save blank
+                        space = need
+                    else:
                         self.update(Entry.blank(), idx)
-                        cnt += 1
-                    print('Empty', cnt)
-                elif hithermost.type == Entry.TYPE_FILE:
-                    # If file, move and fill!
-                    empty = self.ioc.operations.move_end(idx)
-                    space = self._sector(empty.offset + empty.size - length)
-                    num = int(space / 256)
-                    for _ in range(min(8, num)):
-                        self._add_blank()
-                        cnt += 1
-                        print('Blank added')
-                    if num > cnt:  # If not full, save new empty
-                        entry = empty._asdict()
-                        entry['offset'] = self._sector(
-                            (num - cnt) * 256 + entry['offset'])
-                        entry['size'] = self._sector((num - cnt) * 256)
-                        entry = Entry(**entry)
-                        bidx = self.get_blank()
-                        self.update(entry, bidx)
-                        cnt -= 1
-                        print('Blank reduced')
-                    print('File', cnt, space, empty.offset + empty.size, empty.size, length)
+                        space = total
 
-            if cnt == 0:
-                raise Util.exception(Error.AR7_BLANK_FAILURE)
+                if hithermost.type == Entry.TYPE_FILE:
+                    if total >= (need + 512):
+                        entry = empty._asdict()
+                        entry['offset'] = self._sector(length + need)
+                        entry['size'] = self._sector(total - need)
+                        nempty = Entry(**entry)
+                        space = need
+                    else:
+                        space = total
+
+            for _ in range(int(space / 256)):
+                self._add_blank()
+                cnt += 1
+
+            if nempty:
+                bidx = self.get_blank()
+                self.update(nempty, bidx)
+                cnt -= 1
 
             self.ioc.archive._update_header(len(self.__all))
             return cnt
@@ -1036,10 +1025,6 @@ class Archive7(ContainerAware):
                 ops.write_data(offset, data + ops.filler(data))
                 bidx = self.get_blank()
                 self.update(entry, bidx)
-
-                print('Save file: %s: (%s, %s)' % (
-                    bidx, entry.offset, entry.offset+entry.size))
-
             else:
                 raise Util.exception(Error.AR7_WRONG_ENTRY, {
                     'type': entry.type, 'id': entry.id})
@@ -1267,9 +1252,6 @@ class Archive7(ContainerAware):
             entry['offset'] = noffset
             entry = Entry(**entry)
             entries.update(entry, idx)
-
-            print('Move end: %s: (%s, %s)' % (
-                idx, entry.offset, entry.offset+entry.size))
 
             return empty
 
