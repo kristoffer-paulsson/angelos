@@ -9,6 +9,8 @@ import base64
 import struct
 import array
 
+import random
+
 import libnacl.secret
 
 from angelos.utils import Util
@@ -75,9 +77,11 @@ class ConcealIO(io.RawIOBase):
 
         fcntl.flock(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
+        size = os.fstat(self.__file.fileno()).st_size
+        print(size)
+
         self.__box = libnacl.secret.SecretBox(secret)
-        self.__block_cnt = int(os.fstat(
-            self.__file.fileno()).st_size / ConcealIO.TOT_SIZE)
+        self.__block_cnt = int(size / ConcealIO.TOT_SIZE)
         self.__len = 0 if self.__block_cnt == 0 else self.__length()
         self.__size = self.__block_cnt * ConcealIO.ABLK_SIZE
         self.__block_idx = 0
@@ -86,10 +90,11 @@ class ConcealIO(io.RawIOBase):
         self.__save = False
         self.__buffer = None
 
+        print(self.__block_cnt)
         if self.__block_cnt:
             self._load(0)
         else:
-            self.__buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+            self._new()
 
     def __enter__(self):
         return self
@@ -114,7 +119,34 @@ class ConcealIO(io.RawIOBase):
         self.__file.seek(realpos)
         return offset
 
+    def _new(self):
+        blk = self.__block_cnt
+        pos = blk * ConcealIO.TOT_SIZE
+        res = self.__file.seek(pos)
+
+        if pos != res:
+            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
+                'position': pos, 'result': res})
+
+        self.__buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+
+        if blk == 0:
+            filler = b''
+        else:
+            filler = os.urandom(472)
+        block = bytearray(
+            self.__box.encrypt(self.__buffer) + filler)
+        self.__file.write(block)
+
+        self.__block_cnt += 1
+        self.__block_idx = blk
+        self.__save = False
+        return True
+
     def _load(self, blk):
+        if not self.__block_cnt > blk:
+            raise IndexError('Block out of range.')
+
         pos = blk * ConcealIO.TOT_SIZE
         res = self.__file.seek(pos)
         print('Load block:', blk)
@@ -123,11 +155,8 @@ class ConcealIO(io.RawIOBase):
             raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
                 'position': pos, 'result': res})
 
-        if self.__block_cnt > blk:
-            self.__buffer = bytearray(self.__box.decrypt(
-                self.__file.read(ConcealIO.CBLK_SIZE)))
-        else:
-            self.__buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+        self.__buffer = bytearray(self.__box.decrypt(
+            self.__file.read(ConcealIO.CBLK_SIZE)))
 
         self.__block_idx = blk
         self.__save = False
@@ -145,7 +174,7 @@ class ConcealIO(io.RawIOBase):
             raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
                 'position': pos, 'result': res})
 
-        if self.__block_idx is 0:
+        if self.__block_idx == 0:
             filler = b''
         else:
             filler = os.urandom(472)
@@ -162,6 +191,7 @@ class ConcealIO(io.RawIOBase):
 
     def close(self):
         if not self.closed:
+            self._save()
             self.__length(self.__len)
             fcntl.flock(self.__file, fcntl.LOCK_UN)
             io.RawIOBase.close(self)
@@ -175,6 +205,7 @@ class ConcealIO(io.RawIOBase):
         self._save()
         self.__length(self.__len)
         io.RawIOBase.flush(self)
+        self.__file.flush()
 
     def isatty(self):
         if self.closed:
@@ -331,12 +362,15 @@ class ConcealIO(io.RawIOBase):
             self.__cursor += numcpy
             if self.__cursor > self.__len:
                 self.__len = self.__cursor
-                # self.__length(self.__len)
 
             if self.__blk_cursor >= ConcealIO.ABLK_SIZE:
                 self._save()
                 self.__length(self.__len)
-                self._load(self.__block_idx + 1)
+                next = self.__block_idx + 1
+                if self.__block_cnt == next:
+                    self._new()
+                else:
+                    self._load(next)
                 self.__blk_cursor = 0
 
         return cursor if cursor else None
@@ -366,13 +400,39 @@ file = './test.cnl'
 secret = 'jBInDQgVpoVcPcFHipwor9NiTTtefVCLABHlDA44+Sc='
 
 with ConcealIO(file, 'wb', base64.b64decode(secret)) as cnl:
+    pass
+    """cnl.write(LIPSUM)
+    # cnl.write(b'Hello')
     cnl.write(LIPSUM)
+    for slc in range(200):
+        section = random.randrange(20, 40)
+        offset = random.randrange(0, len(LIPSUM) - section)
+        if random.randrange(0, 1):
+            print('Section write:', offset, section)
+            cnl.seek(offset)
+            cnl.write(LIPSUM[offset:offset+section])
+        else:
+            print('Section read:', offset, section)
+            cnl.seek(offset)
+            data = cnl.read(section)
+            print(data)"""
 
 with ConcealIO(file, 'rb+',  base64.b64decode(secret)) as cnl:
-    print(cnl.read() == LIPSUM)
+    cnl.write(LIPSUM)
+    for slc in range(200):
+        section = random.randrange(20, 40)
+        offset = random.randrange(0, len(LIPSUM) - section)
+        if random.randrange(0, 1):
+            print('Section write:', offset, section)
+            cnl.seek(offset)
+            cnl.write(LIPSUM[offset:offset+section])
+        else:
+            print('Section read:', offset, section)
+            cnl.seek(offset)
+            data = cnl.read(section)
+            print(data)
 
 try:
-    pass
     os.unlink(file)
 except FileNotFoundError as e:
     pass

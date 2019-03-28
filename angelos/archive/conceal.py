@@ -51,7 +51,7 @@ class ConcealIO(io.RawIOBase):
         if self.__block_cnt:
             self._load(0)
         else:
-            self.__buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+            self._new()
 
     def __enter__(self):
         return self
@@ -76,20 +76,43 @@ class ConcealIO(io.RawIOBase):
         self.__file.seek(realpos)
         return offset
 
-    def _load(self, blk):
+    def _new(self):
+        blk = self.__block_cnt
         pos = blk * ConcealIO.TOT_SIZE
         res = self.__file.seek(pos)
-        print('Load block:', blk)
 
         if pos != res:
             raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
                 'position': pos, 'result': res})
 
-        if self.__block_cnt > blk:
-            self.__buffer = bytearray(self.__box.decrypt(
-                self.__file.read(ConcealIO.CBLK_SIZE)))
+        self.__buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+
+        if blk == 0:
+            filler = b''
         else:
-            self.__buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+            filler = os.urandom(472)
+        block = bytearray(
+            self.__box.encrypt(self.__buffer) + filler)
+        self.__file.write(block)
+
+        self.__block_cnt += 1
+        self.__block_idx = blk
+        self.__save = False
+        return True
+
+    def _load(self, blk):
+        if not self.__block_cnt > blk:
+            raise IndexError('Block out of range.')
+
+        pos = blk * ConcealIO.TOT_SIZE
+        res = self.__file.seek(pos)
+
+        if pos != res:
+            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
+                'position': pos, 'result': res})
+
+        self.__buffer = bytearray(self.__box.decrypt(
+            self.__file.read(ConcealIO.CBLK_SIZE)))
 
         self.__block_idx = blk
         self.__save = False
@@ -100,14 +123,13 @@ class ConcealIO(io.RawIOBase):
             return False
 
         pos = self.__block_idx * ConcealIO.TOT_SIZE
-        print('Save block:', self.__block_idx)
         res = self.__file.seek(pos)
 
         if pos != res:
             raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
                 'position': pos, 'result': res})
 
-        if self.__block_idx is 0:
+        if self.__block_idx == 0:
             filler = b''
         else:
             filler = os.urandom(472)
@@ -124,6 +146,7 @@ class ConcealIO(io.RawIOBase):
 
     def close(self):
         if not self.closed:
+            self._save()
             self.__length(self.__len)
             fcntl.flock(self.__file, fcntl.LOCK_UN)
             io.RawIOBase.close(self)
@@ -137,6 +160,7 @@ class ConcealIO(io.RawIOBase):
         self._save()
         self.__length(self.__len)
         io.RawIOBase.flush(self)
+        self.__file.flush()
 
     def isatty(self):
         if self.closed:
@@ -156,14 +180,11 @@ class ConcealIO(io.RawIOBase):
         cursor = 0
         self._save()
 
-        print('Read:', self.__cursor, size)
-
         while size > cursor:
             numcpy = min(
                 ConcealIO.ABLK_SIZE - self.__blk_cursor, size - cursor)
 
             block += self.__buffer[self.__blk_cursor:self.__blk_cursor+numcpy]
-            print('Buffer read:', self.__cursor, numcpy)
             cursor += numcpy
             self.__cursor += numcpy
             self.__blk_cursor += numcpy
@@ -278,27 +299,27 @@ class ConcealIO(io.RawIOBase):
 
         cursor = 0
 
-        print('Write:', self.__cursor, wrtlen)
-
         while wrtlen > cursor:
             self.__save = True
             numcpy = min(
                 ConcealIO.ABLK_SIZE - self.__blk_cursor, wrtlen - cursor)
 
             self.__buffer[self.__blk_cursor:self.__blk_cursor + numcpy] = b[cursor: cursor + numcpy]  # noqa E501
-            print('Buffer write:', self.__cursor, numcpy)
 
             cursor += numcpy
             self.__blk_cursor += numcpy
             self.__cursor += numcpy
             if self.__cursor > self.__len:
                 self.__len = self.__cursor
-                # self.__length(self.__len)
 
             if self.__blk_cursor >= ConcealIO.ABLK_SIZE:
                 self._save()
                 self.__length(self.__len)
-                self._load(self.__block_idx + 1)
+                next = self.__block_idx + 1
+                if self.__block_cnt == next:
+                    self._new()
+                else:
+                    self._load(next)
                 self.__blk_cursor = 0
 
         return cursor if cursor else None
@@ -311,9 +332,6 @@ class ConcealIO(io.RawIOBase):
             if not isinstance(line, bytes):
                 raise TypeError()
             self.write(line)
-
-    # def __del__(self):
-    #    self.close()
 
     @property
     def name(self):
