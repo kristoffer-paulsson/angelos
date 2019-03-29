@@ -545,7 +545,10 @@ class Archive7(ContainerAware):
                     raise Util.exception(Error.AR7_NOT_EMPTY, {
                         'index': cidx})
 
-            if self.__delete == Archive7.Delete.ERASE:
+            if not mode:
+                mode = self.__delete
+
+            if mode == Archive7.Delete.ERASE:
                 if entry.type == Entry.TYPE_FILE:
                     entries.update(
                         Entry.empty(
@@ -554,12 +557,12 @@ class Archive7(ContainerAware):
                         idx)
                 elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
                     entries.update(Entry.blank(), idx)
-            elif self.__delete == Archive7.Delete.SOFT:
+            elif mode == Archive7.Delete.SOFT:
                 entry = entry._asdict()
                 entry['deleted'] = True
                 entry = Entry(**entry)
                 self.ioc.entries.update(entry, idx)
-            elif self.__delete == Archive7.Delete.HARD:
+            elif mode == Archive7.Delete.HARD:
                 if entry.type == Entry.TYPE_FILE:
                     if not entries.find_blank():
                         entries.make_blanks()

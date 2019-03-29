@@ -16,6 +16,11 @@ from angelos.archive.archive7 import Archive7
 
 
 class TestConceal(unittest.TestCase):
+    files1 = None
+    files2 = None
+    files3 = None
+    files4 = None
+
     @classmethod
     def setUpClass(cls):
         cls.secret = libnacl.secret.SecretBox().sk
@@ -26,6 +31,17 @@ class TestConceal(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.dir.cleanup()
+
+    def generate_data(self):
+        return ('\n'.join(
+            random.choices(
+                LIPSUM_LINES,
+                k=random.randrange(1, 10)))).encode('utf-8')
+
+    def generate_filename(self, postfix='.txt'):
+        return ''.join(random.choices(
+            string.ascii_lowercase + string.digits,
+            k=random.randrange(5, 10))) + postfix
 
     def test_01_setup(self):
         """Creating new empty archive"""
@@ -47,43 +63,82 @@ class TestConceal(unittest.TestCase):
 
     def test_04_mkfile(self):
         """Open archive and write random files"""
-        with Archive7.open(self.filename, self.secret) as arch:
-            for i in range(200):
-                data = ('\n'.join(
-                    random.choices(
-                        LIPSUM_LINES,
-                        k=random.randrange(1, 10)))).encode('utf-8')
-                filename = random.choices(
-                    LIPSUM_PATH, k=1)[0] + '/' + ''.join(
-                        random.choices(
-                            string.ascii_lowercase + string.digits,
-                            k=random.randrange(5, 10))) + '.txt'
-                arch.mkfile(filename, data)
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                files = []
+                for i in range(200):
+                    data = self.generate_data()
+                    filename = random.choices(
+                        LIPSUM_PATH, k=1)[0] + '/' + self.generate_filename()
+                    files.append(filename)
+                    arch.mkfile(filename, data)
 
+                random.shuffle(files)
+                TestConceal.files1 = files[:10]
+                TestConceal.files2 = files[10:20]
+                TestConceal.files3 = files[20:30]
+                TestConceal.files4 = files[30:40]
+        except Exception as e:
+            self.fail(e)
 
-"""
-    def test_random_access(self):
-        "Create new file, then reopen and write, read write randomly"
-        with ConcealIO(self.filename, 'wb', self.secret) as cnl:
-            pass
-        with ConcealIO(self.filename, 'rb+',  self.secret) as cnl:
-            cnl.write(LIPSUM.encode('utf-8'))
-            cnl.seek(0)
-            data = cnl.read()
+    def test_05_load(self):
+        """Open archive and load files"""
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                for i in arch.glob():
+                    if i not in LIPSUM_PATH:
+                        arch.load(i)
+        except Exception as e:
+            self.fail(e)
 
-            for slc in range(200):
-                section = random.randrange(20, 40)
-                offset = random.randrange(0, len(LIPSUM) - section)
-                if random.randrange(0, 1):
-                    cnl.seek(offset)
-                    cnl.write(LIPSUM[offset:offset+section].encode('utf-8'))
-                else:
-                    cnl.seek(offset)
-                    data = cnl.read(section)
-                    self.assertEqual(
-                        LIPSUM[offset:offset+section].encode('utf-8'), data,
-                        'The read data is different from data section.')
-"""
+    def test_06_save(self):
+        """Open archive and update some files"""
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                for i in TestConceal.files1:
+                    arch.save(i, self.generate_data())
+                for i in TestConceal.files1:
+                    arch.load(i)
+        except Exception as e:
+            self.fail(e)
+
+    def test_07_remove(self):
+        """Open archive and delete some files"""
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                for i in TestConceal.files2:
+                    arch.remove(i)
+        except Exception as e:
+            self.fail(e)
+
+    def test_08_rename(self):
+        """Open archive and delete some files"""
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                for i in TestConceal.files3:
+                    arch.rename(i, self.generate_filename())
+        except Exception as e:
+            self.fail(e)
+
+    def test_09_move(self):
+        """Open archive and delete some files"""
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                for i in TestConceal.files4:
+                    arch.move(i, '/')
+        except Exception as e:
+            self.fail(e)
+
+    def test_10_load2(self):
+        """Open archive and load files"""
+        try:
+            with Archive7.open(self.filename, self.secret) as arch:
+                for i in arch.glob():
+                    if i not in LIPSUM_PATH:
+                        arch.load(i)
+        except Exception as e:
+            self.fail(e)
+
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'])

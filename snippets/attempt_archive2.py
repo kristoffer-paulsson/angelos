@@ -579,7 +579,10 @@ class Archive(ContainerAware):
                 if len(cidx):
                     raise self.ioc.err.set(Archive.Errno.NOT_EMPTY, cidx)
 
-            if self.__delete == Archive.Delete.ERASE:
+            if not mode:
+                mode = self.__delete
+
+            if mode == Archive.Delete.ERASE:
                 if entry.type == Entry.TYPE_FILE:
                     entries.update(
                         Entry.empty(
@@ -588,12 +591,12 @@ class Archive(ContainerAware):
                         idx)
                 elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
                     entries.update(Entry.blank(), idx)
-            elif self.__delete == Archive.Delete.SOFT:
+            elif mode == Archive.Delete.SOFT:
                 entry = entry._asdict()
                 entry['deleted'] = True
                 entry = Entry(**entry)
                 self.ioc.entries.update(entry, idx)
-            elif self.__delete == Archive.Delete.HARD:
+            elif mode == Archive.Delete.HARD:
                 if entry.type == Entry.TYPE_FILE:
                     if not entries.find_blank():
                         entries.make_blanks()

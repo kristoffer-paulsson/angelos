@@ -1,6 +1,7 @@
 import re
 import datetime
 import uuid
+import ipaddress
 
 from ..utils import Util
 from ..error import Error
@@ -23,102 +24,6 @@ class Field:
 
     def to_str(self, value):
         return value
-
-
-class UuidField(Field):
-    def validate(self, value):
-        Field.validate(self, value)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (uuid.UUID, type(None))):
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {'expected': 'uuid.UUID', 'current': type(v)})
-        return True
-
-    def to_str(self, value):
-        return str(value)
-
-
-class DateField(Field):
-    def validate(self, value):
-        Field.validate(self, value)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (datetime.date, type(None))):
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {'expected': 'datetime.date', 'current': type(v)})
-        return True
-
-
-class StringField(Field):
-    def validate(self, value):
-        Field.validate(self, value)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not (isinstance(v, (str, type(None))) or bool(str(v))):
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {'expected': 'str', 'current': type(v)})
-        return True
-
-
-class ChoiceField(Field):
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, choices=[]):
-        Field.__init__(self, value, required, multiple, init)
-        self.choices = choices
-
-    def validate(self, value):
-        Field.validate(self, value)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if v not in self.choices:
-                raise Util.exception(
-                    Error.FIELD_INVALID_CHOICE,
-                    {'expected': self.choices, 'current': v})
-        return True
-
-
-e_re = '^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$'
-
-
-class EmailField(Field):
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, choices=[]):
-        Field.__init__(self, value, required, multiple, init)
-        self.choices = choices
-
-    def validate(self, value):
-        Field.validate(self, value)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not (isinstance(v, (str, type(None))) or bool(str(v))):
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {'expected': 'str', 'current': type(v)})
-
-            if not bool(re.match(e_re, v)):
-                raise Util.exception(
-                    Error.FIELD_INVALID_EMAIL,
-                    {'email': v})
-        return True
 
 
 class DocumentMeta(type):
@@ -193,3 +98,170 @@ class BaseDocument(metaclass=DocumentMeta):
 
     def validate(self):
         raise NotImplementedError()
+
+
+class DocumentField(Field):
+    def __init__(self, value=None, required=True,
+                 multiple=False, init=None, t=None):
+        Field.__init__(self, value, required, multiple, init)
+        self.type = t
+
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (BaseDocument, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': type(BaseDocument), 'current': type(v)})
+
+            if not isinstance(v, (self.type, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': type(self.type), 'current': type(v)})
+
+            v._validate()
+        return True
+
+
+class UuidField(Field):
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (uuid.UUID, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'uuid.UUID', 'current': type(v)})
+        return True
+
+    def to_str(self, value):
+        return str(value)
+
+
+class IPField(Field):
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (
+                    ipaddress.IPv4Address, ipaddress.IPv6Address, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'ipaddress.IPv[4|6]Address',
+                     'current': type(v)})
+        return True
+
+    def to_str(self, value):
+        return str(value)
+
+
+class DateField(Field):
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (datetime.date, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'datetime.date', 'current': type(v)})
+        return True
+
+
+class StringField(Field):
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not (isinstance(v, (str, type(None))) or bool(str(v))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'str', 'current': type(v)})
+        return True
+
+
+class BytesField(Field):
+    def __init__(self, value=None, required=True,
+                 multiple=False, init=None, limit=1024):
+        Field.__init__(self, value, required, multiple, init)
+        self.limit = limit
+
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (bytes, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'bytes', 'current': type(v)})
+
+            if len(v) > self.limit:
+                raise Util.exception(
+                    Error.FIELD_BEYOND_LIMIT,
+                    {'limit': self.limit, 'size': len(v)})
+        return True
+
+
+class ChoiceField(Field):
+    def __init__(self, value=None, required=True,
+                 multiple=False, init=None, choices=[]):
+        Field.__init__(self, value, required, multiple, init)
+        self.choices = choices
+
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if v not in self.choices:
+                raise Util.exception(
+                    Error.FIELD_INVALID_CHOICE,
+                    {'expected': self.choices, 'current': v})
+        return True
+
+
+class EmailField(Field):
+    EMAIL_REGEX = '^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$'  # noqa E501
+
+    def __init__(self, value=None, required=True,
+                 multiple=False, init=None, choices=[]):
+        Field.__init__(self, value, required, multiple, init)
+        self.choices = choices
+
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not (isinstance(v, (str, type(None))) or bool(str(v))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'str', 'current': type(v)})
+
+            if not bool(re.match(EmailField.EMAIL_REGEX, v)):
+                raise Util.exception(
+                    Error.FIELD_INVALID_EMAIL,
+                    {'email': v})
+        return True

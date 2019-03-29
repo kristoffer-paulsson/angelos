@@ -3,14 +3,47 @@ import uuid
 
 from ..utils import Util
 from ..error import Error
-from .model import BaseDocument, UuidField, DateField, StringField
-from .issuance import IssueMixin
+from .model import (
+    DocumentMeta, BaseDocument, UuidField, DateField, StringField)
+
+
+class IssueMixin(metaclass=DocumentMeta):
+    signature = StringField()
+    issuer = UuidField()
+
+    def _validate(self):
+        return True
+
+
+class OwnerMixin(metaclass=DocumentMeta):
+    owner = UuidField()
+
+    def _validate(self):
+        return True
+
+
+class UpdatedMixin(metaclass=DocumentMeta):
+    updated = DateField(required=False)
+
+    def _validate(self):
+        # Validate that "expires" is at least 13 months in the future compared
+        # to "created" if "updated" is null
+        try:
+            if bool(self.updated):
+                if self.expires - self.updated > datetime.timedelta(13*365/12):
+                    raise Util.exception(
+                        Error.DOCUMENT_SHORT_EXPIREY,
+                        {'expected': datetime.timedelta(13*365/12),
+                         'current': self.expires - self.updated})
+        except AttributeError:
+            pass
+        return True
 
 
 class Document(IssueMixin, BaseDocument):
-    id = UuidField(required=True, init=uuid.uuid4)
-    created = DateField(required=True, init=datetime.date.today)
-    expires = DateField(required=True, init=lambda: (
+    id = UuidField(init=uuid.uuid4)
+    created = DateField(init=datetime.date.today)
+    expires = DateField(init=lambda: (
         datetime.date.today() + datetime.timedelta(13*365/12)))
     type = StringField()
 
@@ -28,10 +61,13 @@ class Document(IssueMixin, BaseDocument):
             pass
         return True
 
+    def _check_type(self, _type):
+        if not self.type == _type:
+            raise Util.exception(
+                Error.DOCUMENT_INVALID_TYPE,
+                {'expected': _type,
+                 'current': self.type})
 
-class File(BaseDocument):
-    id = UuidField(init=uuid.uuid4)
-    created = DateField(init=datetime.date.today)
-    mime = StringField()
-    data = StringField()
-    issuer = UuidField()
+    def _check_validate(self, _list):
+        for cls in _list:
+            cls._validate(self)
