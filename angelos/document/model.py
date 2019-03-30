@@ -2,6 +2,7 @@ import re
 import datetime
 import uuid
 import ipaddress
+import base64
 
 from ..utils import Util
 from ..error import Error
@@ -19,11 +20,18 @@ class Field:
             raise Util.exception(Error.FIELD_NOT_SET)
         if not self.multiple:
             if isinstance(value, list):
-                raise Util.exception(Error.FIELD_NOT_MULTIPLE)
+                raise Util.exception(Error.FIELD_NOT_MULTIPLE, {
+                    'type': type(self),
+                    'value': value,
+                })
         return True
 
     def to_str(self, value):
-        return value
+        return str(value)
+
+    def to_bytes(self, value):
+        # raise NotImplementedError('%s, %s, %s' % (type(self), type(value), value))  # noqa E501
+        return bytes(value.encode('utf-8')) if value else b''
 
 
 class DocumentMeta(type):
@@ -55,9 +63,9 @@ class BaseDocument(metaclass=DocumentMeta):
         for key, value in nd.items():
             try:
                 setattr(self, key, value)
-            except AttributeError:
+            except AttributeError as e:
                 if strict:
-                    raise
+                    raise e
 
     def __setattr__(self, key, value):
         if key in self._fields:
@@ -73,6 +81,19 @@ class BaseDocument(metaclass=DocumentMeta):
         nd = {}
         for name in self._fields.keys():
             nd[name] = getattr(self, name)
+        return nd
+
+    def export_bytes(self):
+        nd = {}
+        for name in self._fields.keys():
+            attr = getattr(self, name)
+            if isinstance(attr, list):
+                item_list = []
+                for item in attr:
+                    item_list.append(self._fields[name].to_bytes(item))
+                nd[name] = item_list
+            else:
+                nd[name] = self._fields[name].to_bytes(attr)
         return nd
 
     def export_conf(self):
@@ -113,18 +134,25 @@ class DocumentField(Field):
             value = [value]
 
         for v in value:
-            if not isinstance(v, (BaseDocument, type(None))):
+            if not (isinstance(v, (BaseDocument, type(None))) and isinstance(
+                    v, (self.type, type(None)))):
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': type(BaseDocument), 'current': type(v)})
 
-            if not isinstance(v, (self.type, type(None))):
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {'expected': type(self.type), 'current': type(v)})
+            # if not isinstance(v, (self.type, type(None))):
+            #    raise Util.exception(
+            #        Error.FIELD_INVALID_TYPE,
+            #        {'expected': type(self.type), 'current': type(v)})
 
             v._validate()
         return True
+
+    def to_str(self, value):
+        return value.export_str()
+
+    def to_bytes(self, value):
+        return value.export_bytes()
 
 
 class UuidField(Field):
@@ -144,6 +172,9 @@ class UuidField(Field):
     def to_str(self, value):
         return str(value)
 
+    def to_bytes(self, value):
+        return value.bytes
+
 
 class IPField(Field):
     def validate(self, value):
@@ -161,9 +192,6 @@ class IPField(Field):
                      'current': type(v)})
         return True
 
-    def to_str(self, value):
-        return str(value)
-
 
 class DateField(Field):
     def validate(self, value):
@@ -179,6 +207,9 @@ class DateField(Field):
                     {'expected': 'datetime.date', 'current': type(v)})
         return True
 
+    def to_bytes(self, value):
+        return bytes(value.isoformat(), 'utf-8') if value else b''
+
 
 class StringField(Field):
     def validate(self, value):
@@ -188,11 +219,32 @@ class StringField(Field):
             value = [value]
 
         for v in value:
-            if not (isinstance(v, (str, type(None))) or bool(str(v))):
+            if not isinstance(v, (str, bytes, type(None))):
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'str', 'current': type(v)})
         return True
+
+    def to_bytes(self, value):
+        return bytes(str(value).encode('utf-8')) if value else b''
+
+
+class TypeField(Field):
+    def validate(self, value):
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (int, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'int', 'current': type(v)})
+        return True
+
+    def to_bytes(self, value):
+        return bytes([int(value)]) if value else b''
 
 
 class BytesField(Field):
@@ -219,6 +271,12 @@ class BytesField(Field):
                     {'limit': self.limit, 'size': len(v)})
         return True
 
+    def to_str(self, value):
+        return base64.base64_encode(value) if value else ''
+
+    def to_bytes(self, value):
+        return value
+
 
 class ChoiceField(Field):
     def __init__(self, value=None, required=True,
@@ -239,6 +297,9 @@ class ChoiceField(Field):
                     {'expected': self.choices, 'current': v})
         return True
 
+    def to_bytes(self, value):
+        return value.encode('utf-8') if value else b''
+
 
 class EmailField(Field):
     EMAIL_REGEX = '^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$'  # noqa E501
@@ -255,7 +316,7 @@ class EmailField(Field):
             value = [value]
 
         for v in value:
-            if not (isinstance(v, (str, type(None))) or bool(str(v))):
+            if not isinstance(v, (str, type(None))):
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'str', 'current': type(v)})

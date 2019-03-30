@@ -1,20 +1,35 @@
-from .model import BaseDocument, StringField
+from .model import BaseDocument, TypeField, BytesField
 from .document import Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
-class Keys(Document):
-    type = StringField(value='cert.keys')
-    verify = StringField()
-    public = StringField()
+class PrivateKeys(Document):
+    type = TypeField(value=Document.Type.KEYS_PRIVATE)
+    secret = BytesField()
+    seed = BytesField()
 
     def _validate(self):
-        self._check_type('cert.keys')
+        self._check_type(Document.Type.KEYS_PRIVATE)
+        return True
+
+    def validate(self):
+        validate = [BaseDocument, Document, IssueMixin, PrivateKeys]
+        self._check_validate(validate)
+        return True
+
+
+class Keys(Document):
+    type = TypeField(value=Document.Type.KEYS)
+    verify = BytesField()
+    public = BytesField()
+
+    def _validate(self):
+        self._check_type(Document.Type.KEYS)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Keys]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
@@ -24,42 +39,42 @@ class Entity(Document, UpdatedMixin):
 
 
 class Person(Entity, PersonMixin):
-    type = StringField(value='entity.person')
+    type = TypeField(value=Document.Type.ENTITY_PERSON)
 
     def _validate(self):
-        self._check_type('entity.person')
+        self._check_type(Document.Type.ENTITY_PERSON)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Entity, UpdatedMixin,
                     Person, PersonMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class Ministry(Entity, MinistryMixin):
-    type = StringField(value='entity.ministry')
+    type = TypeField(value=Document.Type.ENTITY_MINISTRY)
 
     def _validate(self):
-        self._check_type('entity.ministry')
+        self._check_type(Document.Type.ENTITY_MINISTRY)
         return True
 
     def validate(self):
         validate = [BaseDocument,  Document, IssueMixin, Entity, UpdatedMixin,
                     Ministry, MinistryMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class Church(Entity, ChurchMixin):
-    type = StringField(value='entity.church')
+    type = TypeField(value=Document.Type.ENTITY_CHURCH)
 
     def _validate(self):
-        self._check_type('entity.church')
+        self._check_type(Document.Type.ENTITY_CHURCH)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Entity, UpdatedMixin,
                     Church, ChurchMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True

@@ -1,36 +1,48 @@
 import sys
 sys.path.append('../angelos')  # noqa
 
-import random
-import datetime
+import unittest
 
-from lipsum import MALE_NAMES, FEMALE_NAMES, SURNAMES
+import support
+from angelos.document.entities import Person
+from angelos.policy.entity import PersonGeneratePolicy
 
 
-def random_identity(self, num):
-    identities = []
-    for i in range(num):
-        chance = random.randrange(1, 100)
-        if 1 <= chance <= 49:
-            gender = 'man'
-            names = random.choice(MALE_NAMES, k=random.randrange(2, 5))
-        elif 50 <= chance <= 98:
-            gender = 'woman'
-            names = random.choice(FEMALE_NAMES, k=random.randrange(2, 5))
-        else:
-            gender = 'undefined'
-            names = random.choice(
-                MALE_NAMES + FEMALE_NAMES, k=random.randrange(2, 5))
+class TestEntities(unittest.TestCase):
+    def setUp(self):
+        pass
 
-        born = datetime.date.today(
-            ) - datetime.timedelta(days=random.randrange(4748, 29220))
+    def tearDown(self):
+        pass
 
-        identities.append({
-            'given_name': names[0],
-            'names': names,
-            'family_name': random.choice(SURNAMES, k=1)[0].capitalize(),
-            'gender': gender,
-            'born': born
-        })
+    def test_create_person(self):
+        """
+        Populating a Person Entity document class with random 'valid' data.
+        """
+        data = support.random_person_entity_data(1)
+        try:
+            self.assertIsInstance(Person(nd=data[0]), Person)
+        except Exception as e:
+            raise e
+            # self.fail(e)
 
-    return identities
+    def test_person_generate_policy(self):
+        """
+        Generating a Person Entity with keys using a GeneratePolicy.
+        """
+        data = support.random_person_entity_data(1)
+        try:
+            policy = PersonGeneratePolicy()
+            self.assertTrue(policy.generate(**data[0]))
+            self.assertTrue(policy.verify(
+                policy.entity, policy.entity, policy.keys))
+            self.assertTrue(policy.verify(
+                 policy.private, policy.entity, policy.keys))
+            self.assertTrue(policy.verify(
+                policy.keys, policy.entity, policy.keys))
+        except Exception as e:
+            self.fail(e)
+
+
+if __name__ == '__main__':
+    unittest.main(argv=['first-arg-is-ignored'])

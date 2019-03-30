@@ -1,6 +1,6 @@
 from .model import (
     BaseDocument, StringField, DateField, ChoiceField, EmailField, BytesField,
-    DocumentField)
+    DocumentField, TypeField)
 from .document import Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
@@ -32,45 +32,45 @@ class Profile(Document, UpdatedMixin):
 
 
 class PersonProfile(Profile, PersonMixin):
-    type = StringField(value='prof.person')
+    type = TypeField(value=Document.Type.PROF_PERSON)
     gender = ChoiceField(required=False, choices=['man', 'woman', 'undefined'])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
     def _validate(self):
-        self._check_type('prof.person')
+        self._check_type(Document.Type.PROF_PERSON)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Profile, UpdatedMixin,
                     PersonProfile, PersonMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class MinistryProfile(Profile, MinistryMixin):
-    type = StringField(value='prof.ministry')
+    type = TypeField(value=Document.Type.PROF_MINISTRY)
 
     def _validate(self):
-        self._check_type('prof.ministry')
+        self._check_type(Document.Type.PROF_MINISTRY)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Profile, UpdatedMixin,
                     MinistryProfile, MinistryMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class ChurchProfile(Profile, ChurchMixin):
-    type = StringField(value='prof.church')
+    type = TypeField(value=Document.Type.PROF_CHURCH)
 
     def _validate(self):
-        self._check_type('prof.church')
+        self._check_type(Document.Type.PROF_CHURCH)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Profile, UpdatedMixin,
                     ChurchProfile, ChurchMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True

@@ -1,5 +1,6 @@
 from .model import (
-    BaseDocument, StringField, DateField, BytesField, DocumentField, UuidField)
+    BaseDocument, StringField, DateField, BytesField, DocumentField, UuidField,
+    TypeField)
 from .document import Document, OwnerMixin, IssueMixin
 
 
@@ -16,74 +17,74 @@ class Message(Document, OwnerMixin):
 
 
 class Note(Message):
-    type = StringField('doc.com.note')
+    type = TypeField(Document.Type.COM_NOTE)
 
     def _validate(self):
-        self._check_type('doc.com.note')
+        self._check_type(Document.Type.COM_NOTE)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
                     Note]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class Instant(Message):
-    type = StringField('doc.com.msg')
+    type = TypeField(Document.Type.COM_INSTANT)
     body = BytesField()
     mime = StringField()
 
     def _validate(self):
-        self._check_type('dot.com.msg')
+        self._check_type(Document.Type.COM_INSTANT)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
                     Instant]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class Mail(Message):
-    type = StringField('doc.com.mail')
+    type = TypeField(Document.Type.COM_MAIL)
     subject = StringField(required=False)
     attachment = DocumentField(required=False, t=Attachment, multiple=True)
 
     def _validate(self):
-        self._check_type('doc.com.mail')
+        self._check_type(Document.Type.COM_MAIL)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
                     Mail]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class Share(Mail):
-    type = StringField('doc.com.share')
+    type = TypeField(Document.Type.COM_SHARE)
 
     def _validate(self):
-        self._check_type('doc.com.share')
+        self._check_type(Document.Type.COM_SHARE)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
                     Mail, Share]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
 
 
 class Report(Mail):
-    type = StringField('doc.com.report')
+    type = TypeField(Document.Type.COM_REPORT)
 
     def _validate(self):
-        self._check_type('com.com.report')
+        self._check_type(Document.Type.COM_REPORT)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
                     Mail, Share]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True

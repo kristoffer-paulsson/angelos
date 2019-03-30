@@ -1,10 +1,11 @@
 import datetime
 import uuid
+import enum
 
 from ..utils import Util
 from ..error import Error
 from .model import (
-    DocumentMeta, BaseDocument, UuidField, DateField, StringField)
+    DocumentMeta, BaseDocument, UuidField, DateField, StringField, TypeField)
 
 
 class IssueMixin(metaclass=DocumentMeta):
@@ -24,10 +25,9 @@ class OwnerMixin(metaclass=DocumentMeta):
 
 class UpdatedMixin(metaclass=DocumentMeta):
     updated = DateField(required=False)
+    signature = StringField(multiple=True)
 
     def _validate(self):
-        # Validate that "expires" is at least 13 months in the future compared
-        # to "created" if "updated" is null
         try:
             if bool(self.updated):
                 if self.expires - self.updated > datetime.timedelta(13*365/12):
@@ -45,11 +45,9 @@ class Document(IssueMixin, BaseDocument):
     created = DateField(init=datetime.date.today)
     expires = DateField(init=lambda: (
         datetime.date.today() + datetime.timedelta(13*365/12)))
-    type = StringField()
+    type = TypeField(value=0)
 
     def _validate(self):
-        # Validate that "expires" is at least 13 months in the future compared
-        # to "created" if "updated" is null
         try:
             if not bool(self.updated):
                 if self.expires - self.created > datetime.timedelta(13*365/12):
@@ -71,3 +69,33 @@ class Document(IssueMixin, BaseDocument):
     def _check_validate(self, _list):
         for cls in _list:
             cls._validate(self)
+
+    class Type(enum.IntEnum):
+        NONE = 0
+
+        KEYS_PRIVATE = 1
+
+        KEYS = 10
+
+        ENTITY_PERSON = 20
+        ENTITY_MINISTRY = 21
+        ENTITY_CHURCH = 22
+        PROF_PERSON = 30
+        PROF_MINISTRY = 31
+        PROF_CHURCH = 32
+
+        NET_DOMAIN = 40
+        NET_NODE = 41
+        NET_NETWORK = 42
+
+        STAT_VERIFIED = 50
+        STAT_TRUSTED = 51
+        STAT_REVOKED = 52
+
+        COM_ENVELOPE = 60
+
+        COM_NOTE = 70
+        COMT_INSTANT = 71
+        COM_MAIL = 72
+        COM_SHARE = 73
+        COM_REPORT = 74

@@ -4,7 +4,8 @@ from ..utils import Util
 from ..error import Error
 
 from .model import (
-    BaseDocument, DateField, StringField, UuidField, DocumentField, BytesField)
+    BaseDocument, DateField, StringField, UuidField, DocumentField, BytesField,
+    TypeField)
 from .document import Document, OwnerMixin, IssueMixin
 
 
@@ -16,14 +17,14 @@ class Header(BaseDocument):
 
 
 class Envelope(Document, OwnerMixin):
-    type = StringField(value='doc.com.envelope')
+    type = TypeField(value=Document.Type.COM_ENVELOPE)
     expires = DateField(required=True, init=lambda: (
         datetime.date.today() + datetime.timedelta(31)))
     message = BytesField(limit=131072)
     header = DocumentField(t=Header, multiple=True)
 
     def _validate(self):
-        self._check_type('doc.com.envelope')
+        self._check_type(Document.Type.COM_ENVELOPE)
 
         if self.expires - self.created > datetime.timedelta(31):
             raise Util.exception(
@@ -35,5 +36,5 @@ class Envelope(Document, OwnerMixin):
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Envelope, OwnerMixin]
-        self._check_validate(self, validate)
+        self._check_validate(validate)
         return True
