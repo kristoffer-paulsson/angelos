@@ -23,7 +23,8 @@ class BaseGeneratePolicy(Policy):
         entity.issuer = entity.id
         entity.signature = base64.standard_b64encode(
             self.box.signature(
-                bytes(entity.id.bytes) + self._docdata(entity)))
+                bytes(entity.issuer.bytes) + self._docdata(entity))).decode()
+
         private = PrivateKeys(nd={
             'issuer': entity.id,
             'secret': self.box.hex_sk(),
@@ -31,16 +32,20 @@ class BaseGeneratePolicy(Policy):
         })
         private.signature = base64.standard_b64encode(
             self.box.signature(
-                bytes(entity.id.bytes) + self._docdata(private)))
+                bytes(private.issuer.bytes) + self._docdata(private))).decode()
 
         keys = Keys(nd={
             'issuer': entity.id,
             'public': self.box.hex_pk(),
             'verify': self.box.hex_vk()
         })
-        keys.signature = base64.standard_b64encode(
+        keys.signature = [base64.standard_b64encode(
             self.box.signature(
-                bytes(entity.id.bytes) + self._docdata(keys)))
+                bytes(keys.issuer.bytes) + self._docdata(keys))).decode()]
+
+        entity._validate()
+        private._validate()
+        keys._validate()
 
         self.entity = entity
         self.private = private

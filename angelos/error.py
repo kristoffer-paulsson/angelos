@@ -35,6 +35,8 @@ class DocumentShortExpiery(AngelosException): pass  # noqa E302
 class DocumentInvalidType(AngelosException): pass  # noqa E302
 class DocumentPersonNotInNames(AngelosException): pass  # noqa E302
 class FieldInvalidEmail(AngelosException): pass  # noqa E302
+class FieldBeyondLimit(AngelosException): pass  # noqa E302
+class FieldIsMultiple(AngelosException): pass  # noqa E302
 
 class ConcealException(AngelosException): pass  # noqa E302
 class ConcealUnkownMode(ConcealException): pass  # noqa E302
@@ -99,6 +101,8 @@ ERROR_INFO = {
     605: (DocumentInvalidType, 'Invalid type set'),  # noqa E501
     606: (DocumentPersonNotInNames, 'Given name not in names'),  # noqa E501
     607: (FieldInvalidEmail, 'Given email not a regular email address'),  # noqa E501
+    608: (FieldBeyondLimit, 'Given data to large'),  # noqa E501
+    609: (FieldIsMultiple, 'Value is not list, but set to multiple'),  # noqa E501
 
     700: (ConcealUnkownMode, 'Conceal doesn\'t support unkown format'),  # noqa E501
     701: (ConcealPositionError, 'Error when seeking in underlying file object'),  # noqa E501
@@ -160,6 +164,8 @@ class Error(IntEnum):
     DOCUMENT_INVALID_TYPE = 605
     DOCUMENT_PERSON_NAMES = 606
     FIELD_INVALID_EMAIL = 607
+    FIELD_BEYOND_LIMIT = 608
+    FIELD_IS_MULTIPLE = 609
 
     # 20 error codes for Conceal
     CONCEAL_UNKOWN_MODE = 700

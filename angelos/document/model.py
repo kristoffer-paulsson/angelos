@@ -2,7 +2,6 @@ import re
 import datetime
 import uuid
 import ipaddress
-import base64
 
 from ..utils import Util
 from ..error import Error
@@ -18,13 +17,23 @@ class Field:
     def validate(self, value):
         if self.required and not bool(value):
             raise Util.exception(Error.FIELD_NOT_SET)
-        if not self.multiple:
-            if isinstance(value, list):
+        if not self.multiple and isinstance(value, list):
                 raise Util.exception(Error.FIELD_NOT_MULTIPLE, {
                     'type': type(self),
                     'value': value,
                 })
+        if self.multiple and not isinstance(value, (list, type(None))):
+            raise Util.exception(Error.FIELD_IS_MULTIPLE, {
+                'type': type(self),
+                'value': value,
+            })
         return True
+
+    def str(self, v):
+        raise NotImplementedError()
+
+    def bytes(self, v):
+        raise NotImplementedError()
 
     def to_str(self, value):
         return str(value)
@@ -32,6 +41,18 @@ class Field:
     def to_bytes(self, value):
         # raise NotImplementedError('%s, %s, %s' % (type(self), type(value), value))  # noqa E501
         return bytes(value.encode('utf-8')) if value else b''
+
+
+def conv_dont(f, v):
+    return v
+
+
+def conv_str(f, v):
+    return f.str(v) if v else ''
+
+
+def conv_bytes(f, v):
+    return f.bytes(v) if v else b''
 
 
 class DocumentMeta(type):
@@ -77,39 +98,21 @@ class BaseDocument(metaclass=DocumentMeta):
         else:
             raise AttributeError('Unknown field "{0}"'.format(key))
 
-    def export(self):
+    def export(self, c=conv_dont):
         nd = {}
-        for name in self._fields.keys():
-            nd[name] = getattr(self, name)
-        return nd
-
-    def export_bytes(self):
-        nd = {}
-        for name in self._fields.keys():
-            attr = getattr(self, name)
-            if isinstance(attr, list):
+        for name, field in self._fields.items():
+            value = getattr(self, name)
+            if not field.multiple:
+                nd[name] = c(field, value) if not isinstance(
+                    value, BaseDocument) else value.export(c)
+            elif isinstance(value, type(None)):
+                nd[name] = []
+            else:
                 item_list = []
-                for item in attr:
-                    item_list.append(self._fields[name].to_bytes(item))
+                for item in value:
+                    item_list.append(c(field, item) if not isinstance(
+                        item, BaseDocument) else item.export(c))
                 nd[name] = item_list
-            else:
-                nd[name] = self._fields[name].to_bytes(attr)
-        return nd
-
-    def export_conf(self):
-        nd = {}
-        for name in self._fields.keys():
-            nd[name] = self._fields[name].to_str(getattr(self, name))
-        return nd
-
-    def export_str(self):
-        nd = {}
-        for name in self._fields.keys():
-            attr = self._fields[name].to_str(getattr(self, name))
-            if isinstance(attr, list):
-                nd[name] = ' '.join(attr)
-            else:
-                nd[name] = str(attr)
         return nd
 
     def _validate(self):
@@ -134,18 +137,13 @@ class DocumentField(Field):
             value = [value]
 
         for v in value:
-            if not (isinstance(v, (BaseDocument, type(None))) and isinstance(
-                    v, (self.type, type(None)))):
+            if isinstance(v, (BaseDocument, self.type)):
+                v._validate()
+            elif not isinstance(v, type(None)):
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': type(BaseDocument), 'current': type(v)})
 
-            # if not isinstance(v, (self.type, type(None))):
-            #    raise Util.exception(
-            #        Error.FIELD_INVALID_TYPE,
-            #        {'expected': type(self.type), 'current': type(v)})
-
-            v._validate()
         return True
 
     def to_str(self, value):
@@ -169,10 +167,10 @@ class UuidField(Field):
                     {'expected': 'uuid.UUID', 'current': type(v)})
         return True
 
-    def to_str(self, value):
+    def str(self, value):
         return str(value)
 
-    def to_bytes(self, value):
+    def bytes(self, value):
         return value.bytes
 
 
@@ -192,6 +190,17 @@ class IPField(Field):
                      'current': type(v)})
         return True
 
+    def str(self, value):
+        return str(value)
+
+    def bytes(self, value):
+        if isinstance(value, ipaddress.IPv4Address):
+            return int(value).to_bytes(4, byteorder='big')
+        if isinstance(value, ipaddress.IPv6Address):
+            return int(value).to_bytes(8, byteorder='big')
+        else:
+            raise TypeError()
+
 
 class DateField(Field):
     def validate(self, value):
@@ -207,8 +216,11 @@ class DateField(Field):
                     {'expected': 'datetime.date', 'current': type(v)})
         return True
 
-    def to_bytes(self, value):
-        return bytes(value.isoformat(), 'utf-8') if value else b''
+    def str(self, value):
+        return value.isoformat()
+
+    def bytes(self, value):
+        return bytes(value.isoformat(), 'utf-8')
 
 
 class StringField(Field):
@@ -225,8 +237,11 @@ class StringField(Field):
                     {'expected': 'str', 'current': type(v)})
         return True
 
-    def to_bytes(self, value):
-        return bytes(str(value).encode('utf-8')) if value else b''
+    def str(self, value):
+        return value
+
+    def bytes(self, value):
+        return value.encode('utf-8')
 
 
 class TypeField(Field):
@@ -243,8 +258,11 @@ class TypeField(Field):
                     {'expected': 'int', 'current': type(v)})
         return True
 
-    def to_bytes(self, value):
-        return bytes([int(value)]) if value else b''
+    def str(self, value):
+        return str(value)
+
+    def bytes(self, value):
+        return bytes([value])
 
 
 class BytesField(Field):
@@ -265,16 +283,16 @@ class BytesField(Field):
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'bytes', 'current': type(v)})
 
-            if len(v) > self.limit:
+            if not isinstance(v, type(None)) and len(v) > self.limit:
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
                     {'limit': self.limit, 'size': len(v)})
         return True
 
-    def to_str(self, value):
-        return base64.base64_encode(value) if value else ''
+    def str(self, value):
+        return str(value.decode('utf-8'))
 
-    def to_bytes(self, value):
+    def bytes(self, value):
         return value
 
 
@@ -282,6 +300,8 @@ class ChoiceField(Field):
     def __init__(self, value=None, required=True,
                  multiple=False, init=None, choices=[]):
         Field.__init__(self, value, required, multiple, init)
+        if not all(isinstance(n, str) for n in choices):
+            raise TypeError()
         self.choices = choices
 
     def validate(self, value):
@@ -291,14 +311,17 @@ class ChoiceField(Field):
             value = [value]
 
         for v in value:
-            if v not in self.choices:
+            if not isinstance(v, type(None)) and v not in self.choices:
                 raise Util.exception(
                     Error.FIELD_INVALID_CHOICE,
                     {'expected': self.choices, 'current': v})
         return True
 
-    def to_bytes(self, value):
-        return value.encode('utf-8') if value else b''
+    def str(self, value):
+        return value
+
+    def bytes(self, value):
+        return bytes(value, 'utf-8')
 
 
 class EmailField(Field):
@@ -321,8 +344,14 @@ class EmailField(Field):
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'str', 'current': type(v)})
 
-            if not bool(re.match(EmailField.EMAIL_REGEX, v)):
+            if not isinstance(v, type(None)) and not bool(
+                    re.match(EmailField.EMAIL_REGEX, v)):
                 raise Util.exception(
-                    Error.FIELD_INVALID_EMAIL,
-                    {'email': v})
+                    Error.FIELD_INVALID_EMAIL, {'email': v})
         return True
+
+    def str(self, value):
+        return value
+
+    def bytes(self, value):
+        return bytes(value, 'utf-8')

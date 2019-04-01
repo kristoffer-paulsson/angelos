@@ -31,17 +31,17 @@ class TestEntities(unittest.TestCase):
         Generating a Person Entity with keys using a GeneratePolicy.
         """
         data = support.random_person_entity_data(1)
-        try:
-            policy = PersonGeneratePolicy()
-            self.assertTrue(policy.generate(**data[0]))
-            self.assertTrue(policy.verify(
-                policy.entity, policy.entity, policy.keys))
-            self.assertTrue(policy.verify(
-                 policy.private, policy.entity, policy.keys))
-            self.assertTrue(policy.verify(
-                policy.keys, policy.entity, policy.keys))
-        except Exception as e:
-            self.fail(e)
+        # try:
+        policy = PersonGeneratePolicy()
+        self.assertTrue(policy.generate(**data[0]))
+        self.assertTrue(policy.verify(
+            policy.entity, policy.entity, policy.keys))
+        self.assertTrue(policy.verify(
+             policy.private, policy.entity, policy.keys))
+        self.assertTrue(policy.verify(
+            policy.keys, policy.entity, policy.keys))
+        # except Exception as e:
+        #    self.fail(e)
 
 
 if __name__ == '__main__':

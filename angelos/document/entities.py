@@ -1,4 +1,4 @@
-from .model import BaseDocument, TypeField, BytesField
+from .model import BaseDocument, TypeField, BytesField, StringField
 from .document import Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
@@ -22,6 +22,7 @@ class Keys(Document):
     type = TypeField(value=Document.Type.KEYS)
     verify = BytesField()
     public = BytesField()
+    signature = StringField(multiple=True)
 
     def _validate(self):
         self._check_type(Document.Type.KEYS)

@@ -5,7 +5,8 @@ import enum
 from ..utils import Util
 from ..error import Error
 from .model import (
-    DocumentMeta, BaseDocument, UuidField, DateField, StringField, TypeField)
+    DocumentMeta, BaseDocument, UuidField, DateField, StringField, TypeField,
+    conv_str, conv_bytes)
 
 
 class IssueMixin(metaclass=DocumentMeta):
@@ -25,7 +26,6 @@ class OwnerMixin(metaclass=DocumentMeta):
 
 class UpdatedMixin(metaclass=DocumentMeta):
     updated = DateField(required=False)
-    signature = StringField(multiple=True)
 
     def _validate(self):
         try:
@@ -58,6 +58,12 @@ class Document(IssueMixin, BaseDocument):
         except AttributeError:
             pass
         return True
+
+    def export_str(self):
+        return self.export(conv_str)
+
+    def export_bytes(self):
+        return self.export(conv_bytes)
 
     def _check_type(self, _type):
         if not self.type == _type:

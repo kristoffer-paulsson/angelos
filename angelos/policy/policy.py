@@ -39,10 +39,10 @@ class Policy:
                 'This document doesn\'t support multiple signatures')
 
         data = bytes(entity.id.bytes) + self._docdata(document, exclude)
-        signature = base64.standard_b64encode(
+        signature = str(base64.standard_b64encode(
             libnacl.sign.Signer(
                 pk.seed).signature(
-                    data)).decode('utf-8')
+                    data)))
 
         if multiple:
             document.signature.append(signature)
@@ -60,7 +60,7 @@ class Policy:
             raise RuntimeError(
                 'Document/Keys issuer or Entity id doesn\'t match')
 
-        data = bytes(entity.id.bytes) + self._docdata(document, exclude)
+        data = bytes(document.issuer.bytes) + self._docdata(document, exclude)
         verifier = libnacl.sign.Verifier(keys.verify)
 
         if isinstance(document.signature, list):
