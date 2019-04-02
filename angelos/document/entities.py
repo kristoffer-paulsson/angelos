@@ -1,12 +1,13 @@
-from .model import BaseDocument, TypeField, BytesField, StringField
+from .model import BaseDocument, TypeField, BinaryField, SignatureField
 from .document import Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class PrivateKeys(Document):
     type = TypeField(value=Document.Type.KEYS_PRIVATE)
-    secret = BytesField()
-    seed = BytesField()
+    secret = BinaryField()
+    seed = BinaryField()
+    signature = SignatureField()
 
     def _validate(self):
         self._check_type(Document.Type.KEYS_PRIVATE)
@@ -20,9 +21,9 @@ class PrivateKeys(Document):
 
 class Keys(Document):
     type = TypeField(value=Document.Type.KEYS)
-    verify = BytesField()
-    public = BytesField()
-    signature = StringField(multiple=True)
+    verify = BinaryField()
+    public = BinaryField()
+    signature = SignatureField(multiple=True)
 
     def _validate(self):
         self._check_type(Document.Type.KEYS)

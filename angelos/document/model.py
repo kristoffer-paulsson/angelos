@@ -2,6 +2,7 @@ import re
 import datetime
 import uuid
 import ipaddress
+import base64
 
 from ..utils import Util
 from ..error import Error
@@ -34,13 +35,6 @@ class Field:
 
     def bytes(self, v):
         raise NotImplementedError()
-
-    def to_str(self, value):
-        return str(value)
-
-    def to_bytes(self, value):
-        # raise NotImplementedError('%s, %s, %s' % (type(self), type(value), value))  # noqa E501
-        return bytes(value.encode('utf-8')) if value else b''
 
 
 def conv_dont(f, v):
@@ -241,7 +235,7 @@ class StringField(Field):
         return value
 
     def bytes(self, value):
-        return value.encode('utf-8')
+        return str(value).encode('utf-8')
 
 
 class TypeField(Field):
@@ -265,7 +259,7 @@ class TypeField(Field):
         return bytes([value])
 
 
-class BytesField(Field):
+class BinaryField(Field):
     def __init__(self, value=None, required=True,
                  multiple=False, init=None, limit=1024):
         Field.__init__(self, value, required, multiple, init)
@@ -290,10 +284,37 @@ class BytesField(Field):
         return True
 
     def str(self, value):
-        return str(value.decode('utf-8'))
+        return base64.standard_b64encode(value).decode('utf-8')
 
     def bytes(self, value):
         return value
+
+
+class SignatureField(BinaryField):
+    def __init__(self, value=None, required=True,
+                 multiple=False, init=None, limit=1024):
+        Field.__init__(self, value, required, multiple, init)
+        self.limit = limit
+        self.redo = False
+
+    def validate(self, value):
+        if not self.redo:
+            Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (bytes, type(None))):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'bytes', 'current': type(v)})
+
+            if not isinstance(v, type(None)) and len(v) > self.limit:
+                raise Util.exception(
+                    Error.FIELD_BEYOND_LIMIT,
+                    {'limit': self.limit, 'size': len(v)})
+        return True
 
 
 class ChoiceField(Field):

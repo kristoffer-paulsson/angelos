@@ -10,11 +10,11 @@ import base64
 import angelos.error as error
 from angelos.document.model import (
     BaseDocument, Field, TypeField, UuidField, IPField, DateField, StringField,
-    BytesField, ChoiceField, EmailField, DocumentField, conv_str, conv_bytes)
+    BinaryField, ChoiceField, EmailField, DocumentField, conv_str, conv_bytes)
 
 
 class DummySubDocument(BaseDocument):
-    bytes = BytesField()
+    bytes = BinaryField()
     string = StringField()
 
 
@@ -24,7 +24,7 @@ class DummyDocument(BaseDocument):
     ip = IPField()
     date = DateField()
     string = StringField()
-    bytes = BytesField()
+    bytes = BinaryField()
     choice = ChoiceField(choices=['yes', 'no'])
     email = EmailField()
     document = DocumentField(t=DummySubDocument)
@@ -50,8 +50,8 @@ class DummyStringField(BaseDocument):
     field = StringField(required=False)
 
 
-class DummyBytesField(BaseDocument):
-    field = BytesField(required=False, limit=15)
+class DummyBinaryField(BaseDocument):
+    field = BinaryField(required=False, limit=15)
 
 
 class DummyChoiceField(BaseDocument):
@@ -197,27 +197,27 @@ class TestModel(unittest.TestCase):
             nd={'field': 'Hello, world!'}).export(
                 conv_bytes)['field'], b'Hello, world!')
 
-    def test_bytesfield(self):
-        """Test of the BytesField class"""
-        self.assertTrue(DummyBytesField(
+    def test_BinaryField(self):
+        """Test of the BinaryField class"""
+        self.assertTrue(DummyBinaryField(
             nd={'field': b'Hello, world!'})._validate())
-        self.assertTrue(DummyBytesField(nd={})._validate())
+        self.assertTrue(DummyBinaryField(nd={})._validate())
         self.assertRaises(
-            error.FieldInvalidType, lambda: DummyBytesField(
+            error.FieldInvalidType, lambda: DummyBinaryField(
                 nd={'field': 'str'}))
         self.assertRaises(
-            error.FieldBeyondLimit, lambda: DummyBytesField(
+            error.FieldBeyondLimit, lambda: DummyBinaryField(
                 nd={'field': b'Hello, world! 123'}))
 
-        self.assertIsInstance(DummyBytesField(
+        self.assertIsInstance(DummyBinaryField(
             nd={'field':  b'Hello, world!'}).export(conv_str)['field'], str)
-        self.assertEqual(DummyBytesField(
+        self.assertEqual(DummyBinaryField(
             nd={'field': b'Hello, world!'}).export(
-                conv_str)['field'], 'Hello, world!')
+                conv_str)['field'], 'SGVsbG8sIHdvcmxkIQ==')
 
-        self.assertIsInstance(DummyBytesField(
+        self.assertIsInstance(DummyBinaryField(
             nd={'field': b'Hello, world!'}).export(conv_bytes)['field'], bytes)
-        self.assertEqual(DummyBytesField(
+        self.assertEqual(DummyBinaryField(
             nd={'field': b'Hello, world!'}).export(
                 conv_bytes)['field'], b'Hello, world!')
 
@@ -286,7 +286,7 @@ class TestModel(unittest.TestCase):
         d.ip = ipaddress.IPv4Address('127.0.0.1')
         d.date = datetime.date(1970, 1, 1)
         d.string = 'Hello, world!'
-        d.bytes = base64.standard_b64encode(b'1234567890')
+        d.bytes = b'1234567890'
         d.choice = 'no'
         d.email = 'john.doe@example.com'
         d.document = DummySubDocument(
@@ -302,7 +302,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(strobj['bytes'], 'MTIzNDU2Nzg5MA==')
         self.assertEqual(strobj['choice'], 'no')
         self.assertEqual(strobj['email'], 'john.doe@example.com')
-        self.assertEqual(strobj['document']['bytes'], 'Hello')
+        self.assertEqual(strobj['document']['bytes'], 'SGVsbG8=')
         self.assertEqual(strobj['document']['string'], 'world')
 
         bytesobj = d.export(conv_bytes)
@@ -311,7 +311,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(bytesobj['ip'], b'\x7f\x00\x00\x01')
         self.assertEqual(bytesobj['date'], b'1970-01-01')
         self.assertEqual(bytesobj['string'], b'Hello, world!')
-        self.assertEqual(bytesobj['bytes'], b'MTIzNDU2Nzg5MA==')
+        self.assertEqual(bytesobj['bytes'], b'1234567890')
         self.assertEqual(bytesobj['choice'], b'no')
         self.assertEqual(bytesobj['email'], b'john.doe@example.com')
         self.assertEqual(bytesobj['document']['bytes'], b'Hello')

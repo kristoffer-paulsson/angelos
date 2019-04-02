@@ -5,12 +5,12 @@ import enum
 from ..utils import Util
 from ..error import Error
 from .model import (
-    DocumentMeta, BaseDocument, UuidField, DateField, StringField, TypeField,
-    conv_str, conv_bytes)
+    DocumentMeta, BaseDocument, UuidField, DateField, TypeField,
+    SignatureField, conv_str, conv_bytes)
 
 
 class IssueMixin(metaclass=DocumentMeta):
-    signature = StringField()
+    signature = SignatureField()
     issuer = UuidField()
 
     def _validate(self):

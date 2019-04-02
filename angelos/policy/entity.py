@@ -1,8 +1,10 @@
-import base64
+import datetime
 
 import libnacl.dual
 
+from ..utils import Util
 from .policy import Policy
+from .crypto import Crypto
 from ..document.entities import PrivateKeys, Keys, Person, Ministry, Church
 
 
@@ -17,31 +19,29 @@ class BaseGeneratePolicy(Policy):
         fields = set(self.ENTITY[0]._fields.keys())
         args = set(kwargs.keys())
 
-        if len(args - fields): raise IndexError()  # noqa E701
+        if len(args - fields):
+            raise IndexError()
 
         entity = self.ENTITY[0](nd=kwargs)
         entity.issuer = entity.id
-        entity.signature = base64.standard_b64encode(
-            self.box.signature(
-                bytes(entity.issuer.bytes) + self._docdata(entity))).decode()
+        entity.signature = self.box.signature(
+            bytes(entity.issuer.bytes) + Crypto._docdata(entity))
 
         private = PrivateKeys(nd={
             'issuer': entity.id,
-            'secret': self.box.hex_sk(),
-            'seed': self.box.hex_seed()
+            'secret': self.box.sk,
+            'seed': self.box.seed
         })
-        private.signature = base64.standard_b64encode(
-            self.box.signature(
-                bytes(private.issuer.bytes) + self._docdata(private))).decode()
+        private.signature = self.box.signature(
+            bytes(private.issuer.bytes) + Crypto._docdata(private))
 
         keys = Keys(nd={
             'issuer': entity.id,
-            'public': self.box.hex_pk(),
-            'verify': self.box.hex_vk()
+            'public': self.box.pk,
+            'verify': self.box.vk
         })
-        keys.signature = [base64.standard_b64encode(
-            self.box.signature(
-                bytes(keys.issuer.bytes) + self._docdata(keys))).decode()]
+        keys.signature = [self.box.signature(
+                bytes(keys.issuer.bytes) + Crypto._docdata(keys))]
 
         entity._validate()
         private._validate()
@@ -66,22 +66,85 @@ class ChurchGeneratePolicy(BaseGeneratePolicy):
     ENTITY = (Church, )
 
 
-class PersonUpdatePolicy(Policy):
-    def update(self):
-        pass
+class BaseUpdatePolicy(Policy):
+    def __init__(self):
+        self.box = None
+        self.entity = None
+        self.private = None
+        self.keys = None
 
-    def change(self):
-        pass
+    def update(self, entity, pk, keys):
+        """Renew the identity document expirey date"""
+        Util.is_type(entity, self.ENTITY[0])
 
-    def keys(self):
-        pass
+        today = datetime.date.today()
+        entity.updated = today
+        entity.expires = today + datetime.timedelta(13*365/12)
+        entity._fields['signature'].redo = True
+        entity.signature = None
+
+        entity = Crypto.sign(entity, entity, pk, keys)
+        entity._validate()
+        self.entity = entity
+
+        return True
+
+    def change(self, entity, **kwargs):
+        """
+        Change information on the identity.
+        Don't forget to update the change.
+        """
+        Util.is_type(entity, self.ENTITY[0])
+
+        fields = set(self.ENTITY[1])
+        args = set(kwargs.keys())
+
+        if len(args - fields):
+            raise IndexError()
+
+        for name, field in kwargs.items():
+            setattr(entity, name, field)
+
+        return entity
+
+    def newkeys(self, entity, pk, keys):
+        """Issue a new pair of keys"""
+        Util.is_type(entity, self.ENTITY[0])
+        self.box = libnacl.dual.DualSecret()
+
+        private = PrivateKeys(nd={
+            'issuer': entity.id,
+            'secret': self.box.sk,
+            'seed': self.box.seed
+        })
+        new_pk = Crypto.sign(private, entity, pk, keys)
+
+        new_keys = Keys(nd={
+            'issuer': entity.id,
+            'public': self.box.pk,
+            'verify': self.box.vk
+        })
+        new_keys = Crypto.sign(
+            new_keys, entity, pk, keys, multiple=True)
+        new_keys = Crypto.sign(
+            new_keys, entity, new_pk, new_keys, multiple=True)
+
+        new_pk._validate()
+        new_keys._validate()
+
+        self.private = new_pk
+        self.keys = new_keys
+
+        return True
 
 
-class MinistryUpdatePolicy(Policy):
-    def update(self):
-        pass
+class PersonUpdatePolicy(BaseUpdatePolicy):
+    ENTITY = (Person, ['family_name'])
 
 
-class ChuchUpdatePolicy(Policy):
-    def update(self):
-        pass
+class MinistryUpdatePolicy(BaseUpdatePolicy):
+    ENTITY = (Person, ['vision', 'ministry'])
+
+
+class ChuchUpdatePolicy(BaseUpdatePolicy):
+    ENTITY = (Person, ['state', 'nation'])
