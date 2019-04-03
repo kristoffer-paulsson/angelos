@@ -101,7 +101,7 @@ class Document(IssueMixin, BaseDocument):
         COM_ENVELOPE = 60
 
         COM_NOTE = 70
-        COMT_INSTANT = 71
+        COM_INSTANT = 71
         COM_MAIL = 72
         COM_SHARE = 73
         COM_REPORT = 74

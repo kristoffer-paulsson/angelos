@@ -1,4 +1,5 @@
 import datetime
+import copy
 
 import libnacl.dual
 
@@ -78,6 +79,7 @@ class BaseUpdatePolicy(Policy):
         Util.is_type(entity, self.ENTITY[0])
 
         today = datetime.date.today()
+        # entity = copy.deepcopy(entity)
         entity.updated = today
         entity.expires = today + datetime.timedelta(13*365/12)
         entity._fields['signature'].redo = True
@@ -146,5 +148,5 @@ class MinistryUpdatePolicy(BaseUpdatePolicy):
     ENTITY = (Person, ['vision', 'ministry'])
 
 
-class ChuchUpdatePolicy(BaseUpdatePolicy):
+class ChurchUpdatePolicy(BaseUpdatePolicy):
     ENTITY = (Person, ['state', 'nation'])

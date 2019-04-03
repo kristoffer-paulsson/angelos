@@ -1,13 +1,13 @@
 from .model import (
-    BaseDocument, StringField, DateField, BytesField, DocumentField, UuidField,
-    TypeField)
+    BaseDocument, StringField, DateField, BinaryField, DocumentField,
+    UuidField, TypeField)
 from .document import Document, OwnerMixin, IssueMixin
 
 
 class Attachment(BaseDocument):
     name = StringField()
     mime = StringField()
-    data = BytesField()
+    data = BinaryField()
 
 
 class Message(Document, OwnerMixin):
@@ -17,7 +17,7 @@ class Message(Document, OwnerMixin):
 
 
 class Note(Message):
-    type = TypeField(Document.Type.COM_NOTE)
+    type = TypeField(value=Document.Type.COM_NOTE)
 
     def _validate(self):
         self._check_type(Document.Type.COM_NOTE)
@@ -31,8 +31,8 @@ class Note(Message):
 
 
 class Instant(Message):
-    type = TypeField(Document.Type.COM_INSTANT)
-    body = BytesField()
+    type = TypeField(value=Document.Type.COM_INSTANT)
+    body = BinaryField()
     mime = StringField()
 
     def _validate(self):
@@ -47,7 +47,7 @@ class Instant(Message):
 
 
 class Mail(Message):
-    type = TypeField(Document.Type.COM_MAIL)
+    type = TypeField(value=Document.Type.COM_MAIL)
     subject = StringField(required=False)
     attachment = DocumentField(required=False, t=Attachment, multiple=True)
 
@@ -63,7 +63,7 @@ class Mail(Message):
 
 
 class Share(Mail):
-    type = TypeField(Document.Type.COM_SHARE)
+    type = TypeField(value=Document.Type.COM_SHARE)
 
     def _validate(self):
         self._check_type(Document.Type.COM_SHARE)
@@ -77,7 +77,7 @@ class Share(Mail):
 
 
 class Report(Mail):
-    type = TypeField(Document.Type.COM_REPORT)
+    type = TypeField(value=Document.Type.COM_REPORT)
 
     def _validate(self):
         self._check_type(Document.Type.COM_REPORT)

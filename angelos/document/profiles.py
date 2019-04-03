@@ -1,5 +1,5 @@
 from .model import (
-    BaseDocument, StringField, DateField, ChoiceField, EmailField, BytesField,
+    BaseDocument, StringField, DateField, ChoiceField, EmailField, BinaryField,
     DocumentField, TypeField)
 from .document import Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
@@ -22,7 +22,7 @@ class Social(BaseDocument):
 
 
 class Profile(Document, UpdatedMixin):
-    picture = BytesField(required=False, limit=65536)
+    picture = BinaryField(required=False, limit=65536)
     email = EmailField(required=False)
     mobile = StringField(required=False)
     phone = StringField(required=False)
