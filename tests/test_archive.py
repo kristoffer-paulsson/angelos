@@ -7,6 +7,7 @@ import os
 import random
 import uuid
 import string
+import logging
 
 import libnacl.secret
 
@@ -23,6 +24,7 @@ class TestConceal(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
         cls.secret = libnacl.secret.SecretBox().sk
         cls.dir = tempfile.TemporaryDirectory()
         cls.filename = os.path.join(cls.dir.name, 'test.ar7.cnl')
@@ -45,24 +47,32 @@ class TestConceal(unittest.TestCase):
 
     def test_01_setup(self):
         """Creating new empty archive"""
+        logging.info('====== %s ======' % 'test_01_setup')
+
         with Archive7.setup(self.filename, self.secret, owner=self.owner):
             pass
         self.assertEqual(512*33, filesize(self.filename), 'Wrong filesize.')
 
     def test_02_mkdir(self):
         """Open archive and write directory tree."""
+        logging.info('====== %s ======' % 'test_02_mkdir')
+
         with Archive7.open(self.filename, self.secret) as arch:
             for dir in LIPSUM_PATH:
                 arch.mkdir(dir)
 
     def test_03_glob(self):
         """Open archive and glob directory tree"""
+        logging.info('====== %s ======' % 'test_03_glob')
+
         with Archive7.open(self.filename, self.secret) as arch:
             tree = arch.glob()
             self.assertListEqual(LIPSUM_PATH, tree, 'Corrupted file tree.')
 
     def test_04_mkfile(self):
         """Open archive and write random files"""
+        logging.info('====== %s ======' % 'test_04_mkfile')
+
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 files = []
@@ -83,6 +93,7 @@ class TestConceal(unittest.TestCase):
 
     def test_05_load(self):
         """Open archive and load files"""
+        logging.info('====== %s ======' % 'test_05_load')
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 for i in arch.glob():
@@ -93,6 +104,8 @@ class TestConceal(unittest.TestCase):
 
     def test_06_save(self):
         """Open archive and update some files"""
+        logging.info('====== %s ======' % 'test_06_save')
+
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 for i in TestConceal.files1:
@@ -104,6 +117,8 @@ class TestConceal(unittest.TestCase):
 
     def test_07_remove(self):
         """Open archive and delete some files"""
+        logging.info('====== %s ======' % 'test_07_remove')
+
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 for i in TestConceal.files2:
@@ -113,6 +128,8 @@ class TestConceal(unittest.TestCase):
 
     def test_08_rename(self):
         """Open archive and delete some files"""
+        logging.info('====== %s ======' % 'test_08_rename')
+
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 for i in TestConceal.files3:
@@ -122,6 +139,8 @@ class TestConceal(unittest.TestCase):
 
     def test_09_move(self):
         """Open archive and delete some files"""
+        logging.info('====== %s ======' % 'test_09_move')
+
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 for i in TestConceal.files4:
@@ -131,6 +150,8 @@ class TestConceal(unittest.TestCase):
 
     def test_10_load2(self):
         """Open archive and load files"""
+        logging.info('====== %s ======' % 'test_10_load2')
+
         try:
             with Archive7.open(self.filename, self.secret) as arch:
                 for i in arch.glob():

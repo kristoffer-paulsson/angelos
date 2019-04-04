@@ -5,7 +5,7 @@ import unittest
 import uuid
 import ipaddress
 import datetime
-import base64
+import logging
 
 import angelos.error as error
 from angelos.document.model import (
@@ -69,20 +69,11 @@ class DummyDocumentField(BaseDocument):
 class TestModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        pass
-
-    @classmethod
-    def tearDownClass(cls):
-        pass
-
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
     def test_field(self):
         """Isolated test of the Field class"""
+        logging.info('====== %s ======' % 'test_field')
         # Test required with no value
         f = Field()
         self.assertRaises(error.FieldRequiredNotSet, f.validate, f.value)
@@ -98,6 +89,8 @@ class TestModel(unittest.TestCase):
 
     def test_typefield(self):
         """Test of the TypeField class"""
+        logging.info('====== %s ======' % 'test_typefield')
+
         self.assertTrue(DummyTypeField(nd={'field': 1})._validate())
         self.assertTrue(DummyTypeField(nd={})._validate())
         self.assertRaises(
@@ -118,6 +111,8 @@ class TestModel(unittest.TestCase):
 
     def test_uuidfield(self):
         """Test of the UuidField class"""
+        logging.info('====== %s ======' % 'test_uuidfield')
+
         self.assertTrue(DummyUuidField(nd={'field': uuid.uuid4()})._validate())
         self.assertTrue(DummyUuidField(nd={})._validate())
         self.assertRaises(
@@ -134,6 +129,8 @@ class TestModel(unittest.TestCase):
 
     def test_ipfield(self):
         """Test of the IPField class"""
+        logging.info('====== %s ======' % 'test_ipfield')
+
         self.assertTrue(DummyIPField(
             nd={'field': ipaddress.IPv4Address('127.0.0.1')})._validate())
         self.assertTrue(DummyIPField(nd={})._validate())
@@ -159,6 +156,8 @@ class TestModel(unittest.TestCase):
 
     def test_datefield(self):
         """Test of the DateField class"""
+        logging.info('====== %s ======' % 'test_datefield')
+
         self.assertTrue(DummyDateField(
             nd={'field': datetime.date.today()})._validate())
         self.assertTrue(DummyDateField(nd={})._validate())
@@ -178,6 +177,8 @@ class TestModel(unittest.TestCase):
 
     def test_stringfield(self):
         """Test of the StringField class"""
+        logging.info('====== %s ======' % 'test_stringfield')
+
         self.assertTrue(DummyStringField(
             nd={'field': 'Hello, world!'})._validate())
         self.assertTrue(DummyStringField(nd={})._validate())
@@ -197,8 +198,10 @@ class TestModel(unittest.TestCase):
             nd={'field': 'Hello, world!'}).export(
                 conv_bytes)['field'], b'Hello, world!')
 
-    def test_BinaryField(self):
+    def test_binaryfield(self):
         """Test of the BinaryField class"""
+        logging.info('====== %s ======' % 'test_binaryfield')
+
         self.assertTrue(DummyBinaryField(
             nd={'field': b'Hello, world!'})._validate())
         self.assertTrue(DummyBinaryField(nd={})._validate())
@@ -223,6 +226,8 @@ class TestModel(unittest.TestCase):
 
     def test_choicefield(self):
         """Test of the ChoiceField class"""
+        logging.info('====== %s ======' % 'test_choicefield')
+
         self.assertTrue(DummyChoiceField(nd={'field': 'yes'})._validate())
         self.assertTrue(DummyChoiceField(nd={})._validate())
         self.assertRaises(
@@ -246,6 +251,8 @@ class TestModel(unittest.TestCase):
 
     def test_emailfield(self):
         """Test of the EmailField class"""
+        logging.info('====== %s ======' % 'test_emailfield')
+
         self.assertTrue(DummyEmailField(
             nd={'field': 'john.doe@example.com'})._validate())
         self.assertTrue(DummyEmailField(nd={})._validate())
@@ -272,6 +279,8 @@ class TestModel(unittest.TestCase):
 
     def test_documentfield(self):
         """Test of the DocumentField class"""
+        logging.info('====== %s ======' % 'test_documentfield')
+
         self.assertTrue(DummyDocumentField(
             nd={'field': DummySubDocument(
                 nd={'bytes': b'Hello', 'string': 'world'})})._validate())

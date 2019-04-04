@@ -6,9 +6,10 @@ import base64
 import datetime
 import uuid
 import ipaddress
+import logging
 
 import support
-from angelos.document.entities import Person
+from angelos.document.entities import Person, Keys, PrivateKeys
 from angelos.document.document import Document, IssueMixin
 from angelos.policy.crypto import Crypto
 from angelos.policy.entity import PersonGeneratePolicy, PersonUpdatePolicy
@@ -37,30 +38,35 @@ class DummyDocument(Document, IssueMixin):
 
 
 class TestEntities(unittest.TestCase):
-    def setUp(self):
-        pass
+    @classmethod
+    def setUpClass(cls):
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    def tearDown(self):
-        pass
-
-    def test_create_person(self):
+    def test_01_create_person(self):
         """
         Populating a Person Entity document class with random 'valid' data.
         """
+        logging.info('====== %s ======' % 'test_create_person')
+
         data = support.random_person_entity_data(1)
         try:
             self.assertIsInstance(Person(nd=data[0]), Person)
         except Exception as e:
             self.fail(e)
 
-    def test_person_generate_policy(self):
+    def test_02_person_generate_policy(self):
         """
         Generating a Person Entity with keys using a GeneratePolicy.
         """
+        logging.info('====== %s ======' % 'test_person_generate_policy')
+
         data = support.random_person_entity_data(1)
         try:
             policy = PersonGeneratePolicy()
             self.assertTrue(policy.generate(**data[0]))
+            self.assertIsInstance(policy.entity, Person)
+            self.assertIsInstance(policy.keys, Keys)
+            self.assertIsInstance(policy.private, PrivateKeys)
             self.assertTrue(Crypto.verify(
                 policy.entity, policy.entity, policy.keys))
             self.assertTrue(Crypto.verify(
@@ -70,7 +76,9 @@ class TestEntities(unittest.TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_sign_verify(self):
+    def test_03_sign_verify(self):
+        logging.info('====== %s ======' % 'test_sign_verify')
+
         try:
             data = support.random_person_entity_data(1)
             policy = PersonGeneratePolicy()
@@ -95,10 +103,12 @@ class TestEntities(unittest.TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_person_change(self):
+    def test_04_person_change(self):
         """
         Update a Person using a UpdatePolicy.
         """
+        logging.info('====== %s ======' % 'test_person_change')
+
         data = support.random_person_entity_data(1)
         try:
             gpolicy = PersonGeneratePolicy()
@@ -114,10 +124,12 @@ class TestEntities(unittest.TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_person_update(self):
+    def test_05_person_update(self):
         """
         Update a Person using a UpdatePolicy.
         """
+        logging.info('====== %s ======' % 'test_person_update')
+
         data = support.random_person_entity_data(1)
         try:
             gpolicy = PersonGeneratePolicy()
@@ -132,10 +144,12 @@ class TestEntities(unittest.TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_person_newkeys(self):
+    def test_06_person_newkeys(self):
         """
         Update a Person using a UpdatePolicy.
         """
+        logging.info('====== %s ======' % 'test_person_newkeys')
+
         data = support.random_person_entity_data(1)
         try:
             gpolicy = PersonGeneratePolicy()
@@ -156,10 +170,12 @@ class TestEntities(unittest.TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_person_change_updatenewkeys(self):
+    def test_07_person_change_updatenewkeys(self):
         """
         Update a Person using a UpdatePolicy.
         """
+        logging.info('====== %s ======' % 'test_person_change_updatenewkeys')
+
         data = support.random_person_entity_data(1)
         try:
             gpolicy = PersonGeneratePolicy()

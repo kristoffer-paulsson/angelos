@@ -20,8 +20,8 @@ class TestConceal(unittest.TestCase):
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
     def setUp(self):
-        self.secret = libnacl.secret.SecretBox().sk
         self.dir = tempfile.TemporaryDirectory()
+        self.home = self.dir.name
         self.filename = os.path.join(self.dir.name, 'test.cnl')
 
     def tearDown(self):

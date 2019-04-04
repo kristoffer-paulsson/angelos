@@ -3,6 +3,7 @@ import datetime
 import uuid
 import ipaddress
 import base64
+import logging
 
 from ..utils import Util
 from ..error import Error
@@ -17,13 +18,17 @@ class Field:
 
     def validate(self, value):
         if self.required and not bool(value):
+            logging.debug('Field with "required" not set. (%s)' % value)
             raise Util.exception(Error.FIELD_NOT_SET)
+
         if not self.multiple and isinstance(value, list):
-                raise Util.exception(Error.FIELD_NOT_MULTIPLE, {
-                    'type': type(self),
-                    'value': value,
-                })
+            logging.debug('Field not "multiple" but list. (%s)' % value)
+            raise Util.exception(Error.FIELD_NOT_MULTIPLE, {
+                'type': type(self),
+                'value': value,
+            })
         if self.multiple and not isinstance(value, (list, type(None))):
+            logging.debug('Field "multiple" but not list. (%s)' % value)
             raise Util.exception(Error.FIELD_IS_MULTIPLE, {
                 'type': type(self),
                 'value': value,
@@ -88,14 +93,18 @@ class BaseDocument(metaclass=DocumentMeta):
                 object.__setattr__(self, key, value)
             else:
                 raise AttributeError(
-                    'Invalid value "{0}" for field "{1}"'.format(value, key))
+                    'Invalid value "%s" for field "%s"'.format(value, key))
         else:
-            raise AttributeError('Unknown field "{0}"'.format(key))
+            raise AttributeError('Unknown field "%s"'.format(key))
 
     def export(self, c=conv_dont):
         nd = {}
+        logging.debug('Exporting document %s' % type(self))
+
         for name, field in self._fields.items():
             value = getattr(self, name)
+            logging.debug('%s, %s, %s' % (type(field), name, value))
+
             if not field.multiple:
                 nd[name] = c(field, value) if not isinstance(
                     value, BaseDocument) else value.export(c)
@@ -134,6 +143,7 @@ class DocumentField(Field):
             if isinstance(v, (BaseDocument, self.type)):
                 v._validate()
             elif not isinstance(v, type(None)):
+                logging.debug('Field is not BaseDocument but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': type(BaseDocument), 'current': type(v)})
@@ -156,6 +166,7 @@ class UuidField(Field):
 
         for v in value:
             if not isinstance(v, (uuid.UUID, type(None))):
+                logging.debug('Field is not UUID but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'uuid.UUID', 'current': type(v)})
@@ -178,6 +189,7 @@ class IPField(Field):
         for v in value:
             if not isinstance(v, (
                     ipaddress.IPv4Address, ipaddress.IPv6Address, type(None))):
+                logging.debug('Field is not IPaddress but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'ipaddress.IPv[4|6]Address',
@@ -205,6 +217,7 @@ class DateField(Field):
 
         for v in value:
             if not isinstance(v, (datetime.date, type(None))):
+                logging.debug('Field is not datetime.date but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'datetime.date', 'current': type(v)})
@@ -226,6 +239,7 @@ class StringField(Field):
 
         for v in value:
             if not isinstance(v, (str, bytes, type(None))):
+                logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'str', 'current': type(v)})
@@ -247,6 +261,7 @@ class TypeField(Field):
 
         for v in value:
             if not isinstance(v, (int, type(None))):
+                logging.debug('Field is not "int" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'int', 'current': type(v)})
@@ -273,11 +288,14 @@ class BinaryField(Field):
 
         for v in value:
             if not isinstance(v, (bytes, type(None))):
+                logging.debug('Field is not "bytes" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'bytes', 'current': type(v)})
 
             if not isinstance(v, type(None)) and len(v) > self.limit:
+                logging.debug('Field beyond limit %s but %s' % (
+                    self.limit, len(v)))
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
                     {'limit': self.limit, 'size': len(v)})
@@ -306,11 +324,14 @@ class SignatureField(BinaryField):
 
         for v in value:
             if not isinstance(v, (bytes, type(None))):
+                logging.debug('Field is not "bytes" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'bytes', 'current': type(v)})
 
             if not isinstance(v, type(None)) and len(v) > self.limit:
+                logging.debug('Field beyond limit %s but %s' % (
+                    self.size, len(v)))
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
                     {'limit': self.limit, 'size': len(v)})
@@ -333,6 +354,7 @@ class ChoiceField(Field):
 
         for v in value:
             if not isinstance(v, type(None)) and v not in self.choices:
+                logging.debug('Field is not valid choice but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_CHOICE,
                     {'expected': self.choices, 'current': v})
@@ -361,12 +383,14 @@ class EmailField(Field):
 
         for v in value:
             if not isinstance(v, (str, type(None))):
+                logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'str', 'current': type(v)})
 
             if not isinstance(v, type(None)) and not bool(
                     re.match(EmailField.EMAIL_REGEX, v)):
+                logging.debug('Field is not valid email but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_EMAIL, {'email': v})
         return True

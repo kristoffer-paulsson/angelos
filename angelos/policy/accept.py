@@ -20,7 +20,7 @@ class ImportPolicy:
         Util.is_type(keys, Keys)
 
         self.__entity = entity
-        self.__keys = entity
+        self.__keys = keys
         self._exception = None
 
     def document(self, document):
@@ -100,7 +100,7 @@ class ImportUpdatePolicy(Policy):
         Util.is_type(keys, Keys)
 
         self.__entity = entity
-        self.__keys = entity
+        self.__keys = keys
         self._exception = None
 
     def keys(self, newkeys):
@@ -131,19 +131,21 @@ class ImportUpdatePolicy(Policy):
             valid = False
 
         diff = []
-        for item in entity:
-            if entity[item] != self.__entity[item]:
+        new_exp = entity.export()
+        old_exp = self.__entity.export()
+
+        for item in new_exp.keys():
+            if new_exp[item] != old_exp[item]:
                 diff.append(item)
-        if len(set(diff) - set(fields + ['signature'])):
+
+        if len(set(diff) - set(fields + ['signature', 'updated'])):
             valid = False
+
         return valid
 
     def person(self, entity):
         Util.is_type(entity, type(self.__entity))
         Util.is_type(entity, Person)
-
-        print(entity.export())
-        print(self.__entity.export())
 
         self._exception = None
         try:
