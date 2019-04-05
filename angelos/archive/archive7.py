@@ -29,7 +29,7 @@ class Header(collections.namedtuple('Header', field_names=[
     'use',          # 1
     'id',           # 16
     'owner',        # 16
-    'network',      # 16
+    'domain',       # 16
     'node',         # 16
     'created',      # 8
     'title',        # 128
@@ -52,12 +52,12 @@ class Header(collections.namedtuple('Header', field_names=[
     FORMAT = '!8sHHbbb16s16s16s16sQ128sL805x'
 
     @staticmethod
-    def header(owner, id=None, node=None, network=None, title=None, _type=None,
+    def header(owner, id=None, node=None, domain=None, title=None, _type=None,
                role=None, use=None, major=1, minor=0, entries=8):
         Util.is_type(owner, uuid.UUID)
         Util.is_type(id, (uuid.UUID, type(None)))
         Util.is_type(node, (uuid.UUID, type(None)))
-        Util.is_type(network, (uuid.UUID, type(None)))
+        Util.is_type(domain, (uuid.UUID, type(None)))
         Util.is_type(title, (bytes, bytearray, type(None)))
         Util.is_type(_type, (int, type(None)))
         Util.is_type(role, (int, type(None)))
@@ -77,7 +77,7 @@ class Header(collections.namedtuple('Header', field_names=[
             use=use,
             id=id,
             owner=owner,
-            network=network,
+            domain=domain,
             node=node,
             created=datetime.datetime.now(),
             title=title,
@@ -100,8 +100,8 @@ class Header(collections.namedtuple('Header', field_names=[
                 self.id, uuid.UUID) else uuid.uuid4().bytes,
             self.owner.bytes if isinstance(
                 self.owner, uuid.UUID) else b'\x00'*16,
-            self.network.bytes if isinstance(
-                self.network, uuid.UUID) else b'\x00'*16,
+            self.domain.bytes if isinstance(
+                self.domain, uuid.UUID) else b'\x00'*16,
             self.node.bytes if isinstance(
                 self.node, uuid.UUID) else b'\x00'*16,
             int(time.mktime(self.created.timetuple(
@@ -129,7 +129,7 @@ class Header(collections.namedtuple('Header', field_names=[
             use=t[5],
             id=uuid.UUID(bytes=t[6]),
             owner=uuid.UUID(bytes=t[7]),
-            network=uuid.UUID(bytes=t[8]),
+            domain=uuid.UUID(bytes=t[8]),
             node=uuid.UUID(bytes=t[9]),
             created=datetime.datetime.fromtimestamp(t[10]),
             title=t[11].strip(b'\x00'),
@@ -389,7 +389,7 @@ class Archive7(ContainerAware):
 
     @staticmethod
     def setup(filename, secret, owner=None, node=None, title=None,
-              network=None, _type=None, role=None, use=None):
+              domain=None, _type=None, role=None, use=None):
         Util.is_type(filename, (str, bytes))
         Util.is_type(secret, (str, bytes))
 
@@ -399,7 +399,7 @@ class Archive7(ContainerAware):
 
         header = Header.header(
             owner=owner, node=node, title=title,
-            network=network, _type=_type, role=role, use=use)
+            domain=domain, _type=_type, role=role, use=use)
 
         fileobj.write(header.serialize())
         for i in range(header.entries):

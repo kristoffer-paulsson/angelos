@@ -31,7 +31,7 @@ class ImportPolicy:
         try:
             if datetime.date.today() > document.expires:
                 valid = False
-            valid = False if not document._validate() else valid
+            valid = False if not document.validate() else valid
             valid = False if not Crypto.verify(
                 document, self.__entity, self.__keys) else valid
         except Exception as e:
@@ -47,7 +47,7 @@ class ImportPolicy:
         try:
             if datetime.date.today() > envelope.expires:
                 valid = False
-            valid = False if not envelope._validate() else valid
+            valid = False if not envelope.validate() else valid
             valid = False if not Crypto.verify(
                 envelope, self.__entity, self.__keys, exclude=['header']
                 ) else valid
@@ -62,11 +62,11 @@ class ImportEntityPolicy(Policy):
     def __init__(self):
         self.__exception = None
 
-    def _validate(self, entity, keys):
+    def __validate(self, entity, keys):
         valid = True
         try:
-            valid = False if not entity._validate() else valid
-            valid = False if not keys._validate() else valid
+            valid = False if not entity.validate() else valid
+            valid = False if not keys.validate() else valid
             if datetime.date.today() > entity.expires:
                 valid = False
         except Exception as e:
@@ -81,17 +81,17 @@ class ImportEntityPolicy(Policy):
     def person(self, entity, keys):
         Util.is_type(entity, Person)
         Util.is_type(keys, Keys)
-        return self._validate(entity, keys)
+        return self.__validate(entity, keys)
 
     def ministry(self, entity, keys):
         Util.is_type(entity, Ministry)
         Util.is_type(keys, Keys)
-        return self._validate(entity, keys)
+        return self.__validate(entity, keys)
 
     def church(self, entity, keys):
         Util.is_type(entity, Church)
         Util.is_type(keys, Keys)
-        return self._validate(entity, keys)
+        return self.__validate(entity, keys)
 
 
 class ImportUpdatePolicy(Policy):
@@ -108,7 +108,7 @@ class ImportUpdatePolicy(Policy):
         self._exception = None
         valid = True
         try:
-            valid = False if not newkeys._validate() else valid
+            valid = False if not newkeys.validate() else valid
             if datetime.date.today() > newkeys.expires:
                 valid = False
         except Exception as e:
@@ -124,7 +124,7 @@ class ImportUpdatePolicy(Policy):
 
     def __dict_cmp(self, entity, fields):
         valid = True
-        valid = False if not entity._validate() else valid
+        valid = False if not entity.validate() else valid
         valid = False if not Crypto.verify(
             entity, self.__entity, self.__keys) else valid
         if datetime.date.today() > entity.expires:

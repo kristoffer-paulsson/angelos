@@ -43,9 +43,9 @@ class BaseGeneratePolicy(Policy):
         keys.signature = [self.box.signature(
                 bytes(keys.issuer.bytes) + Crypto._docdata(keys))]
 
-        entity._validate()
-        private._validate()
-        keys._validate()
+        entity.validate()
+        private.validate()
+        keys.validate()
 
         self.entity = entity
         self.private = private
@@ -85,7 +85,7 @@ class BaseUpdatePolicy(Policy):
         entity.signature = None
 
         entity = Crypto.sign(entity, entity, pk, keys)
-        entity._validate()
+        entity.validate()
         self.entity = entity
 
         return True
@@ -130,8 +130,8 @@ class BaseUpdatePolicy(Policy):
         new_keys = Crypto.sign(
             new_keys, entity, new_pk, new_keys, multiple=True)
 
-        new_pk._validate()
-        new_keys._validate()
+        new_pk.validate()
+        new_keys.validate()
 
         self.private = new_pk
         self.keys = new_keys
