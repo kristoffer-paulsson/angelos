@@ -398,7 +398,7 @@ class Archive7(ContainerAware):
         fileobj = ConcealIO(filename, 'rb+', secret=secret)
 
         header = Header.header(
-            owner=owner, node=node, title=title,
+            owner=owner, node=node, title=str(title).encode(),
             domain=domain, _type=_type, role=role, use=use)
 
         fileobj.write(header.serialize())

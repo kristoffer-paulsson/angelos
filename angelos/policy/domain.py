@@ -12,9 +12,9 @@ from ..document.domain import Domain, Node
 
 class NodePolicy(Policy):
     def __init__(self, entity, pk, keys):
-        Util.is_set(entity, Entity)
-        Util.is_set(pk, PrivateKeys)
-        Util.is_set(keys, Keys)
+        Util.is_type(entity, Entity)
+        Util.is_type(pk, PrivateKeys)
+        Util.is_type(keys, Keys)
 
         self.__entity = entity
         self.__pk = pk
@@ -56,9 +56,9 @@ class NodePolicy(Policy):
 
 class DomainPolicy(Policy):
     def __init__(self, entity, pk, keys):
-        Util.is_set(entity, Entity)
-        Util.is_set(pk, PrivateKeys)
-        Util.is_set(keys, Keys)
+        Util.is_type(entity, Entity)
+        Util.is_type(pk, PrivateKeys)
+        Util.is_type(keys, Keys)
 
         self.__entity = entity
         self.__pk = pk

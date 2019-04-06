@@ -1,4 +1,3 @@
-import datetime as dt
 import pickle as pck
 
 from ..utils import Util
@@ -6,6 +5,7 @@ from ..utils import Util
 from ..document.entities import Entity, PrivateKeys, Keys
 from ..document.domain import Domain, Node
 from .archive7 import Archive7, Entry
+from .glue import Glue
 
 
 HIERARCHY = (
@@ -31,39 +31,44 @@ HIERARCHY = (
     '/messages/trash',
     '/profiles',
     '/settings',
-    '/settings/keys'
     '/settings/nodes',
 )
 
 
 class Vault:
+    IDENTITY = '/identity.pickle'
+    ENTITY = '/entities/entity.pickle'
+    PROFILE = '/profile.pickle'
+    PRIVATE = '/settings/private.pickle'
+    KEYS_LINK = '/keys/public.link'
+    DOMAIN = '/settings/domain.pickle'
+    NETWORK = '/settings/network.pickle'
+
     def __init__(self, filename, secret):
         self.__archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
         self.__closed = False
+        self.load_identity()
 
     @property
     def closed(self):
         return self.__closed
 
     def save(self, filename, document):
-        try:
-            owner = document.owner
-        except AttributeError:
-            owner = document.issuer
+        created, updated, owner = Glue.meta_save(document)
 
-        try:
-            updated = dt.datetime.combine(
-                document.updated, dt.datetime.min.time())
-        except (AttributeError, TypeError):
-            updated = None
-
-        created = dt.datetime.combine(
-            document.created, dt.datetime.min.time())
-
-        self._archive.mkfile(
-            filename, data=pck.dumps(document.export(), pck.DEFAULT_PROTOCOL),
+        self.__archive.mkfile(
+            filename, data=pck.dumps(document, pck.DEFAULT_PROTOCOL),
             id=document.id, owner=owner, created=created, modified=updated,
             compression=Entry.COMP_NONE)
+
+    def load_identity(self):
+        return (
+            pck.loads(self.__archive.load(Vault.ENTITY)),
+            pck.loads(self.__archive.load(Vault.PRIVATE)),
+            pck.loads(self.__archive.load(Vault.KEYS_LINK)),
+            pck.loads(self.__archive.load(Vault.DOMAIN)),
+            pck.loads(self.__archive.load('/settings/nodes/' + str(
+                self.__archive.stats().node) + '.pickle')))
 
     def close(self):
         if not self.__closed:
@@ -71,7 +76,7 @@ class Vault:
             self.__closed = True
 
     @staticmethod
-    def setup(filename, entity, pk, keys, domain, node):
+    def setup(filename, entity, pk, keys, domain, node, secret):
         Util.is_type(entity, Entity)
         Util.is_type(pk, PrivateKeys)
         Util.is_type(keys, Keys)
@@ -79,18 +84,30 @@ class Vault:
         Util.is_type(node, Node)
 
         arch = Archive7.setup(
-            filename, pk.secret, owner=entity.id,
+            filename, secret, owner=entity.id,
             node=node.id, domain=domain.id, title='Vault')  # ,
         #  _type=None, role=None, use=None)
 
         for i in HIERARCHY:
             arch.mkdir(i)
 
-        arch.save('/settings/' + entity.id + '.pickle', entity)
-        arch.save('/settings/private.pickle', pk)
-        arch.save('/settings/keys/' + keys.id + '.pickle', keys)
-        arch.save('/settings/domain.pickle', domain)
-        arch.save('/settings/nodes/' + node.id + '.pickle', node)
+        files = [
+            (Vault.ENTITY, entity),
+            (Vault.PRIVATE, pk),
+            ('/keys/' + str(keys.id) + '.pickle', keys),
+            (Vault.DOMAIN, domain),
+            ('/settings/nodes/' + str(node.id) + '.pickle', node),
+        ]
+
+        for f in files:
+            created, updated, owner = Glue.meta_save(f[1])
+            arch.mkfile(
+                f[0], data=pck.dumps(
+                    f[1].export(), pck.DEFAULT_PROTOCOL),
+                id=f[1].id, owner=owner, created=created, modified=updated,
+                compression=Entry.COMP_NONE)
+
+        arch.link(Vault.KEYS_LINK, '/keys/' + str(keys.id) + '.pickle')
         arch.close()
 
-        return Vault(filename, pk.secret)
+        return Vault(filename, secret)

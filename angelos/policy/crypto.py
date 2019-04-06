@@ -31,8 +31,6 @@ class Crypto:
         Util.is_type(pk, PrivateKeys)
         Util.is_type(keys, Keys)
 
-        print(document.issuer, keys.issuer, entity.id)
-
         if not (document.issuer == keys.issuer == entity.id):
             raise RuntimeError(
                 'Document/Keys "issuer" or Entity "id" doesn\'t match')

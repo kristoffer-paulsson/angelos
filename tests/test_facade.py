@@ -5,14 +5,10 @@ import unittest
 import argparse
 import tempfile
 import logging
-import os
+import libnacl
 
 from support import random_person_entity_data
-from angelos.policy.entity import PersonGeneratePolicy
-from angelos.policy.domain import DomainPolicy, NodePolicy
-from angelos.archive.vault import Vault
-
-import libnacl
+from angelos.facade.facade import Facade
 
 
 class TestConceal(unittest.TestCase):
@@ -25,25 +21,11 @@ class TestConceal(unittest.TestCase):
         self.dir.cleanup()
 
     def test_create_open(self):
-        """Creating new vault archive and then open it"""
+        """Creating new facade with archives and then open it"""
         logging.info('====== %s ======' % 'test_create_open')
         entity_data = random_person_entity_data(1)[0]
 
-        ent_gen = PersonGeneratePolicy()
-        ent_gen.generate(**entity_data)
-
-        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
-        dom_gen.generate()
-
-        nod_gen = NodePolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
-        nod_gen.current(dom_gen.domain)
-
-        vault = Vault.setup(
-            os.path.join(self.home, 'vault.ar7.cnl'), ent_gen.entity,
-            ent_gen.private, ent_gen.keys, dom_gen.domain, nod_gen.node,
-            secret=self.secret)
-
-        vault.close()
+        facade = Facade.setup(self.home, entity_data, self.secret)
 
 
 if __name__ == '__main__':
