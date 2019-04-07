@@ -1,9 +1,10 @@
 import os
 import io
 import random
+import string
 import datetime
 
-from lipsum import SURNAMES, MALE_NAMES, FEMALE_NAMES
+from lipsum import SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES
 
 
 def filesize(file):
@@ -38,3 +39,16 @@ def random_person_entity_data(num):
         })
 
     return identities
+
+
+def generate_data():
+    return ('\n'.join(
+        random.choices(
+            LIPSUM_LINES,
+            k=random.randrange(1, 10)))).encode('utf-8')
+
+
+def generate_filename(postfix='.txt'):
+    return ''.join(random.choices(
+        string.ascii_lowercase + string.digits,
+        k=random.randrange(5, 10))) + postfix

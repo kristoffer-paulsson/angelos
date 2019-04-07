@@ -25,10 +25,10 @@ class Crypto:
         return stream
 
     @staticmethod
-    def sign(document, entity, pk, keys, exclude=[], multiple=False):
+    def sign(document, entity, privkeys, keys, exclude=[], multiple=False):
         Util.is_type(document, Document)
         Util.is_type(entity, Entity)
-        Util.is_type(pk, PrivateKeys)
+        Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
 
         if not (document.issuer == keys.issuer == entity.id):
@@ -52,7 +52,7 @@ class Crypto:
 
         data = bytes(entity.id.bytes) + Crypto._docdata(
             document, exclude)
-        signature = libnacl.sign.Signer(pk.seed).signature(data)
+        signature = libnacl.sign.Signer(privkeys.seed).signature(data)
 
         if multiple:
             if not document.signature:

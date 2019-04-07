@@ -11,13 +11,13 @@ from ..document.domain import Domain, Node
 
 
 class NodePolicy(Policy):
-    def __init__(self, entity, pk, keys):
+    def __init__(self, entity, privkeys, keys):
         Util.is_type(entity, Entity)
-        Util.is_type(pk, PrivateKeys)
+        Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
 
         self.__entity = entity
-        self.__pk = pk
+        self.__privkeys = privkeys
         self.__keys = keys
         self.node = None
 
@@ -41,7 +41,7 @@ class NodePolicy(Policy):
             'issuer': self.__entity.id
         })
 
-        node = Crypto.sign(node, self.__entity, self.__pk, self.__keys)
+        node = Crypto.sign(node, self.__entity, self.__privkeys, self.__keys)
         node.validate()
         self.node = node
 
@@ -55,13 +55,13 @@ class NodePolicy(Policy):
 
 
 class DomainPolicy(Policy):
-    def __init__(self, entity, pk, keys):
+    def __init__(self, entity, privkeys, keys):
         Util.is_type(entity, Entity)
-        Util.is_type(pk, PrivateKeys)
+        Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
 
         self.__entity = entity
-        self.__pk = pk
+        self.__privkeys = privkeys
         self.__keys = keys
         self.domain = None
 
@@ -73,7 +73,8 @@ class DomainPolicy(Policy):
             'issuer': self.__entity.id
         })
 
-        domain = Crypto.sign(domain, self.__entity, self.__pk, self.__keys)
+        domain = Crypto.sign(
+            domain, self.__entity, self.__privkeys, self.__keys)
         domain.validate()
         self.domain = domain
 

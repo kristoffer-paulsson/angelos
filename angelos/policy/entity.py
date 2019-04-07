@@ -73,7 +73,7 @@ class BaseUpdatePolicy(Policy):
         self.private = None
         self.keys = None
 
-    def update(self, entity, pk, keys):
+    def update(self, entity, privkeys, keys):
         """Renew the identity document expirey date"""
         Util.is_type(entity, self.ENTITY[0])
 
@@ -84,7 +84,7 @@ class BaseUpdatePolicy(Policy):
         entity._fields['signature'].redo = True
         entity.signature = None
 
-        entity = Crypto.sign(entity, entity, pk, keys)
+        entity = Crypto.sign(entity, entity, privkeys, keys)
         entity.validate()
         self.entity = entity
 
@@ -108,7 +108,7 @@ class BaseUpdatePolicy(Policy):
 
         return entity
 
-    def newkeys(self, entity, pk, keys):
+    def newkeys(self, entity, privkeys, keys):
         """Issue a new pair of keys"""
         Util.is_type(entity, self.ENTITY[0])
         self.box = libnacl.dual.DualSecret()
@@ -118,7 +118,7 @@ class BaseUpdatePolicy(Policy):
             'secret': self.box.sk,
             'seed': self.box.seed
         })
-        new_pk = Crypto.sign(private, entity, pk, keys)
+        new_pk = Crypto.sign(private, entity, privkeys, keys)
 
         new_keys = Keys(nd={
             'issuer': entity.id,
@@ -126,7 +126,7 @@ class BaseUpdatePolicy(Policy):
             'verify': self.box.vk
         })
         new_keys = Crypto.sign(
-            new_keys, entity, pk, keys, multiple=True)
+            new_keys, entity, privkeys, keys, multiple=True)
         new_keys = Crypto.sign(
             new_keys, entity, new_pk, new_keys, multiple=True)
 
@@ -144,8 +144,8 @@ class PersonUpdatePolicy(BaseUpdatePolicy):
 
 
 class MinistryUpdatePolicy(BaseUpdatePolicy):
-    ENTITY = (Person, ['vision', 'ministry'])
+    ENTITY = (Ministry, ['vision', 'ministry'])
 
 
 class ChurchUpdatePolicy(BaseUpdatePolicy):
-    ENTITY = (Person, ['state', 'nation'])
+    ENTITY = (Church, ['state', 'nation'])

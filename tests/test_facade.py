@@ -8,7 +8,7 @@ import logging
 import libnacl
 
 from support import random_person_entity_data
-from angelos.facade.facade import Facade
+from angelos.facade.facade import PersonClientFacade
 
 
 class TestConceal(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestConceal(unittest.TestCase):
         logging.info('====== %s ======' % 'test_create_open')
         entity_data = random_person_entity_data(1)[0]
 
-        facade = Facade.setup(self.home, entity_data, self.secret)
+        facade = PersonClientFacade.setup(self.home, self.secret, entity_data)
 
 
 if __name__ == '__main__':

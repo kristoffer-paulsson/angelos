@@ -5,7 +5,7 @@ from ..utils import Util
 from ..document.entities import Entity, PrivateKeys, Keys
 from ..document.domain import Domain, Node
 from .archive7 import Archive7, Entry
-from .glue import Glue
+from .helper import Glue
 
 
 HIERARCHY = (
@@ -54,7 +54,7 @@ class Vault:
         return self.__closed
 
     def save(self, filename, document):
-        created, updated, owner = Glue.meta_save(document)
+        created, updated, owner = Glue.doc_save(document)
 
         self.__archive.mkfile(
             filename, data=pck.dumps(document, pck.DEFAULT_PROTOCOL),
@@ -76,9 +76,9 @@ class Vault:
             self.__closed = True
 
     @staticmethod
-    def setup(filename, entity, pk, keys, domain, node, secret):
+    def setup(filename, entity, privkeys, keys, domain, node, secret):
         Util.is_type(entity, Entity)
-        Util.is_type(pk, PrivateKeys)
+        Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
         Util.is_type(domain, Domain)
         Util.is_type(node, Node)
@@ -93,14 +93,14 @@ class Vault:
 
         files = [
             (Vault.ENTITY, entity),
-            (Vault.PRIVATE, pk),
+            (Vault.PRIVATE, privkeys),
             ('/keys/' + str(keys.id) + '.pickle', keys),
             (Vault.DOMAIN, domain),
             ('/settings/nodes/' + str(node.id) + '.pickle', node),
         ]
 
         for f in files:
-            created, updated, owner = Glue.meta_save(f[1])
+            created, updated, owner = Glue.doc_save(f[1])
             arch.mkfile(
                 f[0], data=pck.dumps(
                     f[1].export(), pck.DEFAULT_PROTOCOL),

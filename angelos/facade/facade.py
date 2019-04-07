@@ -1,80 +1,88 @@
 import os
+import logging
 
 from ..utils import Util
 
-from ..policy.entity import PersonGeneratePolicy
-from ..policy.domain import DomainPolicy, NodePolicy
+from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
+from ..document.domain import Domain, Node
 from ..archive.vault import Vault
+
+from ..operation.setup import (
+    SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
 
 
 class Facade:
     def __init__(self, home_dir, secret):
-        self.__path = home_dir
-        self.__secret = secret
+        pass
 
-        self.__vault = Vault(
+
+class BaseFacade:
+    def __init__(self, home_dir, secret):
+        self._path = home_dir
+        self._secret = secret
+
+        self._vault = Vault(
             os.path.join(home_dir, 'vault.ar7.cnl'), secret)
 
-        identity = self.__vault.load_identity()
-        self.__entity = identity[0]
-        self.__private = identity[1]
-        self.__keys = identity[2]
-        self.__domain = identity[3]
-        self.__node = identity[4]
+        identity = self._vault.load_identity()
+        self._entity = identity[0]
+        self._private = identity[1]
+        self._keys = identity[2]
+        self._domain = identity[3]
+        self._node = identity[4]
 
-        print(identity[0])
-        print(identity[1])
-        print(identity[2])
-        print(identity[3])
-        print(identity[4])
-        # if secret:
-        #    box = libnacl.secret.SecretBox(
-        #        libnacl.encode.hex_decode(
-        #            plyer.keystore.get_key('Λόγῳ', 'conceal')))
-        #    self.__secret = box.decrypt(base64.b64decode(secret))
-
-    @staticmethod
-    def setup(home_dir, entity_data=None, secret=None):
+    @classmethod
+    def setup(cls, home_dir, secret, entity_data=None, entity=None,
+              privkeys=None, keys=None, domain=None, node=None):
         Util.is_type(home_dir, str)
-        Util.is_type(entity_data, dict)
+        Util.is_type(secret, bytes)
+
+        if entity_data:
+            Util.is_type(entity_data, dict)
+            Util.is_type(entity, type(None))
+            Util.is_type(privkeys, type(None))
+            Util.is_type(keys, type(None))
+            Util.is_type(domain, type(None))
+            Util.is_type(node, type(None))
+        else:
+            Util.is_type(entity_data, type(None))
+            Util.is_type(entity, cls.PREFS[0])
+            Util.is_type(privkeys, PrivateKeys)
+            Util.is_type(keys, Keys)
+            Util.is_type(domain, Domain)
+            Util.is_type(node, (Node, type(None)))
+
+        logging.info('Setting up facade of type: %s' % type(cls))
 
         if not os.path.isdir(home_dir):
             RuntimeError('Home directory doesn\'t exist')
 
-        ent_gen = PersonGeneratePolicy()
-        ent_gen.generate(**entity_data)
+        if entity_data:
+            entity, privkeys, keys, domain, node = cls.PREFS[1].create_new(
+                entity_data)
 
-        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
-        dom_gen.generate()
-
-        nod_gen = NodePolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
-        nod_gen.current(dom_gen.domain)
+        entity, privkeys, keys, domain, node = cls.PREFS[1].import_ext(
+            entity, privkeys, keys, domain, node)
 
         vault = Vault.setup(
-            os.path.join(home_dir, 'vault.ar7.cnl'), ent_gen.entity,
-            ent_gen.private, ent_gen.keys, dom_gen.domain, nod_gen.node,
-            secret=secret)
+            os.path.join(home_dir, 'vault.ar7.cnl'),
+            entity, privkeys, keys, domain, node, secret=secret)
 
         vault.close()
 
-        return Facade(home_dir, secret)
-
-
-class BaseFacade:
-    def __init__(self):
-        self._vault = None
+        return cls(home_dir, secret)
 
 
 class PersonFacadeMixin:
-    pass
+    PREFS = (Person, SetupPersonOperation)
 
 
 class MinistryFacadeMixin:
-    pass
+    PREFS = (Ministry, SetupMinistryOperation)
 
 
 class ChurchFacadeMixin:
-    pass
+    PREFS = (Church, SetupChurchOperation)
 
 
 class ServerFacadeMixin:
@@ -86,42 +94,42 @@ class ClientFacadeMixin:
 
 
 class PersonClientFacade(BaseFacade, ClientFacadeMixin, PersonFacadeMixin):
-    def __init__(self):
-        BaseFacade.__init__(self)
+    def __init__(self, home_dir, secret):
+        BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
 class PersonServerFacade(BaseFacade, ServerFacadeMixin, PersonFacadeMixin):
-    def __init__(self):
-        BaseFacade.__init__(self)
+    def __init__(self, home_dir, secret):
+        BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
 class MinistryClientFacade(BaseFacade, ClientFacadeMixin, MinistryFacadeMixin):
-    def __init__(self):
-        BaseFacade.__init__(self)
+    def __init__(self, home_dir, secret):
+        BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
 class MinistryServerFacade(BaseFacade, ServerFacadeMixin, MinistryFacadeMixin):
-    def __init__(self):
-        BaseFacade.__init__(self)
+    def __init__(self, home_dir, secret):
+        BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
 class ChurchClientFacade(BaseFacade, ClientFacadeMixin, ChurchFacadeMixin):
-    def __init__(self):
-        BaseFacade.__init__(self)
+    def __init__(self, home_dir, secret):
+        BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
 
 class ChurchServerFacade(BaseFacade, ServerFacadeMixin, ChurchFacadeMixin):
-    def __init__(self):
-        BaseFacade.__init__(self)
+    def __init__(self, home_dir, secret):
+        BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
