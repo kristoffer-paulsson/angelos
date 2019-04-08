@@ -15,6 +15,8 @@ import libnacl.secret
 from lipsum import LIPSUM_PATH
 from support import generate_data, generate_filename
 from angelos.archive.archive7 import Archive7
+from angelos.archive.replicator import Replicator
+
 
 FILES = [
     '/fish/salmon/axgsu2w7.txt',
@@ -204,15 +206,11 @@ class TestReplication(unittest.TestCase):
     def test_replicate(self):
         """Creating new empty archive"""
         logging.info('====== %s ======' % 'test_replicate')
-        with Archive7.open(
-                self.filename, self.secret, Archive7.Delete.HARD) as arch:
-            for f in arch.glob():
-                print(f)
-        print('\n\n')
-        with Archive7.open(
-                self.replica, self.secret, Archive7.Delete.HARD) as arch:
-            for f in arch.glob():
-                print(f)
+        master = Archive7.open(
+            self.filename, self.secret, Archive7.Delete.HARD)
+        slave = Archive7.open(
+            self.replica, self.secret, Archive7.Delete.HARD)
+        Replicator.synchronize(master, slave)
 
 
 if __name__ == '__main__':

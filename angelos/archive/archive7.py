@@ -463,7 +463,7 @@ class Archive7(ContainerAware):
             entries = self.ioc.entries
             ids = self.ioc.hierarchy.ids
 
-            sq = Archive7.Query(name=name)
+            sq = Archive7.Query(pattern=name)
             if id:
                 sq.id(id)
             if parent:
@@ -560,6 +560,7 @@ class Archive7(ContainerAware):
             elif mode == Archive7.Delete.SOFT:
                 entry = entry._asdict()
                 entry['deleted'] = True
+                entry['modified'] = datetime.datetime.now()
                 entry = Entry(**entry)
                 self.ioc.entries.update(entry, idx)
             elif mode == Archive7.Delete.HARD:
@@ -574,6 +575,7 @@ class Archive7(ContainerAware):
                         bidx)
                     entry = entry._asdict()
                     entry['deleted'] = True
+                    entry['modified'] = datetime.datetime.now()
                     entry['size'] = 0
                     entry['length'] = 0
                     entry['offset'] = 0
@@ -582,6 +584,7 @@ class Archive7(ContainerAware):
                 elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
                     entry = entry._asdict()
                     entry['deleted'] = True
+                    entry['modified'] = datetime.datetime.now()
                     entry = Entry(**entry)
                     self.ioc.entries.update(entry, idx)
             else:
@@ -686,7 +689,10 @@ class Archive7(ContainerAware):
 
         return self.ioc.entries.add(entry)
 
-    def save(self, path, data, compression=Entry.COMP_NONE):
+    def save(self, path, data, compression=Entry.COMP_NONE, modified=None):
+        if not modified:
+            modified = datetime.datetime.now()
+
         with self.__lock:
             ops = self.ioc.operations
             entries = self.ioc.entries
@@ -722,7 +728,7 @@ class Archive7(ContainerAware):
                 entry['offset'] = new_offset
                 entry['size'] = size
                 entry['length'] = length
-                entry['modified'] = datetime.datetime.now()
+                entry['modified'] = modified
                 entry['compression'] = compression
                 entry = Entry(**entry)
                 entries.update(entry, idx)
@@ -736,7 +742,7 @@ class Archive7(ContainerAware):
                 entry['digest'] = digest
                 entry['size'] = size
                 entry['length'] = length
-                entry['modified'] = datetime.datetime.now()
+                entry['modified'] = modified
                 entry['compression'] = compression
                 entry = Entry(**entry)
                 entries.update(entry, idx)
@@ -747,7 +753,7 @@ class Archive7(ContainerAware):
                 entry['digest'] = digest
                 entry['size'] = size
                 entry['length'] = length
-                entry['modified'] = datetime.datetime.now()
+                entry['modified'] = modified
                 entry['compression'] = compression
                 entry = Entry(**entry)
                 entries.update(entry, idx)
@@ -1034,7 +1040,8 @@ class Archive7(ContainerAware):
 
         def search(self, query, raw=False):
             Util.is_type(query, Archive7.Query)
-            filterator = filter(query.build(), enumerate(self.__all))
+            filterator = filter(query.build(
+                self.ioc.hierarchy.paths), enumerate(self.__all))
             if not raw:
                 return list(filterator)
             else:
@@ -1195,7 +1202,7 @@ class Archive7(ContainerAware):
         def find_entry(self, name, pid, types=None):
             entries = self.ioc.entries
             idx = entries.search(
-                Archive7.Query(name=name).parent(pid).type(
+                Archive7.Query(pattern=name).parent(pid).type(
                     types).deleted(False))
             if not len(idx):
                 raise Util.exception(Error.AR7_INVALID_FILE, {
@@ -1263,7 +1270,7 @@ class Archive7(ContainerAware):
 
         def is_available(self, name, pid):
             idx = self.ioc.entries.search(
-                Archive7.Query(name=name).parent(pid).deleted(False))
+                Archive7.Query(pattern=name).parent(pid).deleted(False))
             if len(idx):
                 raise Util.exception(Error.AR7_NAME_TAKEN, {
                     'name': name, 'pid': pid, 'index': idx})
@@ -1330,13 +1337,18 @@ class Archive7(ContainerAware):
         GT = '>'
         LT = '<'
 
-        def __init__(self, name='*'):
+        def __init__(self, pattern='*'):
             self.__type = (Entry.TYPE_FILE, Entry.TYPE_DIR, Entry.TYPE_LINK)
-            if name == '*':
-                self.__name = None
+            if pattern == '*':
+                self.__file_regex = None
+                self.__dir_regex = None
             else:
-                self.__name = name
-                self.__regex = re.compile(bytes(name, 'utf-8'))
+                filename = re.escape(os.path.basename(
+                    pattern)).replace('\*', '.*').replace('\?', '.')
+                dirname = re.escape(os.path.dirname(
+                    pattern)).replace('\*', '.*').replace('\?', '.')
+                self.__file_regex = re.compile(bytes(filename, 'utf-8'))
+                self.__dir_regex = re.compile(dirname)
             self.__id = None
             self.__parent = None
             self.__owner = None
@@ -1418,12 +1430,19 @@ class Archive7(ContainerAware):
             self.__deleted = deleted
             return self
 
-        def build(self):
+        def build(self, paths):
+            if self.__dir_regex:
+                parents = []
+                for key, value in paths.items():
+                    if bool(self.__dir_regex.match(key)):
+                        parents.append(value)
+                self.parent(tuple(parents))
+
             def _type_in(x):
                 return x.type in self.__type
 
             def _name_match(x):
-                return bool(self.__regex.match(x.name))
+                return bool(self.__file_regex.match(x.name))
 
             def _id_is(x):
                 return self.__id.int == x.id.int
@@ -1466,7 +1485,7 @@ class Archive7(ContainerAware):
 
             qualifiers = [_type_in]
 
-            if self.__name:
+            if self.__file_regex:
                 qualifiers.append(_name_match)
             if self.__id:
                 qualifiers.append(_id_is)

@@ -26,5 +26,27 @@ class Glue:
 
 class Globber:
     @staticmethod
-    def full(archive):
+    def full(archive, filename='*', cmp_uuid=False):
         Util.is_type(archive, Archive7)
+
+        archive._lock()
+
+        sq = Archive7.Query(pattern=filename)
+        sq.type(b'f')
+        idxs = archive.ioc.entries.search(sq)
+        ids = archive.ioc.hierarchy.ids
+
+        files = {}
+        for i in idxs:
+            idx, entry = i
+            if entry.parent.int == 0:
+                name = '/'+str(entry.name, 'utf-8')
+            else:
+                name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+            if cmp_uuid:
+                files[entry.id] = (name, entry.deleted, entry.modified)
+            else:
+                files[name] = (entry.id, entry.deleted, entry.modified)
+
+        archive._unlock()
+        return files
