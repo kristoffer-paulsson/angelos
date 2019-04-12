@@ -1,3 +1,5 @@
+import base64
+
 import libnacl.sign
 import asyncssh
 
@@ -27,7 +29,7 @@ class NaClPrivateKey(BaseKey):
         Util.is_type(seed, bytes)
         box = libnacl.sign.Signer(seed)
 
-        return cls(seed, box)
+        return cls(box.seed, box)
 
     @classmethod
     def generate(cls):
@@ -94,20 +96,34 @@ class NaClKey(asyncssh.SSHKey):
         return self.verify_der(data, sig_algorithm, sig)
 
     def encode_ssh_private(self):
-        return self._key.key
+        print('#### #### #### #### Encode SSH Private')
+        return base64.b64encode(self._key.value)
 
     def encode_ssh_public(self):
-        return self._key.key
+        print('#### #### #### #### Encode SSH public: %s', self._key.value)
+        return base64.b64encode(self._key.value)
 
     @classmethod
     def decode_ssh_public(cls, packet):
-        public_value = packet.get_string()
+        public_value = base64.b64decode(
+            packet.get_bytes(packet._len - packet._idx))
         return (public_value,)
 
     @classmethod
     def decode_ssh_private(cls, packet):
-        public_value = packet.get_string()
-        return (public_value,)
+        private_value = base64.b64decode(
+            packet.get_bytes(packet._len - packet._idx))
+        return (private_value,)
+
+    @classmethod
+    def make_private(cls, private_value):
+        print('#### #### #### #### Make private')
+        return cls(NaClPrivateKey.construct(private_value))
+
+    @classmethod
+    def make_public(cls, public_value):
+        print('#### #### #### #### Make public')
+        return cls(NaClPublicKey.construct(public_value))
 
     def __eq__(self, other):
         return (isinstance(other, type(self)) and

@@ -96,7 +96,7 @@ C_KEYS = json.loads("""
 def handle_client(process):
     print(process.env, process.command, process.subsystem)
     process.stdout.write(
-        'Welcome to my SSH server, %s!\n' %
+        'This is the server, %s!\n' %
         process.get_extra_info('username'))
     process.exit(0)
 
@@ -114,7 +114,11 @@ class SSHServer(asyncssh.SSHServer):
 
     def connection_lost(self, exc):
         print('connection_lost')
-        print(type(exc), exc)
+        if isinstance(exc, type(None)):
+            print('Connection closed')
+        else:
+            print('Connection unexpectedly closed')
+            print(type(exc), exc)
         pass  # pragma: no cover
 
     def debug_msg_received(self, msg, lang, always_display):
@@ -138,7 +142,6 @@ class SSHServer(asyncssh.SSHServer):
     def validate_public_key(self, username, key):
         print('validate_public_key')
         print(username, type(key))
-        # return key.key == self._client_keys._key.key
         return key in self._client_keys
 
     def session_requested(self):
@@ -159,11 +162,11 @@ async def start_server():
         SSHServer, 'localhost', 22,
         server_host_keys=[import_private_key()],
         process_factory=handle_client,
-        # kex_algs=('diffie-hellman-group18-sha512', ),
-        # encryption_algs=('chacha20-poly1305@openssh.com', ),
-        # mac_algs=('hmac-sha2-512-etm@openssh.com', ),
-        # compression_algs=('zlib', ),
-        # signature_algs=('angelos-tongues', )
+        kex_algs=('diffie-hellman-group18-sha512', ),
+        encryption_algs=('chacha20-poly1305@openssh.com', ),
+        mac_algs=('hmac-sha2-512-etm@openssh.com', ),
+        compression_algs=('zlib', ),
+        signature_algs=('angelos-tongues', )
     )
 
 
@@ -195,5 +198,6 @@ if __name__ == '__main__':
     if args.debug:
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
+    # asyncssh.logging.set_debug_level(3)
     # unittest.main(argv=['first-arg-is-ignored'])
     main()

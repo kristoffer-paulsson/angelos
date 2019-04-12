@@ -3,6 +3,7 @@ sys.path.append('../angelos')  # noqa
 
 import json
 import datetime
+import libnacl
 import support
 from angelos.policy.entity import ChurchGeneratePolicy
 
@@ -18,3 +19,10 @@ policy.generate(**data[0])
 print(json.dumps(policy.entity.export_str()))
 print(json.dumps(policy.private.export_str()))
 print(json.dumps(policy.keys.export_str()))
+
+box = libnacl.sign.Signer()
+box2 = libnacl.sign.Signer(box.seed)
+print(box.vk == box2.vk)
+print(box.seed)
+print(box.vk)
+print(box2.vk)

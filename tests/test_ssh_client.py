@@ -95,7 +95,7 @@ S_KEYS = json.loads("""
 
 class MySSHClientSession(asyncssh.SSHClientSession):
     def data_received(self, data, datatype):
-        print(data, end='')
+        print(data, datatype, end='')
 
     def connection_lost(self, exc):
         if exc:
@@ -115,7 +115,11 @@ class SSHClient(asyncssh.SSHClient):
 
     def connection_lost(self, exc):
         print('connection_lost')
-        print(type(exc), exc)
+        if isinstance(exc, type(None)):
+            print('Connection closed')
+        else:
+            print('Connection unexpectedly closed')
+            print(type(exc), exc)
         pass  # pragma: no cover
 
     def debug_msg_received(self, msg, lang, always_display):
@@ -141,29 +145,22 @@ class SSHClient(asyncssh.SSHClient):
         return self._keylist.pop(0) if self._keylist else None
 
 
-def handle_client(process):
-    print(process.env, process.command, process.subsystem)
-    process.stdout.write(
-        'Welcome to my SSH server, %s!\n' %
-        process.get_extra_info('username'))
-    process.exit(0)
-
-
 async def run_client():
     conn, client = await asyncssh.create_connection(
         SSHClient, 'localhost',
         known_hosts=known_hosts,
         username=C_ENTITY['issuer'],
-        # kex_algs=('diffie-hellman-group18-sha512', ),
-        # encryption_algs=('chacha20-poly1305@openssh.com', ),
-        # mac_algs=('hmac-sha2-512-etm@openssh.com', ),
-        # compression_algs=('zlib', ),
-        # signature_algs=('angelos-tongues', )
+        kex_algs=('diffie-hellman-group18-sha512', ),
+        encryption_algs=('chacha20-poly1305@openssh.com', ),
+        mac_algs=('hmac-sha2-512-etm@openssh.com', ),
+        compression_algs=('zlib', ),
+        signature_algs=('angelos-tongues', )
     )
-
-    async with conn:
-        chan, session = await conn.create_session(MySSHClientSession)
-        # await chan.wait_closed()
+    print(type(client), client)
+    conn.close()
+    # async with conn:
+    #    chan, session = await conn.create_session(MySSHClientSession)
+    #    await chan.wait_closed()
 
 
 def import_client_keys():
@@ -194,5 +191,6 @@ if __name__ == '__main__':
     if args.debug:
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
+    asyncssh.logging.set_debug_level(3)
     # unittest.main(argv=['first-arg-is-ignored'])
     main()
