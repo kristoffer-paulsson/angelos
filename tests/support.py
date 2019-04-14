@@ -4,7 +4,7 @@ import random
 import string
 import datetime
 
-from lipsum import SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES
+from lipsum import SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES, CHURCHES
 
 
 def filesize(file):
@@ -14,7 +14,7 @@ def filesize(file):
         return os.stat(file).st_size
 
 
-def random_person_entity_data(num):
+def random_person_entity_data(num=1):
     identities = []
     for i in range(num):
         gender = random.choices(
@@ -39,6 +39,23 @@ def random_person_entity_data(num):
         })
 
     return identities
+
+
+def random_church_entity_data(num=1):
+    churches = []
+    for i in range(num):
+        church = random.choices(CHURCHES, k=1)[0]
+        founded = datetime.date.today(
+            ) - datetime.timedelta(days=random.randrange(730, 29220))
+
+        churches.append({
+            'founded': founded,
+            'city': church[0],
+            'region': church[1],
+            'country': church[2]
+        })
+
+    return churches
 
 
 def generate_data():

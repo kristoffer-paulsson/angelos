@@ -8,8 +8,8 @@ from .archive7 import Archive7
 
 
 class Replicator:
-    @staticmethod
-    def difference(master, slave):
+    @classmethod
+    def difference(cls, master, slave):
         Util.is_type(master, Archive7)
         Util.is_type(slave, Archive7)
 
@@ -48,8 +48,8 @@ class Replicator:
 
         return push, pull
 
-    @staticmethod
-    def _copy(frm, to, p_list, modify=False):
+    @classmethod
+    def _copy(cls, frm, to, p_list, modify=False):
         for idx, op in p_list:
             if op == b'd':
                 to.remove(idx)
@@ -70,22 +70,22 @@ class Replicator:
             else:
                 logging.error('Unkown synchronization operation: %s' % str(op))
 
-    @staticmethod
-    def push(master, slave, p_list):
-        Replicator._copy(master, slave, p_list)
+    @classmethod
+    def push(cls, master, slave, p_list):
+        cls._copy(master, slave, p_list)
 
-    @staticmethod
-    def pull(master, slave, p_list):
-        Replicator._copy(slave, master, p_list)
+    @classmethod
+    def pull(cls, master, slave, p_list):
+        cls._copy(slave, master, p_list)
 
-    @staticmethod
-    def synchronize(master, slave, modify=False):
+    @classmethod
+    def synchronize(cls, master, slave, modify=False):
         Util.is_type(master, Archive7)
         Util.is_type(slave, Archive7)
 
-        push, pull = Replicator.difference(master, slave)
-        Replicator._copy(master, slave, push, modify)
-        Replicator._copy(slave, master, pull, modify)
+        push, pull = cls.difference(master, slave)
+        cls._copy(master, slave, push, modify)
+        cls._copy(slave, master, pull, modify)
 
 
 class SyncClient:

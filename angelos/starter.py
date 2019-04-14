@@ -1,27 +1,26 @@
-import base64
 import asyncio
 import logging
 
 import asyncssh
 
-from utils import Util
-from document.entities import Entity, PrivateKeys, Keys
-from ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
-from ssh.ssh import SSHClient, SSHServer
+from .utils import Util
+from .document.entities import Entity, PrivateKeys, Keys
+from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
+from .ssh.ssh import SSHClient, SSHServer
 
 
 class Starter:
     ALGS = {
-        'kex_algs': tuple('diffie-hellman-group18-sha512'),
-        'encryption_algs': tuple('chacha20-poly1305@openssh.com'),
-        'mac_algs': tuple('hmac-sha2-512-etm@openssh.com'),
-        'compression_algs': tuple('zlib'),
-        'signature_algs': tuple('angelos-tongues')
+        'kex_algs': ('diffie-hellman-group18-sha512', ),
+        'encryption_algs': ('chacha20-poly1305@openssh.com', ),
+        'mac_algs': ('hmac-sha2-512-etm@openssh.com', ),
+        'compression_algs': ('zlib', ),
+        'signature_algs': ('angelos-tongues', )
     }
 
     SARGS = {
         'backlog': 200,
-        'x509_trusted_certs': False,
+        'x509_trusted_certs': [],
         'x509_purposes': False,
         'gss_host': False,
         'allow_pty': False,
@@ -46,9 +45,10 @@ class Starter:
             'server_host_keys': [cls._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
-        } + cls.ALGS + cls.SARGS
+        }
+        params = {**params, **cls.ALGS, **cls.SARGS}
 
-        cls.__start_server(params)
+        return cls.__start_server(params)
 
     @classmethod
     def node_client(cls, entity, privkeys, host_keys, host, port=22):
@@ -60,16 +60,17 @@ class Starter:
         Util.is_type(port, int)
 
         params = {
-            'username': entity.id,
-            'client_username': entity.id,
+            'username': str(entity.id),
+            'client_username': str(entity.id),
             'host': host,
             'port': port,
             'client_keys': [cls._private_key(privkeys)],
             'known_hosts': cls.__known_host(host_keys),
             'client_factory': SSHClient
-        } + cls.ALGS
+        }
+        params = {**params, **cls.ALGS}
 
-        cls.__start_client(params)
+        return cls.__start_client(params)  # (conn, client)
 
     @classmethod
     def host_server(cls, entity, privkeys, host, port=22):
@@ -86,9 +87,10 @@ class Starter:
             'server_host_keys': [cls._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
-        } + cls.ALGS + cls.SARGS
+        }
+        params = {**params, **cls.ALGS, **cls.SARGS}
 
-        cls.__start_server(params)
+        return cls.__start_server(params)
 
     @classmethod
     def host_client(cls, entity, privkeys, host_keys, host, port=22):
@@ -100,16 +102,17 @@ class Starter:
         Util.is_type(port, int)
 
         params = {
-            'username': entity.id,
-            'client_username': entity.id,
+            'username': str(entity.id),
+            'client_username': str(entity.id),
             'host': host,
             'port': port,
             'client_keys': [cls._private_key(privkeys)],
             'known_hosts': cls.__known_host(host_keys),
             'client_factory': SSHClient
-        } + cls.ALGS
+        }
+        params = {**params, **cls.ALGS}
 
-        cls.__start_client(params)
+        return cls.__start_client(params)  # (conn, client)
 
     @classmethod
     def portal_server(cls, entity, privkeys, host, port=22):
@@ -126,9 +129,10 @@ class Starter:
             'server_host_keys': [cls._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
-        } + cls.ALGS + cls.SARGS
+        }
+        params = {**params, **cls.ALGS, **cls.SARGS}
 
-        cls.__start_server(params)
+        return cls.__start_server(params)
 
     @classmethod
     def portal_client(cls, entity, privkeys, host_keys, host, port=22):
@@ -140,16 +144,17 @@ class Starter:
         Util.is_type(port, int)
 
         params = {
-            'username': entity.id,
-            'client_username': entity.id,
+            'username': str(entity.id),
+            'client_username': str(entity.id),
             'host': host,
             'port': port,
             'client_keys': [cls._private_key(privkeys)],
             'known_hosts': cls.__known_host(host_keys),
             'client_factory': SSHClient
-        } + cls.ALGS
+        }
+        params = {**params, **cls.ALGS}
 
-        cls.__start_client(params)
+        return cls.__start_client(params)  # (conn, client)
 
     @classmethod
     def shell_server(cls, entity, privkeys, host, port=22):
@@ -166,9 +171,10 @@ class Starter:
             'server_host_keys': [cls._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
-        } + cls.ALGS + cls.SARGS
+        }
+        params = {**params, **cls.ALGS, **cls.SARGS}
 
-        cls.__start_server(params)
+        return cls.__start_server(params)
 
     @classmethod
     def boot_server(cls, host, port=22):
@@ -177,26 +183,17 @@ class Starter:
 
     @classmethod
     def __start_server(cls, params):
-        async def run_server():
-            await asyncssh.create_server(**params)
-
-        loop = asyncio.get_event_loop()
         try:
-            loop.run_until_complete(run_server())
+            return asyncio.get_event_loop().run_until_complete(
+                asyncssh.create_server(**params))
         except (OSError, asyncssh.Error) as exc:
             logging.critical('Error starting server: %s' % str(exc))
-        loop.run_forever()
 
     @classmethod
     def __start_client(cls, params):
-        async def run_client():
-            conn, client = await asyncssh.create_connection(**params)
-            # chan, session = await conn.create_session(SSHClientSession)
-            # await chan.wait_closed()
-            conn.close()
-
         try:
-            asyncio.get_event_loop().run_until_complete(run_client())
+            return asyncio.get_event_loop().run_until_complete(
+                asyncssh.create_connection(**params))
         except (OSError, asyncssh.Error) as exc:
             logging.critical('SSH connection failed: %s' % str(exc))
 
@@ -205,15 +202,13 @@ class Starter:
         def callback(h, a, p):
             return (
                 [NaClKey(key=NaClPublicKey.construct(
-                    base64.b64decode(host_keys.verify)))], [], [])
+                    host_keys.verify))], [], [])
         return callback
 
     @classmethod
     def _public_key(cls, keys):
-        return NaClKey(key=NaClPublicKey.construct(
-            base64.b64decode(keys.verify)))
+        return NaClKey(key=NaClPublicKey.construct(keys.verify))
 
     @classmethod
     def _private_key(cls, privkeys):
-        return NaClKey(key=NaClPrivateKey.construct(
-            base64.b64decode(privkeys.seed)))
+        return NaClKey(key=NaClPrivateKey.construct(privkeys.seed))

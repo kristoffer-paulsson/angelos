@@ -10,6 +10,31 @@ from ..utils import Util
 from ..error import Error
 
 
+"""
+r, rb, rb+, w, w+, wb, wb+, a, ab, x, xb
+"""
+
+"""
+Must check if fileobject is open:
+flush fileno isatty peek read1 readall readinto
+readinto1 readline readlines seek tell truncate write
+"""
+
+"""
+fileno, seek, truncate
+
+close, __enter__, __exit__, flush, isatty, __iter__, __next__, readable, readline, readlines, seekable, tell, writable, writelines
+
+closed
+
+readinto, write
+
+read, readall
+
+mode, name,
+"""
+
+
 class ConcealIO(io.RawIOBase):
     TOT_SIZE = 512*33
     CBLK_SIZE = 512*32 + 40

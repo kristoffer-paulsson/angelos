@@ -17,7 +17,7 @@ class Option:
                  name,
                  short=None,
                  type=TYPE_VALUE,
-                 choises=[],
+                 choices=[],
                  mandatory=False,
                  default=None,
                  help=''):
@@ -34,7 +34,7 @@ class Option:
                     dash '-'.
         type        The type of option, boolean, choice or value. Use the type
                     constants to select one.
-        choises     List of string names for available choices if the type is
+        choices     List of string names for available choices if the type is
                     TYPE_CHOICES.
         mandatory   A boolean describing whether this option should be
                     mandatory.
@@ -45,7 +45,7 @@ class Option:
         self.name = name
         self.short = short
         self.type = type
-        self.choises = choises
+        self.choices = choices
         self.mandatory = mandatory
         self.default = default
         self.help = help
@@ -74,7 +74,7 @@ class Option:
         # Test if one option is given
         if len(opt) is 1:
             # Test if given value is a choise
-            if opt[0] not in self.choises:
+            if opt[0] not in self.choices:
                 raise Util.exception(
                     Error.CMD_OPT_ILLEGAL_CHOISE,
                     {'opt': self.name, 'choise': opt[0]})

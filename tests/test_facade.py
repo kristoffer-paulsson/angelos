@@ -11,7 +11,7 @@ from support import random_person_entity_data
 from angelos.facade.facade import PersonClientFacade
 
 
-class TestConceal(unittest.TestCase):
+class TestFacade(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.home = self.dir.name

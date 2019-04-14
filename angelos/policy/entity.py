@@ -12,7 +12,7 @@ class BaseGeneratePolicy(Policy):
     def __init__(self):
         self.box = libnacl.dual.DualSecret()
         self.entity = None
-        self.private = None
+        self.privkeys = None
         self.keys = None
 
     def generate(self, **kwargs):
@@ -27,13 +27,13 @@ class BaseGeneratePolicy(Policy):
         entity.signature = self.box.signature(
             bytes(entity.issuer.bytes) + Crypto._docdata(entity))
 
-        private = PrivateKeys(nd={
+        privkeys = PrivateKeys(nd={
             'issuer': entity.id,
             'secret': self.box.sk,
             'seed': self.box.seed
         })
-        private.signature = self.box.signature(
-            bytes(private.issuer.bytes) + Crypto._docdata(private))
+        privkeys.signature = self.box.signature(
+            bytes(privkeys.issuer.bytes) + Crypto._docdata(privkeys))
 
         keys = Keys(nd={
             'issuer': entity.id,
@@ -44,11 +44,11 @@ class BaseGeneratePolicy(Policy):
                 bytes(keys.issuer.bytes) + Crypto._docdata(keys))]
 
         entity.validate()
-        private.validate()
+        privkeys.validate()
         keys.validate()
 
         self.entity = entity
-        self.private = private
+        self.privkeys = privkeys
         self.keys = keys
 
         return True
@@ -70,7 +70,7 @@ class BaseUpdatePolicy(Policy):
     def __init__(self):
         self.box = None
         self.entity = None
-        self.private = None
+        self.privkeys = None
         self.keys = None
 
     def update(self, entity, privkeys, keys):
@@ -113,12 +113,12 @@ class BaseUpdatePolicy(Policy):
         Util.is_type(entity, self.ENTITY[0])
         self.box = libnacl.dual.DualSecret()
 
-        private = PrivateKeys(nd={
+        privkeys = PrivateKeys(nd={
             'issuer': entity.id,
             'secret': self.box.sk,
             'seed': self.box.seed
         })
-        new_pk = Crypto.sign(private, entity, privkeys, keys)
+        new_pk = Crypto.sign(privkeys, entity, privkeys, keys)
 
         new_keys = Keys(nd={
             'issuer': entity.id,
@@ -133,7 +133,7 @@ class BaseUpdatePolicy(Policy):
         new_pk.validate()
         new_keys.validate()
 
-        self.private = new_pk
+        self.privkeys = new_pk
         self.keys = new_keys
 
         return True

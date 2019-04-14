@@ -15,7 +15,7 @@ from angelos.archive.vault import Vault
 import libnacl
 
 
-class TestConceal(unittest.TestCase):
+class TestVault(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.home = self.dir.name

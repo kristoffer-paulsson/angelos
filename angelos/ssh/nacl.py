@@ -96,11 +96,9 @@ class NaClKey(asyncssh.SSHKey):
         return self.verify_der(data, sig_algorithm, sig)
 
     def encode_ssh_private(self):
-        print('#### #### #### #### Encode SSH Private')
         return base64.b64encode(self._key.value)
 
     def encode_ssh_public(self):
-        print('#### #### #### #### Encode SSH public: %s', self._key.value)
         return base64.b64encode(self._key.value)
 
     @classmethod
@@ -117,12 +115,10 @@ class NaClKey(asyncssh.SSHKey):
 
     @classmethod
     def make_private(cls, private_value):
-        print('#### #### #### #### Make private')
         return cls(NaClPrivateKey.construct(private_value))
 
     @classmethod
     def make_public(cls, public_value):
-        print('#### #### #### #### Make public')
         return cls(NaClPublicKey.construct(public_value))
 
     def __eq__(self, other):

@@ -1,11 +1,13 @@
 import pickle as pck
+import asyncio
+import datetime
 
 from ..utils import Util
 
 from ..document.entities import Entity, PrivateKeys, Keys
 from ..document.domain import Domain, Node
 from .archive7 import Archive7, Entry
-from .helper import Glue
+from .helper import Glue, Globber, AsyncProxy
 
 
 HIERARCHY = (
@@ -45,35 +47,19 @@ class Vault:
     NETWORK = '/settings/network.pickle'
 
     def __init__(self, filename, secret):
-        self.__archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
-        self.__closed = False
+        self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
+        self._closed = asyncio.Event
+        self._proxy = AsyncProxy(self._closed, 200)
         self.load_identity()
 
     @property
     def closed(self):
-        return self.__closed
-
-    def save(self, filename, document):
-        created, updated, owner = Glue.doc_save(document)
-
-        self.__archive.mkfile(
-            filename, data=pck.dumps(document, pck.DEFAULT_PROTOCOL),
-            id=document.id, owner=owner, created=created, modified=updated,
-            compression=Entry.COMP_NONE)
-
-    def load_identity(self):
-        return (
-            pck.loads(self.__archive.load(Vault.ENTITY)),
-            pck.loads(self.__archive.load(Vault.PRIVATE)),
-            pck.loads(self.__archive.load(Vault.KEYS_LINK)),
-            pck.loads(self.__archive.load(Vault.DOMAIN)),
-            pck.loads(self.__archive.load('/settings/nodes/' + str(
-                self.__archive.stats().node) + '.pickle')))
+        return self._closed.is_set()
 
     def close(self):
-        if not self.__closed:
-            self.__archive.close()
-            self.__closed = True
+        if not self._closed:
+            self._proxy.call(self._archive.close, {})
+            self._closed.set()
 
     @staticmethod
     def setup(filename, entity, privkeys, keys, domain, node, secret):
@@ -111,3 +97,45 @@ class Vault:
         arch.close()
 
         return Vault(filename, secret)
+
+    async def load_identity(self):
+        return (
+            pck.loads(await self._proxy.call(
+                self._archive.load, path=Vault.ENTITY)),
+            pck.loads(await self._proxy.call(
+                self._archive.load, path=Vault.PRIVATE)),
+            pck.loads(await self._proxy.call(
+                self._archive.load, path=Vault.KEYS_LINK)),
+            pck.loads(await self._proxy.call(
+                self._archive.load, path=Vault.DOMAIN)),
+            pck.loads(await self._proxy.call(
+                self._archive.load, path='/settings/nodes/' + str(
+                    self._archive.stats().node) + '.pickle'))
+        )
+
+    async def save(self, filename, document):
+        created, updated, owner = Glue.doc_save(document)
+
+        return await self._proxy.call(
+            self._archive.mkfile, filename=filename, data=pck.dumps(
+                document, pck.DEFAULT_PROTOCOL),
+            id=document.id, owner=owner, created=created, modified=updated,
+            compression=Entry.COMP_NONE)
+
+    async def load_pubkeys(self, entity_id):
+        def callable():
+            result = Globber.owner(self._archive, entity_id, '/keys')
+            result.sort(reverse=True, key=lambda e: e[2])
+
+            today = datetime.date.today()
+            keylist = []
+
+            for r in result[:3]:
+                keys = pck.loads(self._archive.load(r[0]))
+                if isinstance(keys, Keys):
+                    if keys.expires > today:
+                        keylist.append()
+
+            return keylist if len(keylist) else None
+
+        return await self._proxy.call(callable, 0, 5)

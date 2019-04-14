@@ -7,12 +7,18 @@ from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 class Address(BaseDocument):
     co = StringField(required=False)
+    organisation = StringField(required=False)
+    apartment = StringField(required=False)
+    floor = StringField(required=False)
+    building = StringField(required=False)
     street = StringField(required=False)
     number = StringField(required=False)
-    address2 = StringField(required=False)
-    zip = StringField(required=False)
+    area = StringField(required=False)
     city = StringField(required=False)
-    state = StringField(required=False)
+    pobox = StringField(required=False)
+    zip = StringField(required=False)
+    subregion = StringField(required=False)
+    region = StringField(required=False)
     country = StringField(required=False)
 
 

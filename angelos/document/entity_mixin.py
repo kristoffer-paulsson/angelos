@@ -34,8 +34,8 @@ class MinistryMixin(metaclass=DocumentMeta):
 class ChurchMixin(metaclass=DocumentMeta):
     founded = DateField()
     city = StringField()
-    state = StringField(required=False)
-    nation = StringField(required=False)
+    region = StringField(required=False)
+    country = StringField(required=False)
 
     def _validate(self):
         return True

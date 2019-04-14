@@ -638,11 +638,11 @@ class Archive7(ContainerAware):
 
         return entry.id
 
-    def mkfile(self, path, data, created=None, modified=None, owner=None,
+    def mkfile(self, filename, data, created=None, modified=None, owner=None,
                parent=None, id=None, compression=Entry.COMP_NONE):
         with self.__lock:
             ops = self.ioc.operations
-            name, dirname = ops.path(path)
+            name, dirname = ops.path(filename)
             pid = None
 
             if parent:
@@ -764,10 +764,10 @@ class Archive7(ContainerAware):
                 bidx = entries.get_blank()
                 entries.update(empty, bidx)
 
-    def load(self, path):
+    def load(self, filename):
         with self.__lock:
             ops = self.ioc.operations
-            name, dirname = ops.path(path)
+            name, dirname = ops.path(filename)
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(
                 name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK))
@@ -782,7 +782,7 @@ class Archive7(ContainerAware):
 
             if entry.digest != hashlib.sha1(data).digest():
                 raise Util.exception(Error.AR7_DIGEST_INVALID, {
-                    'path': path, 'id': entry.id})
+                    'filename': filename, 'id': entry.id})
             return data
 
     class Entries(ContainerAware):
