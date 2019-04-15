@@ -32,18 +32,21 @@ class TestVault(unittest.TestCase):
         ent_gen = PersonGeneratePolicy()
         ent_gen.generate(**entity_data)
 
-        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
+        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
         dom_gen.generate()
 
-        nod_gen = NodePolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
+        nod_gen = NodePolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
         nod_gen.current(dom_gen.domain)
 
         vault = Vault.setup(
             os.path.join(self.home, 'vault.ar7.cnl'), ent_gen.entity,
-            ent_gen.private, ent_gen.keys, dom_gen.domain, nod_gen.node,
+            ent_gen.privkeys, ent_gen.keys, dom_gen.domain, nod_gen.node,
             secret=self.secret)
 
         vault.close()
+
+        # vault = Vault(os.path.join(self.home, 'vault.ar7.cnl'), self.secret)
+        # vault.close()
 
 
 if __name__ == '__main__':

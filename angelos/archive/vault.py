@@ -4,7 +4,8 @@ import datetime
 
 from ..utils import Util
 
-from ..document.entities import Entity, PrivateKeys, Keys
+from ..document.entities import (
+    Entity, PrivateKeys, Keys)
 from ..document.domain import Domain, Node
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
@@ -48,18 +49,18 @@ class Vault:
 
     def __init__(self, filename, secret):
         self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
-        self._closed = asyncio.Event
-        self._proxy = AsyncProxy(self._closed, 200)
-        self.load_identity()
+        self._closed = False
+        self._proxy = AsyncProxy(200)
 
     @property
     def closed(self):
-        return self._closed.is_set()
+        return self._closed
 
     def close(self):
         if not self._closed:
-            self._proxy.call(self._archive.close, {})
-            self._closed.set()
+            self._proxy.quit()
+            self._archive.close()
+            self._closed = True
 
     @staticmethod
     def setup(filename, entity, privkeys, keys, domain, node, secret):
@@ -77,10 +78,11 @@ class Vault:
         for i in HIERARCHY:
             arch.mkdir(i)
 
+        key_path = '/keys/' + str(keys.id) + '.pickle'
         files = [
             (Vault.ENTITY, entity),
             (Vault.PRIVATE, privkeys),
-            ('/keys/' + str(keys.id) + '.pickle', keys),
+            (key_path, keys),
             (Vault.DOMAIN, domain),
             ('/settings/nodes/' + str(node.id) + '.pickle', node),
         ]
@@ -89,29 +91,31 @@ class Vault:
             created, updated, owner = Glue.doc_save(f[1])
             arch.mkfile(
                 f[0], data=pck.dumps(
-                    f[1].export(), pck.DEFAULT_PROTOCOL),
+                    f[1], pck.DEFAULT_PROTOCOL),
                 id=f[1].id, owner=owner, created=created, modified=updated,
                 compression=Entry.COMP_NONE)
 
-        arch.link(Vault.KEYS_LINK, '/keys/' + str(keys.id) + '.pickle')
+        arch.link(Vault.KEYS_LINK, key_path)
         arch.close()
 
         return Vault(filename, secret)
 
-    async def load_identity(self):
-        return (
-            pck.loads(await self._proxy.call(
-                self._archive.load, path=Vault.ENTITY)),
-            pck.loads(await self._proxy.call(
-                self._archive.load, path=Vault.PRIVATE)),
-            pck.loads(await self._proxy.call(
-                self._archive.load, path=Vault.KEYS_LINK)),
-            pck.loads(await self._proxy.call(
-                self._archive.load, path=Vault.DOMAIN)),
-            pck.loads(await self._proxy.call(
-                self._archive.load, path='/settings/nodes/' + str(
-                    self._archive.stats().node) + '.pickle'))
-        )
+    def load_identity(self):
+        load_ops = [
+            self._proxy.call(self._archive.load, filename=Vault.ENTITY),
+            self._proxy.call(self._archive.load, filename=Vault.PRIVATE),
+            self._proxy.call(self._archive.load, filename=Vault.KEYS_LINK),
+            self._proxy.call(self._archive.load, filename=Vault.DOMAIN),
+            self._proxy.call(
+                self._archive.load, filename='/settings/nodes/' + str(
+                    self._archive.stats().node) + '.pickle')
+        ]
+        loop = asyncio.get_event_loop()
+        gathering = asyncio.gather(
+            *load_ops, loop=loop, return_exceptions=True)
+        loop.run_until_complete(gathering)
+
+        return [pck.loads(_) for _ in gathering.result()]
 
     async def save(self, filename, document):
         created, updated, owner = Glue.doc_save(document)
@@ -122,9 +126,9 @@ class Vault:
             id=document.id, owner=owner, created=created, modified=updated,
             compression=Entry.COMP_NONE)
 
-    async def load_pubkeys(self, entity_id):
+    async def find_keys(self, issuer):
         def callable():
-            result = Globber.owner(self._archive, entity_id, '/keys')
+            result = Globber.owner(self._archive, issuer, '/keys')
             result.sort(reverse=True, key=lambda e: e[2])
 
             today = datetime.date.today()

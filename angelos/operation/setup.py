@@ -21,14 +21,14 @@ class BaseSetupOperation(Operation):
         ent_gen = cls.ENTITY[1]()
         ent_gen.generate(**entity_data)
 
-        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
+        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
         dom_gen.generate()
 
-        nod_gen = NodePolicy(ent_gen.entity, ent_gen.private, ent_gen.keys)
+        nod_gen = NodePolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
         nod_gen.current(dom_gen.domain)
 
         return (
-            ent_gen.entity, ent_gen.private, ent_gen.keys,
+            ent_gen.entity, ent_gen.privkeys, ent_gen.keys,
             dom_gen.domain, nod_gen.node
         )
 

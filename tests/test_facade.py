@@ -26,6 +26,7 @@ class TestFacade(unittest.TestCase):
         entity_data = random_person_entity_data(1)[0]
 
         facade = PersonClientFacade.setup(self.home, self.secret, entity_data)
+        del facade
 
 
 if __name__ == '__main__':

@@ -66,7 +66,7 @@ class DomainPolicy(Policy):
         self.domain = None
 
     def generate(self):
-        """Generate node document from currently running node"""
+        """Generate domain document from currently running node"""
         self.domain = None
 
         domain = Domain(nd={

@@ -14,6 +14,7 @@ import copy
 import zlib
 import gzip
 import bz2
+import logging
 
 from ..ioc import Container, ContainerAware
 from ..utils import Util
@@ -774,6 +775,7 @@ class Archive7(ContainerAware):
 
             if entry.type == Entry.TYPE_LINK:
                 entry, idx = ops.follow_link(entry)
+                logging.info('Links to: %s' % str(entry.id))
 
             data = self.ioc.operations.load_data(entry)
 
@@ -783,6 +785,8 @@ class Archive7(ContainerAware):
             if entry.digest != hashlib.sha1(data).digest():
                 raise Util.exception(Error.AR7_DIGEST_INVALID, {
                     'filename': filename, 'id': entry.id})
+
+            logging.info('Loading file: %s' % filename)
             return data
 
     class Entries(ContainerAware):
@@ -1430,8 +1434,8 @@ class Archive7(ContainerAware):
             self.__deleted = deleted
             return self
 
-        def build(self, paths):
-            if self.__dir_regex:
+        def build(self, paths=None):
+            if self.__dir_regex and paths:
                 parents = []
                 for key, value in paths.items():
                     if bool(self.__dir_regex.match(key)):

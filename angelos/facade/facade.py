@@ -17,19 +17,29 @@ class Facade:
 
 
 class BaseFacade:
-    def __init__(self, home_dir, secret):
+    def __init__(self, home_dir, secret, vault=None):
         self._path = home_dir
         self._secret = secret
 
-        self._vault = Vault(
-            os.path.join(home_dir, 'vault.ar7.cnl'), secret)
+        if isinstance(vault, Vault):
+            self._vault = vault
+        else:
+            self._vault = Vault(
+                os.path.join(home_dir, 'vault.ar7.cnl'), secret)
 
         identity = self._vault.load_identity()
-        self._entity = identity[0]
-        self._private = identity[1]
-        self._keys = identity[2]
-        self._domain = identity[3]
-        self._node = identity[4]
+
+        Util.is_type(identity[0], self.PREFS[0])
+        Util.is_type(identity[1], PrivateKeys)
+        Util.is_type(identity[2], Keys)
+        Util.is_type(identity[3], Domain)
+        Util.is_type(identity[4], Node)
+
+        self.__entity = identity[0]
+        self.__privkeys = identity[1]
+        self.__keys = identity[2]
+        self.__domain = identity[3]
+        self.__node = identity[4]
 
     @classmethod
     def setup(cls, home_dir, secret, entity_data=None, entity=None,
@@ -68,9 +78,35 @@ class BaseFacade:
             os.path.join(home_dir, 'vault.ar7.cnl'),
             entity, privkeys, keys, domain, node, secret=secret)
 
-        vault.close()
+        return cls(home_dir, secret, vault)
 
-        return cls(home_dir, secret)
+    @property
+    def entity(self):
+        return self.__entity
+
+    @property
+    def keys(self):
+        return self.__keys
+
+    @property
+    def domain(self):
+        return self.__domain
+
+    @property
+    def node(self):
+        return self.__node
+
+    def import_entity(self, entity, keys, update=False):
+        pass
+
+    def import_keys(self, keys):
+        pass
+
+    def find_keys(self, issuer):
+        pass
+
+    def find_entity(self, issuer):
+        pass
 
 
 class PersonFacadeMixin:
@@ -94,42 +130,42 @@ class ClientFacadeMixin:
 
 
 class PersonClientFacade(BaseFacade, ClientFacadeMixin, PersonFacadeMixin):
-    def __init__(self, home_dir, secret):
-        BaseFacade.__init__(self, home_dir, secret)
+    def __init__(self, home_dir, secret, vault=None):
+        BaseFacade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
 class PersonServerFacade(BaseFacade, ServerFacadeMixin, PersonFacadeMixin):
-    def __init__(self, home_dir, secret):
-        BaseFacade.__init__(self, home_dir, secret)
+    def __init__(self, home_dir, secret, vault=None):
+        BaseFacade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
 class MinistryClientFacade(BaseFacade, ClientFacadeMixin, MinistryFacadeMixin):
-    def __init__(self, home_dir, secret):
-        BaseFacade.__init__(self, home_dir, secret)
+    def __init__(self, home_dir, secret, vault=None):
+        BaseFacade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
 class MinistryServerFacade(BaseFacade, ServerFacadeMixin, MinistryFacadeMixin):
-    def __init__(self, home_dir, secret):
-        BaseFacade.__init__(self, home_dir, secret)
+    def __init__(self, home_dir, secret, vault=None):
+        BaseFacade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
 class ChurchClientFacade(BaseFacade, ClientFacadeMixin, ChurchFacadeMixin):
-    def __init__(self, home_dir, secret):
-        BaseFacade.__init__(self, home_dir, secret)
+    def __init__(self, home_dir, secret, vault=None):
+        BaseFacade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
 
 class ChurchServerFacade(BaseFacade, ServerFacadeMixin, ChurchFacadeMixin):
-    def __init__(self, home_dir, secret):
-        BaseFacade.__init__(self, home_dir, secret)
+    def __init__(self, home_dir, secret, vault=None):
+        BaseFacade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)

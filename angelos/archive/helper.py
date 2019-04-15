@@ -82,8 +82,8 @@ class Globber:
 
 
 class Proxy:
-    def __init__(self, event, size=0):
-        pass
+    def __init__(self):
+        self._quit = False
 
     def call(self, callback, params, priority=1024):
         pass
@@ -91,57 +91,72 @@ class Proxy:
     def run(self):
         pass
 
+    def quit(self):
+        self._quit = True
+
     class Task:
-        def __init__(self, callback, params):
+        def __init__(self, prio, callback, params):
+            self.prio = prio
             self.callable = callback
             self.params = params
             self.result = None
 
+        def __eq__(self, other):
+            return self.prio == other.prio
 
-class NullProxy:
+        def __lt__(self, other):
+            return self.prio < other.prio
+
+
+class NullProxy(Proxy):
     def call(self, callback, priority=1024, timeout=10, **kwargs):
         return callback(**kwargs)
 
 
-class ThreadProxy:
-    def __init__(self, event, size=0):
-        Util.is_type(event, threading._Event)
-        self.__quit = event
+class ThreadProxy(Proxy):
+    def __init__(self, size=0):
+        Proxy.__init__(self)
         self.__queue = threading.PriorityQueue(size)
 
     def call(self, callback, priority=1024, timeout=10, **kwargs):
-        task = Proxy.Task(params=kwargs)
-        self.__queue.put((priority, task))
+        task = Proxy.Task(priority, callback, kwargs)
+        self.__queue.put(task)
         return task.result
 
     def run(self):
-        while not self.__quit.is_set() or not self.__queue.empty():
+        while not (self._quit and self.__queue.empty()):
             task = self.__queue.get()
+            logging.debug('Proxy prepare: %s; %s' % (task.prio, ', '.join(
+                ": ".join(_) for _ in task.params.items())))
             result = task.callable(**task.params)
+            logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
             task.result = result if result else None
             self.__queue.task_done()
 
 
-class AsyncProxy:
-    def __init__(self, event, size=0):
-        Util.is_type(event, asyncio._Event)
-        self.__quit = event
+class AsyncProxy(Proxy):
+    def __init__(self, size=0):
+        Proxy.__init__(self)
         self.__queue = asyncio.PriorityQueue(size)
+        self.task = asyncio.ensure_future(self.run())
 
     async def call(self, callback, priority=1024, timeout=10, **kwargs):
         try:
-            task = Proxy.Task(params=kwargs)
-            await asyncio.wait_for(self.__queue.put((priority, task)), timeout)
+            task = Proxy.Task(priority, callback, kwargs)
+            await asyncio.wait_for(self.__queue.put(task), timeout)
             return task.result
         except asyncio.TimeoutError as e:
             logging.exception(e)
             return None
 
     async def run(self):
-        while not self.__quit.is_set() or not self.__queue.empty():
+        while not (self._quit and self.__queue.empty()):
             await self.__executor(await self.__queue.get())
             self.__queue.task_done()
 
     async def __executor(self, task):
+        logging.debug('Proxy prepare: %s; %s' % (task.prio, ', '.join(
+            ": ".join(_) for _ in task.params.items())))
         result = task.callable(**task.params)
+        logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
         task.result = result if result else None
