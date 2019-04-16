@@ -1042,6 +1042,8 @@ class Archive7(ContainerAware):
                 raise Util.exception(Error.AR7_WRONG_ENTRY, {
                     'type': entry.type, 'id': entry.id})
 
+            return True
+
         def search(self, query, raw=False):
             Util.is_type(query, Archive7.Query)
             filterator = filter(query.build(

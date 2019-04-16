@@ -1,11 +1,14 @@
 import os
 import logging
+import asyncio
 
 from ..utils import Util
 
 from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from ..document.domain import Domain, Node
 from ..archive.vault import Vault
+from ..archive.helper import Glue
+from ..policy.accept import ImportEntityPolicy, ImportUpdatePolicy
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -97,16 +100,67 @@ class BaseFacade:
         return self.__node
 
     def import_entity(self, entity, keys, update=False):
-        pass
+        valid = True
+        dir = None
+        policy = ImportEntityPolicy()
+        if isinstance(entity, Person):
+            valid = policy.person(entity, keys)
+            dir = '/entities/persons'
+        elif isinstance(entity, Ministry):
+            valid = policy.ministry(entity, keys)
+            dir = '/entities/ministries'
+        elif isinstance(entity, Church):
+            valid = policy.church(entity, keys)
+            dir = '/entities/churches'
+        else:
+            logging.warning('Invalid entity type')
+            raise TypeError('Invalid entity type')
 
-    def import_keys(self, keys):
-        pass
+        if not valid:
+            logging.info('Entity or Keys are invalid')
+            raise RuntimeError('Entity or Keys are invalid')
+        else:
+            print(dir)
+            Glue.run_async(
+                self._vault.save(os.path.join(
+                    dir, str(entity.id) + '.pickle'), entity),
+                self._vault.save(os.path.join(
+                    '/keys', str(keys.id) + '.pickle'), keys)
+            )
 
-    def find_keys(self, issuer):
-        pass
+            return True
 
-    def find_entity(self, issuer):
-        pass
+    def import_keys(self, newkeys):
+            entity = self.find_entity(newkeys.issuer)
+            keylist = self.find_keys(newkeys.issuer)
+
+            valid = False
+            for keys in keylist:
+                policy = ImportUpdatePolicy(entity, keys)
+                if policy.keys(newkeys):
+                    valid = True
+                    break
+
+            if valid:
+                asyncio.get_event_loop().run_until_complete(
+                    self._vault.save(os.path.join(
+                        '/keys', str(newkeys.id) + '.pickle'), newkeys))
+                logging.info('New keys imported')
+                return True
+            else:
+                logging.error('New keys invalid')
+                return False
+
+    def find_keys(self, issuer, expiry_check=True):
+        doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
+        return Glue.doc_check(doclist, Keys, expiry_check)
+
+    def find_entity(self, issuer, expiry_check=True):
+        doclist = Glue.run_async(self._vault.issuer(issuer, '/entities/*', 1))
+        entitylist = Glue.doc_check(
+            doclist, (Person, Ministry, Church), expiry_check)
+
+        return entitylist[0] if len(entitylist) else None
 
 
 class PersonFacadeMixin:

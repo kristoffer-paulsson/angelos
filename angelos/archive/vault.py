@@ -1,6 +1,5 @@
 import pickle as pck
 import asyncio
-import datetime
 
 from ..utils import Util
 
@@ -120,26 +119,25 @@ class Vault:
     async def save(self, filename, document):
         created, updated, owner = Glue.doc_save(document)
 
-        return await self._proxy.call(
-            self._archive.mkfile, filename=filename, data=pck.dumps(
-                document, pck.DEFAULT_PROTOCOL),
-            id=document.id, owner=owner, created=created, modified=updated,
-            compression=Entry.COMP_NONE)
+        return (
+            await self._proxy.call(
+                self._archive.mkfile, filename=filename, data=pck.dumps(
+                    document, pck.DEFAULT_PROTOCOL),
+                id=document.id, owner=owner, created=created, modified=updated,
+                compression=Entry.COMP_NONE)
+            )
 
-    async def find_keys(self, issuer):
-        def callable():
-            result = Globber.owner(self._archive, issuer, '/keys')
+    async def issuer(self, issuer, path='/', limit=1):
+        def callback():
+            result = Globber.owner(self._archive, issuer, path)
             result.sort(reverse=True, key=lambda e: e[2])
 
-            today = datetime.date.today()
-            keylist = []
+            datalist = []
+            for r in result[:limit]:
+                datalist.append(self._archive.load(r[0]))
 
-            for r in result[:3]:
-                keys = pck.loads(self._archive.load(r[0]))
-                if isinstance(keys, Keys):
-                    if keys.expires > today:
-                        keylist.append()
+            return datalist
 
-            return keylist if len(keylist) else None
-
-        return await self._proxy.call(callable, 0, 5)
+        return (
+            await self._proxy.call(callback, 0, 5)
+        )

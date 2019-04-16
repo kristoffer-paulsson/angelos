@@ -3,6 +3,7 @@ import threading
 import asyncio
 import logging
 import uuid
+import pickle
 
 from ..utils import Util
 from .archive7 import Archive7
@@ -26,6 +27,38 @@ class Glue:
             document.created, datetime.datetime.min.time())
 
         return created, updated, owner
+
+    @staticmethod
+    def doc_check(datalist, _type, expiry_check=True):
+        # validity = datetime.date.today() - datetime.timedelta(year=3)
+        validity = datetime.date.today()
+        doclist = []
+
+        for data in datalist:
+            doc = pickle.loads(data)
+            if isinstance(doc, _type):
+                # doc.validate()
+                if expiry_check and doc.expires > validity:
+                    doclist.append(doc)
+                elif not expiry_check:
+                    doclist.append(doc)
+
+        return doclist
+
+    @staticmethod
+    def run_async(*aws, raise_exc=True):
+        loop = asyncio.get_event_loop()
+        gathering = asyncio.gather(*aws, loop=loop, return_exceptions=True)
+        loop.run_until_complete(gathering)
+
+        exc = None
+        for result in gathering.result():
+            if isinstance(result, Exception):
+                exc = result if not exc else exc
+                logging.error('Operation failed: %s' % result)
+        if exc:
+            raise exc
+        return result
 
 
 class Globber:
@@ -63,8 +96,7 @@ class Globber:
 
         archive._lock()
 
-        pid = archive.ioc.operations.get_pid(path)
-        sq = Archive7.Query().owner(owner).parent(pid).type(b'f')
+        sq = Archive7.Query(path).owner(owner).type(b'f')
         idxs = archive.ioc.entries.search(sq)
         ids = archive.ioc.hierarchy.ids
 
@@ -110,7 +142,14 @@ class Proxy:
 
 class NullProxy(Proxy):
     def call(self, callback, priority=1024, timeout=10, **kwargs):
-        return callback(**kwargs)
+        try:
+            result = callback(**kwargs)
+            logging.info('Proxy execution: "%s"' % str(callback.__name__))
+            return result
+        except Exception as e:
+            logging.error(
+                'Proxy execution failed: "%s"' % str(callback.__name__))
+            return e
 
 
 class ThreadProxy(Proxy):
@@ -126,11 +165,18 @@ class ThreadProxy(Proxy):
     def run(self):
         while not (self._quit and self.__queue.empty()):
             task = self.__queue.get()
-            logging.debug('Proxy prepare: %s; %s' % (task.prio, ', '.join(
-                ": ".join(_) for _ in task.params.items())))
-            result = task.callable(**task.params)
-            logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
-            task.result = result if result else None
+            # logging.debug('Proxy prepare: %s; %s' % (task.prio, ', '.join(
+            #    ": ".join(_) for _ in task.params.items())))
+            try:
+                result = task.callable(**task.params)
+                logging.info(
+                    'Proxy execution: "%s"' % str(task.callable.__name__))
+                task.result = result if result else None
+            except Exception as e:
+                logging.error(
+                    'Proxy execution failed: "%s"' % str(
+                        task.callable.__name__))
+                task.result = e
             self.__queue.task_done()
 
 
@@ -155,8 +201,13 @@ class AsyncProxy(Proxy):
             self.__queue.task_done()
 
     async def __executor(self, task):
-        logging.debug('Proxy prepare: %s; %s' % (task.prio, ', '.join(
-            ": ".join(_) for _ in task.params.items())))
-        result = task.callable(**task.params)
-        logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
-        task.result = result if result else None
+        # logging.debug('Proxy prepare: %s; %s' % (
+        #    task.prio, json.dumps(task.params)))
+        try:
+            result = task.callable(**task.params)
+            logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
+            task.result = result if result else None
+        except Exception as e:
+            logging.error(
+                'Proxy execution failed: "%s"' % str(task.callable.__name__))
+            task.result = e

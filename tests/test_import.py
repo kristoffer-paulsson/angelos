@@ -45,7 +45,7 @@ class TestImportPolicies(unittest.TestCase):
         upolicy = PersonUpdatePolicy()
         entity = upolicy.change(
             copy.deepcopy(self.policy.entity), family_name='Doe')
-        upolicy.update(entity, self.policy.private, self.policy.keys)
+        upolicy.update(entity, self.policy.privkeys, self.policy.keys)
         try:
             imp = ImportUpdatePolicy(
                 self.policy.entity, self.policy.keys)
@@ -55,15 +55,15 @@ class TestImportPolicies(unittest.TestCase):
 
     def test_03_import_newkeys(self):
         """
-        Importing an updated person entity
+        Generating new keys for entity and import
         """
         logging.info('====== %s ======' % 'test_03_import_newkeys')
 
         upolicy = PersonUpdatePolicy()
         self.assertTrue(upolicy.newkeys(
-            self.policy.entity, self.policy.private, self.policy.keys))
+            self.policy.entity, self.policy.privkeys, self.policy.keys))
         self.assertIsInstance(upolicy.keys, Keys)
-        self.assertIsInstance(upolicy.private, PrivateKeys)
+        self.assertIsInstance(upolicy.privkeys, PrivateKeys)
         try:
             imp = ImportUpdatePolicy(
                 self.policy.entity, self.policy.keys)
@@ -73,7 +73,7 @@ class TestImportPolicies(unittest.TestCase):
 
     def test_04_import_documents(self):
         """
-        Importing an updated person entity
+        Importing an arbitrary document
         """
         logging.info('====== %s ======' % 'test_04_import_documents')
 
@@ -83,7 +83,7 @@ class TestImportPolicies(unittest.TestCase):
                                   'issuer': self.policy.entity.id})
             Crypto.sign(
                 trusted, self.policy.entity,
-                self.policy.private, self.policy.keys)
+                self.policy.privkeys, self.policy.keys)
             self.assertTrue(impdoc.document(trusted))
             # self.assertTrue(impdoc.envelope())
         except Exception as e:
