@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import logging
 from logging.config import dictConfig
 from .const import Const

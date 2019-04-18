@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import collections
 import threading
 from .utils import Util

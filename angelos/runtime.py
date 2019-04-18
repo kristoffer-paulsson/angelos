@@ -1,3 +1,6 @@
+"""Module docstring."""
+
+
 class Runtime:
     def __init__(self, config):
         self.__root = config['root']

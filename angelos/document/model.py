@@ -1,3 +1,4 @@
+"""Module docstring."""
 import re
 import datetime
 import uuid

@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import sys
 import os
 import atexit

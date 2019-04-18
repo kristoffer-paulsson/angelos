@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import re
 import sys
 from ..utils import Util, FactoryInterface

@@ -16,7 +16,7 @@ from support import filesize
 from angelos.archive.archive7 import Archive7
 
 
-class TestConceal(unittest.TestCase):
+class TestArchive(unittest.TestCase):
     files1 = None
     files2 = None
     files3 = None
@@ -84,10 +84,10 @@ class TestConceal(unittest.TestCase):
                     arch.mkfile(filename, data)
 
                 random.shuffle(files)
-                TestConceal.files1 = files[:10]
-                TestConceal.files2 = files[10:20]
-                TestConceal.files3 = files[20:30]
-                TestConceal.files4 = files[30:40]
+                TestArchive.files1 = files[:10]
+                TestArchive.files2 = files[10:20]
+                TestArchive.files3 = files[20:30]
+                TestArchive.files4 = files[30:40]
         except Exception as e:
             self.fail(e)
 
@@ -108,9 +108,9 @@ class TestConceal(unittest.TestCase):
 
         try:
             with Archive7.open(self.filename, self.secret) as arch:
-                for i in TestConceal.files1:
+                for i in TestArchive.files1:
                     arch.save(i, self.generate_data())
-                for i in TestConceal.files1:
+                for i in TestArchive.files1:
                     arch.load(i)
         except Exception as e:
             self.fail(e)
@@ -121,29 +121,30 @@ class TestConceal(unittest.TestCase):
 
         try:
             with Archive7.open(self.filename, self.secret) as arch:
-                for i in TestConceal.files2:
+                for i in TestArchive.files2:
                     arch.remove(i)
         except Exception as e:
             self.fail(e)
 
     def test_08_rename(self):
-        """Open archive and delete some files"""
+        """Open archive and rename some files"""
         logging.info('====== %s ======' % 'test_08_rename')
 
         try:
             with Archive7.open(self.filename, self.secret) as arch:
-                for i in TestConceal.files3:
+                for i in TestArchive.files3:
                     arch.rename(i, self.generate_filename())
         except Exception as e:
             self.fail(e)
 
     def test_09_move(self):
-        """Open archive and delete some files"""
+        """Open archive and move some files"""
         logging.info('====== %s ======' % 'test_09_move')
 
         try:
             with Archive7.open(self.filename, self.secret) as arch:
-                for i in TestConceal.files4:
+                for i in TestArchive.files4:
+                    print('File:', i)
                     arch.move(i, '/')
         except Exception as e:
             self.fail(e)

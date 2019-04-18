@@ -1,3 +1,4 @@
+"""Module docstring."""
 import os
 import re
 import struct
@@ -25,9 +26,9 @@ from .conceal import ConcealIO
 class Header(collections.namedtuple('Header', field_names=[
     'major',        # 2
     'minor',        # 2
-    'type',         # 1
-    'role',         # 1
-    'use',          # 1
+    'type',         # 1  # Facade type
+    'role',         # 1  # Role in the domain network
+    'use',          # 1  # Purpose of the archive
     'id',           # 16
     'owner',        # 16
     'domain',       # 16
@@ -690,7 +691,7 @@ class Archive7(ContainerAware):
 
         return self.ioc.entries.add(entry)
 
-    def save(self, path, data, compression=Entry.COMP_NONE, modified=None):
+    def save(self, filename, data, compression=Entry.COMP_NONE, modified=None):
         if not modified:
             modified = datetime.datetime.now()
 
@@ -701,7 +702,7 @@ class Archive7(ContainerAware):
             if not entries.find_blank():
                 entries.make_blanks()
 
-            name, dirname = ops.path(path)
+            name, dirname = ops.path(filename)
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(
                 name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK))
@@ -1345,16 +1346,17 @@ class Archive7(ContainerAware):
 
         def __init__(self, pattern='*'):
             self.__type = (Entry.TYPE_FILE, Entry.TYPE_DIR, Entry.TYPE_LINK)
-            if pattern == '*':
-                self.__file_regex = None
-                self.__dir_regex = None
-            else:
+            self.__file_regex = None
+            self.__dir_regex = None
+            if not pattern == '*':
                 filename = re.escape(os.path.basename(
                     pattern)).replace('\*', '.*').replace('\?', '.')
                 dirname = re.escape(os.path.dirname(
                     pattern)).replace('\*', '.*').replace('\?', '.')
-                self.__file_regex = re.compile(bytes(filename, 'utf-8'))
-                self.__dir_regex = re.compile(dirname)
+                if filename:
+                    self.__file_regex = re.compile(bytes(filename, 'utf-8'))
+                if dirname:
+                    self.__dir_regex = re.compile(dirname)
             self.__id = None
             self.__parent = None
             self.__owner = None

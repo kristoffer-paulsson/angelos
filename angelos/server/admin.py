@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import asyncio
 import asyncssh
 import sys

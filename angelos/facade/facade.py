@@ -1,8 +1,10 @@
+"""Module docstring."""
 import os
 import logging
 import asyncio
 
 from ..utils import Util
+from ..const import Const
 
 from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from ..document.domain import Domain, Node
@@ -15,11 +17,6 @@ from ..operation.setup import (
 
 
 class Facade:
-    def __init__(self, home_dir, secret):
-        pass
-
-
-class BaseFacade:
     def __init__(self, home_dir, secret, vault=None):
         self._path = home_dir
         self._secret = secret
@@ -83,6 +80,27 @@ class BaseFacade:
 
         return cls(home_dir, secret, vault)
 
+    def open(self, home_dir, secret):
+        vault = Vault(os.path.join(home_dir, 'vault.ar7.cnl'), secret)
+        _type = vault._archive.stats().type
+
+        if _type == Const.A_TYPE_PERSON_CLIENT:
+            facade = PersonClientFacade(home_dir, secret, vault)
+        elif _type == Const.A_TYPE_PERSON_SERVER:
+            facade = PersonServerFacade(home_dir, secret, vault)
+        elif _type == Const.A_TYPE_MINISTRY_CLIENT:
+            facade = MinistryClientFacade(home_dir, secret, vault)
+        elif _type == Const.A_TYPE_MINISTRY_SERVER:
+            facade = MinistryServerFacade(home_dir, secret, vault)
+        elif _type == Const.A_TYPE_CHURCH_CLIENT:
+            facade = ChurchClientFacade(home_dir, secret, vault)
+        elif _type == Const.A_TYPE_CHURCH_SERVER:
+            facade = ChurchServerFacade(home_dir, secret, vault)
+        else:
+            raise RuntimeError('Unkown archive type: %s' % str(_type))
+
+        return facade
+
     @property
     def entity(self):
         return self.__entity
@@ -99,7 +117,7 @@ class BaseFacade:
     def node(self):
         return self.__node
 
-    def import_entity(self, entity, keys, update=False):
+    def import_entity(self, entity, keys):
         valid = True
         dir = None
         policy = ImportEntityPolicy()
@@ -120,7 +138,6 @@ class BaseFacade:
             logging.info('Entity or Keys are invalid')
             raise RuntimeError('Entity or Keys are invalid')
         else:
-            print(dir)
             Glue.run_async(
                 self._vault.save(os.path.join(
                     dir, str(entity.id) + '.pickle'), entity),
@@ -130,7 +147,7 @@ class BaseFacade:
 
             return True
 
-    def import_keys(self, newkeys):
+    def update_keys(self, newkeys):
             entity = self.find_entity(newkeys.issuer)
             keylist = self.find_keys(newkeys.issuer)
 
@@ -142,14 +159,50 @@ class BaseFacade:
                     break
 
             if valid:
-                asyncio.get_event_loop().run_until_complete(
+                result = asyncio.get_event_loop().run_until_complete(
                     self._vault.save(os.path.join(
                         '/keys', str(newkeys.id) + '.pickle'), newkeys))
+                if isinstance(result, Exception):
+                    raise result
                 logging.info('New keys imported')
                 return True
             else:
                 logging.error('New keys invalid')
                 return False
+
+    def update_entity(self, entity):
+        old_ent = self.find_entity(entity.id)
+        keylist = self.find_keys(entity.id)
+
+        dir = None
+        if isinstance(entity, Person):
+            dir = '/entities/persons'
+        elif isinstance(entity, Ministry):
+            dir = '/entities/ministries'
+        elif isinstance(entity, Church):
+            dir = '/entities/churches'
+        else:
+            logging.warning('Invalid entity type')
+            raise TypeError('Invalid entity type')
+
+        valid = False
+        for keys in keylist:
+            policy = ImportUpdatePolicy(old_ent, keys)
+            if policy.entity(entity):
+                valid = True
+                break
+
+        if valid:
+            result = asyncio.get_event_loop().run_until_complete(
+                self._vault.update(os.path.join(
+                    dir, str(entity.id) + '.pickle'), entity))
+            if isinstance(result, Exception):
+                raise result
+            logging.info('updated entity imported')
+            return True
+        else:
+            logging.error('Updated entity invalid')
+            return False
 
     def find_keys(self, issuer, expiry_check=True):
         doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
@@ -183,43 +236,43 @@ class ClientFacadeMixin:
     pass
 
 
-class PersonClientFacade(BaseFacade, ClientFacadeMixin, PersonFacadeMixin):
+class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):
     def __init__(self, home_dir, secret, vault=None):
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        Facade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
-class PersonServerFacade(BaseFacade, ServerFacadeMixin, PersonFacadeMixin):
+class PersonServerFacade(Facade, ServerFacadeMixin, PersonFacadeMixin):
     def __init__(self, home_dir, secret, vault=None):
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
-class MinistryClientFacade(BaseFacade, ClientFacadeMixin, MinistryFacadeMixin):
+class MinistryClientFacade(Facade, ClientFacadeMixin, MinistryFacadeMixin):
     def __init__(self, home_dir, secret, vault=None):
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        Facade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
-class MinistryServerFacade(BaseFacade, ServerFacadeMixin, MinistryFacadeMixin):
+class MinistryServerFacade(Facade, ServerFacadeMixin, MinistryFacadeMixin):
     def __init__(self, home_dir, secret, vault=None):
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
-class ChurchClientFacade(BaseFacade, ClientFacadeMixin, ChurchFacadeMixin):
+class ChurchClientFacade(Facade, ClientFacadeMixin, ChurchFacadeMixin):
     def __init__(self, home_dir, secret, vault=None):
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        Facade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
 
-class ChurchServerFacade(BaseFacade, ServerFacadeMixin, ChurchFacadeMixin):
+class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
     def __init__(self, home_dir, secret, vault=None):
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)

@@ -1,3 +1,4 @@
+"""Module docstring."""
 from .model import BaseDocument, TypeField, BinaryField, SignatureField
 from .document import Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin

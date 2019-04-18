@@ -1,6 +1,4 @@
-'''
-All common data and variables to be incorporated in the server  binary
-'''
+"""All common data and variables to be incorporated in the server  binary."""
 
 from ..const import Const
 from ..utils import Util

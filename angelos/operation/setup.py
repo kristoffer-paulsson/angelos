@@ -1,3 +1,4 @@
+"""Module docstring."""
 import logging
 
 from ..utils import Util

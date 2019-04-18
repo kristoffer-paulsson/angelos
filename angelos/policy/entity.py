@@ -1,3 +1,4 @@
+"""Module docstring."""
 import datetime
 
 import libnacl.dual
@@ -113,12 +114,12 @@ class BaseUpdatePolicy(Policy):
         Util.is_type(entity, self.ENTITY[0])
         self.box = libnacl.dual.DualSecret()
 
-        privkeys = PrivateKeys(nd={
+        new_pk = PrivateKeys(nd={
             'issuer': entity.id,
             'secret': self.box.sk,
             'seed': self.box.seed
         })
-        new_pk = Crypto.sign(privkeys, entity, privkeys, keys)
+        new_pk = Crypto.sign(new_pk, entity, privkeys, keys)
 
         new_keys = Keys(nd={
             'issuer': entity.id,

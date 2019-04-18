@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 
 import time
 from ..const import Const

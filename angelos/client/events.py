@@ -1,3 +1,4 @@
+"""Module docstring."""
 from ..const import Const
 from ..events import Message
 

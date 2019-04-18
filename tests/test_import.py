@@ -71,7 +71,7 @@ class TestImportPolicies(unittest.TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_04_import_documents(self):
+    def bla_test_04_import_documents(self):
         """
         Importing an arbitrary document
         """

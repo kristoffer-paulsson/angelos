@@ -1,3 +1,4 @@
+"""Module docstring."""
 import pickle as pck
 import asyncio
 
@@ -125,6 +126,15 @@ class Vault:
                     document, pck.DEFAULT_PROTOCOL),
                 id=document.id, owner=owner, created=created, modified=updated,
                 compression=Entry.COMP_NONE)
+            )
+
+    async def update(self, filename, document):
+        created, updated, owner = Glue.doc_save(document)
+
+        return (
+            await self._proxy.call(
+                self._archive.save, filename=filename, data=pck.dumps(
+                    document, pck.DEFAULT_PROTOCOL), modified=updated)
             )
 
     async def issuer(self, issuer, path='/', limit=1):

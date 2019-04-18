@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import os
 import sys
 import importlib

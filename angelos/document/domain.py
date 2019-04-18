@@ -1,3 +1,4 @@
+"""Module docstring."""
 from .model import (
     BaseDocument, StringField, IPField, UuidField, DocumentField, TypeField)
 from .document import Document, UpdatedMixin, IssueMixin

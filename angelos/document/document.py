@@ -1,3 +1,4 @@
+"""Module docstring."""
 import datetime
 import uuid
 import enum

@@ -1,3 +1,4 @@
+"""Module docstring."""
 from .model import (
     BaseDocument, StringField, DateField, BinaryField, DocumentField,
     UuidField, TypeField)

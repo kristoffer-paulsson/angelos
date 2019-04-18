@@ -1,29 +1,25 @@
-"""Docstring"""
+"""Module docstring."""
 import collections
-import yaml
+import json
 
-from .server import Server
+from .app import Application
 from .common import IMMUTABLE, DEFAULT
 from ..ioc import Container
 
-from ..worker import Workers
-from ..events import Events
 from ..logger import LogHandler
 from ..runtime import Runtime
 
 try:
-    with open(DEFAULT['runtime']['root'] + '/default.yml') as yc:
-        LOADED = yaml.load(yc.read())
+    with open(DEFAULT['runtime']['root'] + '/config.json') as jc:
+        LOADED = json.load(jc.read())
 except FileNotFoundError:
     LOADED = {'configured': False}
 
 CONFIG = {
-    'workers': lambda self: Workers(),
     'environment': lambda self: collections.ChainMap(
         IMMUTABLE,
         LOADED,
         DEFAULT),
-    'message': lambda self: Events(),
     'log': lambda self: LogHandler(self.environment['logger']),
     'runtime': lambda self: Runtime(self.environment['runtime']),
 }
@@ -31,4 +27,4 @@ CONFIG = {
 
 def start():
     """Docstring"""
-    Server(Container(CONFIG)).start()
+    Application(Container(CONFIG)).start()

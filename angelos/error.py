@@ -1,3 +1,4 @@
+"""Module docstring."""
 from enum import IntEnum
 
 

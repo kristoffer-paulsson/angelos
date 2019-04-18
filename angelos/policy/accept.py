@@ -1,3 +1,4 @@
+"""Module docstring."""
 import datetime
 from ..utils import Util
 
@@ -64,6 +65,11 @@ class ImportEntityPolicy(Policy):
 
     def __validate(self, entity, keys):
         valid = True
+
+        today = datetime.date.today()
+        valid = False if entity.expires < today else valid
+        valid = False if keys.expires < today else valid
+
         try:
             valid = False if not entity.validate() else valid
             valid = False if not keys.validate() else valid
@@ -124,11 +130,11 @@ class ImportUpdatePolicy(Policy):
 
     def __dict_cmp(self, entity, fields):
         valid = True
+
+        valid = False if datetime.date.today() > entity.expires else valid
         valid = False if not entity.validate() else valid
         valid = False if not Crypto.verify(
             entity, self.__entity, self.__keys) else valid
-        if datetime.date.today() > entity.expires:
-            valid = False
 
         diff = []
         new_exp = entity.export()
@@ -143,39 +149,20 @@ class ImportUpdatePolicy(Policy):
 
         return valid
 
-    def person(self, entity):
+    def entity(self, entity):
         Util.is_type(entity, type(self.__entity))
-        Util.is_type(entity, Person)
+        Util.is_type(entity, (Person, Ministry, Church))
+
+        if isinstance(entity, Person):
+            fields = PersonUpdatePolicy.ENTITY[1]
+        elif isinstance(entity, Ministry):
+            fields = MinistryUpdatePolicy.ENTITY[1]
+        elif isinstance(entity, Church):
+            fields = ChurchUpdatePolicy.ENTITY[1]
 
         self._exception = None
         try:
-            valid = self.__dict_cmp(entity, PersonUpdatePolicy.ENTITY[1])
-        except Exception as e:
-            self._exception = e
-            valid = False
-
-        return valid
-
-    def ministry(self, entity):
-        Util.is_type(entity, type(self.__entity))
-        Util.is_type(entity, Ministry)
-
-        self._exception = None
-        try:
-            valid = self.__dict_cmp(entity, MinistryUpdatePolicy.ENTITY[1])
-        except Exception as e:
-            self._exception = e
-            valid = False
-
-        return valid
-
-    def church(self, entity):
-        Util.is_type(entity, type(self.__entity))
-        Util.is_type(entity, Church)
-
-        self._exception = None
-        try:
-            valid = self.__dict_cmp(entity, ChurchUpdatePolicy.ENTITY[1])
+            valid = self.__dict_cmp(entity, fields)
         except Exception as e:
             self._exception = e
             valid = False

@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 from .utils import Util
 
 

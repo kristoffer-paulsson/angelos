@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import types
 from .utils import Util
 from .error import Error

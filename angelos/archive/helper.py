@@ -1,9 +1,11 @@
+"""Module docstring."""
 import datetime
 import threading
 import asyncio
 import logging
 import uuid
 import pickle
+import types
 
 from ..utils import Util
 from .archive7 import Archive7
@@ -117,8 +119,10 @@ class Proxy:
     def __init__(self):
         self._quit = False
 
-    def call(self, callback, params, priority=1024):
-        pass
+    def call(self, callback, priority=1024, timeout=10, **kwargs):
+        Util.is_type(callback, types.FunctionType)
+        if self._quit:
+            raise RuntimeError('Proxy has quit, no more calls')
 
     def run(self):
         pass
@@ -142,6 +146,9 @@ class Proxy:
 
 class NullProxy(Proxy):
     def call(self, callback, priority=1024, timeout=10, **kwargs):
+        Util.is_type(callback, (types.FunctionType, types.MethodType))
+        if self._quit:
+            raise RuntimeError('Proxy has quit, no more calls')
         try:
             result = callback(**kwargs)
             logging.info('Proxy execution: "%s"' % str(callback.__name__))
@@ -158,6 +165,10 @@ class ThreadProxy(Proxy):
         self.__queue = threading.PriorityQueue(size)
 
     def call(self, callback, priority=1024, timeout=10, **kwargs):
+        Util.is_type(callback, (types.FunctionType, types.MethodType))
+        if self._quit:
+            raise RuntimeError('Proxy has quit, no more calls')
+
         task = Proxy.Task(priority, callback, kwargs)
         self.__queue.put(task)
         return task.result
@@ -187,6 +198,10 @@ class AsyncProxy(Proxy):
         self.task = asyncio.ensure_future(self.run())
 
     async def call(self, callback, priority=1024, timeout=10, **kwargs):
+        Util.is_type(callback, (types.FunctionType, types.MethodType))
+        if self._quit:
+            raise RuntimeError('Proxy has quit, no more calls')
+
         try:
             task = Proxy.Task(priority, callback, kwargs)
             await asyncio.wait_for(self.__queue.put(task), timeout)
@@ -196,9 +211,16 @@ class AsyncProxy(Proxy):
             return None
 
     async def run(self):
-        while not (self._quit and self.__queue.empty()):
-            await self.__executor(await self.__queue.get())
+        while True:
+            task = await self.__queue.get()
+            if task is None:
+                break
+            await self.__executor(task)
             self.__queue.task_done()
+
+    def quit(self):
+        Proxy.quit(self)
+        self.__queue.put_nowait(None)
 
     async def __executor(self, task):
         # logging.debug('Proxy prepare: %s; %s' % (

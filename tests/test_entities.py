@@ -66,11 +66,11 @@ class TestEntities(unittest.TestCase):
             self.assertTrue(policy.generate(**data[0]))
             self.assertIsInstance(policy.entity, Person)
             self.assertIsInstance(policy.keys, Keys)
-            self.assertIsInstance(policy.private, PrivateKeys)
+            self.assertIsInstance(policy.privkeys, PrivateKeys)
             self.assertTrue(Crypto.verify(
                 policy.entity, policy.entity, policy.keys))
             self.assertTrue(Crypto.verify(
-                 policy.private, policy.entity, policy.keys))
+                 policy.privkeys, policy.entity, policy.keys))
             self.assertTrue(Crypto.verify(
                 policy.keys, policy.entity, policy.keys))
         except Exception as e:
@@ -97,7 +97,7 @@ class TestEntities(unittest.TestCase):
             d.document = DummySubDocument(
                 nd={'bytes': b'Hello', 'string': 'world'})
 
-            d2 = Crypto.sign(d, policy.entity, policy.private, policy.keys)
+            d2 = Crypto.sign(d, policy.entity, policy.privkeys, policy.keys)
             self.assertIsInstance(d2, DummyDocument)
             self.assertTrue(Crypto.verify(d2, policy.entity, policy.keys))
         except Exception as e:
@@ -138,7 +138,7 @@ class TestEntities(unittest.TestCase):
             upolicy = PersonUpdatePolicy()
 
             self.assertTrue(upolicy.update(
-                gpolicy.entity, gpolicy.private, gpolicy.keys))
+                gpolicy.entity, gpolicy.privkeys, gpolicy.keys))
             self.assertTrue(Crypto.verify(
                 upolicy.entity, gpolicy.entity, gpolicy.keys))
         except Exception as e:
@@ -158,10 +158,20 @@ class TestEntities(unittest.TestCase):
             upolicy = PersonUpdatePolicy()
 
             upolicy.newkeys(
-                gpolicy.entity, gpolicy.private, gpolicy.keys)
+                gpolicy.entity, gpolicy.privkeys, gpolicy.keys)
+
+            self.assertIsInstance(
+                upolicy.keys.signature, list,
+                'Signature field in renewed public key should be list')
+            self.assertEqual(
+                len(upolicy.keys.signature), 2,
+                'Number of signature in renewed public key should be 2')
+            self.assertNotEqual(
+                upolicy.keys.signature[0], upolicy.keys.signature[1],
+                'Signatures in a renewed public key should not be same')
 
             self.assertTrue(Crypto.verify(
-                upolicy.private, gpolicy.entity, gpolicy.keys))
+                upolicy.privkeys, gpolicy.entity, gpolicy.keys))
 
             self.assertTrue(Crypto.verify(
                 upolicy.keys, gpolicy.entity, gpolicy.keys))
@@ -184,14 +194,14 @@ class TestEntities(unittest.TestCase):
             upolicy = PersonUpdatePolicy()
 
             entity = upolicy.change(gpolicy.entity, family_name='Doe')
-            upolicy.update(entity, gpolicy.private, gpolicy.keys)
-            upolicy.newkeys(entity, gpolicy.private, gpolicy.keys)
+            upolicy.update(entity, gpolicy.privkeys, gpolicy.keys)
+            upolicy.newkeys(entity, gpolicy.privkeys, gpolicy.keys)
 
             self.assertEqual(entity.family_name, 'Doe')
             self.assertTrue(Crypto.verify(entity, entity, gpolicy.keys))
 
             self.assertTrue(Crypto.verify(
-                upolicy.private, entity, gpolicy.keys))
+                upolicy.privkeys, entity, gpolicy.keys))
 
             self.assertTrue(Crypto.verify(
                 upolicy.keys, gpolicy.entity, gpolicy.keys))

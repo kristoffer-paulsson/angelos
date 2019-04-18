@@ -1,3 +1,4 @@
+"""Module docstring."""
 import base64
 
 import libnacl.sign

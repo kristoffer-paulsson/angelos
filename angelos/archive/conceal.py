@@ -1,3 +1,4 @@
+"""Module docstring."""
 import io
 import os
 import fcntl

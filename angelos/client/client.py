@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import threading
 import logging
 from kivy.app import App

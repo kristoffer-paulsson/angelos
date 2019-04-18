@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Module docstring."""
 import threading
 import asyncio
 import collections

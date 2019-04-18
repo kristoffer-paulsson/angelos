@@ -1,3 +1,4 @@
+"""Module docstring."""
 import datetime
 
 from ..utils import Util
