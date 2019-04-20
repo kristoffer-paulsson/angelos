@@ -12,21 +12,25 @@ _algorithm = b'angelos-tongues'
 
 
 class BaseKey:
-    """Base class for private/public keys"""
+    """Base class for private/public keys."""
 
     def __init__(self, key, box):
+        """Set the key and box properties."""
         self._key = key
         self._box = box
 
     @property
     def key(self):
+        """Key property."""
         return self._key
 
 
 class NaClPrivateKey(BaseKey):
+    """Private key based on NaCl for asyncssh."""
+
     @classmethod
     def construct(cls, seed):
-        """Construct an NaCl private key"""
+        """Construct an NaCl public key."""
         Util.is_type(seed, bytes)
         box = libnacl.sign.Signer(seed)
 
@@ -34,13 +38,13 @@ class NaClPrivateKey(BaseKey):
 
     @classmethod
     def generate(cls):
-        """Generate a new NaCl private key"""
+        """Generate a new NaCl private key."""
         box = libnacl.sign.Signer()
 
         return cls(box.seed, box)
 
     def sign(self, data):
-        """Sign a block of data"""
+        """Sign a block of data."""
         return self._box.signature(data)
 
     @property
@@ -49,16 +53,18 @@ class NaClPrivateKey(BaseKey):
 
 
 class NaClPublicKey(BaseKey):
+    """Public key based on NaCl for asyncssh."""
+
     @classmethod
     def construct(cls, verify):
-        """Construct an NaCl public key"""
+        """Construct an NaCl public key."""
         Util.is_type(verify, bytes)
         box = libnacl.sign.Verifier(verify.hex())
 
         return cls(verify, box)
 
     def verify(self, data, sig):
-        """Verify the signature on a block of data"""
+        """Verify the signature on a block of data."""
         try:
             self._box.verify(sig + data)
             return True
@@ -78,22 +84,22 @@ class NaClKey(asyncssh.SSHKey):
         self.all_sig_algorithms = set(self.sig_algorithms)
 
     def sign_der(self, data, sig_algorithm):
-        """Abstract method to compute a DER-encoded signature"""
+        """Abstract method to compute a DER-encoded signature."""
         if not self._key.key:
             raise ValueError('Private key needed for signing')
 
         return self._key.sign(data)
 
     def verify_der(self, data, sig_algorithm, sig):
-        """Abstract method to verify a DER-encoded signature"""
+        """Abstract method to verify a DER-encoded signature."""
         return self._key.verify(data, sig)
 
     def sign_ssh(self, data, sig_algorithm):
-        """Abstract method to compute an SSH-encoded signature"""
+        """Abstract method to compute an SSH-encoded signature."""
         return self.sign_der(data, sig_algorithm)
 
     def verify_ssh(self, data, sig_algorithm, sig):
-        """Abstract method to verify an SSH-encoded signature"""
+        """Abstract method to verify an SSH-encoded signature."""
         return self.verify_der(data, sig_algorithm, sig)
 
     def encode_ssh_private(self):

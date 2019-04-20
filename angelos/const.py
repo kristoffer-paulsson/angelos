@@ -16,13 +16,20 @@ class Const:
     A_TYPE_CHURCH_SERVER    Archive type for ChurchServerFacade
 
     A_ROLE_PRIMARY          Current node has a primary role in the domain
-    A_ROLE_CLIENT           Current node has a backup role in the domain
+    A_ROLE_BACKUP           Current node has a backup role in the domain
+    A_ROLE_COURIES          Current archive is a courier archive
 
     A_USE_VAULT             Archive used as vault
     A_USE_HOME              Archive used as an encrypted home directory
     A_USE_MAIL              Archive used as mail router pool
     A_USE_POOL              Archive used as public document pool
     A_USE_FTP               Archive used as encrypted ftp file system
+
+    CNL_VAULT               Vault file path
+    CNL_HOME                Encrypted home directory file path
+    CNL_MAIL                Mail router pool file path
+    CNL_POOL                Public document pool file path
+    CNL_FTP                 Encrypted ftp file path
 
     LOG_ERR                 Logger for technical error messages
     LOG_APP                 Logger for application related events
@@ -38,13 +45,20 @@ class Const:
     A_TYPE_CHURCH_SERVER = b'C'
 
     A_ROLE_PRIMARY = b'p'
-    A_ROLE_CLIENT = b'c'
+    A_ROLE_BACKUP = b'b'
+    A_ROLE_COURIER = b'c'
 
     A_USE_VAULT = b'v'
     A_USE_HOME = b'h'
     A_USE_MAIL = b'm'
     A_USE_POOL = b'p'
     A_USE_FTP = b'f'
+
+    CNL_VAULT = 'vault.ar7.cnl'
+    CNL_HOME = 'home.ar7.cnl'
+    CNL_MAIL = 'mail.ar7.cnl'
+    CNL_POOL = 'pool.ar7.cnl'
+    CNL_FTP = 'ftp.ar7.cnl'
 
     LOG_ERR = 'err'
     LOG_APP = 'app'

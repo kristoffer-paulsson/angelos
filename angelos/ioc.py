@@ -5,16 +5,17 @@ from .error import Error
 
 
 class Container:
-    """Docstring"""
+    """IoC container class."""
+
     def __init__(self, config={}):
-        """Docstring"""
+        """Initialize container with dictionary of values and lambdas."""
         Util.is_type(config, dict)
 
         self.__config = config
         self.__instances = {}
 
     def __getattr__(self, name):
-        """Docstring"""
+        """Get attribute according to container configuration."""
         if name not in self.__instances:
             if name not in self.__config:
                 raise Util.exception(
@@ -26,11 +27,23 @@ class Container:
                     Error.IOC_LAMBDA_EXPECTED, {'service': name})
         return self.__instances[name]
 
+    def add(self, name, value):
+        """Add a service with name and value/lambda after initialization."""
+        if name in self.__config:
+            raise IndexError('Service already configured')
+        else:
+            self.__config[name] = value
+
 
 class ContainerAware:
+    """Mixin that makes a class IoC aware."""
+
     def __init__(self, ioc):
+        """Initialize a class with IoC awareness."""
+        Util.is_type(ioc, Container)
         self.__ioc = ioc
 
     @property
     def ioc(self):
+        """Container property access."""
         return self.__ioc

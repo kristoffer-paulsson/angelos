@@ -25,7 +25,7 @@ class Facade:
             self._vault = vault
         else:
             self._vault = Vault(
-                os.path.join(home_dir, 'vault.ar7.cnl'), secret)
+                os.path.join(home_dir, Const.CNL_VAULT), secret)
 
         identity = self._vault.load_identity()
 
@@ -75,13 +75,13 @@ class Facade:
             entity, privkeys, keys, domain, node)
 
         vault = Vault.setup(
-            os.path.join(home_dir, 'vault.ar7.cnl'),
+            os.path.join(home_dir, Const.CNL_VAULT),
             entity, privkeys, keys, domain, node, secret=secret)
 
         return cls(home_dir, secret, vault)
 
     def open(self, home_dir, secret):
-        vault = Vault(os.path.join(home_dir, 'vault.ar7.cnl'), secret)
+        vault = Vault(os.path.join(home_dir, Const.CNL_VAULT), secret)
         _type = vault._archive.stats().type
 
         if _type == Const.A_TYPE_PERSON_CLIENT:

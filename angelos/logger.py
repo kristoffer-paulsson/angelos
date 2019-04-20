@@ -17,14 +17,17 @@ class LogHandler:
         self.__app = logging.getLogger(Const.LOG_APP)
         self.__biz = logging.getLogger(Const.LOG_BIZ)
 
+    @property
     def err(self):
         """Docstring"""
         return self.__err
 
+    @property
     def app(self):
         """Docstring"""
         return self.__app
 
+    @property
     def biz(self):
         """Docstring"""
         return self.__biz

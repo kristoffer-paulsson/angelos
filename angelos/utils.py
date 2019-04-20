@@ -11,31 +11,31 @@ globally in the application
 
 
 class Util:
-    """@todo"""
+    """@todo."""
+
     __app_path = os.path.dirname(os.path.abspath(sys.argv[0]))
     __usr_path = os.path.expanduser('~')
     __exe_path = os.path.abspath(os.getcwd())
 
     @staticmethod
     def app_dir():
-        """
-        Absolute path to the executed scripts location.
-        """
+        """Absolute path to the executed scripts location."""
         return Util.__app_path
 
     @staticmethod
     def usr_dir():
-        """
-        Absolute path to user home directory.
-        """
+        """Absolute path to user home directory."""
         return Util.__usr_path
 
     @staticmethod
     def exe_dir():
-        """
-        Absolute path to current working directory.
-        """
+        """Absolute path to current working directory."""
         return Util.__exe_path
+
+    @staticmethod
+    def path(dirname, filename):
+        """Merge directory path and filename."""
+        return os.path.join(dirname, filename)
 
     @staticmethod
     def is_type(instance, types):

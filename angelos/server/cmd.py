@@ -3,11 +3,11 @@ import re
 import sys
 from ..utils import Util, FactoryInterface
 from ..error import Error
-from ..ioc import Container
+from ..ioc import ContainerAware
 
 
 class Option:
-    """Docstring"""
+    """Class representation of one Command option."""
 
     TYPE_BOOL = 1
     TYPE_CHOISES = 2
@@ -22,8 +22,7 @@ class Option:
                  default=None,
                  help=''):
         """
-        Initializes an option class the describes an option belonging to a
-        command.
+        Initialize an Option that belonging to a Command.
 
         This class configures an option that is used within a command. The
         option is described, configured and evaluated by Option. If the option
@@ -114,7 +113,7 @@ class Option:
             {'opt': self.name, 'value': opt[0], 'type': self.type})
 
     def evaluate(self, opts):
-        """Docstring"""
+        """Evaluate options."""
         opt = []
         for r in opts:
             if r[0] == str('--'+self.name) or r[0] == ('-'+str(self.short)):
@@ -151,7 +150,8 @@ class Option:
 
 
 class Command(FactoryInterface):
-    """Docstring"""
+    """Representation of one executable command."""
+
     """A short description of the command for the list section"""
     short = ''
 
@@ -159,6 +159,7 @@ class Command(FactoryInterface):
     description = ''
 
     def __init__(self, cmd):
+        """Initialize Command class."""
         self.command = cmd
 
         self._stdin = None
@@ -174,12 +175,14 @@ class Command(FactoryInterface):
 
     def _options(self):
         """
-        Overide this method, returning a list of Option class configurations
+        Return a list of Option class configurations.
+
+        Overide this method.
         """
         return []
 
     def execute(self, opts, stdin=sys.stdin, stdout=sys.stdout):
-        """Executes a command with current options"""
+        """Execute a command with current options."""
         self._stdin = stdin
         self._stdout = stdout
 
@@ -199,6 +202,8 @@ class Command(FactoryInterface):
 
     def _help(self):
         """
+        Print help section.
+
         @todo Redo this with nice tabing, format:
         <name>: (Long description)
 
@@ -253,26 +258,31 @@ class Command(FactoryInterface):
 
     def _command(self, opts):
         """
-        Completes the command. Override this method and implement command logic
-        here.
+        Complete the command.
+
+        Override this method and implement command logichere.
         """
         pass
 
 
-class Shell:
-    """Docstring"""
+class Shell(ContainerAware):
+    """Shell that represents a PTY."""
 
     cmd_regex = """^(\w+)"""
     opt_regex = """(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?"""  # noqa E501
     EOL = '\r\n'
 
     def __init__(self, commands, ioc, stdin=sys.stdin, stdout=sys.stdout):
+        """
+        Initialize the shell.
+
+        Loads the commands and the input/output streams.
+        """
         Util.is_type(commands, list)
-        Util.is_type(ioc, Container)
+        ContainerAware.__init__(self, ioc)
         self.__stdin = stdin
         self.__stdout = stdout
         self.__cmds = {}
-        self.__ioc = ioc
 
         for cmd in commands:
             # klass = Util.imp_pkg(cmd)
@@ -294,8 +304,7 @@ class Shell:
         self.__cmds[cmd.command] = cmd
 
     def execute(self, line):
-        """Docstring"""
-
+        """Interpret one line of text in the shell."""
         if bool(line.strip()) is False:
             raise Util.exception(Error.CMD_SHELL_EMPTY)
 
@@ -315,7 +324,6 @@ class Shell:
         self.__cmds[cmd].execute(opts, self.__stdin, self.__stdout)
 
     def _parse(self, options):
-        """Docstring"""
         opts = []
         for opt in options:
             opts.append((opt[0],
@@ -323,13 +331,14 @@ class Shell:
         return opts
 
     class HelpCommand(Command):
-        """Docstring"""
+        """Print help text about a command."""
 
         short = 'Prints available commands and how to use them.'
         description = """Help will print all the available commands loaded in
 the console shell"""
 
         def __init__(self, cmds):
+            """Initialize the command. Takes a list of Command classes."""
             Command.__init__(self, 'help')
             self.__cmds = cmds
 
@@ -347,25 +356,27 @@ the console shell"""
             self._stdout.write(b)
 
     class ExitCommand(Command):
-        """Docstring"""
+        """Exit the shell."""
 
         short = 'Exits the current terminal session.'
         description = """Exit will exit the console session and restore the
 screen"""
 
         def __init__(self):
+            """Initialize the command."""
             Command.__init__(self, 'exit')
 
         def _command(self, opts):
             raise Util.exception(Error.CMD_SHELL_EXIT)
 
     class ClearCommand(Command):
-        """Docstring"""
+        """Clear the screen."""
 
         short = 'Clears the terminal window.'
         description = """Clear clears the console screen/window"""
 
         def __init__(self):
+            """Initialize the command. Takes a list of Command classes."""
             Command.__init__(self, 'clear')
 
         def _command(self, opts):

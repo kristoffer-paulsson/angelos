@@ -18,9 +18,6 @@ setup(
     install_requires=[
         'asyncssh',  # six, asn1crypto, idna, pycparser, cffi, cryptography
         'libnacl',
-        'pyyaml',
-        'peewee',
-        'pysqlcipher3'
     ],
     ext_modules=cythonize(extensions)
 )

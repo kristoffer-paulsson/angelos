@@ -10,7 +10,7 @@ from ..logger import LogHandler
 from ..runtime import Runtime
 
 try:
-    with open(DEFAULT['runtime']['root'] + '/config.json') as jc:
+    with open(DEFAULT['runtime']['home'] + '/config.json') as jc:
         LOADED = json.load(jc.read())
 except FileNotFoundError:
     LOADED = {'configured': False}
@@ -26,5 +26,5 @@ CONFIG = {
 
 
 def start():
-    """Docstring"""
-    Application(Container(CONFIG)).start()
+    """Docstring."""
+    Application(Container(CONFIG)).run()

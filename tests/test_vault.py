@@ -8,6 +8,7 @@ import logging
 import os
 
 from support import random_person_entity_data
+from angelos.const import Const
 from angelos.policy.entity import PersonGeneratePolicy
 from angelos.policy.domain import DomainPolicy, NodePolicy
 from angelos.archive.vault import Vault
@@ -39,13 +40,13 @@ class TestVault(unittest.TestCase):
         nod_gen.current(dom_gen.domain)
 
         vault = Vault.setup(
-            os.path.join(self.home, 'vault.ar7.cnl'), ent_gen.entity,
+            os.path.join(self.home, Const.CNL_VAULT), ent_gen.entity,
             ent_gen.privkeys, ent_gen.keys, dom_gen.domain, nod_gen.node,
             secret=self.secret)
 
         vault.close()
 
-        # vault = Vault(os.path.join(self.home, 'vault.ar7.cnl'), self.secret)
+        # vault = Vault(os.path.join(self.home, Const.CNL_VAULT), self.secret)
         # vault.close()
 
 

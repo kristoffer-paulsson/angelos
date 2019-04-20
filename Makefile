@@ -10,14 +10,6 @@ export INST_PATH
 default: sqlcipher
 	@echo ========================= make SUCCESS =========================
 
-sqlcipher: openssl
-	$(MAKE) -C $(INC_PATH) -f $@.mk -e
-	@echo ========================= sqlcipher SUCCESS =========================
-
-openssl:
-	$(MAKE) -C $(INC_PATH) -f $@.mk -e
-	@echo ========================= openssl SUCCESS =========================
-
 test:
 	$(MAKE) -C $(INC_PATH) -f $@.mk -e
 	@echo ========================= test SUCCESS =========================
@@ -40,3 +32,9 @@ setup:
 	pip install kivy
 	pip install -U 'https://gitlab.com/kivymd/KivyMD/-/archive/master/KivyMD-master.tar.bz2'
 	pip install -U 'https://codeload.github.com/kivy/plyer/zip/1.3.0'
+
+
+doc:
+	pydoc -w angelos
+	pydoc -w $(find angelos -name '*.py' | tr '/' '.' | sed 's/.\{3\}$//')
+	mv *.html docs

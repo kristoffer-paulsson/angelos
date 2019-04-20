@@ -5,7 +5,7 @@ from ..utils import Util
 
 DEFAULT = {
     'runtime': {
-        'root': Util.app_dir() + '/serverroot',
+        'home': Util.path(Util.app_dir(), 'serverroot'),
         'mode': Const.R_MODE_DEV,
         'type': Const.R_TYPE_SERVER,
         'role': Const.R_ROLE_NORMAL,
@@ -80,7 +80,7 @@ IMMUTABLE = {
             'handlers': ['console', 'default'],
         },
         # 'incrementel': False,
-        # 'disable_existing_loggings': True
+        'disable_existing_loggings': True
     },
     'terminal': {
         'prompt': 'Angelos 0.1dX > ',
@@ -136,11 +136,3 @@ GELp3xBayT5F/liZzlCOaGKjRqoLuAOYMBPRtDK1Uzax45WDbZ2pdmI7TSkgH2Uz8p4snEtzNB5LyB\
 8OIF1kjUpvm6X3Qfq/SWSVvoPIBSiy2Id1U+gU4CUXCApfOAGpYwePh9gCl40NIS4TJgMrPGROpTke\
 Cz7h0YGeOsF+F8uMzbUZUFOA9cevrogq1nQUIQ91P7EaZ1TqeLvTpJnvw0H4fj0Jh7xTi8nTTt+Mqx\
 E+2+gVx0vMx'
-
-
-'''
-A known_hosts client RSA key, should be removed as soon sa possible.
-'''
-
-with open('./rsa.pub') as file:
-    CLIENT_RSA_PUBLIC = file.read()
