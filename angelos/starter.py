@@ -9,7 +9,7 @@ from .document.entities import Entity, PrivateKeys, Keys
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.boot import BootServer
-from .server.common import SERVER_RSA_PRIVATE
+from .server.rsa import SERVER_RSA_PRIVATE
 
 
 class Starter:

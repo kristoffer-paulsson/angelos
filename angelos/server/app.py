@@ -24,11 +24,6 @@ class Application(ContainerAware):
         else:
             self._applog.info(
                 'Vault archive NOT found. Initialize setup mode.')
-            # socket.getfqdn()  # Fully qualified domain name
-            # socket.gethostname()  # Hostname
-            # socket.getaddrinfo(socket.gethostname(), 0, flags=socket.AI_CANONNAME)[0][3]  # Canonical hostname  # noqa E501
-            # socket.getaddrinfo(socket.gethostname(), 0, 0, 0, 0, socket.AI_CANONNAME)[0][3]  # Same same but different  # noqa E501
-            # socket.gethostbyname(socket.gethostname())  # IP-assress
             self.ioc.add('boot', lambda self: Starter(
                 ).boot_server('', ioc=self))
             boot = self.ioc.boot
@@ -39,7 +34,7 @@ class Application(ContainerAware):
 
     def run(self):
         """Run the server applications main loop."""
-        self._applog.info('-------- STARTING SERVER--------')
+        self._applog.info('-------- STARTING SERVER --------')
 
         self._initialize()
         try:
@@ -48,4 +43,4 @@ class Application(ContainerAware):
             pass
         self._finalize()
 
-        self._applog.info('-------- EXITING SERVER--------')
+        self._applog.info('-------- EXITING SERVER --------')

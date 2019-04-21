@@ -7,19 +7,23 @@ PY_VER = python3.7
 export INC_PATH
 export INST_PATH
 
-default: sqlcipher
-	@echo ========================= make SUCCESS =========================
+default:
+	cython -o libangelos.c -3 $(shell python setup/modules.py -m angelos)
+	cython -o eidon.c -3 $(shell python setup/modules.py -m eidon)
+	python setup.py build_ext
+
+# @echo ========================= make SUCCESS =========================
 
 test:
 	$(MAKE) -C $(INC_PATH) -f $@.mk -e
 	@echo ========================= test SUCCESS =========================
 
-# --recurse-not-to
-# python -m nuitka --recurse-all --standalone --show-progress --verbose angelos.py
-# python -m nuitka --recurse-all --standalone logo.py
-
 clean:
-	rm -fr *.o *.so *.app *.spec MANIFEST *.build /build/ *.dist /dist/
+	rm -Rf angelos/**/*.c
+	rm -Rf angelos/**/*.o
+	rm -Rf angelos/**/*.pyc
+	rm -Rf ./**/__pycache__
+	rm -fr *.o *.so *.app *.spec MANIFEST *.build /build/ build *.dist /dist/ .DS_Store
 
 env:
 	# --relocatable --python=$(PYV)

@@ -1,10 +1,14 @@
-from distutils.core import setup
-from Cython.Build import cythonize
+from setuptools import setup
 from distutils.extension import Extension
+from Cython.Build import cythonize
+from Cython.Distutils import build_ext
 
 
-sourcefiles = ['logo.py']
-extensions = [Extension("logo", sourcefiles)]
+extensions = [
+    Extension('libangelos', ['libangelos.c']),
+    Extension('eidon', ['eidon.c']),
+]
+
 
 setup(
     name='angelos',
@@ -14,10 +18,11 @@ setup(
     author_email='kristoffer.paulsson@talenten.se',
     url='https://github.com/kristoffer-paulsson/angelos',
     license='MIT',
-    packages=['angelos', 'angelos.server', 'angelos.client'],
+    packages=['angelos'],
     install_requires=[
         'asyncssh',  # six, asn1crypto, idna, pycparser, cffi, cryptography
         'libnacl',
     ],
-    ext_modules=cythonize(extensions)
+    ext_modules=cythonize(extensions),
+    cmdclass={'build_ext': build_ext}
 )

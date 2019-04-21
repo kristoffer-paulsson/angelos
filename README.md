@@ -63,14 +63,5 @@ git clone -b 3.7 https://github.com/python/cpython.git
 ./configure --disable-shared && make
 
 ### cython-stuff
+http://hplgit.github.io/primer.html/doc/pub/cython/cython-readable.html
 https://cython.readthedocs.io/en/latest/src/tutorial/clibraries.html
-
-### kivy / garden / KivyMD
-
-pip install kivy
-pip install kivy-garden
-pip install -U 'https://gitlab.com/kivymd/KivyMD/-/archive/master/KivyMD-master.tar.bz2'
-
-### qrcode
-pip install qrcode
-./venv/bin/garden install qrcode

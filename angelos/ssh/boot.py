@@ -53,6 +53,7 @@ class Terminal(Shell):
                        stdin=process.stdin, stdout=process.stdout)
         self._process = process
         self._size = process.get_terminal_size()
+        self._config = self.ioc.environment['terminal']
 
     async def run(self):
         """Looping the Shell interpreter."""
@@ -62,15 +63,14 @@ class Terminal(Shell):
         async with self.__lock:
             try:
                 self._process.stdout.write(
-                    '\033[41m\033[H\033[J' + 'message' +
+                    '\033[41m\033[H\033[J' + self._config['message'] +
                     Shell.EOL + '='*79 + Shell.EOL)
 
-                self._process.stdout.write('> ')
+                self._process.stdout.write(self._config['prompt'])
                 while not self._process.stdin.at_eof():
                     try:
                         line = await self._process.stdin.readline()
                         self.execute(line.strip())
-                        # self._process.stdout.write('> ')
                     except CmdShellInvalidCommand as exc:
                         self._process.stdout.write(
                             str(exc) + Shell.EOL +
@@ -82,7 +82,7 @@ class Terminal(Shell):
                         continue
                     except CmdShellExit:
                         break
-                    self._process.stdout.write('> ')
+                    self._process.stdout.write(self._config['prompt'])
 
                 self._process.stdout.write('\033[40m\033[H\033[J')
                 self._process.close()
