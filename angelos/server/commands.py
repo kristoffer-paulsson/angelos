@@ -1,21 +1,61 @@
-"""Module docstring."""
-
+"""Server commands."""
+import os
+import signal
+import asyncio
 import time
-from ..const import Const
+
 from ..utils import Util
-from ..error import CmdShellExit
-from ..ioc import Container
-from .cmd import Command, Option, Shell
-from ..events import Events, Message
+from ..error import Error
+from .cmd import Command, Option
 
 
+class QuitCommand(Command):
+    """Shutdown the angelos server."""
+
+    short = """Shutdown the angelos server"""
+    description = """Use this command to shutdown the angelos server from the terminal."""  # noqa E501
+
+    def __init__(self):
+        """Initialize the command. Takes a list of Command classes."""
+        Command.__init__(self, 'quit')
+
+    def _options(self):
+        """
+        Return a list of Option class configurations.
+
+        Overide this method.
+        """
+        return [Option(
+            'yes',
+            short='y',
+            type=Option.TYPE_BOOL,
+            help='Confirm that you want to shutdown server')]
+
+    def _command(self, opts):
+        if opts['yes']:
+            self._stdout.write(
+                '\nStarting shutdown sequence for the Angelos server.\n\n')
+            asyncio.ensure_future(self._quit())
+            for t in ['3', '.', '.', '2', '.', '.', '1', '.', '.', '0']:
+                self._stdout.write(t)
+                time.sleep(.333)
+            raise Util.exception(Error.CMD_SHELL_EXIT)
+        else:
+            self._stdout.write(
+                '\nYou didn\'t confirm shutdown sequence. Use --yes/-y.\n\n')
+
+    async def _quit(self):
+        await asyncio.sleep(5)
+        os.kill(os.getpid(), signal.SIGINT)
+
+
+"""
 class ServerCommand(Command):
-    """Docstring"""
     short = 'Operates the servers runstate.'
-    description = """With the server command you can operate the servers run
+    description = With the server command you can operate the servers run
 state. you can "start", "restart" and "shutdown" the softaware using the
 options available. "shutdown" requires you to confirm with the "yes"
-option."""
+option."
 
     def __init__(self, message):
         Command.__init__(self, 'server')
@@ -66,3 +106,4 @@ option."""
     def factory(**kwargs):
         Util.is_type(kwargs['ioc'], Container)
         return ServerCommand(kwargs['ioc'].message)
+"""

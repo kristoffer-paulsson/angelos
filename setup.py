@@ -20,8 +20,10 @@ setup(
     license='MIT',
     packages=['angelos'],
     install_requires=[
+        'cython'
         'asyncssh',  # six, asn1crypto, idna, pycparser, cffi, cryptography
         'libnacl',
+        'plyer'
     ],
     ext_modules=cythonize(extensions),
     cmdclass={'build_ext': build_ext}

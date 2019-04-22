@@ -6,6 +6,7 @@ import asyncssh
 
 from .ssh import SSHServer
 from ..server.cmd import Shell
+from ..server.commands import QuitCommand
 from ..ioc import ContainerAware
 from ..error import CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit
 
@@ -39,7 +40,7 @@ class BootServer(ContainerAware, SSHServer):
     async def terminal(self, process):
         """Client handler, returns Terminal instance."""
         return (await Terminal(
-            commands=[], ioc=self.ioc, process=process).run())
+            commands=[QuitCommand], ioc=self.ioc, process=process).run())
 
 
 class Terminal(Shell):
@@ -53,7 +54,7 @@ class Terminal(Shell):
                        stdin=process.stdin, stdout=process.stdout)
         self._process = process
         self._size = process.get_terminal_size()
-        self._config = self.ioc.environment['terminal']
+        self._config = self.ioc.config['terminal']
 
     async def run(self):
         """Looping the Shell interpreter."""
@@ -82,9 +83,10 @@ class Terminal(Shell):
                         continue
                     except CmdShellExit:
                         break
+                    except Exception as e:
+                        self._process.stdout.write('%s: %s \n' % (type(e), e))
                     self._process.stdout.write(self._config['prompt'])
-
-                self._process.stdout.write('\033[40m\033[H\033[J')
-                self._process.close()
             except asyncssh.BreakReceived:
                 pass
+            self._process.stdout.write('\033[40m\033[H\033[J')
+            self._process.close()

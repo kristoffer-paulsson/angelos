@@ -1,4 +1,4 @@
-"""Module docstring."""
+"""Logger service that offers specialized logs."""
 import logging
 from logging.config import dictConfig
 from .const import Const
@@ -6,9 +6,10 @@ from .utils import Util
 
 
 class LogHandler:
-    """Docstring"""
+    """Log handler loaded as a service in the container."""
+
     def __init__(self, config):
-        """Docstring"""
+        """Initialize loggers."""
         Util.is_type(config, dict)
 
         dictConfig(config)
@@ -19,15 +20,15 @@ class LogHandler:
 
     @property
     def err(self):
-        """Docstring"""
+        """Technical error logger."""
         return self.__err
 
     @property
     def app(self):
-        """Docstring"""
+        """Application event logger."""
         return self.__app
 
     @property
     def biz(self):
-        """Docstring"""
+        """Biz transaction logger."""
         return self.__biz

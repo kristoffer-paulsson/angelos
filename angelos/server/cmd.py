@@ -10,7 +10,7 @@ class Option:
     """Class representation of one Command option."""
 
     TYPE_BOOL = 1
-    TYPE_CHOISES = 2
+    TYPE_CHOICES = 2
     TYPE_VALUE = 3
 
     def __init__(self,
@@ -137,7 +137,7 @@ class Option:
         value = None
         if self.type is Option.TYPE_BOOL:
             value = self._bool(opt)
-        elif self.type is Option.TYPE_CHOISES:
+        elif self.type is Option.TYPE_CHOICES:
             value = self._enum(opt)
         elif self.type is Option.TYPE_VALUE:
             value = self._value(opt)
@@ -165,13 +165,11 @@ class Command(FactoryInterface):
         self._stdin = None
         self._stdout = None
 
-        self.__opts = [Option(
+        self.__opts = self._options() + [Option(
             'help',
             short='h',
             type=Option.TYPE_BOOL,
-            help='Prints the command help section')]
-
-        self.__opts += self._options()
+            help='Print the command help section')]
 
     def _options(self):
         """
@@ -217,7 +215,7 @@ class Command(FactoryInterface):
         for opt in self.__opts:
             if opt.type == Option.TYPE_VALUE:
                 expr = opt.name.upper()
-            elif opt.type == Option.TYPE_CHOISES:
+            elif opt.type == Option.TYPE_CHOICES:
                 expr = '(' + '|'.join(opt.choices) + ')'
             else:
                 expr = ''
@@ -251,8 +249,8 @@ class Command(FactoryInterface):
             r_b += Shell.EOL
 
         b = Shell.EOL + self.description + Shell.EOL*2
-        b += '<' + self.command + '> support the options below' + Shell.EOL
-        b += '='*79 + Shell.EOL
+        b += '<' + self.command + '> supports the options below' + Shell.EOL
+        b += '-'*79 + Shell.EOL
         b += r_b + Shell.EOL
         self._stdout.write(b)
 
@@ -288,7 +286,7 @@ class Shell(ContainerAware):
             # klass = Util.imp_pkg(cmd)
             klass = cmd
             Util.is_class(klass, Command)
-            command = klass.factory(ioc=self.__ioc)
+            command = klass.factory(ioc=self.ioc)
             self._add(command)
 
         self._add(Shell.ClearCommand())
@@ -333,7 +331,7 @@ class Shell(ContainerAware):
     class HelpCommand(Command):
         """Print help text about a command."""
 
-        short = 'Prints available commands and how to use them.'
+        short = 'Print available commands and how to use them.'
         description = """Help will print all the available commands loaded in
 the console shell"""
 
@@ -350,7 +348,7 @@ the console shell"""
 
             b = Shell.EOL
             b += 'Available commands with description below.' + Shell.EOL
-            b += '='*79 + Shell.EOL
+            b += '-'*79 + Shell.EOL
             b += Shell.EOL.join(rows) + Shell.EOL*2
             b += 'type <command> -h for detailed help.' + Shell.EOL*2
             self._stdout.write(b)
@@ -358,7 +356,7 @@ the console shell"""
     class ExitCommand(Command):
         """Exit the shell."""
 
-        short = 'Exits the current terminal session.'
+        short = 'Exit the current terminal session.'
         description = """Exit will exit the console session and restore the
 screen"""
 
@@ -372,7 +370,7 @@ screen"""
     class ClearCommand(Command):
         """Clear the screen."""
 
-        short = 'Clears the terminal window.'
+        short = 'Clear the terminal window.'
         description = """Clear clears the console screen/window"""
 
         def __init__(self):

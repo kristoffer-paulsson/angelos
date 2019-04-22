@@ -1,6 +1,8 @@
 """Server argument parser."""
 import argparse
 
+from ..const import Const
+
 
 class Parser:
     """Argument parsing class that can be loaded in a container."""
@@ -14,17 +16,15 @@ class Parser:
         """Argument parser configuration."""
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            '-l', '--listen',  choices=['local', 'unfollow'],
-            help='')
+            '-l', '--listen',  choices=Const.OPT_LISTEN,
+            dest='listen', default='localhost',
+            help='listen to a network interface. (localhost)')
         parser.add_argument(
-            'csv',
-            help='Path to CSV file with Twitter handles')
+            '-p', '--port',
+            dest='port', default=22, type=int,
+            help='listen to a network port. (22)')
         parser.add_argument(
-            '-i', '--index', dest='index',
-            default=1, type=int,
-            help='Index of where to start in CSV file.')
-        parser.add_argument(
-            '-b', '--background', dest='background',
-            default=False, action='store_true',
-            help='Will operate in background without disturbing user')
+            '-d', '--daemon',  choices=['start', 'stop', 'resume', 'suspend'],
+            dest='daemon', default=None,
+            help='run server as a daemon.')
         return parser

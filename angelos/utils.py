@@ -225,7 +225,7 @@ class Util:
 
 class FactoryInterface:
     """Docstring"""
-    @staticmethod
-    def factory(**kwargs):
+    @classmethod
+    def factory(cls, **kwargs):
         """Docstring"""
-        raise NotImplementedError()
+        return cls()

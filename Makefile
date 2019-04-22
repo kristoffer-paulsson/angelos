@@ -23,7 +23,7 @@ clean:
 	rm -Rf angelos/**/*.o
 	rm -Rf angelos/**/*.pyc
 	rm -Rf ./**/__pycache__
-	rm -fr *.o *.so *.app *.spec MANIFEST *.build /build/ build *.dist /dist/ .DS_Store
+	rm -fr *.o *.so *.app *.spec MANIFEST *.build /build/ build *.dist /dist/ .DS_Store *.log
 
 env:
 	# --relocatable --python=$(PYV)

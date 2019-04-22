@@ -64,6 +64,8 @@ class Const:
     LOG_APP = 'app'
     LOG_BIZ = 'biz'
 
+    OPT_LISTEN = ['localhost', 'loopback', 'hostname', 'domain', 'ip', 'any']
+
     LOOP_SLEEP = 0.05
 
     W_SUPERV_NAME = 'Supervisor'  # Server Supervisor worker

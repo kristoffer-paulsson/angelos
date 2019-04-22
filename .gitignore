@@ -9,7 +9,7 @@
 *.cnl
 *.ar7
 *.c
-__pychache__
+**/__pychache__
 /build/
 /dist/
 /*.build/

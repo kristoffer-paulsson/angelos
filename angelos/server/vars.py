@@ -12,7 +12,7 @@ from ..const import Const
 
 """Environment default values."""
 ENV_DEFAULT = {
-
+    'root': Util.path(Util.app_dir(), 'serverroot'),
 }
 
 """Environment immutable values."""
@@ -22,13 +22,7 @@ ENV_IMMUTABLE = {
 
 """Configuration default values"""
 CONFIG_DEFAULT = {
-    'runtime': {
-        'home': Util.path(Util.app_dir(), 'serverroot'),
-        'mode': Const.R_MODE_DEV,
-        'type': Const.R_TYPE_SERVER,
-        'role': Const.R_ROLE_NORMAL,
-        'platform': Const.R_PLATFORM_NIX
-    }
+
 }
 
 """Configuration immutable values"""
