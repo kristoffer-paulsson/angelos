@@ -1,4 +1,4 @@
-"""Docstring"""
+"""Entry point."""
 from angelos.server.main import start
 
 

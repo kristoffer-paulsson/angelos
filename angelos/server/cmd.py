@@ -1,9 +1,179 @@
 """Module docstring."""
 import re
-import sys
+
+import asyncssh
+
 from ..utils import Util, FactoryInterface
 from ..error import Error
 from ..ioc import ContainerAware
+
+
+class ConsoleIO:
+    """IO class for the commands to gather input."""
+
+    def __init__(self, process):
+        """Configure the stdin and stdout stream."""
+        self._process = process
+        self._stdin = process.stdin
+        self._stdout = process.stdout
+
+    async def prompt(self, msg='', t=str):
+        """Prompt for user input."""
+        while True:
+            self._stdout.write('%s: ' % msg)
+            input = await self._stdin.readline()
+
+            try:
+                input = t(input.strip())
+                break
+            except ValueError:
+                self._stdout.write('Invalid data entered.\n')
+                continue
+
+        return input
+
+    async def confirm(self, msg='', em=True):
+        """Ask for user choice."""
+        ans = ['Y', 'N'] if em else ['y', 'n']
+        while True:
+            self._stdout.write('%s\n' % msg)
+            self._stdout.write(
+                'Press key: %s \n' % ' / '.join(['Yes', 'No']))
+            self._stdin.channel.set_line_mode(False)
+            input = await self._stdin.read(1)
+            self._stdin.channel.set_line_mode(True)
+
+            if input == ans[0]:
+                self._stdout.write('Yes\n\n')
+                return True
+            elif input == ans[1]:
+                self._stdout.write('No\n\n')
+                return False
+
+        return None
+
+    async def presskey(self, msg='Press any key to continue...'):
+        """Press a key to continue."""
+        self._stdout.write('%s\n' % msg)
+        self._stdin.channel.set_line_mode(False)
+        await self._stdin.read(1)
+        self._stdin.channel.set_line_mode(True)
+        return True
+
+    async def choose(self, msg='', choices=[], em=False):
+        """Ask for user choice."""
+        keylist = {}
+        for item in choices:
+            if em:
+                key = item[0].upper()
+            else:
+                key = item[0].lower()
+            keylist[key] = item
+
+        while True:
+            self._stdout.write('%s\n' % msg)
+            self._stdout.write('Choices: [ %s ]\n' % ' | '.join(choices))
+            self._stdin.channel.set_line_mode(False)
+            input = await self._stdin.read(1)
+            self._stdin.channel.set_line_mode(True)
+
+            if input in keylist.keys():
+                input = keylist[input]
+                break
+            else:
+                self._stdout.write('Invalid choice.\n')
+
+        return input
+
+    async def menu(self, msg='', entries=[], confirm=False):
+        """Print menu with entries."""
+        entries = entries[:12]
+        cnt = 0
+        lines = []
+
+        for entry in entries:
+            cnt += 1
+            lines.append(' {0:>2}. {1}'.format(cnt, entry))
+
+        while True:
+            self._stdout.write('{0}\n\n'.format(msg))
+            self._stdout.write('\n'.join(lines))
+            self._stdout.write('\n\nChoose: ')
+            try:
+                input = int(await self._stdin.readline())
+            except ValueError:
+                continue
+
+            if not (1 <= input <= len(entries)):
+                self._stdout.write('Invalid choice.\n')
+                continue
+
+            if confirm:
+                if await self.confirm(
+                        'Is ({0}) your final choice?'.format(input), False):
+                    break
+            else:
+                break
+
+        return input - 1
+
+    async def secret(self, msg='Enter password'):
+        """Print menu with entries."""
+        self._stdout.write('{0}'.format(msg))
+
+        self._process.channel.set_echo(False)
+        while True:
+            input = await self._stdin.readline()
+            input = input.strip()
+            if input != '':
+                break
+        self._process.channel.set_echo(True)
+
+        return input
+
+    @classmethod
+    def format(cls, text,
+               b=False, d=False, i=False, u=False, bl=False, nv=False):
+        """Format terminal text in several ways."""
+        codes = ';'.join(filter([
+            '1' if b else None,
+            '2' if d else None,
+            '3' if i else None,
+            '4' if u else None,
+            '5' if bl else None,
+            '7' if nv else None
+        ]))
+        return '\033[{c}m{t}\033[0m'.format(c=codes if codes else '0', t=text)
+
+    @classmethod
+    def bold(cls, text):
+        """Make terminal text bold."""
+        return cls.format(text, b=True)
+
+    @classmethod
+    def dim(cls, text):
+        """Make terminal text dim."""
+        return cls.format(text, d=True)
+
+    @classmethod
+    def italic(cls, text):
+        """Make terminal text italic."""
+        return cls.format(text, i=True)
+
+    @classmethod
+    def underline(cls, text):
+        """Make terminal text underline."""
+        return cls.format(text, u=True)
+
+    @classmethod
+    def blink(cls, text):
+        """Make terminal text blink."""
+        return cls.format(text, bl=True)
+
+    @classmethod
+    def inverse(cls, text):
+        """Make terminal text inverse."""
+        return cls.format(text, nv=True)
 
 
 class Option:
@@ -158,12 +328,10 @@ class Command(FactoryInterface):
     """Long description explaining the command"""
     description = ''
 
-    def __init__(self, cmd):
+    def __init__(self, cmd, io):
         """Initialize Command class."""
         self.command = cmd
-
-        self._stdin = None
-        self._stdout = None
+        self._io = io
 
         self.__opts = self._options() + [Option(
             'help',
@@ -179,17 +347,14 @@ class Command(FactoryInterface):
         """
         return []
 
-    def execute(self, opts, stdin=sys.stdin, stdout=sys.stdout):
+    async def execute(self, opts):
         """Execute a command with current options."""
-        self._stdin = stdin
-        self._stdout = stdout
-
         opts = self._evaluate(opts)
 
         if opts['help']:
             self._help()
         else:
-            self._command(opts)
+            await self._command(opts)
 
     def _evaluate(self, opts):
         options = {}
@@ -252,9 +417,9 @@ class Command(FactoryInterface):
         b += '<' + self.command + '> supports the options below' + Shell.EOL
         b += '-'*79 + Shell.EOL
         b += r_b + Shell.EOL
-        self._stdout.write(b)
+        self._io._stdout.write(b)
 
-    def _command(self, opts):
+    async def _command(self, opts):
         """
         Complete the command.
 
@@ -270,7 +435,7 @@ class Shell(ContainerAware):
     opt_regex = """(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?"""  # noqa E501
     EOL = '\r\n'
 
-    def __init__(self, commands, ioc, stdin=sys.stdin, stdout=sys.stdout):
+    def __init__(self, commands, ioc, process):
         """
         Initialize the shell.
 
@@ -278,20 +443,18 @@ class Shell(ContainerAware):
         """
         Util.is_type(commands, list)
         ContainerAware.__init__(self, ioc)
-        self.__stdin = stdin
-        self.__stdout = stdout
+        self._process = process
+        self._io = ConsoleIO(process)
         self.__cmds = {}
 
-        for cmd in commands:
-            # klass = Util.imp_pkg(cmd)
-            klass = cmd
+        for klass in commands:
             Util.is_class(klass, Command)
-            command = klass.factory(ioc=self.ioc)
+            command = klass.factory(ioc=self.ioc, io=self._io)
             self._add(command)
 
-        self._add(Shell.ClearCommand())
-        self._add(Shell.ExitCommand())
-        self._add(Shell.HelpCommand(self.__cmds))
+        self._add(Shell.ClearCommand(self._io))
+        self._add(Shell.ExitCommand(self._io))
+        self._add(Shell.HelpCommand(self._io, self.__cmds))
 
     def _add(self, cmd):
         if cmd.command in self.__cmds:
@@ -301,7 +464,7 @@ class Shell(ContainerAware):
 
         self.__cmds[cmd.command] = cmd
 
-    def execute(self, line):
+    async def execute(self, line):
         """Interpret one line of text in the shell."""
         if bool(line.strip()) is False:
             raise Util.exception(Error.CMD_SHELL_EMPTY)
@@ -319,13 +482,17 @@ class Shell(ContainerAware):
         opts = re.findall(self.opt_regex, line)
         opts = self._parse(opts)
 
-        self.__cmds[cmd].execute(opts, self.__stdin, self.__stdout)
+        try:
+            await self.__cmds[cmd].execute(opts)
+        except asyncssh.BreakReceived as e:
+            self._io._stdout.write(
+                '\n\nAbort sequence received!\n%s\n\n' % e)
 
     def _parse(self, options):
         opts = []
         for opt in options:
-            opts.append((opt[0],
-                         opt[1] if bool(opt[1]) is not False else opt[2]))
+            opts.append(
+                (opt[0], opt[1] if bool(opt[1]) is not False else opt[2]))
         return opts
 
     class HelpCommand(Command):
@@ -335,12 +502,12 @@ class Shell(ContainerAware):
         description = """Help will print all the available commands loaded in
 the console shell"""
 
-        def __init__(self, cmds):
+        def __init__(self, io, cmds):
             """Initialize the command. Takes a list of Command classes."""
-            Command.__init__(self, 'help')
+            Command.__init__(self, 'help', io)
             self.__cmds = cmds
 
-        def _command(self, opts):
+        async def _command(self, opts):
             rows = []
             for cmd in self.__cmds:
                 rows.append('{n:<16}{d}'.format(
@@ -351,7 +518,7 @@ the console shell"""
             b += '-'*79 + Shell.EOL
             b += Shell.EOL.join(rows) + Shell.EOL*2
             b += 'type <command> -h for detailed help.' + Shell.EOL*2
-            self._stdout.write(b)
+            self._io._stdout.write(b)
 
     class ExitCommand(Command):
         """Exit the shell."""
@@ -360,11 +527,11 @@ the console shell"""
         description = """Exit will exit the console session and restore the
 screen"""
 
-        def __init__(self):
+        def __init__(self, io):
             """Initialize the command."""
-            Command.__init__(self, 'exit')
+            Command.__init__(self, 'exit', io)
 
-        def _command(self, opts):
+        async def _command(self, opts):
             raise Util.exception(Error.CMD_SHELL_EXIT)
 
     class ClearCommand(Command):
@@ -373,9 +540,9 @@ screen"""
         short = 'Clear the terminal window.'
         description = """Clear clears the console screen/window"""
 
-        def __init__(self):
+        def __init__(self, io):
             """Initialize the command. Takes a list of Command classes."""
-            Command.__init__(self, 'clear')
+            Command.__init__(self, 'clear', io)
 
-        def _command(self, opts):
-            self._stdout.write('\033[H\033[J')
+        async def _command(self, opts):
+            self._io._stdout.write('\033[H\033[J')

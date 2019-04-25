@@ -22,8 +22,8 @@ class ExecutorHandler:
 
     def __call__(self, callback, *args, **kwargs):
         """Add a function/method/coroutine to the event loop."""
-        return self.__loop.run_in_executor(
-            self.__executor, functools.partial(callback, *args, **kwargs))
+        return asyncio.ensure_future(self.__loop.run_in_executor(
+            self.__executor, functools.partial(callback, *args, **kwargs)))
 
     async def __end(self):
         await self.__loop.run_in_executor(self.__executor, self.__queue)

@@ -28,16 +28,17 @@ class EventsAddressRemoved(AngelosException): pass  # noqa E302
 class EventsAddressMissing(AngelosException): pass  # noqa E302
 class IssuanceInvalid(AngelosException): pass  # noqa E302
 
-class FieldRequiredNotSet(AngelosException): pass  # noqa E302
-class FieldNotMultiple(AngelosException): pass  # noqa E302
-class FieldInvalidType(AngelosException): pass  # noqa E302
-class FieldInvalidChoice(AngelosException): pass  # noqa E302
-class DocumentShortExpiery(AngelosException): pass  # noqa E302
-class DocumentInvalidType(AngelosException): pass  # noqa E302
-class DocumentPersonNotInNames(AngelosException): pass  # noqa E302
-class FieldInvalidEmail(AngelosException): pass  # noqa E302
-class FieldBeyondLimit(AngelosException): pass  # noqa E302
-class FieldIsMultiple(AngelosException): pass  # noqa E302
+class ModelException(AngelosException): pass  # noqa E302
+class FieldRequiredNotSet(ModelException): pass  # noqa E302
+class FieldNotMultiple(ModelException): pass  # noqa E302
+class FieldInvalidType(ModelException): pass  # noqa E302
+class FieldInvalidChoice(ModelException): pass  # noqa E302
+class DocumentShortExpiery(ModelException): pass  # noqa E302
+class DocumentInvalidType(ModelException): pass  # noqa E302
+class DocumentPersonNotInNames(ModelException): pass  # noqa E302
+class FieldInvalidEmail(ModelException): pass  # noqa E302
+class FieldBeyondLimit(ModelException): pass  # noqa E302
+class FieldIsMultiple(ModelException): pass  # noqa E302
 
 class ConcealException(AngelosException): pass  # noqa E302
 class ConcealUnkownMode(ConcealException): pass  # noqa E302

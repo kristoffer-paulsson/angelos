@@ -6,7 +6,7 @@ import asyncssh
 
 from .ssh import SSHServer
 from ..server.cmd import Shell
-from ..server.commands import QuitCommand
+from ..server.commands import QuitCommand, EnvCommand, SetupCommand
 from ..ioc import ContainerAware
 from ..error import CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit
 
@@ -40,7 +40,8 @@ class BootServer(ContainerAware, SSHServer):
     async def terminal(self, process):
         """Client handler, returns Terminal instance."""
         return (await Terminal(
-            commands=[QuitCommand], ioc=self.ioc, process=process).run())
+            commands=[SetupCommand, EnvCommand, QuitCommand],
+            ioc=self.ioc, process=process).run())
 
 
 class Terminal(Shell):
@@ -50,9 +51,7 @@ class Terminal(Shell):
 
     def __init__(self, commands, ioc, process):
         """Initialize Terminal from SSHServerProcess."""
-        Shell.__init__(self, commands=commands, ioc=ioc,
-                       stdin=process.stdin, stdout=process.stdout)
-        self._process = process
+        Shell.__init__(self, commands, ioc, process)
         self._size = process.get_terminal_size()
         self._config = self.ioc.config['terminal']
 
@@ -63,30 +62,30 @@ class Terminal(Shell):
             return
         async with self.__lock:
             try:
-                self._process.stdout.write(
+                self._io._stdout.write(
                     '\033[41m\033[H\033[J' + self._config['message'] +
                     Shell.EOL + '='*79 + Shell.EOL)
 
-                self._process.stdout.write(self._config['prompt'])
-                while not self._process.stdin.at_eof():
+                self._io._stdout.write(self._config['prompt'])
+                while not self._io._stdin.at_eof():
                     try:
-                        line = await self._process.stdin.readline()
-                        self.execute(line.strip())
+                        line = await self._io._stdin.readline()
+                        await self.execute(line.strip())
                     except CmdShellInvalidCommand as exc:
-                        self._process.stdout.write(
+                        self._io._stdout.write(
                             str(exc) + Shell.EOL +
                             'Try \'help\' or \'<command> -h\'' + Shell.EOL*2)
                     except CmdShellEmpty:
                         pass
                     except asyncssh.TerminalSizeChanged:
-                        self._size = self._process.get_terminal_size()
+                        self._size = self._io.get_terminal_size()
                         continue
                     except CmdShellExit:
                         break
                     except Exception as e:
-                        self._process.stdout.write('%s: %s \n' % (type(e), e))
-                    self._process.stdout.write(self._config['prompt'])
+                        self._io._stdout.write('%s: %s \n' % (type(e), e))
+                    self._io._stdout.write(self._config['prompt'])
             except asyncssh.BreakReceived:
                 pass
-            self._process.stdout.write('\033[40m\033[H\033[J')
+            self._io._stdout.write('\033[40m\033[H\033[J')
             self._process.close()

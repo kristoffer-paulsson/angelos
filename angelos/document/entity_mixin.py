@@ -7,7 +7,7 @@ from .model import (
 
 
 class PersonMixin(metaclass=DocumentMeta):
-    gender = ChoiceField(choices=['man', 'woman', 'undefined'])
+    sex = ChoiceField(choices=['man', 'woman', 'undefined'])
     born = DateField()
     names = StringField(multiple=True)
     family_name = StringField()

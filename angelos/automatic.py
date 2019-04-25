@@ -19,12 +19,12 @@ class Automatic:
         self.ip = socket.gethostbyname(self.name)
         self.domain = socket.getfqdn()
 
-        (self.system, self.node, self.release, self.version,
-            self.machine, self.processor) = platform.uname()
-        self.java = platform.java_ver()[0]
-        self.win = platform.win32_ver()[0]
-        self.mac = platform.mac_ver()[0]
-        self.linux = platform.dist()[0]
+        (self.p_system, self.p_node, self.p_release, self.p_version,
+            self.p_machine, self.p_processor) = platform.uname()
+        self.p_java = platform.java_ver()[0]
+        self.p_win = platform.win32_ver()[0]
+        self.p_mac = platform.mac_ver()[0]
+        self.p_linux = platform.dist()[0]
 
         self.pid = os.getpid()
         self.ppid = os.getppid()

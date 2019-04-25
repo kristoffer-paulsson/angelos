@@ -228,4 +228,4 @@ class FactoryInterface:
     @classmethod
     def factory(cls, **kwargs):
         """Docstring"""
-        return cls()
+        return cls(kwargs['io'])
