@@ -18,6 +18,7 @@ class Const:
     A_ROLE_PRIMARY          Current node has a primary role in the domain
     A_ROLE_BACKUP           Current node has a backup role in the domain
     A_ROLE_COURIES          Current archive is a courier archive
+    A_ROLE_SEED             An archive used as a facade seed
 
     A_USE_VAULT             Archive used as vault
     A_USE_HOME              Archive used as an encrypted home directory
@@ -37,22 +38,23 @@ class Const:
 
     """
 
-    A_TYPE_PERSON_CLIENT = b'p'
-    A_TYPE_PERSON_SERVER = b'P'
-    A_TYPE_MINISTRY_CLIENT = b'm'
-    A_TYPE_MINISTRY_SERVER = b'M'
-    A_TYPE_CHURCH_CLIENT = b'c'
-    A_TYPE_CHURCH_SERVER = b'C'
+    A_TYPE_PERSON_CLIENT = ord(b'p')
+    A_TYPE_PERSON_SERVER = ord(b'P')
+    A_TYPE_MINISTRY_CLIENT = ord(b'm')
+    A_TYPE_MINISTRY_SERVER = ord(b'M')
+    A_TYPE_CHURCH_CLIENT = ord(b'c')
+    A_TYPE_CHURCH_SERVER = ord(b'C')
 
-    A_ROLE_PRIMARY = b'p'
-    A_ROLE_BACKUP = b'b'
-    A_ROLE_COURIER = b'c'
+    A_ROLE_PRIMARY = ord(b'p')
+    A_ROLE_BACKUP = ord(b'b')
+    A_ROLE_COURIER = ord(b'c')
+    A_ROLE_SEED = ord(b's')
 
-    A_USE_VAULT = b'v'
-    A_USE_HOME = b'h'
-    A_USE_MAIL = b'm'
-    A_USE_POOL = b'p'
-    A_USE_FTP = b'f'
+    A_USE_VAULT = ord(b'v')
+    A_USE_HOME = ord(b'h')
+    A_USE_MAIL = ord(b'm')
+    A_USE_POOL = ord(b'p')
+    A_USE_FTP = ord(b'f')
 
     CNL_VAULT = 'vault.ar7.cnl'
     CNL_HOME = 'home.ar7.cnl'

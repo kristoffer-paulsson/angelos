@@ -13,8 +13,16 @@ from ..policy.domain import DomainPolicy, NodePolicy
 
 
 class BaseSetupOperation(Operation):
+    """Baseclass for entity setup/import operations."""
+
     @classmethod
     def create_new(cls, entity_data):
+        """
+        Issue a new set of documents from entity data.
+
+        The following documents will be issued:
+        Entity, PrivateKeys, Keys, Domain and Node.
+        """
         Util.is_type(entity_data, dict)
 
         logging.info('Creating new entity of type: %s' % type(cls.ENTITY[0]))
@@ -35,6 +43,7 @@ class BaseSetupOperation(Operation):
 
     @classmethod
     def import_ext(cls, entity, privkeys, keys, domain, node=None):
+        """Validate a set of documents related to an entity for import."""
         Util.is_type(entity, cls.ENTITY[0])
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
@@ -101,12 +110,18 @@ class BaseSetupOperation(Operation):
 
 
 class SetupPersonOperation(BaseSetupOperation):
+    """Person entity setup policy."""
+
     ENTITY = (Person, PersonGeneratePolicy)
 
 
 class SetupMinistryOperation(BaseSetupOperation):
+    """Ministry entity setup policy."""
+
     ENTITY = (Ministry, MinistryGeneratePolicy)
 
 
 class SetupChurchOperation(BaseSetupOperation):
+    """Church entity setup policy."""
+
     ENTITY = (Church, ChurchGeneratePolicy)

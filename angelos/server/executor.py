@@ -17,6 +17,7 @@ class ExecutorHandler:
         """Initialize asyncio loop and thread pool."""
         self.__executor = concurrent.futures.ThreadPoolExecutor()
         self.__loop = asyncio.get_event_loop()
+        self.__loop.set_default_executor(self.__executor)
         self.__queue = multiprocessing.Queue()
         self.__future = asyncio.ensure_future(self.__end())
 

@@ -17,7 +17,21 @@ from ..operation.setup import (
 
 
 class Facade:
+    """
+    Facade baseclass.
+
+    The Facade is the gatekeeper of the integrity. The facade garantuees the
+    integrity of the entity and its domain. It is here where all policies are
+    enforced and where security is checked. No document can be imported without
+    being verified.
+    """
+
     def __init__(self, home_dir, secret, vault=None):
+        """
+        Initialize the facade class.
+
+        Opens the Vault with the secret key and loads the core documents.
+        """
         self._path = home_dir
         self._secret = secret
 
@@ -27,25 +41,13 @@ class Facade:
             self._vault = Vault(
                 os.path.join(home_dir, Const.CNL_VAULT), secret)
 
-        identity = self._vault.load_identity()
-
-        Util.is_type(identity[0], self.PREFS[0])
-        Util.is_type(identity[1], PrivateKeys)
-        Util.is_type(identity[2], Keys)
-        Util.is_type(identity[3], Domain)
-        Util.is_type(identity[4], Node)
-
-        self.__entity = identity[0]
-        self.__privkeys = identity[1]
-        self.__keys = identity[2]
-        self.__domain = identity[3]
-        self.__node = identity[4]
-
     @classmethod
-    def setup(cls, home_dir, secret, entity_data=None, entity=None,
-              privkeys=None, keys=None, domain=None, node=None):
+    async def setup(cls, home_dir, secret, role, entity_data=None, entity=None,
+                    privkeys=None, keys=None, domain=None, node=None):
+        """Create the existence of a new facade from scratch."""
         Util.is_type(home_dir, str)
         Util.is_type(secret, bytes)
+        Util.is_type(role, int)
 
         if entity_data:
             Util.is_type(entity_data, dict)
@@ -67,6 +69,9 @@ class Facade:
         if not os.path.isdir(home_dir):
             RuntimeError('Home directory doesn\'t exist')
 
+        if role not in [Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP]:
+            RuntimeError('Unsupported use of facade')
+
         if entity_data:
             entity, privkeys, keys, domain, node = cls.PREFS[1].create_new(
                 entity_data)
@@ -76,11 +81,21 @@ class Facade:
 
         vault = Vault.setup(
             os.path.join(home_dir, Const.CNL_VAULT),
-            entity, privkeys, keys, domain, node, secret=secret)
+            entity, privkeys, keys, domain, node, secret=secret,
+            _type=cls.INFO[0], role=role, use=Const.A_USE_VAULT)
 
-        return cls(home_dir, secret, vault)
+        facade = cls(home_dir, secret, vault)
+        await facade.__post_init()
+        return facade
 
-    def open(self, home_dir, secret):
+    @staticmethod
+    async def open(home_dir, secret):
+        """
+        Load an existing facade.
+
+        The Vault is opened before the creation of the Facade so the right sort
+        can be instanciated.
+        """
         vault = Vault(os.path.join(home_dir, Const.CNL_VAULT), secret)
         _type = vault._archive.stats().type
 
@@ -99,25 +114,51 @@ class Facade:
         else:
             raise RuntimeError('Unkown archive type: %s' % str(_type))
 
+        await facade.__post_init()
         return facade
+
+    async def __post_init(self):
+        identity = await self._vault.load_identity()
+
+        Util.is_type(identity[0], self.PREFS[0])
+        Util.is_type(identity[1], PrivateKeys)
+        Util.is_type(identity[2], Keys)
+        Util.is_type(identity[3], Domain)
+        Util.is_type(identity[4], Node)
+
+        self.__entity = identity[0]
+        self.__privkeys = identity[1]
+        self.__keys = identity[2]
+        self.__domain = identity[3]
+        self.__node = identity[4]
 
     @property
     def entity(self):
+        """Entity core document getter."""
         return self.__entity
 
     @property
     def keys(self):
+        """Public keys core document getter."""
         return self.__keys
 
     @property
     def domain(self):
+        """Domain core document getter."""
         return self.__domain
 
     @property
     def node(self):
+        """Node core document getter."""
         return self.__node
 
     def import_entity(self, entity, keys):
+        """
+        Import an entity.
+
+        Import a foreign entity and its public keys. Enforces
+        ImportEntityPolicy.
+        """
         valid = True
         dir = None
         policy = ImportEntityPolicy()
@@ -148,29 +189,41 @@ class Facade:
             return True
 
     def update_keys(self, newkeys):
-            entity = self.find_entity(newkeys.issuer)
-            keylist = self.find_keys(newkeys.issuer)
+        """
+        Import new public keys.
 
-            valid = False
-            for keys in keylist:
-                policy = ImportUpdatePolicy(entity, keys)
-                if policy.keys(newkeys):
-                    valid = True
-                    break
+        Imports new public keys for already imported foreign entity. Enforces
+        ImportUpdatePolicy.
+        """
+        entity = self.find_entity(newkeys.issuer)
+        keylist = self.find_keys(newkeys.issuer)
 
-            if valid:
-                result = asyncio.get_event_loop().run_until_complete(
-                    self._vault.save(os.path.join(
-                        '/keys', str(newkeys.id) + '.pickle'), newkeys))
-                if isinstance(result, Exception):
-                    raise result
-                logging.info('New keys imported')
-                return True
-            else:
-                logging.error('New keys invalid')
-                return False
+        valid = False
+        for keys in keylist:
+            policy = ImportUpdatePolicy(entity, keys)
+            if policy.keys(newkeys):
+                valid = True
+                break
+
+        if valid:
+            result = asyncio.get_event_loop().run_until_complete(
+                self._vault.save(os.path.join(
+                    '/keys', str(newkeys.id) + '.pickle'), newkeys))
+            if isinstance(result, Exception):
+                raise result
+            logging.info('New keys imported')
+            return True
+        else:
+            logging.error('New keys invalid')
+            return False
 
     def update_entity(self, entity):
+        """
+        Import updated entity document.
+
+        Imports an updated version for already imported foreign entity.
+        Enforces ImportUpdatePolicy.
+        """
         old_ent = self.find_entity(entity.id)
         keylist = self.find_keys(entity.id)
 
@@ -205,10 +258,20 @@ class Facade:
             return False
 
     def find_keys(self, issuer, expiry_check=True):
+        """
+        Load public keys.
+
+        Loads public keys belonging to issuing entity.
+        """
         doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
         return Glue.doc_check(doclist, Keys, expiry_check)
 
     def find_entity(self, issuer, expiry_check=True):
+        """
+        Load foreign entity docuemnt.
+
+        Loads the entity document based on the issuers ID.
+        """
         doclist = Glue.run_async(self._vault.issuer(issuer, '/entities/*', 1))
         entitylist = Glue.doc_check(
             doclist, (Person, Ministry, Church), expiry_check)
@@ -217,62 +280,98 @@ class Facade:
 
 
 class PersonFacadeMixin:
+    """Mixin for a Person Facade."""
+
     PREFS = (Person, SetupPersonOperation)
 
 
 class MinistryFacadeMixin:
+    """Mixin for a Ministry Facade."""
+
     PREFS = (Ministry, SetupMinistryOperation)
 
 
 class ChurchFacadeMixin:
+    """Mixin for a Church Facade."""
+
     PREFS = (Church, SetupChurchOperation)
 
 
 class ServerFacadeMixin:
-    pass
+    """Mixin for a Server Facade."""
 
 
 class ClientFacadeMixin:
-    pass
+    """Mixin for a Church Facade."""
 
 
 class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):
+    """Final facade for Person entity in a client."""
+
+    INFO = (Const.A_TYPE_PERSON_CLIENT, )
+
     def __init__(self, home_dir, secret, vault=None):
+        """Initialize the facade and its mixins."""
         Facade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
 class PersonServerFacade(Facade, ServerFacadeMixin, PersonFacadeMixin):
+    """Final facade for Person entity as a server."""
+
+    INFO = (Const.A_TYPE_PERSON_SERVER, )
+
     def __init__(self, home_dir, secret, vault=None):
+        """Initialize the facade and its mixins."""
         Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
 
 class MinistryClientFacade(Facade, ClientFacadeMixin, MinistryFacadeMixin):
+    """Final facade for Ministry entity in a client."""
+
+    INFO = (Const.A_TYPE_MINISTRY_CLIENT, )
+
     def __init__(self, home_dir, secret, vault=None):
+        """Initialize the facade and its mixins."""
         Facade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
 class MinistryServerFacade(Facade, ServerFacadeMixin, MinistryFacadeMixin):
+    """Final facade for Ministry entity as a server."""
+
+    INFO = (Const.A_TYPE_MINISTRY_SERVER, )
+
     def __init__(self, home_dir, secret, vault=None):
+        """Initialize the facade and its mixins."""
         Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
 
 class ChurchClientFacade(Facade, ClientFacadeMixin, ChurchFacadeMixin):
+    """Final facade for Church entity in a client."""
+
+    INFO = (Const.A_TYPE_CHURCH_CLIENT, )
+
     def __init__(self, home_dir, secret, vault=None):
+        """Initialize the facade and its mixins."""
         Facade.__init__(self, home_dir, secret, vault)
         ClientFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
 
 class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
+    """Final facade for Church entity as a server."""
+
+    INFO = (Const.A_TYPE_CHURCH_SERVER, )
+
     def __init__(self, home_dir, secret, vault=None):
+        """Initialize the facade and its mixins."""
         Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)

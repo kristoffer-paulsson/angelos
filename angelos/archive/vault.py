@@ -1,4 +1,4 @@
-"""Module docstring."""
+"""Vault."""
 import pickle as pck
 import asyncio
 
@@ -39,6 +39,13 @@ HIERARCHY = (
 
 
 class Vault:
+    """
+    Vault interface.
+
+    The Vault is the most important archive in a facade, because it contains
+    the private entity data.
+    """
+
     IDENTITY = '/identity.pickle'
     ENTITY = '/entities/entity.pickle'
     PROFILE = '/profile.pickle'
@@ -48,22 +55,28 @@ class Vault:
     NETWORK = '/settings/network.pickle'
 
     def __init__(self, filename, secret):
+        """Initialize the Vault."""
         self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
         self._closed = False
         self._proxy = AsyncProxy(200)
 
     @property
     def closed(self):
+        """Indicate if vault is closed."""
         return self._closed
 
     def close(self):
+        """Close the Vault."""
         if not self._closed:
             self._proxy.quit()
             self._archive.close()
             self._closed = True
 
     @staticmethod
-    def setup(filename, entity, privkeys, keys, domain, node, secret):
+    def setup(filename,
+              entity, privkeys, keys, domain, node,
+              secret, _type=None, role=None, use=None):
+        """Create and setup the whole Vault according to policys."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
@@ -72,8 +85,8 @@ class Vault:
 
         arch = Archive7.setup(
             filename, secret, owner=entity.id,
-            node=node.id, domain=domain.id, title='Vault')  # ,
-        #  _type=None, role=None, use=None)
+            node=node.id, domain=domain.id, title='Vault',
+            _type=_type, role=role, use=use)
 
         for i in HIERARCHY:
             arch.mkdir(i)
@@ -100,7 +113,8 @@ class Vault:
 
         return Vault(filename, secret)
 
-    def load_identity(self):
+    async def load_identity(self):
+        """Load the entity core documents."""
         load_ops = [
             self._proxy.call(self._archive.load, filename=Vault.ENTITY),
             self._proxy.call(self._archive.load, filename=Vault.PRIVATE),
@@ -110,14 +124,11 @@ class Vault:
                 self._archive.load, filename='/settings/nodes/' + str(
                     self._archive.stats().node) + '.pickle')
         ]
-        loop = asyncio.get_event_loop()
-        gathering = asyncio.gather(
-            *load_ops, loop=loop, return_exceptions=True)
-        loop.run_until_complete(gathering)
-
-        return [pck.loads(_) for _ in gathering.result()]
+        result = await asyncio.gather(*load_ops, return_exceptions=True)
+        return [pck.loads(_) for _ in result]
 
     async def save(self, filename, document):
+        """Save a document at a certian location."""
         created, updated, owner = Glue.doc_save(document)
 
         return (
@@ -129,6 +140,7 @@ class Vault:
             )
 
     async def update(self, filename, document):
+        """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
         return (
@@ -138,6 +150,7 @@ class Vault:
             )
 
     async def issuer(self, issuer, path='/', limit=1):
+        """Search a folder for documents by issuer."""
         def callback():
             result = Globber.owner(self._archive, issuer, path)
             result.sort(reverse=True, key=lambda e: e[2])

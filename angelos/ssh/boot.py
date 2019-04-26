@@ -84,6 +84,7 @@ class Terminal(Shell):
                         break
                     except Exception as e:
                         self._io._stdout.write('%s: %s \n' % (type(e), e))
+                        logging.exception(e)
                     self._io._stdout.write(self._config['prompt'])
             except asyncssh.BreakReceived:
                 pass

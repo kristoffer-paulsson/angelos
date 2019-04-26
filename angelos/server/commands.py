@@ -4,11 +4,16 @@ import signal
 import asyncio
 import time
 import datetime
+import binascii
+
+import libnacl
 
 from ..utils import Util
 from ..error import Error
+from ..const import Const
 from .cmd import Command, Option
-from ..document.entities import Person, Ministry, Church
+from ..facade.facade import (
+    PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
 
 
 class SetupCommand(Command):
@@ -24,9 +29,10 @@ have an entity and a domain with working nodes, you need to import entity
 documents and connect to the nodes on the current domain network.
 """
 
-    def __init__(self, io):
+    def __init__(self, io, root):
         """Initialize the command. Takes a list of Command classes."""
         Command.__init__(self, 'setup', io)
+        self._root = root
 
     async def _command(self, opts):
         """Do entity setup."""
@@ -37,7 +43,43 @@ documents and connect to the nodes on the current domain network.
         ], True)
 
         if do == 0:
-            entity_data = await self.do_new()
+            # Collect information for the data entity
+            subdo, entity_data = await self.do_new()
+            # Select server role
+            r = await self._io.menu('What role should the server have?', [
+                'Primary server',
+                'Backup server'
+            ], True)
+
+            if r == 0:
+                role = Const.A_ROLE_PRIMARY
+            elif r == 1:
+                role = Const.A_ROLE_BACKUP
+
+            # Generate master key
+            secret = libnacl.secret.SecretBox().hex_sk()
+            self._io._stdout.write(
+                'This is the Master key for this entity.\n' +
+                'Make a backup, don\'t loose it!\n\n' +
+                secret.decode() + '\n\n'
+            )
+            await self._io.presskey()
+            # Verify master key
+            s2 = await self._io.prompt('Enter the master key as verification!')
+
+            if secret.decode() != s2:
+                raise RuntimeError('Master key mismatch')
+
+            if subdo == 0:
+                facade = await PersonServerFacade.setup(
+                    self._root, binascii.unhexlify(secret), role, entity_data)
+            elif subdo == 1:
+                facade = await MinistryServerFacade.setup(
+                    self._root, binascii.unhexlify(secret), role, entity_data)
+            elif subdo == 2:
+                facade = await ChurchServerFacade.setup(
+                    self._root, binascii.unhexlify(secret), role, entity_data)
+
         elif do == 1:
             docs = await self.do_import()
             return
@@ -126,15 +168,20 @@ documents and connect to the nodes on the current domain network.
 
     async def do_ministry(self):
         """Collect ministry entity data."""
-        pass
+        pass  # Just cut and paset from do_person and adjust
 
     async def do_church(self):
         """Collect church entity data."""
-        pass
+        pass  # Just cut and paset from do_person and adjust
 
     async def do_import(self):
         """Import entity from seed vault."""
         self._io._stdio.write('importing entities not implemented.')
+
+    @classmethod
+    def factory(cls, **kwargs):
+        """Create command with env from IoC."""
+        return cls(kwargs['io'], kwargs['ioc'].env['root'])
 
 
 class EnvCommand(Command):
