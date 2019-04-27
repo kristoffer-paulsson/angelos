@@ -60,33 +60,40 @@ class Terminal(Shell):
         if self.__lock.locked():
             self._process.close()
             return
+
         async with self.__lock:
             try:
+
                 self._io._stdout.write(
                     '\033[41m\033[H\033[J' + self._config['message'] +
                     Shell.EOL + '='*79 + Shell.EOL)
-
                 self._io._stdout.write(self._config['prompt'])
+
                 while not self._io._stdin.at_eof():
                     try:
+
                         line = await self._io._stdin.readline()
                         await self.execute(line.strip())
+
                     except CmdShellInvalidCommand as exc:
                         self._io._stdout.write(
                             str(exc) + Shell.EOL +
-                            'Try \'help\' or \'<command> -h\'' + Shell.EOL*2)
+                            'Try "help" or "<command> -h"' + Shell.EOL*2)
                     except CmdShellEmpty:
                         pass
                     except asyncssh.TerminalSizeChanged:
-                        self._size = self._io.get_terminal_size()
+                        self._size = self._io._upd_size()
                         continue
                     except CmdShellExit:
                         break
                     except Exception as e:
                         self._io._stdout.write('%s: %s \n' % (type(e), e))
                         logging.exception(e)
+
                     self._io._stdout.write(self._config['prompt'])
+
             except asyncssh.BreakReceived:
                 pass
+
             self._io._stdout.write('\033[40m\033[H\033[J')
             self._process.close()

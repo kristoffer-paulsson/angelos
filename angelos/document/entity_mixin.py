@@ -1,4 +1,4 @@
-"""Module docstring."""
+"""Entity mixin for shared fields."""
 from ..utils import Util
 from ..error import Error
 
@@ -7,6 +7,8 @@ from .model import (
 
 
 class PersonMixin(metaclass=DocumentMeta):
+    """Mixin for person specific fields."""
+
     sex = ChoiceField(choices=['man', 'woman', 'undefined'])
     born = DateField()
     names = StringField(multiple=True)
@@ -24,6 +26,8 @@ class PersonMixin(metaclass=DocumentMeta):
 
 
 class MinistryMixin(metaclass=DocumentMeta):
+    """Mixin for ministry specific fields."""
+
     vision = StringField(required=False)
     ministry = StringField()
     founded = DateField()
@@ -33,6 +37,8 @@ class MinistryMixin(metaclass=DocumentMeta):
 
 
 class ChurchMixin(metaclass=DocumentMeta):
+    """Mixin for church specific fields."""
+
     founded = DateField()
     city = StringField()
     region = StringField(required=False)

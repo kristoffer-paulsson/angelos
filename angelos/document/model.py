@@ -1,4 +1,10 @@
-"""Module docstring."""
+"""
+Model module.
+
+Contains the document model. A document is made up of a number of fields.
+All fields are selfvalidating. Also all classes based on the BaseDocument can
+implement validation.
+"""
 import re
 import datetime
 import uuid
@@ -11,13 +17,23 @@ from ..error import Error
 
 
 class Field:
+    """
+    Base class for all fields.
+
+    Implements basic functionality for fields such as support for init value
+    or function, multiple values, whether required and validation checks
+    thereof.
+    """
+
     def __init__(self, value=None, required=True, multiple=False, init=None):
+        """Initialize basic field functionality."""
         self.value = value
         self.required = required
         self.multiple = multiple
         self.init = init
 
     def validate(self, value):
+        """Validate according to basic field functionality."""
         if self.required and not bool(value):
             logging.debug('Field with "required" not set. (%s)' % value)
             raise Util.exception(Error.FIELD_NOT_SET)
@@ -37,26 +53,38 @@ class Field:
         return True
 
     def str(self, v):
+        """Abstract for converting value to string."""
         raise NotImplementedError()
 
     def bytes(self, v):
+        """Abstract for converting value to bytes."""
         raise NotImplementedError()
 
 
 def conv_dont(f, v):
+    """None convertion activator."""
     return v
 
 
 def conv_str(f, v):
+    """Str convertion activator."""
     return f.str(v) if v else ''
 
 
 def conv_bytes(f, v):
+    """Bytes convertion activator."""
     return f.bytes(v) if v else b''
 
 
 class DocumentMeta(type):
+    """
+    Meta implementation of Document.
+
+    Implements accumulation of all field into one namespace.
+    """
+
     def __new__(self, name, bases, namespace):
+        """Create new class."""
         fields = {}
         for base in bases:
             if '_fields' in base.__dict__:
@@ -76,7 +104,18 @@ class DocumentMeta(type):
 
 
 class BaseDocument(metaclass=DocumentMeta):
+    """
+    Field magic behind the scenes.
+
+    Implements basic field handling and some export and validation logic.
+    """
+
     def __init__(self, nd={}, strict=True):
+        """
+        Initialize a document.
+
+        Receives a dictionary of values and populates the fields.
+        """
         for name, field in self._fields.items():
             object.__setattr__(self, name, field.init() if (
                 bool(field.init) and not bool(field.value)) else field.value)
@@ -89,6 +128,11 @@ class BaseDocument(metaclass=DocumentMeta):
                     raise e
 
     def __setattr__(self, key, value):
+        """
+        Set a field.
+
+        Sets a field and validates transparently.
+        """
         if key in self._fields:
             if self._fields[key].validate(value):
                 object.__setattr__(self, key, value)
@@ -99,6 +143,11 @@ class BaseDocument(metaclass=DocumentMeta):
             raise AttributeError('Unknown field "%s"'.format(key))
 
     def export(self, c=conv_dont):
+        """
+        Export a document as a dictionary.
+
+        Fields can be converted during export into String or Bytes.
+        """
         nd = {}
         logging.debug('Exporting document %s' % type(self))
 
@@ -120,21 +169,31 @@ class BaseDocument(metaclass=DocumentMeta):
         return nd
 
     def _validate(self):
+        """Validate all fields."""
         for name in self._fields.keys():
             self._fields[name].validate(getattr(self, name))
         return True
 
     def validate(self):
+        """
+        Abstract document validator.
+
+        Should be implemented by all final document implementations.
+        """
         raise NotImplementedError()
 
 
 class DocumentField(Field):
+    """Field that holds one or several Documents as field."""
+
     def __init__(self, value=None, required=True,
                  multiple=False, init=None, t=None):
         Field.__init__(self, value, required, multiple, init)
+        """Set a type to be accepted in particular"""
         self.type = t
 
     def validate(self, value):
+        """Validate document type and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -151,15 +210,10 @@ class DocumentField(Field):
 
         return True
 
-    def to_str(self, value):
-        return value.export_str()
-
-    def to_bytes(self, value):
-        return value.export_bytes()
-
 
 class UuidField(Field):
     def validate(self, value):
+        """Validate data type as UUID and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -174,14 +228,17 @@ class UuidField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return str(value)
 
     def bytes(self, value):
+        """Bytes converter."""
         return value.bytes
 
 
 class IPField(Field):
     def validate(self, value):
+        """Validate data type as IPvXAddress and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -198,9 +255,11 @@ class IPField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return str(value)
 
     def bytes(self, value):
+        """Bytes converter."""
         if isinstance(value, ipaddress.IPv4Address):
             return int(value).to_bytes(4, byteorder='big')
         if isinstance(value, ipaddress.IPv6Address):
@@ -211,6 +270,7 @@ class IPField(Field):
 
 class DateField(Field):
     def validate(self, value):
+        """Validate field type as Date and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -225,14 +285,17 @@ class DateField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return value.isoformat()
 
     def bytes(self, value):
+        """Bytes converter."""
         return bytes(value.isoformat(), 'utf-8')
 
 
 class StringField(Field):
     def validate(self, value):
+        """Validate field type as String and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -240,6 +303,7 @@ class StringField(Field):
 
         for v in value:
             if not isinstance(v, (str, bytes, type(None))):
+            # if not isinstance(v, (str, type(None))):
                 logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
@@ -247,14 +311,17 @@ class StringField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return value
 
     def bytes(self, value):
+        """Bytes converter."""
         return str(value).encode('utf-8')
 
 
 class TypeField(Field):
     def validate(self, value):
+        """Validate field type as Int and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -269,9 +336,11 @@ class TypeField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return str(value)
 
     def bytes(self, value):
+        """Bytes converter."""
         return bytes([value])
 
 
@@ -282,6 +351,10 @@ class BinaryField(Field):
         self.limit = limit
 
     def validate(self, value):
+        """
+        Validate field type as Bytes and within limits
+        and inherited validation logic.
+        """
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -303,9 +376,11 @@ class BinaryField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return base64.standard_b64encode(value).decode('utf-8')
 
     def bytes(self, value):
+        """Bytes converter."""
         return value
 
 
@@ -317,6 +392,7 @@ class SignatureField(BinaryField):
         self.redo = False
 
     def validate(self, value):
+        """Validate field type as String and inherited validation logic."""
         if not self.redo:
             Field.validate(self, value)
 
@@ -348,6 +424,7 @@ class ChoiceField(Field):
         self.choices = choices
 
     def validate(self, value):
+        """Validate field type as String and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -362,9 +439,11 @@ class ChoiceField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return value
 
     def bytes(self, value):
+        """Bytes converter."""
         return bytes(value, 'utf-8')
 
 
@@ -377,6 +456,7 @@ class EmailField(Field):
         self.choices = choices
 
     def validate(self, value):
+        """Validate as Email address and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):
@@ -397,7 +477,9 @@ class EmailField(Field):
         return True
 
     def str(self, value):
+        """Str converter."""
         return value
 
     def bytes(self, value):
+        """Bytes converter."""
         return bytes(value, 'utf-8')

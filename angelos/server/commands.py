@@ -70,15 +70,16 @@ documents and connect to the nodes on the current domain network.
             if secret.decode() != s2:
                 raise RuntimeError('Master key mismatch')
 
+            sk = binascii.unhexlify(secret)
             if subdo == 0:
                 facade = await PersonServerFacade.setup(
-                    self._root, binascii.unhexlify(secret), role, entity_data)
+                    self._root, sk, role, entity_data)
             elif subdo == 1:
                 facade = await MinistryServerFacade.setup(
-                    self._root, binascii.unhexlify(secret), role, entity_data)
+                    self._root, sk, role, entity_data)
             elif subdo == 2:
                 facade = await ChurchServerFacade.setup(
-                    self._root, binascii.unhexlify(secret), role, entity_data)
+                    self._root, sk, role, entity_data)
 
         elif do == 1:
             docs = await self.do_import()
@@ -141,7 +142,8 @@ documents and connect to the nodes on the current domain network.
             elif do == 1:
                 data['family_name'] = await self._io.prompt('Family name')
             elif do == 2:
-                data['names'].append(await self._io.prompt('One (1) middle name'))  # noqa E501
+                data['names'].append(await self._io.prompt(
+                    'One (1) middle name'))
             elif do == 3:
                 data['born'] = await self._io.prompt(
                     'Birth date (YYYY-MM-DD)', t=datetime.date.fromisoformat)
@@ -168,11 +170,119 @@ documents and connect to the nodes on the current domain network.
 
     async def do_ministry(self):
         """Collect ministry entity data."""
-        pass  # Just cut and paset from do_person and adjust
+        self._io._stdout.write(
+            'It is necessary to collect information ' +
+            'for the ministry entity.\n')
+        valid = False
+        data = {
+            'vision': None,
+            'ministry': None,
+            'founded': None,
+        }
+
+        while True:
+            do = await self._io.menu('Ministry entity data, (* = mandatory)', [
+                '{m} {t:17} {c:4} {v}'.format(
+                    m=' ', t='Vision',
+                    c='OK' if bool(data['vision']) else 'N/A',
+                    v=data['vision']),
+                '{m} {t:17} {c:4} {v}'.format(
+                    m='*', t='Ministry name',
+                    c='OK' if bool(data['ministry']) else 'N/A',
+                    v=data['ministry']),
+                '{m} {t:17} {c:4} {v}'.format(
+                    m='*', t='Ministry founded',
+                    c='OK' if bool(data['founded']) else 'N/A',
+                    v=data['founded']),
+                '  Reset'
+            ] + (['  Continue'] if valid else []))
+
+            if do == 0:
+                vision = await self._io.prompt('Ministry vision')
+                data['vision'] = vision
+            elif do == 1:
+                data['ministry'] = await self._io.prompt('Ministry name')
+            elif do == 2:
+                data['founded'] = await self._io.prompt(
+                    'Ministry founded (YYYY-MM-DD)',
+                    t=datetime.date.fromisoformat)
+            elif do == 3:
+                data = {
+                    'vision': None,
+                    'ministry': None,
+                    'founded': None,
+                }
+            elif do == 4:
+                break
+
+            if all(data):
+                valid = True
+            else:
+                valid = False
+
+        return data
 
     async def do_church(self):
         """Collect church entity data."""
-        pass  # Just cut and paset from do_person and adjust
+        self._io._stdout.write(
+            'It is necessary to collect information for the church entity.\n')
+        valid = False
+        data = {
+            'founded': None,
+            'city': None,
+            'region': None,
+            'country': None,
+        }
+
+        while True:
+            do = await self._io.menu('Church entity data, (* = mandatory)', [
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='Founded',
+                    c='OK' if bool(data['founded']) else 'N/A',
+                    v=data['founded']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='City',
+                    c='OK' if bool(data['city']) else 'N/A',
+                    v=data['city']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m=' ', t='Region/state',
+                    c='OK' if bool(data['region']) else 'N/A',
+                    v=data['region']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m=' ', t='Country/nation',
+                    c='OK' if bool(data['country']) else 'N/A',
+                    v=data['country']),
+                '  Reset'
+            ] + (['  Continue'] if valid else []))
+
+            if do == 0:
+                founded = await self._io.prompt(
+                    'Church founded when (YYYY-MM-DD)',
+                    t=datetime.date.fromisoformat)
+                data['founded'] = founded
+            elif do == 1:
+                data['city'] = await self._io.prompt('Church of what city')
+            elif do == 2:
+                data['region'].append(await self._io.prompt(
+                    'Region or state (if applicable)'))
+            elif do == 3:
+                data['country'] = await self._io.prompt('Country ')
+            elif do == 4:
+                data = {
+                    'founded': None,
+                    'city': None,
+                    'region': None,
+                    'country': None,
+                }
+            elif do == 5:
+                break
+
+            if all(data):
+                valid = True
+            else:
+                valid = False
+
+        return data
 
     async def do_import(self):
         """Import entity from seed vault."""

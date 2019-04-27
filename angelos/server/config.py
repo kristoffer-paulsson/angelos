@@ -9,7 +9,6 @@ from .vars import (
 
 from ..logger import LogHandler
 from ..automatic import Automatic
-from .executor import ExecutorHandler
 from .parser import Parser
 
 try:
@@ -35,7 +34,6 @@ CONFIG = {
         CONFIG_IMMUTABLE,
         CONFIG_LOADED,
         CONFIG_DEFAULT),
-    # 'executor': lambda self: ExecutorHandler(),
     'log': lambda self: LogHandler(self.config['logger']),
     'opts': lambda self: Parser(),
     'auto': lambda self: Automatic(),

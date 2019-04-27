@@ -16,6 +16,11 @@ class ConsoleIO:
         self._process = process
         self._stdin = process.stdin
         self._stdout = process.stdout
+        self._size = process.get_terminal_size()
+
+    def upd_size(self):
+        """Update terminal size at event."""
+        self._size = self._process.get_terminal_size()
 
     async def prompt(self, msg='', t=str):
         """Prompt for user input."""
