@@ -49,6 +49,7 @@ class NaClPrivateKey(BaseKey):
 
     @property
     def value(self):
+        """Verification key."""
         return self._box.vk
 
 
@@ -73,11 +74,15 @@ class NaClPublicKey(BaseKey):
 
     @property
     def value(self):
+        """Verification key."""
         return self._box.vk
 
 
 class NaClKey(asyncssh.SSHKey):
+    """SSHKey for NaCl."""
+
     def __init__(self, key):
+        """Initialize key."""
         super().__init__(key)
         self.algorithm = _algorithm
         self.sig_algorithms = (self.algorithm,)
@@ -103,36 +108,44 @@ class NaClKey(asyncssh.SSHKey):
         return self.verify_der(data, sig_algorithm, sig)
 
     def encode_ssh_private(self):
+        """Encode private SSH key."""
         return base64.b64encode(self._key.value)
 
     def encode_ssh_public(self):
+        """Encode public SSH key."""
         return base64.b64encode(self._key.value)
 
     @classmethod
     def decode_ssh_public(cls, packet):
+        """Decode public SSH key."""
         public_value = base64.b64decode(
             packet.get_bytes(packet._len - packet._idx))
         return (public_value,)
 
     @classmethod
     def decode_ssh_private(cls, packet):
+        """Decode private SSH key."""
         private_value = base64.b64decode(
             packet.get_bytes(packet._len - packet._idx))
         return (private_value,)
 
     @classmethod
     def make_private(cls, private_value):
+        """Produce a private NaCl key."""
         return cls(NaClPrivateKey.construct(private_value))
 
     @classmethod
     def make_public(cls, public_value):
+        """Produce a public SSH key."""
         return cls(NaClPublicKey.construct(public_value))
 
     def __eq__(self, other):
+        """Compare class with another object."""
         return (isinstance(other, type(self)) and
                 self._key.value == other._key.value)
 
     def __hash__(self):
+        """Generate a hash for this class."""
         return hash((self.algorithm, self._key.value))
 
     # def validate(self, key, address):
@@ -143,5 +156,6 @@ register_public_key_alg(_algorithm, NaClKey, (_algorithm,))
 
 
 def make_known_hosts(verify):
+    """Produce a known hosts generator."""
     return lambda h, a, p: (
         [NaClKey(key=NaClPublicKey.construct(verify=verify))], [], [])

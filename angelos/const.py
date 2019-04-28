@@ -97,3 +97,7 @@ class Const:
     I_SETUP = 'setup'
     I_SPINNER = 'spinner'
     I_FLASH = 'flash'
+
+    ARCH_BLK_1 = 227
+    ARCH_BLK_2 = 454
+    ARCH_BLK_4 = 908

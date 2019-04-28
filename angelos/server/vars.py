@@ -13,6 +13,7 @@ from ..const import Const
 """Environment default values."""
 ENV_DEFAULT = {
     'root': Util.path(Util.app_dir(), 'serverroot'),
+    'log': Util.path(Util.app_dir(), 'serverroot')
 }
 
 """Environment immutable values."""

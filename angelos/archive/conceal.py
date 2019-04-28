@@ -24,7 +24,8 @@ readinto1 readline readlines seek tell truncate write
 """
 fileno, seek, truncate
 
-close, __enter__, __exit__, flush, isatty, __iter__, __next__, readable, readline, readlines, seekable, tell, writable, writelines
+close, __enter__, __exit__, flush, isatty, __iter__, __next__, readable,
+readline, readlines, seekable, tell, writable, writelines
 
 closed
 

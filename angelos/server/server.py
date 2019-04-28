@@ -27,20 +27,12 @@ class Server(ContainerAware):
         loop.add_signal_handler(
             signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM))
 
-        vault_file = Util.path(self.ioc.env['root'], Const.CNL_VAULT)
-        if os.path.isfile(vault_file):
-            self._applog.info(
-                'Vault archive found. Initialize startup mode.')
-        else:
-            self._applog.info(
-                'Vault archive NOT found. Initialize setup mode.')
-            self.ioc.add('boot', lambda ioc: Starter().boot_server(
-                self._listen(), port=self.ioc.env['port'], ioc=ioc))
-            boot = self.ioc.boot
+        self._applog.info('Starting boot server.')
+        self.ioc.boot = Starter().boot_server(
+            self._listen(), port=self.ioc.env['port'], ioc=self.ioc)
 
     def _finalize(self):
         self._applog.info('Shutting down server.')
-        # self.ioc.executor.stop()
         self._applog.info('Server quitting.')
 
     def _listen(self):

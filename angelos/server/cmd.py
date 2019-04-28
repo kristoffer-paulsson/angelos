@@ -1,10 +1,12 @@
 """Module docstring."""
 import re
+import asyncio
+import logging
 
 import asyncssh
 
 from ..utils import Util, FactoryInterface
-from ..error import Error
+from ..error import CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit, Error
 from ..ioc import ContainerAware
 
 
@@ -21,6 +23,11 @@ class ConsoleIO:
     def upd_size(self):
         """Update terminal size at event."""
         self._size = self._process.get_terminal_size()
+
+    def __lshift__(self, other):  # Print
+        """Print to stdout C++ - style."""
+        Util.is_type(other, str)
+        self._stdout.write(other)
 
     async def prompt(self, msg='', t=str):
         """Prompt for user input."""
@@ -44,9 +51,13 @@ class ConsoleIO:
             self._stdout.write('%s\n' % msg)
             self._stdout.write(
                 'Press key: %s \n' % ' / '.join(['Yes', 'No']))
-            self._stdin.channel.set_line_mode(False)
-            input = await self._stdin.read(1)
-            self._stdin.channel.set_line_mode(True)
+            try:
+                self._stdin.channel.set_line_mode(False)
+                input = await self._stdin.read(1)
+                self._stdin.channel.set_line_mode(True)
+            except Exception as e:
+                self._stdin.channel.set_line_mode(True)
+                raise e
 
             if input == ans[0]:
                 self._stdout.write('Yes\n\n')
@@ -60,9 +71,16 @@ class ConsoleIO:
     async def presskey(self, msg='Press any key to continue...'):
         """Press a key to continue."""
         self._stdout.write('%s\n' % msg)
-        self._stdin.channel.set_line_mode(False)
-        await self._stdin.read(1)
-        self._stdin.channel.set_line_mode(True)
+
+        try:
+            self._stdin.channel.set_line_mode(False)
+            await self._stdin.read(1)
+            self._stdin.channel.set_line_mode(True)
+
+        except Exception as e:
+            self._stdin.channel.set_line_mode(True)
+            raise e
+
         return True
 
     async def choose(self, msg='', choices=[], em=False):
@@ -124,15 +142,19 @@ class ConsoleIO:
 
     async def secret(self, msg='Enter password'):
         """Print menu with entries."""
-        self._stdout.write('{0}'.format(msg))
+        self._stdout.write('{0}: '.format(msg))
 
         self._process.channel.set_echo(False)
-        while True:
-            input = await self._stdin.readline()
-            input = input.strip()
-            if input != '':
-                break
-        self._process.channel.set_echo(True)
+        try:
+            while True:
+                input = await self._stdin.readline()
+                input = input.strip()
+                if input != '':
+                    break
+            self._process.channel.set_echo(True)
+        except Exception as e:
+            self._process.channel.set_echo(True)
+            raise e
 
         return input
 
@@ -179,6 +201,10 @@ class ConsoleIO:
     def inverse(cls, text):
         """Make terminal text inverse."""
         return cls.format(text, nv=True)
+
+    def exception(self, e):
+        """Print exception error message to console."""
+        self._stdout.write('\nError: %s\n\n' % e)
 
 
 class Option:
@@ -422,7 +448,7 @@ class Command(FactoryInterface):
         b += '<' + self.command + '> supports the options below' + Shell.EOL
         b += '-'*79 + Shell.EOL
         b += r_b + Shell.EOL
-        self._io._stdout.write(b)
+        self._io << b
 
     async def _command(self, opts):
         """
@@ -490,8 +516,7 @@ class Shell(ContainerAware):
         try:
             await self.__cmds[cmd].execute(opts)
         except asyncssh.BreakReceived as e:
-            self._io._stdout.write(
-                '\n\nAbort sequence received!\n%s\n\n' % e)
+            self._io << '\n\nAbort sequence received!\n%s\n\n' % e
 
     def _parse(self, options):
         opts = []
@@ -518,12 +543,12 @@ the console shell"""
                 rows.append('{n:<16}{d}'.format(
                     n=self.__cmds[cmd].command, d=self.__cmds[cmd].short))
 
-            b = Shell.EOL
-            b += 'Available commands with description below.' + Shell.EOL
-            b += '-'*79 + Shell.EOL
-            b += Shell.EOL.join(rows) + Shell.EOL*2
-            b += 'type <command> -h for detailed help.' + Shell.EOL*2
-            self._io._stdout.write(b)
+            self._io << (
+                Shell.EOL +
+                'Available commands with description below.' + Shell.EOL +
+                '-'*79 + Shell.EOL +
+                Shell.EOL.join(rows) + Shell.EOL*2 +
+                'type <command> -h for detailed help.' + Shell.EOL*2)
 
     class ExitCommand(Command):
         """Exit the shell."""
@@ -550,4 +575,58 @@ screen"""
             Command.__init__(self, 'clear', io)
 
         async def _command(self, opts):
-            self._io._stdout.write('\033[H\033[J')
+            self._io << '\033[H\033[J'
+
+
+class Terminal(Shell):
+    """Asynchronoius instance of Shell."""
+
+    __lock = asyncio.Lock()
+
+    def __init__(self, commands, ioc, process):
+        """Initialize Terminal from SSHServerProcess."""
+        Shell.__init__(self, commands, ioc, process)
+        self._config = self.ioc.config['terminal']
+
+    async def run(self):
+        """Looping the Shell interpreter."""
+        if self.__lock.locked():
+            self._process.close()
+            return
+
+        async with self.__lock:
+            try:
+
+                self._io << (
+                    '\033[41m\033[H\033[J' + self._config['message'] +
+                    Shell.EOL + '='*79 + Shell.EOL)
+                self._io << self._config['prompt']
+
+                while not self._io._stdin.at_eof():
+                    try:
+
+                        line = await self._io._stdin.readline()
+                        await self.execute(line.strip())
+
+                    except CmdShellInvalidCommand as exc:
+                        self._io << (
+                            str(exc) + Shell.EOL +
+                            'Try "help" or "<command> -h"' + Shell.EOL*2)
+                    except CmdShellEmpty:
+                        pass
+                    except asyncssh.TerminalSizeChanged:
+                        self._io._upd_size()
+                        continue
+                    except CmdShellExit:
+                        break
+                    except Exception as e:
+                        self._io << ('%s: %s \n' % (type(e), e))
+                        logging.exception(e)
+
+                    self._io << self._config['prompt']
+
+            except asyncssh.BreakReceived:
+                pass
+
+            self._io << '\033[40m\033[H\033[J'
+            self._process.close()

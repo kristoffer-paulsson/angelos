@@ -7,6 +7,8 @@ import asyncio
 from .vars import (
     ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE)
 
+from ..ioc import Handle
+from ..facade.facade import Facade
 from ..logger import LogHandler
 from ..automatic import Automatic
 from .parser import Parser
@@ -35,6 +37,8 @@ CONFIG = {
         CONFIG_LOADED,
         CONFIG_DEFAULT),
     'log': lambda self: LogHandler(self.config['logger']),
+    'facade': lambda self: Handle(Facade),
+    'boot': lambda self: Handle(asyncio.Server),
     'opts': lambda self: Parser(),
     'auto': lambda self: Automatic(),
     'quit': lambda self: asyncio.Event(),

@@ -27,13 +27,6 @@ class Container:
                     Error.IOC_LAMBDA_EXPECTED, {'service': name})
         return self.__instances[name]
 
-    def add(self, name, value):
-        """Add a service with name and value/lambda after initialization."""
-        if name in self.__config:
-            raise IndexError('Service already configured')
-        else:
-            self.__config[name] = value
-
 
 class ContainerAware:
     """Mixin that makes a class IoC aware."""
@@ -47,3 +40,36 @@ class ContainerAware:
     def ioc(self):
         """Container property access."""
         return self.__ioc
+
+
+class Handle:
+    """Handle for late IoC services."""
+
+    def __init__(self, _type):
+        """Init handle by setting allowed type."""
+        self.__type = _type
+        self.__value = None
+        self.__name = None
+
+    def __get__(self, instance, owner):
+        """Return None if not set or the correct instance."""
+        return self.__value
+
+    def __set__(self, instance, value):
+        """
+        Set the handle instance.
+
+        Handle is immutable and can only be set once.
+        """
+        if self.__value: raise ValueError(  # noqa E701
+            'Handle already set for %s' % self.__name)
+        Util.is_type(value, self.__type)
+        self.__value = value
+
+    def __delete__(self, instance):
+        """Handle can not be deleted. It is immutable."""
+        raise ValueError('Can not delete handle for %s' % self.__name)
+
+    def __set_name__(self, owner, name):
+        """Set the attribute name."""
+        self.__name = name

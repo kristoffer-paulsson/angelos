@@ -5,6 +5,7 @@ import asyncio
 import time
 import datetime
 import binascii
+import logging
 
 import libnacl
 
@@ -13,7 +14,7 @@ from ..error import Error
 from ..const import Const
 from .cmd import Command, Option
 from ..facade.facade import (
-    PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
+    Facade, PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
 
 
 class SetupCommand(Command):
@@ -29,14 +30,24 @@ have an entity and a domain with working nodes, you need to import entity
 documents and connect to the nodes on the current domain network.
 """
 
-    def __init__(self, io, root):
+    def __init__(self, io, root, ioc):
         """Initialize the command. Takes a list of Command classes."""
         Command.__init__(self, 'setup', io)
         self._root = root
+        self._ioc = ioc
 
     async def _command(self, opts):
         """Do entity setup."""
-        self._io._stdout.write(self.msg_start)
+        if isinstance(self._ioc.facade, Facade):
+            self._io << '\nServer already running.\n\n'
+            return
+
+        vault_file = Util.path(self.ioc.env['root'], Const.CNL_VAULT)
+        if os.path.isfile(vault_file):
+            self._io << '\n\nServer already setup.\n\n'
+            return
+
+        self._io << self.msg_start
         do = await self._io.menu('Select an entry', [
             'Create new entity',
             'Import existing entity'
@@ -57,32 +68,35 @@ documents and connect to the nodes on the current domain network.
                 role = Const.A_ROLE_BACKUP
 
             # Generate master key
-            secret = libnacl.secret.SecretBox().hex_sk()
-            self._io._stdout.write(
+            secret = libnacl.secret.SecretBox().sk
+            self._io << (
                 'This is the Master key for this entity.\n' +
                 'Make a backup, don\'t loose it!\n\n' +
-                secret.decode() + '\n\n'
+                binascii.hexlify(secret).decode() + '\n\n'
             )
             await self._io.presskey()
             # Verify master key
-            s2 = await self._io.prompt('Enter the master key as verification!')
+            key = await self._io.prompt(
+                'Enter the master key as verification!')
 
-            if secret.decode() != s2:
+            if secret != binascii.unhexlify(key.encode()):
                 raise RuntimeError('Master key mismatch')
 
-            sk = binascii.unhexlify(secret)
             if subdo == 0:
                 facade = await PersonServerFacade.setup(
-                    self._root, sk, role, entity_data)
+                    self._root, secret, role, entity_data)
             elif subdo == 1:
                 facade = await MinistryServerFacade.setup(
-                    self._root, sk, role, entity_data)
+                    self._root, secret, role, entity_data)
             elif subdo == 2:
                 facade = await ChurchServerFacade.setup(
-                    self._root, sk, role, entity_data)
+                    self._root, secret, role, entity_data)
+
+            self._ioc.facade = facade
 
         elif do == 1:
-            docs = await self.do_import()
+            raise NotImplementedError('Import to be implemented')
+            # docs = await self.do_import()
             return
 
     async def do_new(self):
@@ -102,7 +116,7 @@ documents and connect to the nodes on the current domain network.
 
     async def do_person(self):
         """Collect person entity data."""
-        self._io._stdout.write(
+        self._io << (
             'It is necessary to collect information for the person entity.\n')
         valid = False
         data = {
@@ -170,7 +184,7 @@ documents and connect to the nodes on the current domain network.
 
     async def do_ministry(self):
         """Collect ministry entity data."""
-        self._io._stdout.write(
+        self._io << (
             'It is necessary to collect information ' +
             'for the ministry entity.\n')
         valid = False
@@ -224,7 +238,7 @@ documents and connect to the nodes on the current domain network.
 
     async def do_church(self):
         """Collect church entity data."""
-        self._io._stdout.write(
+        self._io << (
             'It is necessary to collect information for the church entity.\n')
         valid = False
         data = {
@@ -286,12 +300,52 @@ documents and connect to the nodes on the current domain network.
 
     async def do_import(self):
         """Import entity from seed vault."""
-        self._io._stdio.write('importing entities not implemented.')
+        self._io << 'importing entities not implemented.'
 
     @classmethod
     def factory(cls, **kwargs):
         """Create command with env from IoC."""
-        return cls(kwargs['io'], kwargs['ioc'].env['root'])
+        return cls(kwargs['io'], kwargs['ioc'].env['root'], kwargs['ioc'])
+
+
+class StartupCommand(Command):
+    """Unlock and start the server."""
+
+    short = """Unlock and start."""
+    description = """Receive the master key, then unlock and start the server."""  # noqa E501
+
+    def __init__(self, io, root, ioc):
+        """Initialize the command. Takes a list of Command classes."""
+        Command.__init__(self, 'startup', io)
+        self._root = root
+        self._ioc = ioc
+
+    async def _command(self, opts):
+        if isinstance(self._ioc.facade, Facade):
+            self._io << '\nServer already running.\n\n'
+            return
+
+        try:
+            key = await self._io.secret('Enter the master key')
+            secret = binascii.unhexlify(key.encode())
+
+            facade = await Facade.open(self._root, secret)
+            self._ioc.facade = facade
+
+            self._io << '\nSuccessfully loaded the facade.\nID: %s\n\n' % (
+                    facade.entity.id)
+
+        except (ValueError, binascii.Error) as e:
+            self._io << '\nError: %s\n\n' % e
+
+        except Exception as e:
+            logging.exception(e)
+            self._io << '\nError: %s\n\n' % e
+
+    @classmethod
+    def factory(cls, **kwargs):
+        """Create command with env from IoC."""
+        return cls(kwargs['io'], kwargs['ioc'].env['root'], kwargs['ioc'])
 
 
 class EnvCommand(Command):
@@ -306,11 +360,11 @@ class EnvCommand(Command):
         self.__env = env
 
     async def _command(self, opts):
-            self._io._stdout.write(
+            self._io << (
                 '\nEnvironment variables:\n' + '-'*79 + '\n')
-            self._io._stdout.write('\n'.join([
-                '%s: %s' % (k, v) for k, v in self.__env.items()]))
-            self._io._stdout.write('\n' + '-'*79 + '\n\n')
+            self._io << '\n'.join([
+                '%s: %s' % (k, v) for k, v in self.__env.items()])
+            self._io << '\n' + '-'*79 + '\n\n'
 
     @classmethod
     def factory(cls, **kwargs):
@@ -342,15 +396,15 @@ class QuitCommand(Command):
 
     async def _command(self, opts):
         if opts['yes']:
-            self._io._stdout.write(
+            self._io << (
                 '\nStarting shutdown sequence for the Angelos server.\n\n')
             asyncio.ensure_future(self._quit())
             for t in ['3', '.', '.', '2', '.', '.', '1', '.', '.', '0']:
-                self._io._stdout.write(t)
+                self._io << t
                 time.sleep(.333)
             raise Util.exception(Error.CMD_SHELL_EXIT)
         else:
-            self._io._stdout.write(
+            self._io << (
                 '\nYou didn\'t confirm shutdown sequence. Use --yes/-y.\n\n')
 
     async def _quit(self):
