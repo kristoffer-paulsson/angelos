@@ -68,26 +68,24 @@ class Globber:
     def full(archive, filename='*', cmp_uuid=False):
         Util.is_type(archive, Archive7)
 
-        archive._lock()
+        with archive.lock:
+            sq = Archive7.Query(pattern=filename)
+            sq.type(b'f')
+            idxs = archive.ioc.entries.search(sq)
+            ids = archive.ioc.hierarchy.ids
 
-        sq = Archive7.Query(pattern=filename)
-        sq.type(b'f')
-        idxs = archive.ioc.entries.search(sq)
-        ids = archive.ioc.hierarchy.ids
+            files = {}
+            for i in idxs:
+                idx, entry = i
+                if entry.parent.int == 0:
+                    name = '/'+str(entry.name, 'utf-8')
+                else:
+                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                if cmp_uuid:
+                    files[entry.id] = (name, entry.deleted, entry.modified)
+                else:
+                    files[name] = (entry.id, entry.deleted, entry.modified)
 
-        files = {}
-        for i in idxs:
-            idx, entry = i
-            if entry.parent.int == 0:
-                name = '/'+str(entry.name, 'utf-8')
-            else:
-                name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
-            if cmp_uuid:
-                files[entry.id] = (name, entry.deleted, entry.modified)
-            else:
-                files[name] = (entry.id, entry.deleted, entry.modified)
-
-        archive._unlock()
         return files
 
     @staticmethod
@@ -96,22 +94,20 @@ class Globber:
         Util.is_type(path, str)
         Util.is_type(owner, (str, uuid.UUID))
 
-        archive._lock()
+        with archive.lock:
+            sq = Archive7.Query(path).owner(owner).type(b'f')
+            idxs = archive.ioc.entries.search(sq)
+            ids = archive.ioc.hierarchy.ids
 
-        sq = Archive7.Query(path).owner(owner).type(b'f')
-        idxs = archive.ioc.entries.search(sq)
-        ids = archive.ioc.hierarchy.ids
+            files = []
+            for i in idxs:
+                idx, entry = i
+                if entry.parent.int == 0:
+                    name = '/'+str(entry.name, 'utf-8')
+                else:
+                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                files.append((name, entry.id, entry.created))
 
-        files = []
-        for i in idxs:
-            idx, entry = i
-            if entry.parent.int == 0:
-                name = '/'+str(entry.name, 'utf-8')
-            else:
-                name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
-            files.append((name, entry.id, entry.created))
-
-        archive._unlock()
         return files
 
 

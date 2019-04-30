@@ -72,6 +72,22 @@ class Util:
                     str(types), str(instance)))
 
     @staticmethod
+    def is_path(instance):
+        """
+        check_path is a helper function. Tests for a PathLike and raises a
+        standardized TypeError exception.
+
+        Instance    The instanced variable
+
+        Example:
+        check_class(result, (Model, BaseModel))
+        """
+        if not isinstance(instance, os.PathLike):
+            raise TypeError(
+                'Path like object expected, but got: {0}'.format(
+                    str(instance)))
+
+    @staticmethod
     def exception(error_code, debug_info={}):
         """Docstring"""
         Util.is_type(error_code, int)

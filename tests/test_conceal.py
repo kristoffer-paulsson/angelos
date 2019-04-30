@@ -31,20 +31,22 @@ class TestConceal(unittest.TestCase):
         """Creating new empty file and then open file"""
         logging.info('====== %s ======' % 'test_create_open')
 
-        with ConcealIO(self.filename, 'wb', self.secret):
+        with ConcealIO(self.filename, 'wb', secret=self.secret):
             pass
-        self.assertEqual(512*33, filesize(self.filename), 'Wrong filesize.')
-        with ConcealIO(self.filename, 'rb+',  self.secret):
+        self.assertEqual(16896, filesize(self.filename), 'Wrong filesize.')
+        with ConcealIO(self.filename, 'rb+',  secret=self.secret):
             pass
-        self.assertEqual(512*33, filesize(self.filename), 'Wrong filesize.')
+        self.assertEqual(16896, filesize(self.filename), 'Wrong filesize.')
 
     def test_rw_init(self):
         """Writes data to new file, then reopen and read."""
         logging.info('====== %s ======' % 'test_rw_init')
 
-        with ConcealIO(self.filename, 'wb', self.secret) as cnl:
+        logging.info('Length: %s' % len(LIPSUM.encode('utf-8')))
+
+        with ConcealIO(self.filename, 'wb', secret=self.secret) as cnl:
             cnl.write(LIPSUM.encode('utf-8'))
-        with ConcealIO(self.filename, 'rb+',  self.secret) as cnl:
+        with ConcealIO(self.filename, 'rb+', secret=self.secret) as cnl:
             data = cnl.read()
         self.assertEqual(LIPSUM.encode('utf-8'), data, 'Corrupted data.')
 
@@ -52,9 +54,9 @@ class TestConceal(unittest.TestCase):
         """Creates new file, then reopen for write and read."""
         logging.info('====== %s ======' % 'test_rw_noinit')
 
-        with ConcealIO(self.filename, 'wb', self.secret) as cnl:
+        with ConcealIO(self.filename, 'wb', secret=self.secret) as cnl:
             pass
-        with ConcealIO(self.filename, 'rb+',  self.secret) as cnl:
+        with ConcealIO(self.filename, 'rb+', secret=self.secret) as cnl:
             cnl.write(LIPSUM.encode('utf-8'))
             cnl.seek(0)
             data = cnl.read()
@@ -64,9 +66,9 @@ class TestConceal(unittest.TestCase):
         """Create new file, then reopen and write, read write randomly"""
         logging.info('====== %s ======' % 'test_random_access')
 
-        with ConcealIO(self.filename, 'wb', self.secret) as cnl:
+        with ConcealIO(self.filename, 'wb', secret=self.secret) as cnl:
             pass
-        with ConcealIO(self.filename, 'rb+',  self.secret) as cnl:
+        with ConcealIO(self.filename, 'rb+', secret=self.secret) as cnl:
             cnl.write(LIPSUM.encode('utf-8'))
             cnl.seek(0)
             data = cnl.read()

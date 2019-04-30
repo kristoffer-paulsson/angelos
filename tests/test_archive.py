@@ -1,3 +1,4 @@
+"""Tests for Archive7."""
 import sys
 sys.path.append('../angelos')  # noqa
 
@@ -16,7 +17,18 @@ from support import filesize
 from angelos.archive.archive7 import Archive7
 
 
+"""
+TODO
+
+Tests for links
+Tests for vacuum
+Tests for query deleted
+"""
+
+
 class TestArchive(unittest.TestCase):
+    """Testsuite for archive7."""
+
     files1 = None
     files2 = None
     files3 = None
@@ -24,6 +36,7 @@ class TestArchive(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """Prepare class."""
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
         cls.secret = libnacl.secret.SecretBox().sk
         cls.dir = tempfile.TemporaryDirectory()
@@ -32,21 +45,24 @@ class TestArchive(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        """Shutdown class."""
         cls.dir.cleanup()
 
     def generate_data(self):
+        """Generate dummy texts."""
         return ('\n'.join(
             random.choices(
                 LIPSUM_LINES,
                 k=random.randrange(1, 10)))).encode('utf-8')
 
     def generate_filename(self, postfix='.txt'):
+        """Generate dummy filenames."""
         return ''.join(random.choices(
             string.ascii_lowercase + string.digits,
             k=random.randrange(5, 10))) + postfix
 
     def test_01_setup(self):
-        """Creating new empty archive"""
+        """Creating new empty archive."""
         logging.info('====== %s ======' % 'test_01_setup')
 
         with Archive7.setup(self.filename, self.secret, owner=self.owner):
@@ -62,7 +78,7 @@ class TestArchive(unittest.TestCase):
                 arch.mkdir(dir)
 
     def test_03_glob(self):
-        """Open archive and glob directory tree"""
+        """Open archive and glob directory tree."""
         logging.info('====== %s ======' % 'test_03_glob')
 
         with Archive7.open(self.filename, self.secret) as arch:
@@ -70,7 +86,7 @@ class TestArchive(unittest.TestCase):
             self.assertListEqual(LIPSUM_PATH, tree, 'Corrupted file tree.')
 
     def test_04_mkfile(self):
-        """Open archive and write random files"""
+        """Open archive and write random files."""
         logging.info('====== %s ======' % 'test_04_mkfile')
 
         try:
@@ -92,7 +108,7 @@ class TestArchive(unittest.TestCase):
             self.fail(e)
 
     def test_05_load(self):
-        """Open archive and load files"""
+        """Open archive and load files."""
         logging.info('====== %s ======' % 'test_05_load')
         try:
             with Archive7.open(self.filename, self.secret) as arch:
@@ -103,7 +119,7 @@ class TestArchive(unittest.TestCase):
             self.fail(e)
 
     def test_06_save(self):
-        """Open archive and update some files"""
+        """Open archive and update some files."""
         logging.info('====== %s ======' % 'test_06_save')
 
         try:
@@ -116,7 +132,7 @@ class TestArchive(unittest.TestCase):
             self.fail(e)
 
     def test_07_remove(self):
-        """Open archive and delete some files"""
+        """Open archive and delete some files."""
         logging.info('====== %s ======' % 'test_07_remove')
 
         try:
@@ -127,7 +143,7 @@ class TestArchive(unittest.TestCase):
             self.fail(e)
 
     def test_08_rename(self):
-        """Open archive and rename some files"""
+        """Open archive and rename some files."""
         logging.info('====== %s ======' % 'test_08_rename')
 
         try:
@@ -138,7 +154,7 @@ class TestArchive(unittest.TestCase):
             self.fail(e)
 
     def test_09_move(self):
-        """Open archive and move some files"""
+        """Open archive and move some files."""
         logging.info('====== %s ======' % 'test_09_move')
 
         try:
@@ -150,7 +166,7 @@ class TestArchive(unittest.TestCase):
             self.fail(e)
 
     def test_10_load2(self):
-        """Open archive and load files"""
+        """Open archive and load files."""
         logging.info('====== %s ======' % 'test_10_load2')
 
         try:

@@ -1,4 +1,4 @@
-"""Module docstring."""
+"""Archive 7."""
 import os
 import re
 import struct
@@ -50,12 +50,15 @@ class Header(collections.namedtuple('Header', field_names=[
     None,
     8,
 ))):
+    """Archive header."""
+
     __slots__ = ()
     FORMAT = '!8sHHbbb16s16s16s16sQ128sL805x'
 
     @staticmethod
     def header(owner, id=None, node=None, domain=None, title=None, _type=None,
                role=None, use=None, major=1, minor=0, entries=8):
+        """Generate archive header."""
         Util.is_type(owner, uuid.UUID)
         Util.is_type(id, (uuid.UUID, type(None)))
         Util.is_type(node, (uuid.UUID, type(None)))
@@ -87,6 +90,7 @@ class Header(collections.namedtuple('Header', field_names=[
         )
 
     def serialize(self):
+        """Serialize archive header."""
         return struct.pack(
             Header.FORMAT,
             b'archive7',
@@ -110,13 +114,14 @@ class Header(collections.namedtuple('Header', field_names=[
                 )) if isinstance(self.created, datetime.datetime
                                  ) else time.mktime(datetime.datetime.now(
                                     ).timetuple())),
-            self.title[:128] if isinstance(
-                self.title, (bytes, bytearray)) else b'\x00'*128,
+            self.title[:64] if isinstance(
+                self.title, (bytes, bytearray)) else b'\x00'*64,
             self.entries if isinstance(self.entries, int) else 8
         )
 
     @staticmethod
     def deserialize(data):
+        """Deserialize archive header."""
         Util.is_type(data, (bytes, bytearray))
         t = struct.unpack(Header.FORMAT, data)
 
@@ -151,27 +156,37 @@ class Entry(collections.namedtuple('Entry', field_names=[
     'length',       # 8
     'compression',  # 1
     'deleted',      # 1
-    # padding'      # 17
     'digest',       # 20
-    'name'          # 128
+    'name',         # 64
+    # Unix extras
+    'user',         # 32
+    'group',        # 16
+    'permissions',  # 2
+    # padding       # 2
+    # blanks        # 29
 ], defaults=(
     b'b',
-    uuid.uuid4(),  # Always generate manually
+    uuid.uuid4(),                           # Always generate manually
     uuid.UUID(bytes=b'\x00'*16),
     uuid.UUID(bytes=b'\x00'*16),
-    datetime.datetime.fromtimestamp(0),  # Always generate manually
-    datetime.datetime.fromtimestamp(0),  # Always generate manually
+    datetime.datetime.fromtimestamp(0),     # Always generate manually
+    datetime.datetime.fromtimestamp(0),     # Always generate manually
     None,
     None,
     None,
     0,
     False,
-    # None,
     None,
-    None
+    None,
+    # Unix extras
+    None,
+    None,
+    755,
 ))):
+    """Archive entry header."""
+
     __slots__ = ()
-    FORMAT = '!c16s16s16sqqQQQb?17x20s128s'
+    FORMAT = '!c16s16s16sqqQQQb?20s64s32s16sH2x29x'
     TYPE_FILE = b'f'    # Represents a file
     TYPE_LINK = b'l'     # Represents a link
     TYPE_DIR = b'd'     # Represents a directory
@@ -184,6 +199,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def blank():
+        """Generate a blank ready-to-use entry header."""
         kwargs = {
             'type': Entry.TYPE_BLANK,
             'id': uuid.uuid4(),
@@ -192,6 +208,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
 
     @staticmethod
     def empty(offset, size):
+        """Generate header for a block of reusable space."""
         Util.is_type(offset, int)
         Util.is_type(size, int)
 
@@ -204,19 +221,24 @@ class Entry(collections.namedtuple('Entry', field_names=[
         return Entry(**kwargs)
 
     @staticmethod
-    def dir(name, parent=None, owner=None, created=None, modified=None):
+    def dir(name, parent=None, owner=None, created=None, modified=None,
+            user=None, group=None, permissions=None):
+        """Generate entry for a directory."""
         Util.is_type(name, str)
         Util.is_type(parent, (type(None), uuid.UUID))
         Util.is_type(owner, (type(None), uuid.UUID))
         Util.is_type(created, (type(None), datetime.datetime))
         Util.is_type(modified, (type(None), datetime.datetime))
+        Util.is_type(user, (type(None), str))
+        Util.is_type(group, (type(None), str))
+        Util.is_type(permissions, (type(None), int))
 
         kwargs = {
             'type': Entry.TYPE_DIR,
             'id': uuid.uuid4(),
             'created': datetime.datetime.now(),
             'modified': datetime.datetime.now(),
-            'name': name.encode('utf-8')[:128]
+            'name': name.encode('utf-8')[:64]
         }
 
         if parent:
@@ -227,16 +249,27 @@ class Entry(collections.namedtuple('Entry', field_names=[
             kwargs['created'] = created
         if modified:
             kwargs['modified'] = modified
+        if user:
+            kwargs['user'] = user.encode('utf-8')[:32]
+        if group:
+            kwargs['group'] = group.encode('utf-8')[:16]
+        if permissions:
+            kwargs['permissions'] = permissions
 
         return Entry(**kwargs)
 
     @staticmethod
-    def link(name, link, parent=None, created=None, modified=None):
+    def link(name, link, parent=None, created=None, modified=None,
+             user=None, group=None, permissions=None):
+        """Generate entry for file link."""
         Util.is_type(name, str)
         Util.is_type(parent, (type(None), uuid.UUID))
         Util.is_type(link, uuid.UUID)
         Util.is_type(created, (type(None), datetime.datetime))
         Util.is_type(modified, (type(None), datetime.datetime))
+        Util.is_type(user, (type(None), str))
+        Util.is_type(group, (type(None), str))
+        Util.is_type(permissions, (type(None), int))
 
         kwargs = {
             'type': Entry.TYPE_LINK,
@@ -244,7 +277,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
             'owner': link,
             'created': datetime.datetime.now(),
             'modified': datetime.datetime.now(),
-            'name': name.encode('utf-8')[:128]
+            'name': name.encode('utf-8')[:64]
         }
 
         if parent:
@@ -253,12 +286,20 @@ class Entry(collections.namedtuple('Entry', field_names=[
             kwargs['created'] = created
         if modified:
             kwargs['modified'] = modified
+        if user:
+            kwargs['user'] = user.encode('utf-8')[:32]
+        if group:
+            kwargs['group'] = group.encode('utf-8')[:16]
+        if permissions:
+            kwargs['permissions'] = permissions
 
         return Entry(**kwargs)
 
     @staticmethod
     def file(name, offset, size, digest, id=None, parent=None, owner=None,
-             created=None, modified=None, compression=None, length=None):
+             created=None, modified=None, compression=None, length=None,
+             user=None, group=None, permissions=None):
+        """Entry header for file."""
         Util.is_type(name, str)
         Util.is_type(offset, int)
         Util.is_type(size, int)
@@ -270,6 +311,9 @@ class Entry(collections.namedtuple('Entry', field_names=[
         Util.is_type(modified, (type(None), datetime.datetime))
         Util.is_type(compression, (type(None), int))
         Util.is_type(length, (type(None), int))
+        Util.is_type(user, (type(None), str))
+        Util.is_type(group, (type(None), str))
+        Util.is_type(permissions, (type(None), int))
 
         kwargs = {
             'type': Entry.TYPE_FILE,
@@ -279,7 +323,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
             'offset': offset,
             'size': size,
             'digest': digest[:20],
-            'name': name.encode('utf-8')[:128]
+            'name': name.encode('utf-8')[:64]
         }
 
         if id:
@@ -292,6 +336,12 @@ class Entry(collections.namedtuple('Entry', field_names=[
             kwargs['created'] = created
         if modified:
             kwargs['modified'] = modified
+        if user:
+            kwargs['user'] = user.encode('utf-8')[:32]
+        if group:
+            kwargs['group'] = group.encode('utf-8')[:16]
+        if permissions:
+            kwargs['permissions'] = permissions
         if compression and length:
             if 1 <= compression <= 3 and not isinstance(length, int):
                 raise Util.exception(Error.AR7_INVALID_COMPRESSION, {
@@ -304,6 +354,7 @@ class Entry(collections.namedtuple('Entry', field_names=[
         return Entry(**kwargs)
 
     def serialize(self):
+        """Serialize entry."""
         return struct.pack(
             Entry.FORMAT,
             self.type if not isinstance(
@@ -331,12 +382,19 @@ class Entry(collections.namedtuple('Entry', field_names=[
             # b'\x00'*17,
             self.digest if isinstance(
                 self.digest, (bytes, bytearray)) else b'\x00'*20,
-            self.name[:128] if isinstance(
-                self.name, (bytes, bytearray)) else b'\x00'*128
+            self.name[:64] if isinstance(
+                self.name, (bytes, bytearray)) else b'\x00'*64,
+            self.user[:32] if isinstance(
+                self.user, (bytes, bytearray)) else b'\x00'*32,
+            self.group[:16] if isinstance(
+                self.group, (bytes, bytearray)) else b'\x00'*16,
+            self.permissions if isinstance(
+                self.permissions, int) else 755,
         )
 
     @staticmethod
     def deserialize(data):
+        """Deserialize entry."""
         Util.is_type(data, (bytes, bytearray))
         t = struct.unpack(Entry.FORMAT, data)
         return Entry(
@@ -352,14 +410,20 @@ class Entry(collections.namedtuple('Entry', field_names=[
             compression=t[9],
             deleted=t[10],
             digest=t[11],
-            name=t[12].strip(b'\x00')
+            name=t[12].strip(b'\x00'),
+            user=t[13].strip(b'\x00'),
+            group=t[14].strip(b'\x00'),
+            permissions=int(t[15]),
         )
 
 
 class Archive7(ContainerAware):
+    """Archive main class and high level API."""
+
     BLOCK_SIZE = 512
 
     def __init__(self, fileobj, delete=3):
+        """Init archive using a file object and set delete mode."""
         self.__closed = False
         self.__lock = threading.Lock()
         self.__file = fileobj
@@ -392,6 +456,7 @@ class Archive7(ContainerAware):
     @staticmethod
     def setup(filename, secret, owner=None, node=None, title=None,
               domain=None, _type=None, role=None, use=None):
+        """Create a new archive."""
         Util.is_type(filename, (str, bytes))
         Util.is_type(secret, (str, bytes))
 
@@ -412,6 +477,7 @@ class Archive7(ContainerAware):
 
     @staticmethod
     def open(filename, secret, delete=3):
+        """Open an archive with a symmetric encryption key."""
         Util.is_type(filename, (str, bytes))
         Util.is_type(secret, (str, bytes))
 
@@ -423,33 +489,38 @@ class Archive7(ContainerAware):
 
     @property
     def closed(self):
+        """File closed property."""
         return self.__closed
 
     @property
     def locked(self):
+        """Lock mode property."""
         return self.__lock.locked()
 
-    def _lock(self):
-        return self.__lock.acquire()
-
-    def _unlock(self):
-        self.__lock.release()
+    @property
+    def lock(self):
+        """Lock property."""
+        return self.__lock
 
     def _update_header(self, cnt):
+        """Update archive header with new entries count."""
         header = self.__header._asdict()
         header['entries'] = cnt
         self.__header = Header(**header)
         self.ioc.operations.write_data(0, self.__header.serialize())
 
     def close(self):
+        """Close archive."""
         with self.__lock:
             if not self.__closed:
                 self.__file.close()
 
     def stats(self):
+        """Archive stats."""
         return copy.deepcopy(self.__header)
 
     def info(self, path):
+        """Return file info."""
         with self.__lock:
             ops = self.ioc.operations
 
@@ -460,7 +531,8 @@ class Archive7(ContainerAware):
             return copy.deepcopy(entry)
 
     def glob(self, name='*', id=None, parent=None,
-             owner=None, created=None, modified=None, deleted=None):
+             owner=None, created=None, modified=None, deleted=False):
+        """Glob the file system in the archive."""
         with self.__lock:
             entries = self.ioc.entries
             ids = self.ioc.hierarchy.ids
@@ -492,6 +564,7 @@ class Archive7(ContainerAware):
             return files
 
     def move(self, src, dest):
+        """Move file/dir to another directory."""
         with self.__lock:
             ops = self.ioc.operations
 
@@ -506,7 +579,9 @@ class Archive7(ContainerAware):
             entry = Entry(**entry)
             self.ioc.entries.update(entry, idx)
 
-    def chmod(self, path, id=None, owner=None, deleted=None):
+    def chmod(self, path, id=None, owner=None, deleted=None,
+              user=None, group=None, permissions=None):
+        """Update ID/owner or deleted status for an entry."""
         with self.__lock:
             ops = self.ioc.operations
 
@@ -521,10 +596,17 @@ class Archive7(ContainerAware):
                 entry['owner'] = owner
             if deleted:
                 entry['deleted'] = deleted
+            if user:
+                entry['user'] = user
+            if group:
+                entry['group'] = group
+            if permissions:
+                entry['permissions'] = permissions
             entry = Entry(**entry)
             self.ioc.entries.update(entry, idx)
 
     def remove(self, path, mode=None):
+        """Remove file or dir."""
         with self.__lock:
             ops = self.ioc.operations
             entries = self.ioc.entries
@@ -594,6 +676,7 @@ class Archive7(ContainerAware):
                     'mode': self.__delete})
 
     def rename(self, path, dest):
+        """Rename file or directory."""
         with self.__lock:
             ops = self.ioc.operations
             entries = self.ioc.entries
@@ -608,9 +691,10 @@ class Archive7(ContainerAware):
             entry = Entry(**entry)
             entries.update(entry, idx)
 
-    def mkdir(self, path):
+    def mkdir(self, path, user=None, group=None, permissions=None):
         """
         Make a new directory in the archive hierarchy.
+
             name        The full path and name of new directory
             returns     the entry ID
         """
@@ -635,13 +719,16 @@ class Archive7(ContainerAware):
                 pid = None
 
             # Generate entry for new directory
-            entry = Entry.dir(name=name, parent=pid)
+            entry = Entry.dir(name=name, parent=pid,
+                              user=user, group=group, permissions=permissions)
             self.ioc.entries.add(entry)
 
         return entry.id
 
     def mkfile(self, filename, data, created=None, modified=None, owner=None,
-               parent=None, id=None, compression=Entry.COMP_NONE):
+               parent=None, id=None, compression=Entry.COMP_NONE,
+               user=None, group=None, permissions=None):
+        """Create a new file."""
         with self.__lock:
             ops = self.ioc.operations
             name, dirname = ops.path(filename)
@@ -666,11 +753,14 @@ class Archive7(ContainerAware):
             entry = Entry.file(
                 name=name, size=size, offset=0, digest=digest,
                 id=id, parent=pid, owner=owner, created=created,
-                modified=modified, length=length, compression=compression)
+                modified=modified, length=length, compression=compression,
+                user=user, group=group, permissions=permissions)
 
         return self.ioc.entries.add(entry, data)
 
-    def link(self, path, link, created=None, modified=None):
+    def link(self, path, link, created=None, modified=None,
+             user=None, group=None, permissions=None):
+        """Create a new link to file or directory."""
         with self.__lock:
             ops = self.ioc.operations
             name, dirname = ops.path(path)
@@ -687,11 +777,13 @@ class Archive7(ContainerAware):
 
             entry = Entry.link(
                 name=name, link=target.id, parent=pid, created=created,
-                modified=modified)
+                modified=modified, user=user, group=group,
+                permissions=permissions)
 
         return self.ioc.entries.add(entry)
 
     def save(self, filename, data, compression=Entry.COMP_NONE, modified=None):
+        """Update a file with new data."""
         if not modified:
             modified = datetime.datetime.now()
 
@@ -767,8 +859,10 @@ class Archive7(ContainerAware):
                 entries.update(empty, bidx)
 
     def load(self, filename):
+        """Load data from a file."""
         with self.__lock:
             ops = self.ioc.operations
+
             name, dirname = ops.path(filename)
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(
@@ -791,11 +885,15 @@ class Archive7(ContainerAware):
             return data
 
     class Entries(ContainerAware):
+        """Entries manager."""
+
         def __init__(self, ioc, entries):
+            """Init entry manager."""
             ContainerAware.__init__(self, ioc)
             self.reload()
 
         def reload(self):
+            """Reload all entries from archive."""
             entries = []
             length = struct.calcsize(Entry.FORMAT)
             header = self.ioc.archive.stats()
@@ -823,13 +921,11 @@ class Archive7(ContainerAware):
             return int(math.ceil(length/512)*512)
 
         def get_entry(self, index):
+            """Return entry based on index."""
             return self.__all[index]
 
         def get_empty(self, size):
-            """
-            Finds the largest empty space block that is large enough.
-            Returns entry index or None
-            """
+            """Return entry index for largest empty block, large enough."""
             current = None
             current_size = sys.maxsize
 
@@ -845,9 +941,10 @@ class Archive7(ContainerAware):
 
         def get_blank(self):
             """
-            Returns a blank entry to use. Don't use this function if you
-            intend to not use the entry. Otherwise the hierarchy will become
-            corrupt.
+            Return a blank entry to use.
+
+            Don't use this function if you intend to not use the entry.
+            Otherwise the hierarchy will become corrupt.
             Returns     index or None
             """
             if len(self.__blanks) >= 1:
@@ -857,7 +954,8 @@ class Archive7(ContainerAware):
 
         def find_blank(self, num=1):
             """
-            Finds a number of available blank entries in the hierarchy.
+            Find a number of available blank entries in the hierarchy.
+
             num         number of available blanks requested for
             Returns     number or None
             """
@@ -873,8 +971,9 @@ class Archive7(ContainerAware):
 
         def make_blanks(self, num=8):
             """
-            Create more blank entries by allocating more space in the beginning
-            of the file.
+            Create more blank entries.
+
+            Allocates space in the beginning of the archive.
             num     Number of new blanks
             """
             cnt = 0
@@ -935,6 +1034,7 @@ class Archive7(ContainerAware):
             return cnt
 
         def get_hithermost(self, limit=0):
+            """Return entry index for file closest to the beginning."""
             idx = None
             offset = sys.maxsize
 
@@ -947,6 +1047,7 @@ class Archive7(ContainerAware):
             return idx
 
         def get_thithermost(self, limit=sys.maxsize):
+            """Return entry index for file closest to the end."""
             idx = None
             offset = 0
 
@@ -959,7 +1060,7 @@ class Archive7(ContainerAware):
             return idx
 
         def update(self, entry, index):
-            """Updates an entry, saves it and keep hierachy clean."""
+            """Update entry, save it and keep hierachy clean."""
             old = self.__all[index]
             if entry.type != old.type:
 
@@ -1001,6 +1102,7 @@ class Archive7(ContainerAware):
             self.ioc.operations.write_entry(entry, index)
 
         def add(self, entry, data=None):
+            """Add file entry to hierarchy and save data."""
             if not self.find_blank():
                 self.make_blanks()
 
@@ -1046,6 +1148,7 @@ class Archive7(ContainerAware):
             return True
 
         def search(self, query, raw=False):
+            """Search with a query."""
             Util.is_type(query, Archive7.Query)
             filterator = filter(query.build(
                 self.ioc.hierarchy.paths), enumerate(self.__all))
@@ -1055,6 +1158,7 @@ class Archive7(ContainerAware):
                 return filterator
 
         def follow(self, entry):
+            """Follow link and return entries indices."""
             if entry.type != Entry.TYPE_LINK:
                 raise Util.exception(Error.AR7_WRONG_ENTRY, {
                     'type': entry.type, 'id': entry.id})
@@ -1063,30 +1167,39 @@ class Archive7(ContainerAware):
 
         @property
         def count(self):
+            """Length of entry list."""
             return len(self.__all)
 
         @property
         def files(self):
+            """List with all file entries."""
             return self.__files
 
         @property
         def links(self):
+            """List with all link entries."""
             return self.__links
 
         @property
         def dirs(self):
+            """List with all directory entries."""
             return self.__dirs
 
         @property
         def empties(self):
+            """List with all emtpy entries."""
             return self.__empties
 
         @property
         def blanks(self):
+            """List with all blank entries."""
             return self.__blanks
 
     class Hierarchy(ContainerAware):
+        """Path hierarchy manager."""
+
         def __init__(self, ioc):
+            """Init hierarchy manager."""
             ContainerAware.__init__(self, ioc)
             self.reload()
 
@@ -1094,6 +1207,7 @@ class Archive7(ContainerAware):
             pass
 
         def reload(self, deleted=False):
+            """Reload hierachy from entries manager."""
             entries = self.ioc.entries
             dirs = entries.dirs
             zero = uuid.UUID(bytes=b'\x00'*16)
@@ -1134,6 +1248,7 @@ class Archive7(ContainerAware):
                 self.__ids[cid] = search_path
 
         def add(self, entry, deleted=False):
+            """Add directory entry to hierarchy."""
             entries = self.ioc.entries
             dirs = entries.dirs
             path = []
@@ -1168,27 +1283,35 @@ class Archive7(ContainerAware):
             self.__ids[cid] = search_path
 
         def remove(self, entry):
+            """Remove directory entry from hierarchy."""
             path = self.__ids[entry.id]
             del self.__paths[path]
             del self.__ids[entry.id]
 
         @property
         def paths(self):
+            """Map of path to id."""
             return self.__paths
 
         @property
         def ids(self):
+            """Map of id to path."""
             return self.__ids
 
     class Operations(ContainerAware):
+        """Logical operations on data and archive."""
+
         def filler(self, data):
+            """Calculate length of file."""
             length = len(data)
             return b'\x00' * (int(math.ceil(length/512)*512) - length)
 
         def path(self, path):
+            """Return basename and dirname from filename."""
             return os.path.basename(path), os.path.dirname(path)
 
         def get_pid(self, dirname):
+            """Get parent ID for directory."""
             paths = self.ioc.hierarchy.paths
             if dirname not in paths.keys():
                 raise Util.exception(Error.AR7_INVALID_DIR, {
@@ -1196,6 +1319,7 @@ class Archive7(ContainerAware):
             return paths[dirname]
 
         def follow_link(self, entry):
+            """Return index of entry that link points at."""
             idxs = self.ioc.entries.follow(entry)
             if not len(idxs):
                 raise Util.exception(Error.AR7_LINK_BROKEN, {'id': entry.id})
@@ -1207,6 +1331,7 @@ class Archive7(ContainerAware):
             return link, idx
 
         def find_entry(self, name, pid, types=None):
+            """Return entry for filename with parent ID."""
             entries = self.ioc.entries
             idx = entries.search(
                 Archive7.Query(pattern=name).parent(pid).type(
@@ -1219,6 +1344,7 @@ class Archive7(ContainerAware):
             return entry, idx
 
         def write_entry(self, entry, index):
+            """Write entry to disk."""
             Util.is_type(entry, Entry)
             Util.is_type(index, int)
 
@@ -1231,6 +1357,7 @@ class Archive7(ContainerAware):
             fileobj.write(entry.serialize())
 
         def load_data(self, entry):
+            """Read data belonging to entry from disk."""
             if entry.type != Entry.TYPE_FILE:
                 raise Util.exception(Error.AR7_WRONG_ENTRY, {
                     'type': entry.type, 'id': entry.id})
@@ -1241,6 +1368,7 @@ class Archive7(ContainerAware):
             return fileobj.read(entry.size)
 
         def write_data(self, offset, data):
+            """Write data to disk."""
             fileobj = self.ioc.fileobj
             if fileobj.seek(offset) != offset:
                 raise Util.exception(Error.AR7_INVALID_SEEK, {
@@ -1249,7 +1377,8 @@ class Archive7(ContainerAware):
 
         def move_end(self, idx):
             """
-            Copy data for a file to the end of the archive
+            Copy data for a file to the end of the archive.
+
             idx         Index of entry
             returns     Non-registered empty entry
             """
@@ -1273,9 +1402,11 @@ class Archive7(ContainerAware):
             return empty
 
         def check(self, entry, data):
+            """Calculate data integrity."""
             return entry.digest == hashlib.sha1(data).digest()
 
         def is_available(self, name, pid):
+            """Check if filename is available in directory."""
             idx = self.ioc.entries.search(
                 Archive7.Query(pattern=name).parent(pid).deleted(False))
             if len(idx):
@@ -1284,6 +1415,7 @@ class Archive7(ContainerAware):
             return True
 
         def zip(self, data, compression):
+            """Compress data using a zip format."""
             if compression == Entry.COMP_ZIP:
                 return zlib.compress(data)
             elif compression == Entry.COMP_GZIP:
@@ -1295,6 +1427,7 @@ class Archive7(ContainerAware):
                     'compression': compression})
 
         def unzip(self, data, compression):
+            """Decompress data using a zip format."""
             if compression == Entry.COMP_ZIP:
                 return zlib.decompress(data)
             elif compression == Entry.COMP_GZIP:
@@ -1306,6 +1439,7 @@ class Archive7(ContainerAware):
                     'compression': compression})
 
         def vacuum(self):
+            """Clean up empty space and align data."""
             entries = self.ioc.entries
             all = entries.dirs + entries.files + entries.links
             cnt = len(all)
@@ -1339,12 +1473,15 @@ class Archive7(ContainerAware):
             self.ioc.fileobj.truncate(offset)
 
     class Query:
+        """Low level query API."""
+
         EQ = '='
         NE = '≠'
         GT = '>'
         LT = '<'
 
         def __init__(self, pattern='*'):
+            """Init a query."""
             self.__type = (Entry.TYPE_FILE, Entry.TYPE_DIR, Entry.TYPE_LINK)
             self.__file_regex = None
             self.__dir_regex = None
@@ -1362,13 +1499,17 @@ class Archive7(ContainerAware):
             self.__owner = None
             self.__created = None
             self.__modified = None
-            self.__deleted = None
+            self.__deleted = False
+            self.__user = None
+            self.__group = None
 
         @property
         def types(self):
+            """File system entry types."""
             return self.__type
 
         def type(self, _type=None, operand='='):
+            """Search for an entry type."""
             Util.is_type(_type, (tuple, bytes, type(None)))
             if isinstance(_type, tuple):
                 self.__type = _type
@@ -1377,11 +1518,13 @@ class Archive7(ContainerAware):
             return self
 
         def id(self, id=None):
+            """Search for ID."""
             Util.is_type(id, uuid.UUID)
             self.__id = id
             return self
 
         def parent(self, parent, operand='='):
+            """Search with directory ID."""
             Util.is_type(parent, (uuid.UUID, tuple, type(None)))
             if operand not in ['=', '≠']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
@@ -1396,6 +1539,7 @@ class Archive7(ContainerAware):
             return self
 
         def owner(self, owner, operand='='):
+            """Search with owner."""
             Util.is_type(owner, (uuid.UUID, tuple, type(None)))
             if operand not in ['=', '≠']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
@@ -1410,6 +1554,7 @@ class Archive7(ContainerAware):
             return self
 
         def created(self, created, operand='>'):
+            """Search with creation date."""
             Util.is_type(created, (int, str, datetime.datetime))
             if operand not in ['=', '>', '<']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
@@ -1422,6 +1567,7 @@ class Archive7(ContainerAware):
             return self
 
         def modified(self, modified, operand='>'):
+            """Search with modified date."""
             Util.is_type(modified, (int, str, datetime.datetime))
             if operand not in ['=', '>', '<']:
                 raise Util.exception(Error.AR7_OPERAND_INVALID, {
@@ -1434,11 +1580,43 @@ class Archive7(ContainerAware):
             return self
 
         def deleted(self, deleted):
-            Util.is_type(deleted, bool)
+            """Search for deleted."""
+            Util.is_type(deleted, (bool, type(None)))
             self.__deleted = deleted
             return self
 
+        def user(self, user, operand='='):
+            """Search with unix username."""
+            Util.is_type(user, (str, tuple, type(None)))
+            if operand not in ['=', '≠']:
+                raise Util.exception(Error.AR7_OPERAND_INVALID, {
+                    'operand': operand})
+            if isinstance(user, str):
+                self.__user = ([user.encode('utf-8')], operand)
+            elif isinstance(user, tuple):
+                ints = []
+                for i in user:
+                    ints.append(i.encode('utf-8'))
+                self.__user = (ints, operand)
+            return self
+
+        def group(self, group, operand='='):
+            """Search with unix group."""
+            Util.is_type(group, (str, tuple, type(None)))
+            if operand not in ['=', '≠']:
+                raise Util.exception(Error.AR7_OPERAND_INVALID, {
+                    'operand': operand})
+            if isinstance(group, str):
+                self.__group = ([group.encode('utf-8')], operand)
+            elif isinstance(group, tuple):
+                ints = []
+                for i in group:
+                    ints.append(i.encode('utf-8'))
+                self.__group = (ints, group)
+            return self
+
         def build(self, paths=None):
+            """Generate the search query function."""
             if self.__dir_regex and paths:
                 parents = []
                 for key, value in paths.items():
@@ -1491,6 +1669,21 @@ class Archive7(ContainerAware):
             def _deleted_not(x):
                 return x.deleted is False
 
+            def _deleted_any(x):
+                return True
+
+            def _user_is(x):
+                return x.user in self.__user[0]
+
+            def _user_not(x):
+                return x.user not in self.__user[0]
+
+            def _group_is(x):
+                return x.group in self.__group[0]
+
+            def _group_not(x):
+                return x.group not in self.__group[0]
+
             qualifiers = [_type_in]
 
             if self.__file_regex:
@@ -1526,6 +1719,18 @@ class Archive7(ContainerAware):
                     qualifiers.append(_deleted_is)
                 else:
                     qualifiers.append(_deleted_not)
+            elif isinstance(self.__deleted, type(None)):
+                qualifiers.append(_deleted_any)
+            if self.__user:
+                if self.__user[1] == '=':
+                    qualifiers.append(_user_is)
+                elif self.__parent[1] == '≠':
+                    qualifiers.append(_user_not)
+            if self.__group:
+                if self.__group[1] == '=':
+                    qualifiers.append(_group_is)
+                elif self.__group[1] == '≠':
+                    qualifiers.append(_group_not)
 
             def query(x):
                 for q in qualifiers:
@@ -1536,9 +1741,12 @@ class Archive7(ContainerAware):
             return query
 
     class Delete(enum.IntEnum):
+        """Delete mode flags."""
+
         SOFT = 1  # Raise file delete flag
         HARD = 2  # Raise  file delete flag, set size and offset to zero, add empty block.  # noqa #E501
         ERASE = 3  # Replace file with empty block
 
     def __del__(self):
+        """Destructor."""
         self.close()
