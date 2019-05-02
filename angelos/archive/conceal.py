@@ -5,7 +5,7 @@ import math
 import struct
 import fcntl
 
-import libnacl
+import libnacl.secret
 
 from ..utils import Util
 from ..error import Error
@@ -244,7 +244,6 @@ class ConcealIO(io.RawIOBase):
         if self.closed:
             raise ValueError()
         return self._readable
-        # return True
 
     def seek(self, offset, whence=io.SEEK_SET):
         """
@@ -291,7 +290,6 @@ class ConcealIO(io.RawIOBase):
         if self.closed:
             raise ValueError()
         return self._seekable
-        # return True
 
     def tell(self):
         """Tell current IO position."""
@@ -339,7 +337,6 @@ class ConcealIO(io.RawIOBase):
         if self.closed:
             raise ValueError()
         return self._writable
-        # return True
 
     def write(self, b):
         """

@@ -42,7 +42,7 @@ documents and connect to the nodes on the current domain network.
             self._io << '\nServer already running.\n\n'
             return
 
-        vault_file = Util.path(self.ioc.env['root'], Const.CNL_VAULT)
+        vault_file = Util.path(self._ioc.env['root'], Const.CNL_VAULT)
         if os.path.isfile(vault_file):
             self._io << '\n\nServer already setup.\n\n'
             return

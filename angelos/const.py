@@ -15,10 +15,12 @@ class Const:
     A_TYPE_CHURCH_CLIENT    Archive type for ChurchClientFacade
     A_TYPE_CHURCH_SERVER    Archive type for ChurchServerFacade
 
+    A_TYPE_BEARER           Archive type for courier data.
+    A_TYPE_SEED             Archive type for seed data.
+    A_TYPE_ARCHIVE          Archive type for general fs data.
+
     A_ROLE_PRIMARY          Current node has a primary role in the domain
     A_ROLE_BACKUP           Current node has a backup role in the domain
-    A_ROLE_COURIES          Current archive is a courier archive
-    A_ROLE_SEED             An archive used as a facade seed
 
     A_USE_VAULT             Archive used as vault
     A_USE_HOME              Archive used as an encrypted home directory
@@ -45,10 +47,12 @@ class Const:
     A_TYPE_CHURCH_CLIENT = ord(b'c')
     A_TYPE_CHURCH_SERVER = ord(b'C')
 
+    A_TYPE_BEARER = ord(b'b')
+    A_TYPE_SEED = ord(b's')
+    A_TYPE_ARCHIVE = ord(b'a')
+
     A_ROLE_PRIMARY = ord(b'p')
     A_ROLE_BACKUP = ord(b'b')
-    A_ROLE_COURIER = ord(b'c')
-    A_ROLE_SEED = ord(b's')
 
     A_USE_VAULT = ord(b'v')
     A_USE_HOME = ord(b'h')

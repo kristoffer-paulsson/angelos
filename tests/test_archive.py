@@ -14,7 +14,7 @@ import libnacl.secret
 
 from lipsum import LIPSUM_LINES, LIPSUM_PATH
 from support import filesize
-from angelos.archive.archive7 import Archive7
+from angelos.archive.archive7 import Archive7, Entry
 
 
 """
@@ -171,6 +171,32 @@ class TestArchive(unittest.TestCase):
 
         try:
             with Archive7.open(self.filename, self.secret) as arch:
+                for i in arch.glob():
+                    if i not in LIPSUM_PATH:
+                        arch.load(i)
+        except Exception as e:
+            self.fail(e)
+
+    def test_11_compression(self):
+        """Create archive and save and load files with compression."""
+        logging.info('====== %s ======' % 'test_05_load')
+        try:
+            archive = os.path.join(self.dir.name, 'compressed.ar7.cnl')
+
+            with Archive7.setup(
+                    archive, self.secret, owner=self.owner) as arch:
+                for dir in LIPSUM_PATH:
+                    arch.mkdir(dir)
+
+                files = []
+                for i in range(200):
+                    data = self.generate_data()
+                    filename = random.choices(
+                        LIPSUM_PATH, k=1)[0] + '/' + self.generate_filename()
+                    files.append(filename)
+                    arch.mkfile(filename, data, compression=Entry.COMP_BZIP2)
+
+            with Archive7.open(archive, self.secret) as arch:
                 for i in arch.glob():
                     if i not in LIPSUM_PATH:
                         arch.load(i)
