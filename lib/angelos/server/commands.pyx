@@ -1,0 +1,473 @@
+# cython: language_level=3
+"""Server commands."""
+import os
+import signal
+import asyncio
+import time
+import datetime
+import binascii
+import logging
+
+import libnacl
+
+from ..utils import Util
+from ..error import Error
+from ..const import Const
+from .cmd import Command, Option
+from ..facade.facade import (
+    Facade, PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
+
+
+class SetupCommand(Command):
+    """Prepare and setup the server."""
+
+    short = """Setup the facade with entity."""
+    description = """Create or import an entity to configure the facade and node."""  # noqa E501
+    msg_start = """
+Setup command will lead you through the process of setting up an angelos
+server. If you are creating a new entity with a new domain you have to go
+through the process of configuring entity documents. Otherwise if you already
+have an entity and a domain with working nodes, you need to import entity
+documents and connect to the nodes on the current domain network.
+"""
+
+    def __init__(self, io, root, ioc):
+        """Initialize the command. Takes a list of Command classes."""
+        Command.__init__(self, 'setup', io)
+        self._root = root
+        self._ioc = ioc
+
+    async def _command(self, opts):
+        """Do entity setup."""
+        if isinstance(self._ioc.facade, Facade):
+            self._io << '\nServer already running.\n\n'
+            return
+
+        vault_file = Util.path(self._ioc.env['root'], Const.CNL_VAULT)
+        if os.path.isfile(vault_file):
+            self._io << '\n\nServer already setup.\n\n'
+            return
+
+        self._io << self.msg_start
+        do = await self._io.menu('Select an entry', [
+            'Create new entity',
+            'Import existing entity'
+        ], True)
+
+        if do == 0:
+            # Collect information for the data entity
+            subdo, entity_data = await self.do_new()
+            # Select server role
+            r = await self._io.menu('What role should the server have?', [
+                'Primary server',
+                'Backup server'
+            ], True)
+
+            if r == 0:
+                role = Const.A_ROLE_PRIMARY
+            elif r == 1:
+                role = Const.A_ROLE_BACKUP
+
+            # Generate master key
+            secret = libnacl.secret.SecretBox().sk
+            self._io << (
+                'This is the Master key for this entity.\n' +
+                'Make a backup, don\'t loose it!\n\n' +
+                binascii.hexlify(secret).decode() + '\n\n'
+            )
+            await self._io.presskey()
+            # Verify master key
+            key = await self._io.prompt(
+                'Enter the master key as verification!')
+
+            if secret != binascii.unhexlify(key.encode()):
+                raise RuntimeError('Master key mismatch')
+
+            if subdo == 0:
+                facade = await PersonServerFacade.setup(
+                    self._root, secret, role, entity_data)
+            elif subdo == 1:
+                facade = await MinistryServerFacade.setup(
+                    self._root, secret, role, entity_data)
+            elif subdo == 2:
+                facade = await ChurchServerFacade.setup(
+                    self._root, secret, role, entity_data)
+
+            self._ioc.facade = facade
+
+        elif do == 1:
+            raise NotImplementedError('Import to be implemented')
+            # docs = await self.do_import()
+            return
+
+    async def do_new(self):
+        """Let user select what entity to create."""
+        do = await self._io.menu('What type of entity should be created?', [
+            'Person',
+            'Ministry',
+            'Church'
+        ], True)
+
+        if do == 0:
+            return (0, await self.do_person())
+        elif do == 1:
+            return (1, await self.do_ministry())
+        elif do == 2:
+            return (2, await self.do_church())
+
+    async def do_person(self):
+        """Collect person entity data."""
+        self._io << (
+            'It is necessary to collect information for the person entity.\n')
+        valid = False
+        data = {
+            'given_name': None,
+            'family_name': None,
+            'names': [],
+            'born': None,
+            'sex': None
+        }
+
+        while True:
+            do = await self._io.menu('Person entity data, (* = mandatory)', [
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='First name',
+                    c='OK' if bool(data['given_name']) else 'N/A',
+                    v=data['given_name']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='Family name',
+                    c='OK' if bool(data['family_name']) else 'N/A',
+                    v=data['family_name']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='Middle names',
+                    c='OK' if bool(data['names']) else 'N/A', v=data['names']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='Birth date',
+                    c='OK' if bool(data['born']) else 'N/A', v=data['born']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='Sex',
+                    c='OK' if bool(data['sex']) else 'N/A', v=data['sex']),
+                '  Reset'
+            ] + (['  Continue'] if valid else []))
+
+            if do == 0:
+                name = await self._io.prompt('Given name')
+                data['given_name'] = name
+                data['names'].append(name)
+            elif do == 1:
+                data['family_name'] = await self._io.prompt('Family name')
+            elif do == 2:
+                data['names'].append(await self._io.prompt(
+                    'One (1) middle name'))
+            elif do == 3:
+                data['born'] = await self._io.prompt(
+                    'Birth date (YYYY-MM-DD)', t=datetime.date.fromisoformat)
+            elif do == 4:
+                data['sex'] = await self._io.choose(
+                    'Biological sex', ['man', 'woman', 'undefined'])
+            elif do == 5:
+                data = {
+                    'given_name': None,
+                    'family_name': None,
+                    'names': [],
+                    'born': None,
+                    'sex': None
+                }
+            elif do == 6:
+                break
+
+            if all(data) and data['given_name'] in data['names']:
+                valid = True
+            else:
+                valid = False
+
+        return data
+
+    async def do_ministry(self):
+        """Collect ministry entity data."""
+        self._io << (
+            'It is necessary to collect information ' +
+            'for the ministry entity.\n')
+        valid = False
+        data = {
+            'vision': None,
+            'ministry': None,
+            'founded': None,
+        }
+
+        while True:
+            do = await self._io.menu('Ministry entity data, (* = mandatory)', [
+                '{m} {t:17} {c:4} {v}'.format(
+                    m=' ', t='Vision',
+                    c='OK' if bool(data['vision']) else 'N/A',
+                    v=data['vision']),
+                '{m} {t:17} {c:4} {v}'.format(
+                    m='*', t='Ministry name',
+                    c='OK' if bool(data['ministry']) else 'N/A',
+                    v=data['ministry']),
+                '{m} {t:17} {c:4} {v}'.format(
+                    m='*', t='Ministry founded',
+                    c='OK' if bool(data['founded']) else 'N/A',
+                    v=data['founded']),
+                '  Reset'
+            ] + (['  Continue'] if valid else []))
+
+            if do == 0:
+                vision = await self._io.prompt('Ministry vision')
+                data['vision'] = vision
+            elif do == 1:
+                data['ministry'] = await self._io.prompt('Ministry name')
+            elif do == 2:
+                data['founded'] = await self._io.prompt(
+                    'Ministry founded (YYYY-MM-DD)',
+                    t=datetime.date.fromisoformat)
+            elif do == 3:
+                data = {
+                    'vision': None,
+                    'ministry': None,
+                    'founded': None,
+                }
+            elif do == 4:
+                break
+
+            if all(data):
+                valid = True
+            else:
+                valid = False
+
+        return data
+
+    async def do_church(self):
+        """Collect church entity data."""
+        self._io << (
+            'It is necessary to collect information for the church entity.\n')
+        valid = False
+        data = {
+            'founded': None,
+            'city': None,
+            'region': None,
+            'country': None,
+        }
+
+        while True:
+            do = await self._io.menu('Church entity data, (* = mandatory)', [
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='Founded',
+                    c='OK' if bool(data['founded']) else 'N/A',
+                    v=data['founded']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m='*', t='City',
+                    c='OK' if bool(data['city']) else 'N/A',
+                    v=data['city']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m=' ', t='Region/state',
+                    c='OK' if bool(data['region']) else 'N/A',
+                    v=data['region']),
+                '{m} {t:15} {c:4} {v}'.format(
+                    m=' ', t='Country/nation',
+                    c='OK' if bool(data['country']) else 'N/A',
+                    v=data['country']),
+                '  Reset'
+            ] + (['  Continue'] if valid else []))
+
+            if do == 0:
+                founded = await self._io.prompt(
+                    'Church founded when (YYYY-MM-DD)',
+                    t=datetime.date.fromisoformat)
+                data['founded'] = founded
+            elif do == 1:
+                data['city'] = await self._io.prompt('Church of what city')
+            elif do == 2:
+                data['region'].append(await self._io.prompt(
+                    'Region or state (if applicable)'))
+            elif do == 3:
+                data['country'] = await self._io.prompt('Country ')
+            elif do == 4:
+                data = {
+                    'founded': None,
+                    'city': None,
+                    'region': None,
+                    'country': None,
+                }
+            elif do == 5:
+                break
+
+            if all(data):
+                valid = True
+            else:
+                valid = False
+
+        return data
+
+    async def do_import(self):
+        """Import entity from seed vault."""
+        self._io << 'importing entities not implemented.'
+
+    @classmethod
+    def factory(cls, **kwargs):
+        """Create command with env from IoC."""
+        return cls(kwargs['io'], kwargs['ioc'].env['root'], kwargs['ioc'])
+
+
+class StartupCommand(Command):
+    """Unlock and start the server."""
+
+    short = """Unlock and start."""
+    description = """Receive the master key, then unlock and start the server."""  # noqa E501
+
+    def __init__(self, io, root, ioc):
+        """Initialize the command. Takes a list of Command classes."""
+        Command.__init__(self, 'startup', io)
+        self._root = root
+        self._ioc = ioc
+
+    async def _command(self, opts):
+        if isinstance(self._ioc.facade, Facade):
+            self._io << '\nServer already running.\n\n'
+            return
+
+        try:
+            key = await self._io.secret('Enter the master key')
+            secret = binascii.unhexlify(key.encode())
+
+            facade = await Facade.open(self._root, secret)
+            self._ioc.facade = facade
+
+            self._io << '\nSuccessfully loaded the facade.\nID: %s\n\n' % (
+                    facade.entity.id)
+
+        except (ValueError, binascii.Error) as e:
+            self._io << '\nError: %s\n\n' % e
+
+        except Exception as e:
+            logging.exception(e)
+            self._io << '\nError: %s\n\n' % e
+
+    @classmethod
+    def factory(cls, **kwargs):
+        """Create command with env from IoC."""
+        return cls(kwargs['io'], kwargs['ioc'].env['root'], kwargs['ioc'])
+
+
+class EnvCommand(Command):
+    """Work with environment variables."""
+
+    short = """Work with environment valriables."""
+    description = """Use this command to display the environment variables."""  # noqa E501
+
+    def __init__(self, io, env):
+        """Initialize the command. Takes a list of Command classes."""
+        Command.__init__(self, 'env', io)
+        self.__env = env
+
+    async def _command(self, opts):
+            self._io << (
+                '\nEnvironment variables:\n' + '-'*79 + '\n')
+            self._io << '\n'.join([
+                '%s: %s' % (k, v) for k, v in self.__env.items()])
+            self._io << '\n' + '-'*79 + '\n\n'
+
+    @classmethod
+    def factory(cls, **kwargs):
+        """Create command with env from IoC."""
+        return cls(kwargs['io'], kwargs['ioc'].env)
+
+
+class QuitCommand(Command):
+    """Shutdown the angelos server."""
+
+    short = """Shutdown the angelos server"""
+    description = """Use this command to shutdown the angelos server from the terminal."""  # noqa E501
+
+    def __init__(self, io):
+        """Initialize the command. Takes a list of Command classes."""
+        Command.__init__(self, 'quit', io)
+
+    def _options(self):
+        """
+        Return a list of Option class configurations.
+
+        Overide this method.
+        """
+        return [Option(
+            'yes',
+            short='y',
+            type=Option.TYPE_BOOL,
+            help='Confirm that you want to shutdown server')]
+
+    async def _command(self, opts):
+        if opts['yes']:
+            self._io << (
+                '\nStarting shutdown sequence for the Angelos server.\n\n')
+            asyncio.ensure_future(self._quit())
+            for t in ['3', '.', '.', '2', '.', '.', '1', '.', '.', '0']:
+                self._io << t
+                time.sleep(.333)
+            raise Util.exception(Error.CMD_SHELL_EXIT)
+        else:
+            self._io << (
+                '\nYou didn\'t confirm shutdown sequence. Use --yes/-y.\n\n')
+
+    async def _quit(self):
+        await asyncio.sleep(5)
+        os.kill(os.getpid(), signal.SIGINT)
+
+
+"""
+class ServerCommand(Command):
+    short = 'Operates the servers runstate.'
+    description = With the server command you can operate the servers run
+state. you can "start", "restart" and "shutdown" the softaware using the
+options available. "shutdown" requires you to confirm with the "yes"
+option."
+
+    def __init__(self, message):
+        Command.__init__(self, 'server')
+        Util.is_type(message, Events)
+        self.__events = message
+
+    def _options(self):
+        return[
+            Option(
+                'start', type=Option.TYPE_BOOL,
+                help='Elevates the servers run state into operational mode'),
+            Option('restart', type=Option.TYPE_BOOL,
+                   help='Restarts the server'),
+            Option('shutdown', type=Option.TYPE_BOOL,
+                   help='Shuts down the server'),
+            Option('yes', short='y', type=Option.TYPE_BOOL,
+                   help='Use to confirm "shutdown"'),
+        ]
+
+    def _command(self, opts):
+        if opts['start']:
+            self._stdout.write(
+                '"start" operation not implemented.' + Shell.EOL)
+
+        elif opts['restart']:
+            self._stdout.write(
+                '"restart" operation not implemented.' + Shell.EOL)
+
+        elif opts['shutdown']:
+            if opts['yes']:
+                self._stdout.write('Commencing operation "shutdown".' +
+                                   Shell.EOL + 'Good bye!' + Shell.EOL)
+                self.__events.send(Message(
+                    Const.W_ADMIN_NAME, Const.W_SUPERV_NAME, 1, {}))
+                for r in range(5):
+                    self._stdout.write('.')
+                    time.sleep(1)
+                raise CmdShellExit()
+            else:
+                self._stdout.write(
+                    'operation "shutdown" not confirmed.' + Shell.EOL)
+
+        else:
+            self._stdout.write(
+                'No operation given. Type <server> -h for help.' + Shell.EOL)
+
+    @staticmethod
+    def factory(**kwargs):
+        Util.is_type(kwargs['ioc'], Container)
+        return ServerCommand(kwargs['ioc'].message)
+"""

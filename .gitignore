@@ -1,5 +1,6 @@
 /venv/
 .eggs
+*.spec
 *.pyc
 *.so
 *.log
@@ -12,10 +13,9 @@
 **/__pychache__
 /build/
 /dist/
-/*.build/
-/*.dist/
+/*.egg-info/
+
 .DS_Store
-*.spec
 MANIFEST
 
 # Keep all the secondary makefiles for including
