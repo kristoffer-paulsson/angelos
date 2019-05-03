@@ -7,6 +7,7 @@ from Cython.Distutils import build_ext
 extensions = [
     Extension('libangelos', ['libangelos.c']),
     Extension('eidon', ['eidon.c']),
+    Extension('libar7', ['libar7.c']),
 ]
 
 

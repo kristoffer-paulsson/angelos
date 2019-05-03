@@ -65,3 +65,7 @@ git clone -b 3.7 https://github.com/python/cpython.git
 ### cython-stuff
 http://hplgit.github.io/primer.html/doc/pub/cython/cython-readable.html
 https://cython.readthedocs.io/en/latest/src/tutorial/clibraries.html
+
+How to find libraries in UNIX
+find /Library -name "*python*.a" 2>&1 | grep -v "find:"
+Extensions to look for *.a, *.dylib, *.o, *.so

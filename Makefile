@@ -1,29 +1,54 @@
+VERSION = 3.7
+PYTHON = python$(VERSION)
+
+INC = /Library/Frameworks/Python.framework/Versions/$(VERSION)/include/$(PYTHON)m
+LIB = /Library/Frameworks/Python.framework/Versions/$(VERSION)/lib
+BUILD = build/
+
 INC_PATH = $(realpath ./include)
 ENV_DIR = $(realpath ./venv)
 ROOT_DIR = $(realpath ./)
 INST_PATH = $(ENV_DIR)
-PY_VER = python3.7
+
 
 export INC_PATH
 export INST_PATH
 
-default:
-	cython -o libangelos.c -3 $(shell python setup/modules.py -m angelos)
-	cython -o eidon.c -3 $(shell python setup/modules.py -m eidon)
-	python setup.py build_ext
+pysetup:
+	python setup.py build_ext --inplace
 
-# @echo ========================= make SUCCESS =========================
+libangelos:
+	cython -o libangelos.c -3 $(shell python setup/modules.py -m angelos)
+
+libeidon:
+	cython -o eidon.c -3 $(shell python setup/modules.py -m eidon)
+
+libar7:
+	cython -o libar7.c -3 angelos/error.py angelos/utils.py angelos/ioc.py angelos/archive/conceal.py angelos/archive/archive7.py
+
+default:
+
+
+
+
+
+ar7: libar7
+	cython -o ar7.c ar7.py -3 --embed
+	gcc -v -Os -I $(INC) -L $(LIB) -o ar7 libar7.c ar7.c -l$(PYTHON)  -lpthread -lm -lutil -ldl
+
+
 
 test:
 	$(MAKE) -C $(INC_PATH) -f $@.mk -e
 	@echo ========================= test SUCCESS =========================
 
 clean:
-	rm -Rf angelos/**/*.c
-	rm -Rf angelos/**/*.o
-	rm -Rf angelos/**/*.pyc
+	rm -Rf ./**/*.c
+	rm -Rf ./**/*.o
+	rm -Rf ./**/*.pyc
 	rm -Rf ./**/__pycache__
-	rm -fr *.o *.so *.app *.spec MANIFEST *.build /build/ build *.dist /dist/ .DS_Store *.log
+	rm -fr *.c *.o *.so *.app *.spec MANIFEST *.build /build/ build *.dist /dist/ .DS_Store *.log
+	rm ar7
 
 env:
 	# --relocatable --python=$(PYV)
@@ -36,7 +61,6 @@ setup:
 	pip install kivy
 	pip install -U 'https://gitlab.com/kivymd/KivyMD/-/archive/master/KivyMD-master.tar.bz2'
 	pip install -U 'https://codeload.github.com/kivy/plyer/zip/1.3.0'
-
 
 doc:
 	pydoc -w angelos
