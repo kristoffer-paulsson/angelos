@@ -13,8 +13,7 @@ from ..const import Const
 
 """Environment default values."""
 ENV_DEFAULT = {
-    'root': Util.path(Util.app_dir(), 'serverroot'),
-    'log': Util.path(Util.app_dir(), 'serverroot')
+
 }
 
 """Environment immutable values."""
@@ -29,6 +28,21 @@ CONFIG_DEFAULT = {
 
 """Configuration immutable values"""
 CONFIG_IMMUTABLE = {
+    'state': [
+        {
+            'name': 'running'
+        },
+        {
+            'name': 'boot',
+            'blocking': ('serving', ),
+            'depends': ('running', )
+        },
+        {
+            'name': 'serving',
+            'depends': ('running', ),
+            'switches': ('boot', )
+        }
+    ],
     'logger': {
         'version': 1,
         'formatters': {

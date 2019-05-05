@@ -10,33 +10,73 @@ import plyer
 from .utils import Util
 
 
-class Automatic:
-    """Automatic values about the system."""
+class BaseAuto:
+    pass
 
+
+class Opts(BaseAuto):
+    def __init__(self, parser):
+        for k, v in vars(parser.args).items():
+            self.__dict__[k] = v
+
+
+class Dir(BaseAuto):
     def __init__(self):
-        """Generate the values and instanciate vars."""
-        self.name = socket.gethostname()
-        self.hostname = self.name.lower()
-        self.ip = socket.gethostbyname(self.name)
+        app = Util.app_dir()
+
+        if '/usr/local/bin' in app:
+            self.stem = os.path.dirname(os.path.dirname(os.path.dirname(app)))
+        if '/usr/bin' in app:
+            self.stem = os.path.dirname(os.path.dirname(app))
+        elif '/bin' in app:
+            self.stem = os.path.dirname(app)
+
+        # Binary install directory
+        self.executable = app
+        # Current users directory
+        self.home = Util.usr_dir()
+        # Server root directory
+        self.root = os.path.join(self.stem, 'var/lib/angelos')
+        # Logging directory
+        self.log = os.path.join(self.stem, 'var/log/angelos')
+        # Current working directory
+        self.current = Util.exe_dir()
+
+
+class Sys(BaseAuto):
+    def __init__(self):
+        (self.system, self.node, self.release, self.version,
+            self.machine, self.processor) = platform.uname()
+        self.java = platform.java_ver()[0]
+        self.win = platform.win32_ver()[0]
+        self.mac = platform.mac_ver()[0]
+
+
+class Net(BaseAuto):
+    def __init__(self, name):
+        self.hostname = name.lower()
+        self.ip = socket.gethostbyname(name)
         self.domain = socket.getfqdn()
 
-        (self.p_system, self.p_node, self.p_release, self.p_version,
-            self.p_machine, self.p_processor) = platform.uname()
-        self.p_java = platform.java_ver()[0]
-        self.p_win = platform.win32_ver()[0]
-        self.p_mac = platform.mac_ver()[0]
-        self.p_linux = platform.dist()[0]
 
+class Automatic(BaseAuto):
+    """Automatic values about the system."""
+
+    def __init__(self, parser=None):
+        """Generate the values and instanciate vars."""
+        self.name = socket.gethostname()
         self.pid = os.getpid()
         self.ppid = os.getppid()
         self.cpus = os.cpu_count()
         self.platform = sys.platform
-
         self.id = plyer.uniqueid.id.decode()
 
-        self.app_dir = Util.app_dir()
-        self.usr_dir = Util.usr_dir()
-        self.exe_dir = Util.exe_dir()
+        self.sys = Sys()
+        self.dir = Dir()
+        self.net = Net(self.name)
+
+        if parser:
+            self.opts = Opts(parser)
 
 
 """

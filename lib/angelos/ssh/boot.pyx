@@ -9,7 +9,8 @@ from ..utils import Util
 from ..const import Const
 from .ssh import SSHServer
 from ..server.cmd import Terminal
-from ..server.commands import QuitCommand, SetupCommand, StartupCommand
+from ..server.commands import (
+    QuitCommand, SetupCommand, StartupCommand, EnvCommand)
 from ..ioc import ContainerAware
 
 
@@ -22,7 +23,7 @@ class BootServer(ContainerAware, SSHServer):
         SSHServer.__init__(self)
         self._applog = self.ioc.log.app
 
-        vault_file = Util.path(self.ioc.env['root'], Const.CNL_VAULT)
+        vault_file = Util.path(self.ioc.env['dir'].root, Const.CNL_VAULT)
         if os.path.isfile(vault_file):
             self._applog.info(
                 'Vault archive found. Initialize startup mode.')
@@ -54,7 +55,7 @@ class BootServer(ContainerAware, SSHServer):
 
         The terminal will be equipped for setup or startup.
         """
-        vault_file = Util.path(self.ioc.env['root'], Const.CNL_VAULT)
+        vault_file = Util.path(self.ioc.env['dir'].root, Const.CNL_VAULT)
 
         if os.path.isfile(vault_file):
             return (await Terminal(
@@ -62,5 +63,5 @@ class BootServer(ContainerAware, SSHServer):
                 ioc=self.ioc, process=process).run())
         else:
             return (await Terminal(
-                commands=[SetupCommand, QuitCommand],
+                commands=[SetupCommand, QuitCommand, EnvCommand],
                 ioc=self.ioc, process=process).run())

@@ -1,12 +1,12 @@
 # cython: language_level=3
 cdef class IOBase:  # (metaclass=abc.ABCMeta)
-    cpdef seek(self, pos, whence=0):
+    cdef seek(self, pos, whence=0):
         pass
 
     cdef tell(self):
         return self.seek(0, 1)
 
-    cpdef truncate(self, pos=None):
+    cdef truncate(self, pos=None):
         pass
 
     cdef flush(self):
@@ -27,7 +27,7 @@ cdef class IOBase:  # (metaclass=abc.ABCMeta)
         except:
             pass
 
-    cpdef seekable(self):
+    cdef seekable(self):
         """File or stream is not seekable."""
         return False
 
@@ -55,7 +55,7 @@ cdef class IOBase:  # (metaclass=abc.ABCMeta)
     cdef __exit__(self, *args):
         self.close()
 
-    cpdef fileno(self):
+    cdef fileno(self):
         pass
 
     cdef isatty(self):
@@ -148,8 +148,8 @@ cdef class RawIOBase(IOBase):
             # b'' or None
             return data
 
-    cpdef readinto(self, b):
+    cdef readinto(self, b):
         pass
 
-    cpdef write(self, b):
+    cdef write(self, b):
         pass

@@ -1,14 +1,21 @@
 # cython: language_level=3
-"""Module docstring."""
+"""
+Utility module.
+
+The utility module containse all minor extras that is used globally in the
+application.
+"""
 import os
 import sys
 import importlib
+import asyncio
 from .error import ERROR_INFO
 
-"""
-The Util.py module is the module that containse all minor extras that is used
-globally in the application
-"""
+
+class Event(asyncio.Event):
+    """A threadsafe asynchronous event class."""
+    def set(self):
+        asyncio.get_running_loop().call_soon_threadsafe(super().set)
 
 
 class Util:

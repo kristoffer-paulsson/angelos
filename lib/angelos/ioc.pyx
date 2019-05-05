@@ -21,7 +21,7 @@ class Container:
             if name not in self.__config:
                 raise Util.exception(
                     Error.IOC_NOT_CONFIGURED, {'service': name})
-            elif isinstance(self.__config[name], types.LambdaType):
+            elif callable(self.__config[name]):
                 self.__instances[name] = self.__config[name](self)
             else:
                 raise Util.exception(
@@ -41,6 +41,14 @@ class ContainerAware:
     def ioc(self):
         """Container property access."""
         return self.__ioc
+
+
+class Config:
+    def __load(self, filename):
+        pass
+
+    def __config(self):
+        return {}
 
 
 class Handle:

@@ -231,7 +231,7 @@ class Option:
         is invalid an exception is raised.
 
         name        The long name of the option, without double dash '--'.
-        short       One character abbreviation of the long name, without
+        abbr        One character abbreviation of the long name, without
                     dash '-'.
         type        The type of option, boolean, choice or value. Use the type
                     constants to select one.
@@ -354,8 +354,8 @@ class Option:
 class Command(FactoryInterface):
     """Representation of one executable command."""
 
-    """A short description of the command for the list section"""
-    short = ''
+    """A abbreviated description of the command for the list section"""
+    abbr = ''
 
     """Long description explaining the command"""
     description = ''
@@ -367,7 +367,7 @@ class Command(FactoryInterface):
 
         self.__opts = self._options() + [Option(
             'help',
-            short='h',
+            abbr='h',
             type=Option.TYPE_BOOL,
             help='Print the command help section')]
 
@@ -529,7 +529,7 @@ class Shell(ContainerAware):
     class HelpCommand(Command):
         """Print help text about a command."""
 
-        short = 'Print available commands and how to use them.'
+        abbr = 'Print available commands and how to use them.'
         description = """Help will print all the available commands loaded in
 the console shell"""
 
@@ -554,7 +554,7 @@ the console shell"""
     class ExitCommand(Command):
         """Exit the shell."""
 
-        short = 'Exit the current terminal session.'
+        abbr = 'Exit the current terminal session.'
         description = """Exit will exit the console session and restore the
 screen"""
 
@@ -568,7 +568,7 @@ screen"""
     class ClearCommand(Command):
         """Clear the screen."""
 
-        short = 'Clear the terminal window.'
+        abbr = 'Clear the terminal window.'
         description = """Clear clears the console screen/window"""
 
         def __init__(self, io):

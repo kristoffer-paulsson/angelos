@@ -9,7 +9,7 @@ basic:
 	python setup.py develop
 
 angelos: basic
-	pyinstaller ./bin/angelos --onefile
+	pyinstaller ./bin/angelos $(PYI)
 
 ar7: basic
 	python ./setup/ar7_spec.py
@@ -19,4 +19,3 @@ clean:
 	rm -fr ./dist/
 	rm -fr ./build/
 	rm -fr ./angelos/**/*.so
-	# find ./lib/ -name '*.c' -delete

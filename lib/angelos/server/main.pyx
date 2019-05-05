@@ -19,9 +19,7 @@ class Application:
     def run(self):
         """Start and run application."""
         from .server import Server
-        from ..ioc import Container
-        from .config import CONFIG
-        Server(Container(CONFIG)).run()
+        Server().run()
 
 
 class Daemonizer:

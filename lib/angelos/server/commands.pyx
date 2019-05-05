@@ -16,12 +16,13 @@ from ..const import Const
 from .cmd import Command, Option
 from ..facade.facade import (
     Facade, PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
+from ..automatic import BaseAuto
 
 
 class SetupCommand(Command):
     """Prepare and setup the server."""
 
-    short = """Setup the facade with entity."""
+    abbr = """Setup the facade with entity."""
     description = """Create or import an entity to configure the facade and node."""  # noqa E501
     msg_start = """
 Setup command will lead you through the process of setting up an angelos
@@ -43,7 +44,7 @@ documents and connect to the nodes on the current domain network.
             self._io << '\nServer already running.\n\n'
             return
 
-        vault_file = Util.path(self._ioc.env['root'], Const.CNL_VAULT)
+        vault_file = Util.path(self._ioc.env['dir'].root, Const.CNL_VAULT)
         if os.path.isfile(vault_file):
             self._io << '\n\nServer already setup.\n\n'
             return
@@ -83,6 +84,7 @@ documents and connect to the nodes on the current domain network.
             if secret != binascii.unhexlify(key.encode()):
                 raise RuntimeError('Master key mismatch')
 
+            os.makedirs(self._root)
             if subdo == 0:
                 facade = await PersonServerFacade.setup(
                     self._root, secret, role, entity_data)
@@ -98,7 +100,13 @@ documents and connect to the nodes on the current domain network.
         elif do == 1:
             raise NotImplementedError('Import to be implemented')
             # docs = await self.do_import()
-            return
+
+        self._io << (
+            'You just de-encrypted and loaded the Facade. Next step in\n' +
+            'boot sequence is to start the services and the Admin console.\n' +
+            'Meanwhile you will be logged out from the Boot console.\n'
+        )
+        await self._io.presskey()
 
     async def do_new(self):
         """Let user select what entity to create."""
@@ -306,13 +314,13 @@ documents and connect to the nodes on the current domain network.
     @classmethod
     def factory(cls, **kwargs):
         """Create command with env from IoC."""
-        return cls(kwargs['io'], kwargs['ioc'].env['root'], kwargs['ioc'])
+        return cls(kwargs['io'], kwargs['ioc'].env['dir'].root, kwargs['ioc'])
 
 
 class StartupCommand(Command):
     """Unlock and start the server."""
 
-    short = """Unlock and start."""
+    abbr = """Unlock and start."""
     description = """Receive the master key, then unlock and start the server."""  # noqa E501
 
     def __init__(self, io, root, ioc):
@@ -322,19 +330,25 @@ class StartupCommand(Command):
         self._ioc = ioc
 
     async def _command(self, opts):
-        if isinstance(self._ioc.facade, Facade):
-            self._io << '\nServer already running.\n\n'
-            return
-
         try:
-            key = await self._io.secret('Enter the master key')
-            secret = binascii.unhexlify(key.encode())
+            if isinstance(self._ioc.facade, Facade):
+                self._io << '\nServer already running.\n\n'
+            else:
+                key = await self._io.secret('Enter the master key')
+                secret = binascii.unhexlify(key.encode())
 
-            facade = await Facade.open(self._root, secret)
-            self._ioc.facade = facade
+                facade = await Facade.open(self._root, secret)
+                self._ioc.facade = facade
 
-            self._io << '\nSuccessfully loaded the facade.\nID: %s\n\n' % (
-                    facade.entity.id)
+                self._io << '\nSuccessfully loaded the facade.\nID: %s\n\n' % (
+                        facade.entity.id)
+
+            self._io << (
+            'You just de-encrypted and loaded the Facade. Next step in\n' +
+            'boot sequence is to start the services and the Admin console.\n' +
+            'Meanwhile you will be logged out from the Boot console.\n'
+            )
+            await self._io.presskey()
 
         except (ValueError, binascii.Error) as e:
             self._io << '\nError: %s\n\n' % e
@@ -346,13 +360,13 @@ class StartupCommand(Command):
     @classmethod
     def factory(cls, **kwargs):
         """Create command with env from IoC."""
-        return cls(kwargs['io'], kwargs['ioc'].env['root'], kwargs['ioc'])
+        return cls(kwargs['io'], kwargs['ioc'].env['dir'].root, kwargs['ioc'])
 
 
 class EnvCommand(Command):
     """Work with environment variables."""
 
-    short = """Work with environment valriables."""
+    abbr = """Work with environment valriables."""
     description = """Use this command to display the environment variables."""  # noqa E501
 
     def __init__(self, io, env):
@@ -363,9 +377,18 @@ class EnvCommand(Command):
     async def _command(self, opts):
             self._io << (
                 '\nEnvironment variables:\n' + '-'*79 + '\n')
-            self._io << '\n'.join([
-                '%s: %s' % (k, v) for k, v in self.__env.items()])
+            self._io << '\n'.join(self._recurse(self.__env))
             self._io << '\n' + '-'*79 + '\n\n'
+
+    def _recurse(self, obj, suf='', level=0):
+        items=[]
+        for k, v in obj.items():
+            if isinstance(v, BaseAuto):
+                items += self._recurse(vars(v), k, level+1)
+            else:
+                items.append('{s:}{k:}: {v:}'.format(
+                    s=(suf + '.' if suf else ''), k=k, v=v))
+        return items
 
     @classmethod
     def factory(cls, **kwargs):
@@ -376,7 +399,7 @@ class EnvCommand(Command):
 class QuitCommand(Command):
     """Shutdown the angelos server."""
 
-    short = """Shutdown the angelos server"""
+    abbr = """Shutdown the angelos server"""
     description = """Use this command to shutdown the angelos server from the terminal."""  # noqa E501
 
     def __init__(self, io):
@@ -391,7 +414,7 @@ class QuitCommand(Command):
         """
         return [Option(
             'yes',
-            short='y',
+            abbr='y',
             type=Option.TYPE_BOOL,
             help='Confirm that you want to shutdown server')]
 
@@ -411,63 +434,3 @@ class QuitCommand(Command):
     async def _quit(self):
         await asyncio.sleep(5)
         os.kill(os.getpid(), signal.SIGINT)
-
-
-"""
-class ServerCommand(Command):
-    short = 'Operates the servers runstate.'
-    description = With the server command you can operate the servers run
-state. you can "start", "restart" and "shutdown" the softaware using the
-options available. "shutdown" requires you to confirm with the "yes"
-option."
-
-    def __init__(self, message):
-        Command.__init__(self, 'server')
-        Util.is_type(message, Events)
-        self.__events = message
-
-    def _options(self):
-        return[
-            Option(
-                'start', type=Option.TYPE_BOOL,
-                help='Elevates the servers run state into operational mode'),
-            Option('restart', type=Option.TYPE_BOOL,
-                   help='Restarts the server'),
-            Option('shutdown', type=Option.TYPE_BOOL,
-                   help='Shuts down the server'),
-            Option('yes', short='y', type=Option.TYPE_BOOL,
-                   help='Use to confirm "shutdown"'),
-        ]
-
-    def _command(self, opts):
-        if opts['start']:
-            self._stdout.write(
-                '"start" operation not implemented.' + Shell.EOL)
-
-        elif opts['restart']:
-            self._stdout.write(
-                '"restart" operation not implemented.' + Shell.EOL)
-
-        elif opts['shutdown']:
-            if opts['yes']:
-                self._stdout.write('Commencing operation "shutdown".' +
-                                   Shell.EOL + 'Good bye!' + Shell.EOL)
-                self.__events.send(Message(
-                    Const.W_ADMIN_NAME, Const.W_SUPERV_NAME, 1, {}))
-                for r in range(5):
-                    self._stdout.write('.')
-                    time.sleep(1)
-                raise CmdShellExit()
-            else:
-                self._stdout.write(
-                    'operation "shutdown" not confirmed.' + Shell.EOL)
-
-        else:
-            self._stdout.write(
-                'No operation given. Type <server> -h for help.' + Shell.EOL)
-
-    @staticmethod
-    def factory(**kwargs):
-        Util.is_type(kwargs['ioc'], Container)
-        return ServerCommand(kwargs['ioc'].message)
-"""
