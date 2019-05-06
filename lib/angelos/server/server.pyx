@@ -6,11 +6,13 @@ import functools
 import asyncio
 import collections
 import json
+import socket
 
 from ..utils import Util, Event
 from ..const import Const
 from ..ioc import Container, ContainerAware, Config, Handle
 from ..starter import Starter
+from ..worker import Worker
 
 from .state import StateMachine
 from ..logger import LogHandler
@@ -47,7 +49,7 @@ class Configuration(Config, Container):
             'state': lambda self: StateMachine(self.config['state']),
             'log': lambda self: LogHandler(self.config['logger']),
             'facade': lambda self: Handle(Facade),
-            'boot': lambda self: Handle(asyncio.Server),
+            'boot': lambda self: Handle(asyncio.base_events.Server),
             'opts': lambda self: Parser(),
             'auto': lambda self: Automatic(self.opts),
             'quit': lambda self: Event(),
@@ -60,10 +62,12 @@ class Server(ContainerAware):
     def __init__(self):
         """Initialize app logger."""
         ContainerAware.__init__(self, Configuration())
+        self._worker = Worker('server.main', self.ioc, executor=0, new=False)
         self._applog = self.ioc.log.app
 
     def _initialize(self):
-        loop = asyncio.get_event_loop()
+        self.ioc.state('running', True)
+        loop = self._worker.loop
 
         loop.add_signal_handler(
             signal.SIGINT, functools.partial(self.quiter, signal.SIGINT))
@@ -71,9 +75,10 @@ class Server(ContainerAware):
         loop.add_signal_handler(
             signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM))
 
+        self._worker.run_coroutine(self.boot_flipflop())
+        self._worker.run_coroutine(self.boot_activator())
+
         self._applog.info('Starting boot server.')
-        self.ioc.boot = Starter().boot_server(
-            self._listen(), port=self.ioc.env['opts'].port, ioc=self.ioc)
 
     def _finalize(self):
         self._applog.info('Shutting down server.')
@@ -123,3 +128,27 @@ class Server(ContainerAware):
         self._finalize()
 
         self._applog.info('-------- EXITING SERVER --------')
+
+    async def boot_flipflop(self):
+        first = True
+        while not self.ioc.quit.is_set():
+            if self.ioc.state.position('boot'):
+                await self.ioc.state.off('boot')
+                boot_server = self.ioc.boot
+                boot_server.close()
+                for socket in boot_server.sockets:
+                    socket.shutdown(socket.SHUT_RDWR)
+                await boot_server.wait_closed()
+            else:
+                await self.ioc.state.on('boot')
+                if first:
+                    self.ioc.boot = await Starter().boot_server(
+                        self._listen(), port=self.ioc.env['opts'].port,
+                        ioc=self.ioc, loop=self._worker.loop)
+                    first = False
+                else:
+                    await self.ioc.boot.start_serving()
+
+    async def boot_activator(self):
+        asyncio.sleep(2)
+        self.ioc.state('boot', True)

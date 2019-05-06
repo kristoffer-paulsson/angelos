@@ -1,3 +1,5 @@
+# cython: language_level=3
+"""State machine."""
 import asyncio
 
 from ..utils import Event
@@ -14,16 +16,16 @@ class State:
     name = None
     """Unique name of the state in the statemachine."""
 
-    blockers = None
+    blocking = []
     """Blocking states that must be OFF for this state to turn ON."""
 
-    depends = None
+    depends = []
     """Dependencies that must be ON for this state to turn ON."""
 
-    switches = None
+    switches = []
     """Switch the following states OFF when this turns ON."""
 
-    def __init__(self, name=None, blockers=None, depends=None, switches=None):
+    def __init__(self, name=None, blocking=[], depends=[], switches=[]):
         """Init the state"""
         if not (self.name or name):
             raise StateMissconfiguredError('State name not set')
@@ -32,10 +34,10 @@ class State:
         elif name and not self.name:
             self.name = name
 
-        if self.blockers and blockers:
+        if self.blocking and blocking:
             raise StateMissconfiguredError('State blockers can not be set twice')
         else:
-            self.blockers = blockers
+            self.blocking = blocking
 
         if self.depends and depends:
             raise StateMissconfiguredError('State dependencies can not be set twice')
@@ -50,7 +52,6 @@ class State:
         self.__state = False
         self.__on = Event()
         self.__off = Event()
-        self.switch(False)
 
     @property
     def state(self):
@@ -58,7 +59,7 @@ class State:
 
     def switch(self, turn=None):
         """Flip the current state and clear and set the ON/OFF events."""
-        if turn != None:
+        if turn == None:
             self.__state = not self.__state
         else:
             self.__state = bool(turn)
@@ -79,9 +80,9 @@ class State:
                 return await self.__off.wait()
             else:
                 return await self.__on.wait()
-        elif turn:
+        elif turn == True:
             return await self.__on.wait()
-        elif not turn:
+        elif turn == False:
             return await self.__off.wait()
         else:
             return
@@ -92,66 +93,73 @@ class StateMachine:
         self.__states = {}
         self.__lock = asyncio.Lock
         self.__counter = 0
-        for s in states:
-            state = State(**s)
-            self.__states[state.name] = state
+
+        for args in states:
+            si = State(**args)
+            self.__states[si.name] = si
 
     @property
     def states(self):
         return self.__states.keys()
 
-    def __call__(self, state, turn=None):
-        with self.__lock:
-            return self.__do_turn(self.__get(state), turn)
+    def position(self, state):
+        return self.__get(state).state
 
-    def __enter__(self):
+    def __call__(self, state, turn=None):
+        if state == 'all' and turn == False:
+            for name in self.__states.keys():
+                self.__do_turn(self.__get(name), False)
+            return True
+        return self.__do_turn(self.__get(state), turn)
+
+    """def __enter__(self):
         self.__lock.acquire()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.__lock.release()
         raise exc_type(exc_val)
+        """
 
     def __get(self, state):
-        if state not in self.states:
+        if state not in self.__states:
             raise StateMissconfiguredError(
                 'There is no state "%s" configured' % state)
         return self.__states[state]
 
-    def __do_turn(self, state, turn):
+    def __do_turn(self, si, turn):
         if turn == True:
-            self.__validate(state)
+            self.__validate(si)
 
-        for switch in state.switches:
+        for switch in si.switches:
             self.__do_turn(self.__get(switch), False)
 
-        return state.switch(turn)
+        return si.switch(turn)
 
-    def __validate(self, state):
-
-        blockers = []
-        for name in state.blockers:
+    def __validate(self, si):
+        blocking = []
+        for name in si.blocking:
             b = self.__get(name)
             if b.state:
-                blockers.append(b)
-        if blockers:
+                blocking.append(b.name)
+        if len(blocking):
             raise StateBlockedError('State "%s" blocked by: "%s"' % (
-                state.name, '", "'.join(blockers)))
+                si.name, '", "'.join(blocking)))
 
         missing = []
-        for name in state.depends:
+        for name in si.depends:
             d = self.__get(name)
             if not d.state:
-                missing.append(d)
-        if missing:
+                missing.append(d.name)
+        if len(missing):
             raise StateDependencyError(
-                'State dependency failure for "%s" by: "%s"' % (
-                    state.name, '", "'.join(missing)))
+                'Dependencies "%s" not fullfiled for state "%s"' % (
+                    '", "'.join(missing), si.name))
 
     async def on(self, state):
-        await self.__get(state).wait(state, True)
+        await self.__get(state).wait(True)
         return self
 
     async def off(self, state):
-        await self.__get(state).wait(state, False)
+        await self.__get(state).wait(False)
         return self

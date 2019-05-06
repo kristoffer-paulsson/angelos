@@ -9,8 +9,7 @@ from ..utils import Util
 from ..const import Const
 from .ssh import SSHServer
 from ..server.cmd import Terminal
-from ..server.commands import (
-    QuitCommand, SetupCommand, StartupCommand, EnvCommand)
+from ..server.commands import QuitCommand, SetupCommand, StartupCommand
 from ..ioc import ContainerAware
 
 
@@ -63,5 +62,5 @@ class BootServer(ContainerAware, SSHServer):
                 ioc=self.ioc, process=process).run())
         else:
             return (await Terminal(
-                commands=[SetupCommand, QuitCommand, EnvCommand],
+                commands=[SetupCommand, QuitCommand],
                 ioc=self.ioc, process=process).run())

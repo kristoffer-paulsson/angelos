@@ -15,7 +15,7 @@ from .error import ERROR_INFO
 class Event(asyncio.Event):
     """A threadsafe asynchronous event class."""
     def set(self):
-        asyncio.get_running_loop().call_soon_threadsafe(super().set)
+        self._loop.call_soon_threadsafe(super().set)
 
 
 class Util:

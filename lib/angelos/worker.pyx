@@ -1,24 +1,25 @@
 # cython: language_level=3
 """Asynchronous multithreaded worker."""
 import asyncio
+import logging
 import threading
 import multiprocessing
 import concurrent.futures
 import functools
-import logging
 
+from .utils import Event
 from .ioc import ContainerAware
 
 
 class Worker(ContainerAware):
     """Worker with a private thread, loop and executor."""
 
-    __exit = asyncio.Event()
+    __exit = Event()
     __workers = {}
 
     def __init__(self, name, ioc, executor=None, new=True):
         """Initialize worker."""
-        ContainerAware.__init__(ioc)
+        ContainerAware.__init__(self, ioc)
 
         if name in self.__workers.keys():
             raise RuntimeError('Worker name is taken: %s' % name)
@@ -31,6 +32,7 @@ class Worker(ContainerAware):
 
         if not new:
             self.__loop = asyncio.get_event_loop()
+            self.__loop.set_exception_handler(self.__loop_exc_handler)
             self.__thread = threading.main_thread()
 
             if executor:
@@ -38,16 +40,17 @@ class Worker(ContainerAware):
                     self.__end(), loop=self.__loop)
                 self.__loop.set_default_executor(self.__executor)
 
-            self.__loop.call_soon(self.__quited)
+            asyncio.run_coroutine_threadsafe(self.__quiter(), self.__loop)
         else:
             self.__loop = asyncio.new_event_loop()
+            self.__loop.set_exception_handler(self.__loop_exc_handler)
 
             if executor:
                 self.__future = asyncio.ensure_future(
                     self.__end(), loop=self.__loop)
                 self.__loop.set_default_executor(self.__executor)
 
-            self.__loop.call_soon_threadsafe(self.__quiter)
+            asyncio.run_coroutine_threadsafe(self.__quiter(), self.__loop)
             self.__thread = threading.Thread(
                 target=self.__run, name=name
             ).start()
@@ -68,6 +71,23 @@ class Worker(ContainerAware):
     def thread(self):
         """Accress to the thread object."""
         return self.__thread
+
+    def __loop_exc_handler(self, loop, context):
+        exc1 = None
+        exc2 = None
+
+        logging.critical(context.message)
+
+        if context.exception:
+            exc1 = context.exception
+        if context.future:
+            exc2 = context.future.exception()
+
+        if exc1 == exc2 and exc1 != None:
+            logging.exception(exc1)
+        else:
+            logging.exception(exc1)
+            logging.exception(exc2)
 
     def __run(self):
         try:

@@ -463,8 +463,9 @@ class Command(FactoryInterface):
 class Shell(ContainerAware):
     """Shell that represents a PTY."""
 
-    cmd_regex = """^(\w+)"""
-    opt_regex = """(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?"""  # noqa E501
+    cmd_regex = '^(\w+)'
+    opt_regex = '(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)' \
+                '(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?'
     EOL = '\r\n'
 
     def __init__(self, commands, ioc, process):

@@ -37,7 +37,7 @@ class Starter:
     }
 
     @classmethod
-    def node_server(self, entity, privkeys, host, port=22):
+    def node_server(self, entity, privkeys, host, port=22, loop=None):
         """Start server for incoming node/domain communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -51,6 +51,7 @@ class Starter:
             'server_host_keys': [Starter._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
+            'loop': loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -79,7 +80,7 @@ class Starter:
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def host_server(self, entity, privkeys, host, port=22):
+    def host_server(self, entity, privkeys, host, port=22, loop=None):
         """Start server for incoming host/host communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -93,6 +94,7 @@ class Starter:
             'server_host_keys': [Starter._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
+            'loop': loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -121,7 +123,7 @@ class Starter:
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def portal_server(self, entity, privkeys, host, port=22):
+    def portal_server(self, entity, privkeys, host, port=22, loop=None):
         """Start server for incoming client/portal communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -135,6 +137,7 @@ class Starter:
             'server_host_keys': [Starter._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
+            'loop': loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -161,7 +164,7 @@ class Starter:
 
         return Starter.__start_client(params)  # (conn, client)
 
-    def shell_server(self, entity, privkeys, host, port=22):
+    def shell_server(self, entity, privkeys, host, port=22, loop=None):
         """Start shell server for incoming admin communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -175,17 +178,19 @@ class Starter:
             'server_host_keys': [Starter._private_key(privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
+            'loop': loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
         return Starter.__start_server(params)
 
-    def boot_server(self, host, port=22, ioc=None):
+    def boot_server(self, host, port=22, ioc=None, loop=None):
         """Start shell server for incoming boot communications."""
         params = {
             'server_factory': lambda: BootServer(ioc),
             'host': host,
             'port': port,
+            'loop': loop,
             'server_host_keys': [
                 asyncssh.import_private_key(SERVER_RSA_PRIVATE)],
         }
@@ -197,16 +202,14 @@ class Starter:
     @staticmethod
     def __start_server(params):
         try:
-            return asyncio.get_event_loop().run_until_complete(
-                asyncssh.create_server(**params))
+            return asyncssh.create_server(**params)
         except (OSError, asyncssh.Error) as exc:
             logging.critical('Error starting server: %s' % str(exc))
 
     @staticmethod
     def __start_client(params):
         try:
-            return asyncio.get_event_loop().run_until_complete(
-                asyncssh.create_connection(**params))
+            return asyncssh.create_connection(**params)
         except (OSError, asyncssh.Error) as exc:
             logging.critical('SSH connection failed: %s' % str(exc))
 

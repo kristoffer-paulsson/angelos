@@ -107,6 +107,7 @@ documents and connect to the nodes on the current domain network.
             'Meanwhile you will be logged out from the Boot console.\n'
         )
         await self._io.presskey()
+        self._ioc.state('serving', True)
 
     async def do_new(self):
         """Let user select what entity to create."""
@@ -349,6 +350,7 @@ class StartupCommand(Command):
             'Meanwhile you will be logged out from the Boot console.\n'
             )
             await self._io.presskey()
+            self._ioc.state('boot', False)
 
         except (ValueError, binascii.Error) as e:
             self._io << '\nError: %s\n\n' % e
@@ -402,9 +404,10 @@ class QuitCommand(Command):
     abbr = """Shutdown the angelos server"""
     description = """Use this command to shutdown the angelos server from the terminal."""  # noqa E501
 
-    def __init__(self, io):
+    def __init__(self, io, state):
         """Initialize the command. Takes a list of Command classes."""
         Command.__init__(self, 'quit', io)
+        self._state = state
 
     def _options(self):
         """
@@ -422,6 +425,7 @@ class QuitCommand(Command):
         if opts['yes']:
             self._io << (
                 '\nStarting shutdown sequence for the Angelos server.\n\n')
+            self._state('all', False)
             asyncio.ensure_future(self._quit())
             for t in ['3', '.', '.', '2', '.', '.', '1', '.', '.', '0']:
                 self._io << t
@@ -434,3 +438,8 @@ class QuitCommand(Command):
     async def _quit(self):
         await asyncio.sleep(5)
         os.kill(os.getpid(), signal.SIGINT)
+
+    @classmethod
+    def factory(cls, **kwargs):
+        """Create command with env from IoC."""
+        return cls(kwargs['io'], kwargs['ioc'].state)

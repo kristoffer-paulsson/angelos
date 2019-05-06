@@ -1,6 +1,6 @@
 # cython: language_level=3
 """Module docstring."""
-import types
+import logging
 from .utils import Util
 from .error import Error
 
@@ -22,7 +22,11 @@ class Container:
                 raise Util.exception(
                     Error.IOC_NOT_CONFIGURED, {'service': name})
             elif callable(self.__config[name]):
-                self.__instances[name] = self.__config[name](self)
+                try:
+                    self.__instances[name] = self.__config[name](self)
+                except Exception as e:
+                    logging.exception(e)
+                    raise e
             else:
                 raise Util.exception(
                     Error.IOC_LAMBDA_EXPECTED, {'service': name})
