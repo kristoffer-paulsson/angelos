@@ -16,6 +16,7 @@ from ..worker import Worker
 
 from .state import StateMachine
 from ..logger import LogHandler
+from ..ssh.ssh import SessionManager
 from ..facade.facade import Facade
 from ..automatic import Automatic
 from .parser import Parser
@@ -48,8 +49,10 @@ class Configuration(Config, Container):
                 CONFIG_DEFAULT),
             'state': lambda self: StateMachine(self.config['state']),
             'log': lambda self: LogHandler(self.config['logger']),
+            'session': lambda self: SessionManager(),
             'facade': lambda self: Handle(Facade),
             'boot': lambda self: Handle(asyncio.base_events.Server),
+            'admin': lambda self: Handle(asyncio.base_events.Server),
             'opts': lambda self: Parser(),
             'auto': lambda self: Automatic(self.opts),
             'quit': lambda self: Event(),
@@ -75,7 +78,8 @@ class Server(ContainerAware):
         loop.add_signal_handler(
             signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM))
 
-        self._worker.run_coroutine(self.boot_flipflop())
+        self._worker.run_coroutine(self.boot_server())
+        self._worker.run_coroutine(self.admin_server())
         self._worker.run_coroutine(self.boot_activator())
 
         self._applog.info('Starting boot server.')
@@ -129,26 +133,46 @@ class Server(ContainerAware):
 
         self._applog.info('-------- EXITING SERVER --------')
 
-    async def boot_flipflop(self):
+    async def admin_server(self):
+        first = True
+        while not self.ioc.quit.is_set():
+            if self.ioc.state.position('serving'):
+                await self.ioc.state.off('serving')
+                server = self.ioc.admin
+                server.close()
+                await self.ioc.session.unreg_server('admin')
+                await server.wait_closed()
+            else:
+                await self.ioc.state.on('serving')
+                if first:
+                    self.ioc.admin = await Starter().admin_server(
+                        self._listen(), port=self.ioc.env['opts'].port,
+                        ioc=self.ioc, loop=self._worker.loop)
+                    self.ioc.session.reg_server('admin', self.ioc.admin)
+                    first = False
+                else:
+                    await self.ioc.admin.start_serving()
+
+    async def boot_server(self):
         first = True
         while not self.ioc.quit.is_set():
             if self.ioc.state.position('boot'):
                 await self.ioc.state.off('boot')
-                boot_server = self.ioc.boot
-                boot_server.close()
-                for socket in boot_server.sockets:
-                    socket.shutdown(socket.SHUT_RDWR)
-                await boot_server.wait_closed()
+                server = self.ioc.boot
+                server.close()
+                await self.ioc.session.unreg_server('boot')
+                await server.wait_closed()
             else:
                 await self.ioc.state.on('boot')
                 if first:
                     self.ioc.boot = await Starter().boot_server(
                         self._listen(), port=self.ioc.env['opts'].port,
                         ioc=self.ioc, loop=self._worker.loop)
+                    self.ioc.session.reg_server('boot', self.ioc.boot)
                     first = False
                 else:
                     await self.ioc.boot.start_serving()
 
     async def boot_activator(self):
-        asyncio.sleep(2)
+        await asyncio.sleep(1)
         self.ioc.state('boot', True)

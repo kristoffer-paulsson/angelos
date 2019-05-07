@@ -1,9 +1,12 @@
 # cython: language_level=3
 """Module docstring."""
 import asyncio
+import uuid
 import logging
 
 import asyncssh
+
+from ..utils import Util
 
 
 class SSHServer(asyncssh.SSHServer):
@@ -83,3 +86,94 @@ class SSHClient(asyncssh.SSHClient):
             yield from asyncio.sleep(self._delay)
         logging.info('Public key authentication requested')
         return self._keylist.pop(0) if self._keylist else None
+
+
+class SessionHandle:
+    """Handle for a SSH Session."""
+
+    def __init__(self, user_id, session):
+        """Init the handle."""
+        Util.is_type(user_id, uuid.UUID)
+        Util.is_type(session, asyncssh.session.SSHSession)
+
+        self.id = user_id
+        self.session = session
+        self.idle = 0
+
+    def __del__(self):
+        """Delete the handle including session."""
+        self.session.close(sessmgr=True)
+        del self.session
+        del self.id
+
+
+class SessionManager:
+    """Session manager to be used with the IoC."""
+
+    def __init__(self):
+        """Init session manager."""
+        self.__servers = {}
+        self.__servsess = {}
+        self.__sessions = {}
+
+    def length(self):
+        return len(self.__sessions)
+
+    def reg_server(self, name, server, idle=60):
+        """register a server with the manager."""
+        Util.is_type(name, str)
+        Util.is_type(server, asyncio.base_events.Server)
+        Util.is_type(idle, int)
+
+        if name in self.__servers.keys():
+            # If server name not registered raise Error
+            raise RuntimeError('Can not register a server twice')
+
+        self.__servers[name] = (server, idle)  # Get server into registry
+        self.__servsess[name] = set()  # Set server/session association
+
+    async def unreg_server(self, name):
+        """Unregister server and close all related sessions."""
+        if name not in self.__servers.keys():
+            # If server name not registered raise Error
+            raise RuntimeError(
+                'Can not register session on non-registered server')
+
+        server = self.__servers[name][0]  # Get server instance by name
+        self.__servers.pop(name)  # Remove server instance from registry
+
+        for handle in self.__servsess[name]:  # Each session assoc with server
+            del self.__sessions[handle.id]  # Remove session
+            del handle  # Delete session
+
+        del self.__servsess[name]  # Remove server/session association
+
+    def add_session(self, name, handle):
+        """Add a new session to related server."""
+        if name not in self.__servers.keys():
+            # Server for session must exist
+            raise RuntimeError(
+                'Can not register session on non-registered server')
+
+        if handle.id in self.__sessions.keys():
+            # Session can only be added once.
+            raise RuntimeError('Can not register session twice.')
+
+        self.__sessions[handle.id] = handle  # Register session in registry
+        self.__servsess[name].add(handle)  # Associate session with server
+
+    def close_session(self, user_id):
+        """Close a specific session."""
+        if user_id not in self.__sessions.keys():
+            return  # If session doesn't exist, pretend to close.
+
+        handle = self.__sessions[user_id]  # Get session by user id
+        del self.__sessions[user_id]
+
+        for name in self.__servsess.keys():  # Remove session/server assoc
+            try:
+                self.__servsess[name].remove(handle)
+            except KeyError:
+                pass
+
+        del handle  # Delete session handle. Handle will close session on del

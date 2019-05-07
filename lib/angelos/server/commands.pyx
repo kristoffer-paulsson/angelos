@@ -84,7 +84,7 @@ documents and connect to the nodes on the current domain network.
             if secret != binascii.unhexlify(key.encode()):
                 raise RuntimeError('Master key mismatch')
 
-            os.makedirs(self._root)
+            os.makedirs(self._root, exist_ok=True)
             if subdo == 0:
                 facade = await PersonServerFacade.setup(
                     self._root, secret, role, entity_data)
@@ -107,7 +107,8 @@ documents and connect to the nodes on the current domain network.
             'Meanwhile you will be logged out from the Boot console.\n'
         )
         await self._io.presskey()
-        self._ioc.state('serving', True)
+        asyncio.ensure_future(self._switch())
+        raise Util.exception(Error.CMD_SHELL_EXIT)
 
     async def do_new(self):
         """Let user select what entity to create."""
@@ -312,6 +313,10 @@ documents and connect to the nodes on the current domain network.
         """Import entity from seed vault."""
         self._io << 'importing entities not implemented.'
 
+    async def _switch(self):
+        await asyncio.sleep(2)
+        self._ioc.state('serving', True)
+
     @classmethod
     def factory(cls, **kwargs):
         """Create command with env from IoC."""
@@ -350,14 +355,19 @@ class StartupCommand(Command):
             'Meanwhile you will be logged out from the Boot console.\n'
             )
             await self._io.presskey()
-            self._ioc.state('boot', False)
+            asyncio.ensure_future(self._switch())
+            raise Util.exception(Error.CMD_SHELL_EXIT)
 
         except (ValueError, binascii.Error) as e:
             self._io << '\nError: %s\n\n' % e
 
-        except Exception as e:
-            logging.exception(e)
-            self._io << '\nError: %s\n\n' % e
+        # except Exception as e:
+        #    logging.exception(e)
+        #    self._io << '\nError: %s\n\n' % e
+
+    async def _switch(self):
+        await asyncio.sleep(2)
+        self._ioc.state('serving', True)
 
     @classmethod
     def factory(cls, **kwargs):

@@ -8,6 +8,9 @@ basic:
 	# pip install -U -r requirements.txt
 	python setup.py develop
 
+logo: basic
+	pyinstaller ./bin/logo $(PYI)
+
 angelos: basic
 	pyinstaller ./bin/angelos $(PYI)
 

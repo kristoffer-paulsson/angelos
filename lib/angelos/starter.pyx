@@ -6,10 +6,11 @@ import logging
 import asyncssh
 
 from .utils import Util
+from .ioc import Container
 from .document.entities import Entity, PrivateKeys, Keys
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
-from .ssh.boot import BootServer
+from .ssh.console import BootServer, AdminServer
 from .server.rsa import SERVER_RSA_PRIVATE
 
 
@@ -37,12 +38,15 @@ class Starter:
     }
 
     @classmethod
-    def node_server(self, entity, privkeys, host, port=22, loop=None):
+    def node_server(
+            self, entity, privkeys, host, port=22, ioc=None, loop=None):
         """Start server for incoming node/domain communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(host, str)
         Util.is_type(port, int)
+        Util.is_type(ioc, Container)
+        Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
             'server_factory': SSHServer,
@@ -80,12 +84,15 @@ class Starter:
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def host_server(self, entity, privkeys, host, port=22, loop=None):
+    def host_server(
+            self, entity, privkeys, host, port=22, ioc=None, loop=None):
         """Start server for incoming host/host communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(host, str)
         Util.is_type(port, int)
+        Util.is_type(ioc, Container)
+        Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
             'server_factory': SSHServer,
@@ -123,12 +130,15 @@ class Starter:
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def portal_server(self, entity, privkeys, host, port=22, loop=None):
+    def portal_server(
+            self, entity, privkeys, host, port=22, ioc=None, loop=None):
         """Start server for incoming client/portal communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(host, str)
         Util.is_type(port, int)
+        Util.is_type(ioc, Container)
+        Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
             'server_factory': SSHServer,
@@ -164,15 +174,19 @@ class Starter:
 
         return Starter.__start_client(params)  # (conn, client)
 
-    def shell_server(self, entity, privkeys, host, port=22, loop=None):
+    def admin_server(
+            self, host, port=22, ioc=None, loop=None):
+            # self, entity, privkeys, host, port=22, ioc=None, loop=None):
         """Start shell server for incoming admin communications."""
-        Util.is_type(entity, Entity)
+        """Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(host, str)
         Util.is_type(port, int)
+        Util.is_type(ioc, Container)
+        Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': SSHServer,
+            'server_factory': lambda AdminServer(ioc),
             'host': host,
             'port': port,
             'server_host_keys': [Starter._private_key(privkeys)],
@@ -182,10 +196,33 @@ class Starter:
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
+        return Starter.__start_server(params)"""
+
+        Util.is_type(host, str)
+        Util.is_type(port, int)
+        Util.is_type(ioc, Container)
+        Util.is_type(loop, asyncio.base_events.BaseEventLoop)
+
+        params = {
+            'server_factory': lambda: AdminServer(ioc),
+            'host': host,
+            'port': port,
+            'loop': loop,
+            'server_host_keys': [
+                asyncssh.import_private_key(SERVER_RSA_PRIVATE)],
+        }
+        params = {**params, **self.SARGS}
+        params['allow_pty'] = True
+
         return Starter.__start_server(params)
 
     def boot_server(self, host, port=22, ioc=None, loop=None):
         """Start shell server for incoming boot communications."""
+        Util.is_type(host, str)
+        Util.is_type(port, int)
+        Util.is_type(ioc, Container)
+        Util.is_type(loop, asyncio.base_events.BaseEventLoop)
+
         params = {
             'server_factory': lambda: BootServer(ioc),
             'host': host,

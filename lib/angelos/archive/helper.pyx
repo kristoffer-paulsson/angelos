@@ -173,8 +173,6 @@ class ThreadProxy(Proxy):
     def run(self):
         while not (self._quit and self.__queue.empty()):
             task = self.__queue.get()
-            # logging.debug('Proxy prepare: %s; %s' % (task.prio, ', '.join(
-            #    ": ".join(_) for _ in task.params.items())))
             try:
                 result = task.callable(**task.params)
                 logging.info(
@@ -220,8 +218,6 @@ class AsyncProxy(Proxy):
         self.__queue.put_nowait(None)
 
     async def __executor(self, task):
-        # logging.debug('Proxy prepare: %s; %s' % (
-        #    task.prio, json.dumps(task.params)))
         try:
             result = task.callable(**task.params)
             logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
