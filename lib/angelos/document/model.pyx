@@ -169,6 +169,12 @@ class BaseDocument(metaclass=DocumentMeta):
                 nd[name] = item_list
         return nd
 
+    def export_str(self):
+        return self.export(conv_str)
+
+    def export_bytes(self):
+        return self.export(conv_bytes)
+
     def _validate(self):
         """Validate all fields."""
         for name in self._fields.keys():
@@ -317,7 +323,7 @@ class StringField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return str(value).encode('utf-8')
+        return bytes(value, 'utf-8')
 
 
 class TypeField(Field):

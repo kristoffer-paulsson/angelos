@@ -77,6 +77,8 @@ class Automatic(BaseAuto):
 
         if parser:
             self.opts = Opts(parser)
+        else:
+            self.opts = None
 
 
 """

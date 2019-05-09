@@ -70,15 +70,20 @@ class Facade:
         if not os.path.isdir(home_dir):
             RuntimeError('Home directory doesn\'t exist')
 
-        if role not in [Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP]:
+        if role not in [Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP, 0]:
             RuntimeError('Unsupported use of facade')
 
         if entity_data:
+            server = True if cls.INFO[0] in (
+                Const.A_TYPE_PERSON_SERVER,
+                Const.A_TYPE_MINISTRY_SERVER,
+                Const.A_TYPE_CHURCH_SERVER
+            ) else False
             entity, privkeys, keys, domain, node = cls.PREFS[1].create_new(
-                entity_data)
+                entity_data, role, server)
 
         entity, privkeys, keys, domain, node = cls.PREFS[1].import_ext(
-            entity, privkeys, keys, domain, node)
+            entity, privkeys, keys, domain, node, role, server)
 
         vault = Vault.setup(
             os.path.join(home_dir, Const.CNL_VAULT),

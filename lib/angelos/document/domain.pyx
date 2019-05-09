@@ -1,7 +1,8 @@
 # cython: language_level=3
 """Module docstring."""
 from .model import (
-    BaseDocument, StringField, IPField, UuidField, DocumentField, TypeField)
+    BaseDocument, StringField, IPField, UuidField, DocumentField, TypeField,
+    ChoiceField)
 from .document import Document, UpdatedMixin, IssueMixin
 
 
@@ -47,7 +48,7 @@ class Network(Document, UpdatedMixin):
 class Node(Document, UpdatedMixin):
     type = TypeField(value=Document.Type.NET_NODE)
     domain = UuidField()
-    role = StringField()
+    role = ChoiceField(choices=['client', 'server', 'backup'])
     device = StringField()
     serial = StringField()
     location = DocumentField(required=False, t=Location)

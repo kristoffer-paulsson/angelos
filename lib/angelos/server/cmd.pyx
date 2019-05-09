@@ -274,18 +274,18 @@ class Option:
     def _enum(self, opt):
         # Test if one option is given
         if len(opt) is 1:
-            # Test if given value is a choise
+            # Test if given value is a choice
             if opt[0] not in self.choices:
                 raise Util.exception(
-                    Error.CMD_OPT_ILLEGAL_CHOISE,
-                    {'opt': self.name, 'choise': opt[0]})
+                    Error.CMD_OPT_ILLEGAL_CHOICE,
+                    {'opt': self.name, 'choice': opt[0]})
             # Test if value is given
             if bool(opt[0]) is True:
                 return opt[0]
             else:
                 raise Util.exception(
-                    Error.CMD_OPT_CHOISE_OMITTED,
-                    {'opt': self.name, 'choise': None})
+                    Error.CMD_OPT_CHOICE_OMITTED,
+                    {'opt': self.name, 'choice': None})
 
         # Test if presence is missing
         if len(opt) is 0:

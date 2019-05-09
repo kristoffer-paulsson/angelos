@@ -2,28 +2,52 @@
 """Module docstring."""
 import libnacl
 import datetime
+import pprint
 
 from ..utils import Util
+from ..document.model import BaseDocument
 from ..document.document import Document
 from ..document.entities import Entity, PrivateKeys, Keys
 
 
 class Crypto:
     @staticmethod
-    def _docdata(document, exclude=[]):
+    def _document_data(document, exclude=[]):
         stream = bytes()
+        new_dict = {}
         exclude += ['issuer', 'signature']
-        for field, data in sorted(document.export_bytes().items()):
-            if field in exclude:
-                continue
-            elif isinstance(data, list):
-                for item in data:
-                    stream += item
-            elif isinstance(data, dict):
-                for item in data.keys():
-                    stream += data[item]
+
+        for k, v in document.export_bytes().items():
+            if k not in exclude:
+                new_dict[k] = v
+
+        return Crypto._dict_data(new_dict)
+
+    def _list_data(_list):
+        stream = bytes()
+        for item in sorted(_list):
+            if isinstance(item, dict):
+                stream += Crypto._dict_data(item)
+            elif isinstance(item, (bytes, bytearray)):
+                stream += item
             else:
+                Util.is_type(item, (bytes, bytearray))
+
+        return stream
+
+    def _dict_data(_dict):
+        stream = bytes()
+        for field, data in sorted(_dict.items()):
+            stream += field.encode()
+            if isinstance(data, list):
+                stream += Crypto._list_data(data)
+            elif isinstance(data, dict):
+                stream += Crypto._dict_data(data)
+            elif isinstance(data, (bytes, bytearray)):
                 stream += data
+            else:
+                Util.is_type(data, (bytes, bytearray))
+
         return stream
 
     @staticmethod
@@ -52,7 +76,7 @@ class Crypto:
             raise RuntimeError(
                 'This document doesn\'t support multiple signatures')
 
-        data = bytes(entity.id.bytes) + Crypto._docdata(
+        data = bytes(entity.id.bytes) + Crypto._document_data(
             document, exclude)
         signature = libnacl.sign.Signer(privkeys.seed).signature(data)
 
@@ -77,7 +101,7 @@ class Crypto:
             raise RuntimeError(
                 'Document/Keys issuer or Entity id doesn\'t match')
 
-        data = bytes(document.issuer.bytes) + Crypto._docdata(
+        data = bytes(document.issuer.bytes) + Crypto._document_data(
             document, exclude)
         verifier = libnacl.sign.Verifier(keys.verify.hex())
 

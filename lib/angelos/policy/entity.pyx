@@ -27,7 +27,7 @@ class BaseGeneratePolicy(Policy):
         entity = self.ENTITY[0](nd=kwargs)
         entity.issuer = entity.id
         entity.signature = self.box.signature(
-            bytes(entity.issuer.bytes) + Crypto._docdata(entity))
+            bytes(entity.issuer.bytes) + Crypto._document_data(entity))
 
         privkeys = PrivateKeys(nd={
             'issuer': entity.id,
@@ -35,7 +35,7 @@ class BaseGeneratePolicy(Policy):
             'seed': self.box.seed
         })
         privkeys.signature = self.box.signature(
-            bytes(privkeys.issuer.bytes) + Crypto._docdata(privkeys))
+            bytes(privkeys.issuer.bytes) + Crypto._document_data(privkeys))
 
         keys = Keys(nd={
             'issuer': entity.id,
@@ -43,7 +43,7 @@ class BaseGeneratePolicy(Policy):
             'verify': self.box.vk
         })
         keys.signature = [self.box.signature(
-                bytes(keys.issuer.bytes) + Crypto._docdata(keys))]
+                bytes(keys.issuer.bytes) + Crypto._document_data(keys))]
 
         entity.validate()
         privkeys.validate()

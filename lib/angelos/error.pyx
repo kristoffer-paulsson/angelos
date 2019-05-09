@@ -12,8 +12,8 @@ class WorkerNotRegistered(AngelosException): pass  # noqa E302
 class CmdShellException(AngelosException): pass  # noqa E302
 class CmdShellDuplicate(CmdShellException): pass  # noqa E302
 class CmdOptionIllegalValue(CmdShellException): pass  # noqa E302
-class CmdOptionIllegalChoise(CmdShellException): pass  # noqa E302
-class CmdOptionChoiseOmitted(CmdShellException): pass  # noqa E302
+class CmdOptionIllegalChoice(CmdShellException): pass  # noqa E302
+class CmdOptionChoiceOmitted(CmdShellException): pass  # noqa E302
 class CmdOptionValueOmitted(CmdShellException): pass  # noqa E302
 class CmdOptionMultipleValues(CmdShellException): pass  # noqa E302
 class CmdOptionMandatoryOmitted(CmdShellException): pass  # noqa E302
@@ -79,8 +79,8 @@ ERROR_INFO = {
 
     521: (CmdShellDuplicate, 'The command is already loaded'),  # noqa E501
     522: (CmdOptionIllegalValue, 'Command option value should be omitted'),  # noqa E501
-    523: (CmdOptionIllegalChoise, 'Invalid choise for command option'),  # noqa E501
-    524: (CmdOptionChoiseOmitted, 'Omitted choise for command option'),  # noqa E501
+    523: (CmdOptionIllegalChoice, 'Invalid choice for command option'),  # noqa E501
+    524: (CmdOptionChoiceOmitted, 'Omitted choice for command option'),  # noqa E501
     525: (CmdOptionValueOmitted, 'Omitted value for command option'),  # noqa E501
     526: (CmdOptionMultipleValues, 'More than one value for command option'),  # noqa E501
     527: (CmdOptionMandatoryOmitted, 'Mandatory command option omitted'),  # noqa E501
@@ -141,8 +141,8 @@ class Error(IntEnum):
 
     CMD_SHELL_DUPLICATE = 521  # 1 Error code for commands
     CMD_OPT_ILLEGAL_VALUE = 522
-    CMD_OPT_ILLEGAL_CHOISE = 523
-    CMD_OPT_CHOISE_OMITTED = 524
+    CMD_OPT_ILLEGAL_CHOICE = 523
+    CMD_OPT_CHOICE_OMITTED = 524
     CMD_OPT_VALUE_OMITTED = 525
     CMD_OPT_MULTIPLE_VALUES = 526
     CMD_OPT_MANDATORY_OMITTED = 527

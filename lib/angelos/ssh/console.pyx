@@ -12,6 +12,7 @@ from .ssh import SSHServer, SessionHandle
 from ..server.cmd import Terminal
 from ..server.commands import (
     EnvCommand, QuitCommand, SetupCommand, StartupCommand)
+from ..server.impexp import ImportCommand, ExportCommand
 from ..ioc import ContainerAware
 
 
@@ -100,7 +101,7 @@ class BootServer(ContainerAware, SSHServer):
 class AdminServer(ContainerAware, SSHServer):
     """SSH Server for the admin console."""
 
-    commands = [EnvCommand, QuitCommand]
+    commands = [EnvCommand, QuitCommand, ImportCommand, ExportCommand]
 
     def __init__(self, ioc):
         """Initialize AdminServer."""

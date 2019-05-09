@@ -17,7 +17,7 @@ class BaseSetupOperation(Operation):
     """Baseclass for entity setup/import operations."""
 
     @classmethod
-    def create_new(cls, entity_data):
+    def create_new(cls, entity_data, role='client', server=False):
         """
         Issue a new set of documents from entity data.
 
@@ -35,7 +35,7 @@ class BaseSetupOperation(Operation):
         dom_gen.generate()
 
         nod_gen = NodePolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
-        nod_gen.current(dom_gen.domain)
+        nod_gen.current(dom_gen.domain, role, server)
 
         return (
             ent_gen.entity, ent_gen.privkeys, ent_gen.keys,
@@ -43,7 +43,8 @@ class BaseSetupOperation(Operation):
         )
 
     @classmethod
-    def import_ext(cls, entity, privkeys, keys, domain, node=None):
+    def import_ext(cls, entity, privkeys, keys, domain,
+                   node=None, role='client', server=False):
         """Validate a set of documents related to an entity for import."""
         Util.is_type(entity, cls.ENTITY[0])
         Util.is_type(privkeys, PrivateKeys)
@@ -56,7 +57,7 @@ class BaseSetupOperation(Operation):
 
         if not node:
             nod_gen = NodePolicy(entity, privkeys, keys)
-            nod_gen.current(domain)
+            nod_gen.current(domain, role=role, server=server)
             node = nod_gen.node
 
         valid = True
