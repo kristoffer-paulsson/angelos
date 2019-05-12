@@ -38,8 +38,8 @@ class Starter:
     }
 
     @classmethod
-    def node_server(
-            self, entity, privkeys, host, port=22, ioc=None, loop=None):
+    def nodes_server(
+            self, entity, privkeys, host, port=3, ioc=None, loop=None):
         """Start server for incoming node/domain communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -62,7 +62,7 @@ class Starter:
         return Starter.__start_server(params)
 
     @classmethod
-    def node_client(self, entity, privkeys, host_keys, host, port=22):
+    def nodes_client(self, entity, privkeys, host_keys, host, port=3):
         """Start client for outgoing node/domain communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -84,8 +84,8 @@ class Starter:
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def host_server(
-            self, entity, privkeys, host, port=22, ioc=None, loop=None):
+    def hosts_server(
+            self, entity, privkeys, host, port=4, ioc=None, loop=None):
         """Start server for incoming host/host communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -108,7 +108,7 @@ class Starter:
         return Starter.__start_server(params)
 
     @classmethod
-    def host_client(self, entity, privkeys, host_keys, host, port=22):
+    def hosts_client(self, entity, privkeys, host_keys, host, port=4):
         """Start client for outgoing host/host communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -130,8 +130,8 @@ class Starter:
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def portal_server(
-            self, entity, privkeys, host, port=22, ioc=None, loop=None):
+    def clients_server(
+            self, entity, privkeys, host, port=5, ioc=None, loop=None):
         """Start server for incoming client/portal communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -141,19 +141,17 @@ class Starter:
         Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': SSHServer,
+            'server_factory': lambda: BootServer(ioc),
             'host': host,
             'port': port,
             'server_host_keys': [Starter._private_key(privkeys)],
-            'process_factory': lambda: None,
-            'session_factory': lambda: None,
             'loop': loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
         return Starter.__start_server(params)
 
-    def portal_client(self, entity, privkeys, host_keys, host, port=22):
+    def clients_client(self, entity, privkeys, host_keys, host, port=5):
         """Start client for outgoing client/portal communications."""
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -259,7 +257,7 @@ class Starter:
         return callback
 
     @staticmethod
-    def _public_key(keys):
+    def public_key(keys):
         return NaClKey(key=NaClPublicKey.construct(keys.verify))
 
     @staticmethod

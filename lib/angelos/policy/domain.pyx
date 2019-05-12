@@ -11,7 +11,7 @@ from .crypto import Crypto
 from ..utils import Util
 from ..const import Const
 from ..document.entities import Entity, PrivateKeys, Keys
-from ..document.domain import Domain, Node, Location
+from ..document.domain import Domain, Node, Location, Network, Host
 from ..automatic import Automatic
 
 
@@ -37,6 +37,8 @@ class NodePolicy(Policy):
         Util.is_type(role, (str, int, type(None)))
         Util.is_type(server, (bool, type(None)))
 
+        self.node = None
+
         if isinstance(role, int):
             if role == Const.A_ROLE_PRIMARY:
                 role = 'server'
@@ -58,17 +60,14 @@ class NodePolicy(Policy):
                 'ip': [ipaddress.ip_address(auto.net.ip)]
             })
 
-        self.node = None
-        params = {
+        node = Node(nd={
             'domain': domain.id,
             'role': role,
             'device': platform.platform(),
             'serial': plyer.uniqueid.id.decode('utf-8'),
             'issuer': self.__entity.id,
             'location': location
-        }
-
-        node = Node(nd=params)
+        })
 
         node = Crypto.sign(node, self.__entity, self.__privkeys, self.__keys)
         node.validate()
@@ -106,6 +105,48 @@ class DomainPolicy(Policy):
             domain, self.__entity, self.__privkeys, self.__keys)
         domain.validate()
         self.domain = domain
+
+        return True
+
+    def update(self, domain):
+        raise NotImplementedError()
+
+
+class NetworkPolicy(Policy):
+    def __init__(self, entity, privkeys, keys):
+        Util.is_type(entity, Entity)
+        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(keys, Keys)
+
+        self.__entity = entity
+        self.__privkeys = privkeys
+        self.__keys = keys
+        self.network = None
+
+    def generate(self, domain, *nodes):
+        """Generate network document from currently running node."""
+        Util.is_type(domain, Domain)
+        for node in nodes:
+            Util.is_type(node, Node)
+
+        hosts = []
+        for node in nodes:
+            hosts.append(Host(nd={
+                'node': node.id,
+                'ip': node.location.ip,
+                'hostname': node.location.hostname
+            }))
+
+        network = Network(nd={
+            'domain': domain.id,
+            'hosts': hosts,
+            'issuer': self.__entity.id,
+        })
+
+        network = Crypto.sign(
+            network, self.__entity, self.__privkeys, self.__keys)
+        network.validate()
+        self.network = network
 
         return True
 

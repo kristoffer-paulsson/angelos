@@ -51,7 +51,8 @@ class Glue:
     @staticmethod
     def run_async(*aws, raise_exc=True):
         loop = asyncio.get_event_loop()
-        gathering = asyncio.gather(*aws, loop=loop, return_exceptions=True)
+        gathering = asyncio.gather(
+            *aws, loop=loop, return_exceptions=True)
         loop.run_until_complete(gathering)
 
         exc = None

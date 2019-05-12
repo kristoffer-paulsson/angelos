@@ -7,12 +7,19 @@ import logging
 import asyncssh
 
 from ..utils import Util
+from ..ioc import ContainerAware
 
 
-class SSHServer(asyncssh.SSHServer):
-    def __init__(self, client_keys=()):
+class SSHServer(ContainerAware, asyncssh.SSHServer):
+    """SSH server container aware baseclass."""
+
+    def __init__(self, ioc):
+        """Initialize AdminServer."""
         self._conn = None
-        self._client_keys = client_keys
+        self._client_keys = ()
+        ContainerAware.__init__(self, ioc)
+
+        self._applog = self.ioc.log.app
 
     def connection_made(self, conn):
         logging.info('Connection made')
@@ -42,6 +49,7 @@ class SSHServer(asyncssh.SSHServer):
     def validate_public_key(self, username, key):
         logging.info('Authentication for a user')
         logging.debug('%s' % username)
+        return False  # Security countermeasure
 
     def session_requested(self):
         logging.debug('Session requested')
@@ -139,7 +147,7 @@ class SessionManager:
             raise RuntimeError(
                 'Can not register session on non-registered server')
 
-        server = self.__servers[name][0]  # Get server instance by name
+        # server = self.__servers[name][0]  # Get server instance by name
         self.__servers.pop(name)  # Remove server instance from registry
 
         for handle in self.__servsess[name]:  # Each session assoc with server

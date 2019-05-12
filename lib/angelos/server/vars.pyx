@@ -8,7 +8,6 @@ might effect the runtime of the software. Configurational variables in
 particular are used to configure services available from the IoC container.
 """
 
-from ..utils import Util
 from ..const import Const
 
 """Environment default values."""
@@ -28,19 +27,25 @@ CONFIG_DEFAULT = {
 
 """Configuration immutable values"""
 CONFIG_IMMUTABLE = {
-    'state': [
-        {
+    'state': [{
             'name': 'running'
-        },
-        {
+        }, {
             'name': 'boot',
             'blocking': ('serving', ),
             'depends': ('running', )
-        },
-        {
+        }, {
             'name': 'serving',
             'depends': ('running', ),
             'switches': ('boot', )
+        }, {
+            'name': 'nodes',
+            'depends': ('serving', )
+        }, {
+            'name': 'hosts',
+            'depends': ('serving', )
+        }, {
+            'name': 'clients',
+            'depends': ('serving', )
         }
     ],
     'logger': {

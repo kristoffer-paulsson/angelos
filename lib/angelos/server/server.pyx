@@ -6,10 +6,8 @@ import functools
 import asyncio
 import collections
 import json
-import socket
 
-from ..utils import Util, Event
-from ..const import Const
+from ..utils import Event
 from ..ioc import Container, ContainerAware, Config, Handle
 from ..starter import Starter
 from ..worker import Worker
@@ -53,6 +51,9 @@ class Configuration(Config, Container):
             'facade': lambda self: Handle(Facade),
             'boot': lambda self: Handle(asyncio.base_events.Server),
             'admin': lambda self: Handle(asyncio.base_events.Server),
+            'clients': lambda self: Handle(asyncio.base_events.Server),
+            'nodes': lambda self: Handle(asyncio.base_events.Server),
+            'hosts': lambda self: Handle(asyncio.base_events.Server),
             'opts': lambda self: Parser(),
             'auto': lambda self: Automatic(self.opts),
             'quit': lambda self: Event(),
@@ -80,6 +81,9 @@ class Server(ContainerAware):
 
         self._worker.run_coroutine(self.boot_server())
         self._worker.run_coroutine(self.admin_server())
+        self._worker.run_coroutine(self.clients_server())
+        # self._worker.run_coroutine(self.hosts_server())
+        # self._worker.run_coroutine(self.nodes_server())
         self._worker.run_coroutine(self.boot_activator())
 
         self._applog.info('Starting boot server.')
@@ -172,6 +176,72 @@ class Server(ContainerAware):
                     first = False
                 else:
                     await self.ioc.boot.start_serving()
+
+    async def clients_server(self):
+        first = True
+        while not self.ioc.quit.is_set():
+            if self.ioc.state.position('clients'):
+                await self.ioc.state.off('clients')
+                server = self.ioc.clients
+                server.close()
+                await self.ioc.session.unreg_server('clients')
+                await server.wait_closed()
+            else:
+                await self.ioc.state.on('clients')
+                if first:
+                    self.ioc.clients = await Starter().clients_server(
+                        self.ioc.facade.entity, self.ioc.facade.__,
+                        self.ioc.entity.facade.privkeys,
+                        self._listen(), port=self.ioc.env['opts'].port,
+                        ioc=self.ioc, loop=self._worker.loop)
+                    self.ioc.session.reg_server('clients', self.ioc.clients)
+                    first = False
+                else:
+                    await self.ioc.clients.start_serving()
+
+    async def hosts_server(self):
+        first = True
+        while not self.ioc.quit.is_set():
+            if self.ioc.state.position('hosts'):
+                await self.ioc.state.off('hosts')
+                server = self.ioc.hosts
+                server.close()
+                await self.ioc.session.unreg_server('hosts')
+                await server.wait_closed()
+            else:
+                await self.ioc.state.on('hosts')
+                if first:
+                    self.ioc.hosts = await Starter().hosts_server(
+                        self.ioc.facade.entity, self.ioc.facade.__,
+                        self.ioc.entity.facade.privkeys,
+                        self._listen(), port=self.ioc.env['opts'].port,
+                        ioc=self.ioc, loop=self._worker.loop)
+                    self.ioc.session.reg_server('hosts', self.ioc.hosts)
+                    first = False
+                else:
+                    await self.ioc.hosts.start_serving()
+
+    async def nodes_server(self):
+        first = True
+        while not self.ioc.quit.is_set():
+            if self.ioc.state.position('nodes'):
+                await self.ioc.state.off('nodes')
+                server = self.ioc.nodes
+                server.close()
+                await self.ioc.session.unreg_server('nodes')
+                await server.wait_closed()
+            else:
+                await self.ioc.state.on('nodes')
+                if first:
+                    self.ioc.nodes = await Starter().nodes_server(
+                        self.ioc.facade.entity, self.ioc.facade.__,
+                        self.ioc.entity.facade.privkeys,
+                        self._listen(), port=self.ioc.env['opts'].port,
+                        ioc=self.ioc, loop=self._worker.loop)
+                    self.ioc.session.reg_server('nodes', self.ioc.nodes)
+                    first = False
+                else:
+                    await self.ioc.nodes.start_serving()
 
     async def boot_activator(self):
         await asyncio.sleep(1)

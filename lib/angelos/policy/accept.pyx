@@ -16,7 +16,7 @@ from .crypto import Crypto
 from .policy import Policy
 
 
-class ImportPolicy:
+class ImportPolicy(Policy):
     def __init__(self, entity, keys):
         Util.is_type(entity, Entity)
         Util.is_type(keys, Keys)

@@ -16,13 +16,17 @@ class CmdOptionIllegalChoice(CmdShellException): pass  # noqa E302
 class CmdOptionChoiceOmitted(CmdShellException): pass  # noqa E302
 class CmdOptionValueOmitted(CmdShellException): pass  # noqa E302
 class CmdOptionMultipleValues(CmdShellException): pass  # noqa E302
-class CmdOptionMandatoryOmitted(CmdShellException): pass  # noqa E302
+class CmdOptionUnkown(CmdShellException): pass  # noqa E302
 class CmdOptionTypeInvalid(CmdShellException): pass  # noqa E302
 class CmdShellConfused(CmdShellException): pass  # noqa E302
 class CmdUnknownError(CmdShellException): pass  # noqa E302
 class CmdShellInvalidCommand(CmdShellException): pass  # noqa E302
 class CmdShellEmpty(CmdShellException): pass  # noqa E302
 class CmdShellExit(CmdShellException): pass  # noqa E302
+class CmdOptionMutuallyExclusive(CmdShellException): pass  # noqa E302
+class CmdOptionDemandAny(CmdShellException): pass  # noqa E302
+class CmdOptionDemandAll(CmdShellException): pass  # noqa E302
+class CmdOptionCombine(CmdShellException): pass  # noqa E302
 
 class EventsAddressTaken(AngelosException): pass  # noqa E302
 class EventsAddressRemoved(AngelosException): pass  # noqa E302
@@ -83,13 +87,17 @@ ERROR_INFO = {
     524: (CmdOptionChoiceOmitted, 'Omitted choice for command option'),  # noqa E501
     525: (CmdOptionValueOmitted, 'Omitted value for command option'),  # noqa E501
     526: (CmdOptionMultipleValues, 'More than one value for command option'),  # noqa E501
-    527: (CmdOptionMandatoryOmitted, 'Mandatory command option omitted'),  # noqa E501
+    527: (CmdOptionUnkown, 'Unkown option found'),  # noqa E501
     528: (CmdOptionTypeInvalid, 'Command option type is not set or invalid'),  # noqa E501
     529: (CmdShellConfused, 'Shell failed to interpret command'),  # noqa E501
     530: (CmdUnknownError, 'Simply an unknown error'),  # noqa E501
     531: (CmdShellInvalidCommand, 'Command is unknown or invalid'),  # noqa E501
     532: (CmdShellEmpty, 'Command line is empty'),  # noqa E501
     533: (CmdShellExit, 'Exits terminal session'),  # noqa E501
+    534: (CmdOptionMutuallyExclusive, 'Command option is mutually exclusice'),  # noqa E501
+    535: (CmdOptionDemandAny, 'Command option demand one other option present'),  # noqa E501
+    536: (CmdOptionDemandAll, 'Command option demand several other options present'),  # noqa E501
+    537: (CmdOptionCombine, 'Command option must be combined with another option'),  # noqa E501
 
     540: (EventsAddressTaken, 'The sender address is already taken'),  # noqa E501
     541: (EventsAddressRemoved, 'The sender address is already removed'),  # noqa E501
@@ -145,13 +153,17 @@ class Error(IntEnum):
     CMD_OPT_CHOICE_OMITTED = 524
     CMD_OPT_VALUE_OMITTED = 525
     CMD_OPT_MULTIPLE_VALUES = 526
-    CMD_OPT_MANDATORY_OMITTED = 527
+    CMD_OPT_UNKNOWN = 527
     CMD_OPT_TYPE_INVALID = 528
     CMD_SHELL_CONFUSED = 529
     CMD_UNKOWN_ERROR = 530
     CMD_SHELL_INVALID_COMMAND = 531
     CMD_SHELL_EMPTY = 532
     CMD_SHELL_EXIT = 533
+    CMD_OPT_MUT_EXCL = 534
+    CMD_OPT_DEM_ANY = 535
+    CMD_OPT_DEM_ALL = 536
+    CMD_OPT_COMBINE = 537
 
     EVENT_ADDRESS_TAKEN = 540  # 10 error codes for events
     EVENT_ADDRESS_REMOVED = 541

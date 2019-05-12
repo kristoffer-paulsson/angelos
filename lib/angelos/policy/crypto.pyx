@@ -2,10 +2,8 @@
 """Module docstring."""
 import libnacl
 import datetime
-import pprint
 
 from ..utils import Util
-from ..document.model import BaseDocument
 from ..document.document import Document
 from ..document.entities import Entity, PrivateKeys, Keys
 
@@ -13,7 +11,6 @@ from ..document.entities import Entity, PrivateKeys, Keys
 class Crypto:
     @staticmethod
     def _document_data(document, exclude=[]):
-        stream = bytes()
         new_dict = {}
         exclude += ['issuer', 'signature']
 

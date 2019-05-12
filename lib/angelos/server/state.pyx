@@ -6,10 +6,10 @@ from ..utils import Event
 from ..error import AngelosException
 
 
-class StateMachineError(AngelosException): pass
-class StateMissconfiguredError(StateMachineError): pass
-class StateBlockedError(StateMachineError): pass
-class StateDependencyError(StateMachineError): pass
+class StateMachineError(AngelosException): pass  # noqa E701
+class StateMissconfiguredError(StateMachineError): pass  # noqa E701
+class StateBlockedError(StateMachineError): pass  # noqa E701
+class StateDependencyError(StateMachineError): pass  # noqa E701
 
 
 class State:
@@ -35,12 +35,14 @@ class State:
             self.name = name
 
         if self.blocking and blocking:
-            raise StateMissconfiguredError('State blockers can not be set twice')
+            raise StateMissconfiguredError(
+                'State blockers can not be set twice')
         else:
             self.blocking = blocking
 
         if self.depends and depends:
-            raise StateMissconfiguredError('State dependencies can not be set twice')
+            raise StateMissconfiguredError(
+                'State dependencies can not be set twice')
         else:
             self.depends = depends
 
@@ -59,7 +61,7 @@ class State:
 
     def switch(self, turn=None):
         """Flip the current state and clear and set the ON/OFF events."""
-        if turn == None:
+        if turn is None:
             self.__state = not self.__state
         else:
             self.__state = bool(turn)
@@ -75,14 +77,14 @@ class State:
 
     async def wait(self, turn=None):
         """wait for the opposite event of current state to happen."""
-        if turn == None:
+        if turn is None:
             if self.__state:
                 return await self.__off.wait()
             else:
                 return await self.__on.wait()
-        elif turn == True:
+        elif turn is True:
             return await self.__on.wait()
-        elif turn == False:
+        elif turn is False:
             return await self.__off.wait()
         else:
             return
@@ -106,7 +108,7 @@ class StateMachine:
         return self.__get(state).state
 
     def __call__(self, state, turn=None):
-        if state == 'all' and turn == False:
+        if state == 'all' and turn is False:
             for name in self.__states.keys():
                 self.__do_turn(self.__get(name), False)
             return True
@@ -128,7 +130,7 @@ class StateMachine:
         return self.__states[state]
 
     def __do_turn(self, si, turn):
-        if turn == True:
+        if turn is True:
             self.__validate(si)
 
         for switch in si.switches:

@@ -1,6 +1,7 @@
 # cython: language_level=3
 """Module docstring."""
 import os
+import uuid
 import logging
 import asyncio
 
@@ -8,10 +9,12 @@ from ..utils import Util
 from ..const import Const
 
 from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
-from ..document.domain import Domain, Node
+from ..document.domain import Domain, Node, Network
+from ..document.statements import Trusted
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy.accept import ImportEntityPolicy, ImportUpdatePolicy
+from ..policy.domain import NetworkPolicy
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -73,6 +76,7 @@ class Facade:
         if role not in [Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP, 0]:
             RuntimeError('Unsupported use of facade')
 
+        network = None
         if entity_data:
             server = True if cls.INFO[0] in (
                 Const.A_TYPE_PERSON_SERVER,
@@ -82,16 +86,20 @@ class Facade:
             entity, privkeys, keys, domain, node = cls.PREFS[1].create_new(
                 entity_data, role, server)
 
+            network = NetworkPolicy(entity, privkeys, keys)
+            network.generate(domain, node)
+            network = network.network
+
         entity, privkeys, keys, domain, node = cls.PREFS[1].import_ext(
             entity, privkeys, keys, domain, node, role, server)
 
         vault = Vault.setup(
-            os.path.join(home_dir, Const.CNL_VAULT),
-            entity, privkeys, keys, domain, node, secret=secret,
+            os.path.join(home_dir, Const.CNL_VAULT), secret,
+            entity, privkeys, keys, domain, node, network,
             _type=cls.INFO[0], role=role, use=Const.A_USE_VAULT)
 
         facade = cls(home_dir, secret, vault)
-        await facade.__post_init()
+        await facade._post_init()
         return facade
 
     @staticmethod
@@ -120,10 +128,10 @@ class Facade:
         else:
             raise RuntimeError('Unkown archive type: %s' % str(_type))
 
-        await facade.__post_init()
+        await facade._post_init()
         return facade
 
-    async def __post_init(self):
+    async def _post_init(self):
         identity = await self._vault.load_identity()
 
         Util.is_type(identity[0], self.PREFS[0])
@@ -272,9 +280,14 @@ class Facade:
         doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
         return Glue.doc_check(doclist, Keys, expiry_check)
 
+    @property
+    def __(self):
+        """Helper property."""
+        return self.__privkeys
+
     def find_entity(self, issuer, expiry_check=True):
         """
-        Load foreign entity docuemnt.
+        Load foreign entity document.
 
         Loads the entity document based on the issuers ID.
         """
@@ -285,30 +298,126 @@ class Facade:
         return entitylist[0] if len(entitylist) else None
 
 
-class PersonFacadeMixin:
+class EntityFacadeMixin:
+    """Abstract baseclass for Entities FacadeMixin's"""
+
+    PREFS = (None, None)
+
+
+class PersonFacadeMixin(EntityFacadeMixin):
     """Mixin for a Person Facade."""
 
     PREFS = (Person, SetupPersonOperation)
 
+    def __init__(self):
+        EntityFacadeMixin.__init__(self)
 
-class MinistryFacadeMixin:
+    async def _post_init(self):
+        """Post init async work."""
+        pass
+
+
+class MinistryFacadeMixin(EntityFacadeMixin):
     """Mixin for a Ministry Facade."""
 
     PREFS = (Ministry, SetupMinistryOperation)
 
+    def __init__(self):
+        EntityFacadeMixin.__init__(self)
 
-class ChurchFacadeMixin:
+    async def _post_init(self):
+        """Post init async work."""
+        pass
+
+
+class ChurchFacadeMixin(EntityFacadeMixin):
     """Mixin for a Church Facade."""
 
     PREFS = (Church, SetupChurchOperation)
 
+    def __init__(self):
+        EntityFacadeMixin.__init__(self)
 
-class ServerFacadeMixin:
+    async def _post_init(self):
+        """Post init async work."""
+        pass
+
+
+class TypeFacadeMixin:
+    pass
+
+
+class ServerFacadeMixin(TypeFacadeMixin):
     """Mixin for a Server Facade."""
 
+    def __init__(self):
+        TypeFacadeMixin.__init__(self)
 
-class ClientFacadeMixin:
+    @property
+    def network(self):
+        """Network core document getter."""
+        return self.__network
+
+    async def _post_init(self):
+        """Post init async work."""
+        self.__network = await self._vault.load_network()
+
+    async def load_client_auth(self, username):
+        """Load documents required for Clients server authentication."""
+        issuer = uuid.UUID(username)
+        doclist = Glue.run_async(
+            self._vault.issuer(issuer, '/keys/', 3),
+            self._vault.issuer(issuer, '/entities/*', 1),
+            self._vault.issuer(issuer, '/issued/trusted', 1)
+        )
+
+        authlist = (
+            Glue.doc_check(doclist[0], Keys, True),
+            Glue.doc_check(doclist[1], (Person, Ministry, Church), True),
+            Glue.doc_check(doclist[2], Trusted, True)
+        )
+
+        return authlist if len(authlist) else None
+
+    async def load_host_auth(self, username):
+        """Load documents required for Hosts server authentication."""
+        issuer = uuid.UUID(username)
+        doclist = Glue.run_async(
+            self._vault.issuer(issuer, '/networks/', 1),
+            self._vault.issuer(issuer, '/keys/', 2),
+            self._vault.issuer(issuer, '/entities/*', 1),
+            self._vault.issuer(issuer, '/issued/trusted', 1)
+        )
+
+        authlist = (
+            Glue.doc_check(doclist[1], Keys, True),
+            Glue.doc_check(doclist[2], (Person, Ministry, Church), True),
+            Glue.doc_check(doclist[3], Trusted, True),
+            Glue.doc_check(doclist[0], Network, True),
+        )
+
+        return authlist if len(authlist) else None
+
+    async def load_node_auth(self, username):
+        """Load documents required for Nodes server authentication."""
+        issuer = uuid.UUID(username)
+        doclist = Glue.run_async(
+            self._vault.issuer(
+                issuer, '/settings/nodes' + str(issuer)+'.pickle', 1))
+
+        authlist = (Glue.doc_check(doclist[0], Node, True))
+        return authlist if len(authlist) else None
+
+
+class ClientFacadeMixin(TypeFacadeMixin):
     """Mixin for a Church Facade."""
+
+    def __init__(self):
+        TypeFacadeMixin.__init__(self)
+
+    async def _post_init(self):
+        """Post init async work."""
+        pass
 
 
 class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):
@@ -322,6 +431,12 @@ class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):
         ClientFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
+    async def _post_init(self):
+        """Post init async work."""
+        await Facade._post_init(self)
+        await ClientFacadeMixin._post_init(self)
+        await PersonFacadeMixin._post_init(self)
+
 
 class PersonServerFacade(Facade, ServerFacadeMixin, PersonFacadeMixin):
     """Final facade for Person entity as a server."""
@@ -333,6 +448,12 @@ class PersonServerFacade(Facade, ServerFacadeMixin, PersonFacadeMixin):
         Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
+
+    async def _post_init(self):
+        """Post init async work."""
+        await Facade._post_init(self)
+        await ServerFacadeMixin._post_init(self)
+        await PersonFacadeMixin._post_init(self)
 
 
 class MinistryClientFacade(Facade, ClientFacadeMixin, MinistryFacadeMixin):
@@ -346,6 +467,12 @@ class MinistryClientFacade(Facade, ClientFacadeMixin, MinistryFacadeMixin):
         ClientFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
+    async def _post_init(self):
+        """Post init async work."""
+        await Facade._post_init(self)
+        await ClientFacadeMixin._post_init(self)
+        await MinistryFacadeMixin._post_init(self)
+
 
 class MinistryServerFacade(Facade, ServerFacadeMixin, MinistryFacadeMixin):
     """Final facade for Ministry entity as a server."""
@@ -357,6 +484,12 @@ class MinistryServerFacade(Facade, ServerFacadeMixin, MinistryFacadeMixin):
         Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
+
+    async def _post_init(self):
+        """Post init async work."""
+        await Facade._post_init(self)
+        await ServerFacadeMixin._post_init(self)
+        await MinistryFacadeMixin._post_init(self)
 
 
 class ChurchClientFacade(Facade, ClientFacadeMixin, ChurchFacadeMixin):
@@ -370,6 +503,12 @@ class ChurchClientFacade(Facade, ClientFacadeMixin, ChurchFacadeMixin):
         ClientFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
+    async def _post_init(self):
+        """Post init async work."""
+        await Facade._post_init(self)
+        await ClientFacadeMixin._post_init(self)
+        await ChurchFacadeMixin._post_init(self)
+
 
 class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
     """Final facade for Church entity as a server."""
@@ -381,3 +520,9 @@ class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
         Facade.__init__(self, home_dir, secret, vault)
         ServerFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
+
+    async def _post_init(self):
+        """Post init async work."""
+        await Facade._post_init(self)
+        await ServerFacadeMixin._post_init(self)
+        await ChurchFacadeMixin._post_init(self)

@@ -6,7 +6,6 @@ import asyncio
 import time
 import datetime
 import binascii
-import logging
 
 import libnacl
 
@@ -288,8 +287,8 @@ documents and connect to the nodes on the current domain network.
             elif do == 1:
                 data['city'] = await self._io.prompt('Church of what city')
             elif do == 2:
-                data['region'].append(await self._io.prompt(
-                    'Region or state (if applicable)'))
+                data['region'] = await self._io.prompt(
+                    'Region or state (if applicable)')
             elif do == 3:
                 data['country'] = await self._io.prompt('Country ')
             elif do == 4:
@@ -316,6 +315,12 @@ documents and connect to the nodes on the current domain network.
     async def _switch(self):
         await asyncio.sleep(2)
         self._ioc.state('serving', True)
+        await asyncio.sleep(2)
+        self._ioc.state('nodes', True)
+        await asyncio.sleep(2)
+        self._ioc.state('hosts', True)
+        await asyncio.sleep(2)
+        self._ioc.state('clients', True)
 
     @classmethod
     def factory(cls, **kwargs):
@@ -350,9 +355,9 @@ class StartupCommand(Command):
                         facade.entity.id)
 
             self._io << (
-            'You just de-encrypted and loaded the Facade. Next step in\n' +
-            'boot sequence is to start the services and the Admin console.\n' +
-            'Meanwhile you will be logged out from the Boot console.\n'
+                'You just de-encrypted and loaded the Facade. Next step in\n' +
+                'boot sequence is to start the services and the Admin console.\n' +  # noqa E501
+                'Meanwhile you will be logged out from the Boot console.\n'
             )
             await self._io.presskey()
             asyncio.ensure_future(self._switch())
@@ -361,13 +366,15 @@ class StartupCommand(Command):
         except (ValueError, binascii.Error) as e:
             self._io << '\nError: %s\n\n' % e
 
-        # except Exception as e:
-        #    logging.exception(e)
-        #    self._io << '\nError: %s\n\n' % e
-
     async def _switch(self):
         await asyncio.sleep(2)
         self._ioc.state('serving', True)
+        await asyncio.sleep(2)
+        self._ioc.state('nodes', True)
+        await asyncio.sleep(2)
+        self._ioc.state('hosts', True)
+        await asyncio.sleep(2)
+        self._ioc.state('clients', True)
 
     @classmethod
     def factory(cls, **kwargs):
@@ -393,7 +400,7 @@ class EnvCommand(Command):
             self._io << '\n' + '-'*79 + '\n\n'
 
     def _recurse(self, obj, suf='', level=0):
-        items=[]
+        items = []
         for k, v in obj.items():
             if isinstance(v, BaseAuto):
                 items += self._recurse(vars(v), k, level+1)
@@ -418,6 +425,11 @@ class QuitCommand(Command):
         """Initialize the command. Takes a list of Command classes."""
         Command.__init__(self, 'quit', io)
         self._state = state
+
+    def _rules(self):
+        return {
+            'depends': ['yes']
+        }
 
     def _options(self):
         """

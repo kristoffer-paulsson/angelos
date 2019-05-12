@@ -1,4 +1,8 @@
+# cython: language_level=3
 """Import and export commands."""
+import pickle
+import base64
+
 from .cmd import Command, Option
 
 
@@ -34,7 +38,33 @@ class ExportCommand(Command):
         self.__facade = facade
 
     async def _command(self, opts):
+        if opts['vault']:
+            if opts['vault'] == 'self':
+                self._io << ('\n' + self.exporter(
+                    'Identity', self.__facade.entity,
+                    self.__facade.keys, self.__facade.network) + '\n')
+
         self._io << ('\nTo be implemented!\n')
+
+    def exporter(self, name, *docs, meta=None):
+        output = self.headline(name, '(Start)')
+        data = base64.b64encode(pickle.dumps(docs)).decode('utf-8')
+        output += '\n' + '\n'.join(
+            [data[i:i+79] for i in range(0, len(data), 79)]) + '\n'
+        output += self.headline(name, '(End)')
+        return output
+
+    def headline(self, title, filler=''):
+        title = ' ' + title + ' ' + filler + ' '
+        line = '-' * 79
+        offset = int(79/2 - len(title)/2)
+        return line[:offset] + title + line[offset + len(title):]
+
+    def _rules(self):
+        return {
+            'exclusive': ['vault'],
+            'option': ['vault']
+        }
 
     def _options(self):
         """

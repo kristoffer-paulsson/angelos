@@ -13,7 +13,6 @@ from ..server.cmd import Terminal
 from ..server.commands import (
     EnvCommand, QuitCommand, SetupCommand, StartupCommand)
 from ..server.impexp import ImportCommand, ExportCommand
-from ..ioc import ContainerAware
 
 
 class ConsoleServerProcess(asyncssh.SSHServerProcess):
@@ -44,15 +43,12 @@ class AdminServerProcess(ConsoleServerProcess):
         ConsoleServerProcess.__init__(self, process_factory, sess_mgr, 'admin')
 
 
-class BootServer(ContainerAware, SSHServer):
+class BootServer(SSHServer):
     """SSH Server for the boot sequence."""
 
     def __init__(self, ioc):
         """Initialize BootServer."""
-        ContainerAware.__init__(self, ioc)
-        SSHServer.__init__(self)
-
-        self._applog = self.ioc.log.app
+        SSHServer.__init__(self, ioc)
 
         vault_file = Util.path(self.ioc.env['dir'].root, Const.CNL_VAULT)
         if os.path.isfile(vault_file):
@@ -98,17 +94,10 @@ class BootServer(ContainerAware, SSHServer):
                 ioc=self.ioc, process=process).run())
 
 
-class AdminServer(ContainerAware, SSHServer):
+class AdminServer(SSHServer):
     """SSH Server for the admin console."""
 
     commands = [EnvCommand, QuitCommand, ImportCommand, ExportCommand]
-
-    def __init__(self, ioc):
-        """Initialize AdminServer."""
-        ContainerAware.__init__(self, ioc)
-        SSHServer.__init__(self)
-
-        self._applog = self.ioc.log.app
 
     def begin_auth(self, username):
         """Auth not required."""

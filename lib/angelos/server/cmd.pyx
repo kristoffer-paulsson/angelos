@@ -7,7 +7,9 @@ import logging
 import asyncssh
 
 from ..utils import Util, FactoryInterface
-from ..error import CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit, Error
+from ..error import (
+    CmdShellException, CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit,
+    Error)
 from ..ioc import ContainerAware
 
 
@@ -25,10 +27,11 @@ class ConsoleIO:
         """Update terminal size at event."""
         self._size = self._process.get_terminal_size()
 
-    def __lshift__(self, other):  # Print
+    def __lshift__(self, other):
         """Print to stdout C++ - style."""
         Util.is_type(other, str)
         self._stdout.write(other)
+        return self
 
     async def prompt(self, msg='', t=str):
         """Prompt for user input."""
@@ -220,7 +223,6 @@ class Option:
                  abbr=None,
                  type=TYPE_VALUE,
                  choices=[],
-                 mandatory=False,
                  default=None,
                  help=''):
         """
@@ -237,8 +239,6 @@ class Option:
                     constants to select one.
         choices     List of string names for available choices if the type is
                     TYPE_CHOICES.
-        mandatory   A boolean describing whether this option should be
-                    mandatory.
         default     A default value if the option is not given from the command
                     line.
         help        A helpful description of the option.
@@ -247,7 +247,6 @@ class Option:
         self.abbr = abbr
         self.type = type
         self.choices = choices
-        self.mandatory = mandatory
         self.default = default
         self.help = help
 
@@ -317,20 +316,17 @@ class Option:
     def evaluate(self, opts):
         """Evaluate options."""
         opt = []
+        rm = None
         for r in opts:
             if r[0] == str('--'+self.name) or r[0] == ('-'+str(self.abbr)):
                 opt.append(r[1])
+                rm = r
 
         # Test if not single
         if len(opt) > 1:
             raise Util.exception(
                 Error.CMD_OPT_MULTIPLE_VALUES,
                 {'opt': self.name, 'tot_num': len(opt)})
-
-        # Test whether given if mandatory
-        if self.mandatory is True and len(opt) is 0:
-            raise Util.exception(
-                Error.CMD_OPT_MANDATORY_OMITTED, {'opt': self.name})
 
         # Test if there is a default and none given
         if self.default is not None and len(opt) is 0:
@@ -347,6 +343,11 @@ class Option:
             raise Util.exception(
                 Error.CMD_OPT_TYPE_INVALID,
                 {'opt': self.name, 'type': self.type})
+
+        try:
+            opts.remove(rm)
+        except ValueError:
+            pass
 
         return (self.name, value)
 
@@ -365,11 +366,7 @@ class Command(FactoryInterface):
         self.command = cmd
         self._io = io
 
-        self.__opts = self._options() + [Option(
-            'help',
-            abbr='h',
-            type=Option.TYPE_BOOL,
-            help='Print the command help section')]
+        self.__opts = self._options()
 
     def _options(self):
         """
@@ -379,20 +376,112 @@ class Command(FactoryInterface):
         """
         return []
 
+    def _rules(self):
+        """
+        Return a dictionary of Option combination rules.
+
+        Overide this method.
+
+        Mutualy exclusive, abbreviated "exclusive". A list of tuples of option
+        names. Each tuple will be tested for mutual exclusivity, individually:
+
+            'exclusive': [('foo', 'bar', 'baz'), ('spam', 'ham', 'eggs')]
+
+        Demand any, abbreviated "option". Requires at least one to be present.
+
+            'option': ['foo', 'bar', 'bas']
+
+        Demand all, abbreviated "depends". Requires all to be present.
+
+            'depends': ['spam', 'ham', 'eggs']
+
+        Combine with, abbreviated "combo". Requires an option only to be
+        present in combination with one in the tuple/list.
+
+            ('foo', 'bar', 'baz')
+
+        Options can have their own set of rules. No set of rules are
+        mandatory, just leave in an empty tuple as placeholder (, ).
+
+            'foo': [(<combo>), (<option>), (<depends>), (<exclusive>)]
+        """
+        return {}
+
     async def execute(self, opts):
         """Execute a command with current options."""
-        opts = self._evaluate(opts)
-
-        if opts['help']:
+        if opts == [('--help', '')] or opts == [('-h', '')]:
             self._help()
         else:
+            opts = self._evaluate(opts)
             await self._command(opts)
+
+    def _rule_exclusive(self, exclusive, opt_keys):
+        key_set = set(opt_keys)
+        intersection = key_set.intersection(set(exclusive))
+        if len(intersection) > 1:
+            raise Util.exception(
+                Error.CMD_OPT_MUT_EXCL, {
+                    'exclusive': exclusive, 'collision': intersection})
+
+    def _rule_option(self, option, opt_keys):
+        key_set = set(opt_keys)
+        if len(set(option).intersection(key_set)) < 1:
+            raise Util.exception(
+                Error.CMD_OPT_DEM_ANY, {'one_of_them': option})
+
+    def _rule_depends(self, depends, opt_keys):
+        key_set = set(opt_keys)
+        represented = set(depends).intersection(key_set)
+        if len(represented) < len(depends):
+            raise Util.exception(
+                Error.CMD_OPT_DEM_ALL, {
+                    'all_of_them': depends,
+                    'missing': set(depends) - represented})
+
+    def _rule_combo(self, opt, combo, opt_keys):
+        key_set = set(opt_keys)
+        if len(set(combo).intersection(key_set)) > 0:
+            raise Util.exception(
+                Error.CMD_OPT_COMBINE, {
+                    'option': opt, 'combination': combo})
 
     def _evaluate(self, opts):
         options = {}
+        opt_keys = []
+        rules = self._rules()
+
         for opt in self.__opts:
             (k, v) = list(opt.evaluate(opts))
             options[k] = v
+            if bool(v):
+                opt_keys.append(k)
+
+        if opts:
+            raise Util.exception(
+                Error.CMD_OPT_UNKNOWN, {'unkown': opts})
+
+        if 'exclusive' in rules.keys():
+            for t in rules['exclusive']:
+                self._rule_exclusive(t, opt_keys)
+
+        if 'option' in rules.keys():
+            self._rule_option(rules['option'], opt_keys)
+
+        if 'depends' in rules.keys():
+            self._rule_depends(rules['depends'], opt_keys)
+
+        for opt in opt_keys:
+            if opt in rules.keys():
+                rule = rules[opt]
+                if rule[0]:
+                    self._rule_combo(rule[0], opt_keys)
+                if rule[1]:
+                    self._rule_option(rule[1], opt_keys)
+                if rule[2]:
+                    self._rule_depends(rule[2], opt_keys)
+                if rule[3]:
+                    self._rule_exclusive(rule[3], opt_keys)
+
         return options
 
     def _help(self):
@@ -408,8 +497,14 @@ class Command(FactoryInterface):
         """
         rows = []
 
+        opts = self.__opts + [Option(
+            'help',
+            abbr='h',
+            type=Option.TYPE_BOOL,
+            help='Print the command help section')]
+
         # Loop through option cols and create rows
-        for opt in self.__opts:
+        for opt in opts:
             if opt.type == Option.TYPE_VALUE:
                 expr = opt.name.upper()
             elif opt.type == Option.TYPE_CHOICES:
@@ -421,7 +516,6 @@ class Command(FactoryInterface):
             else:
                 flag = '--' + opt.name + '/-' + opt.abbr
             rows.append((
-                '*' if bool(opt.mandatory) is True else '',
                 opt.name,
                 flag,
                 expr,
@@ -429,8 +523,8 @@ class Command(FactoryInterface):
                 opt.help))
 
         # Calculate the max width of each column
-        width = [0, 0, 0, 0, 0, 0]
-        for col in range(6):
+        width = [0, 0, 0, 0, 0]
+        for col in range(5):
             chars = 0
             for row in rows:
                 roww = len(row[col])
@@ -440,7 +534,7 @@ class Command(FactoryInterface):
 
         r_b = ''
         for row in rows:
-            for col in range(6):
+            for col in range(5):
                 r_b += row[col] + ' '*(
                     width[col] - len(row[col]) + 2)
             r_b += Shell.EOL
@@ -617,10 +711,12 @@ class Terminal(Shell):
                     except CmdShellEmpty:
                         pass
                     except asyncssh.TerminalSizeChanged:
-                        self._io._upd_size()
+                        self._io.upd_size()
                         continue
                     except CmdShellExit:
                         break
+                    except CmdShellException as e:
+                        self._io << ('%s \n' % e)
                     except Exception as e:
                         self._io << ('%s: %s \n' % (type(e), e))
                         logging.exception(e)
