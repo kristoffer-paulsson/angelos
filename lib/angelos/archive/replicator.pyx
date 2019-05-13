@@ -71,6 +71,8 @@ class Replicator:
                         e.modified if not modify else datetime.datetime.now()))
             else:
                 logging.error('Unkown synchronization operation: %s' % str(op))
+                raise RuntimeError(
+                    'Unkown synchronization operation: %s' % str(op))
 
     @classmethod
     def push(cls, master, slave, p_list):

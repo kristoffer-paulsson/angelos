@@ -20,11 +20,10 @@ from kivymd.selectioncontrols import MDCheckbox, MDSwitch
 from kivymd.bottomsheet import MDListBottomSheet
 from kivymd.button import MDIconButton
 from kivymd.dialog import MDDialog
-from kivymd.menu import MDDropdownMenu
+from kivymd.menus import MDDropdownMenu
 # from kivymd.label import MDLabel
 
 from ...const import Const
-from ...facade.person import PersonFacade
 from ..events import Messages
 
 

@@ -64,13 +64,22 @@ class SSHServer(ContainerAware, asyncssh.SSHServer):
         return False
 
 
-class SSHClient(asyncssh.SSHClient):
-    def __init__(self, keylist=(), delay=1):
+class SSHClient(ContainerAware, asyncssh.SSHClient):
+
+    def __init__(self, ioc, keylist=(), delay=1):
+        """Initialize Client."""
+        self._connection = None
+        self._channel = None
+        self._session = None
         self._keylist = keylist
         self._delay = delay
+        ContainerAware.__init__(self, ioc)
 
     def connection_made(self, conn):
         logging.info('Connection made')
+        self._connection = conn
+        # self._channel, self._session =
+        #   await conn.create_session(SSHClientSession)
         # chan, session = await conn.create_session(SSHClientSession)
         # await chan.wait_closed()
 

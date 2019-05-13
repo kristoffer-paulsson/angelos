@@ -15,9 +15,8 @@ class ClientsServer(SSHServer):
         auth = self.ioc.load_client_auth(username)
         if auth[0] and auth[1] and auth[2]:
             self._client_keys = [Starter.public_key(key) for key in auth[0]]
-            return True
-        else:
-            return False
+
+        return True
 
     def validate_public_key(self, username, key):
         logging.info('Authentication for a user')

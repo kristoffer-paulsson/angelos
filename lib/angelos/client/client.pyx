@@ -1,109 +1,72 @@
 # cython: language_level=3
 """Module docstring."""
-import threading
-import logging
+import os
+import collections
+import json
+
 from kivy.app import App
-from kivy.clock import Clock
+from kivy.lang import Builder
 from kivymd.theming import ThemeManager
 
-from .events import Messages
-from ..const import Const
-from ..worker import Worker
-from .backend import Backend
-from .ui.manager import InterfaceManager
+from ..ioc import Container, ContainerAware, Config, Handle
+
+from ..utils import Event
+
+# from .state import StateMachine
+from ..logger import LogHandler
+from ..ssh.ssh import SessionManager
+from ..facade.facade import Facade
+from ..automatic import Automatic
+
+from .ui.root import MAIN
+from .vars import (
+    ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE)
 
 
-class LogoApp(App):
+class Configuration(Config, Container):
+    def __init__(self):
+        Container.__init__(self, self.__config())
+
+    def __load(self, filename):
+        try:
+            with open(os.path.join(self.auto.dir.root, filename)) as jc:
+                return json.load(jc.read())
+        except FileNotFoundError:
+            return {}
+
+    def __config(self):
+        return {
+            'env': lambda self: collections.ChainMap(
+                ENV_IMMUTABLE,
+                vars(self.auto),
+                self.__load('env.json'),
+                ENV_DEFAULT),
+            'config': lambda self: collections.ChainMap(
+                CONFIG_IMMUTABLE,
+                self.__load('config.json'),
+                CONFIG_DEFAULT),
+            # 'state': lambda self: StateMachine(self.config['state']),
+            'log': lambda self: LogHandler(self.config['logger']),
+            'session': lambda self: SessionManager(),
+            'facade': lambda self: Handle(Facade),
+            'auto': lambda self: Automatic(self.opts),
+            'quit': lambda self: Event(),
+        }
+
+
+class Client(ContainerAware, App):
     theme_cls = ThemeManager()
-    title = "Logo"
-    ioc = None
+
+    def __init__(self):
+        """Initialize app logger."""
+        ContainerAware.__init__(self, Configuration())
+        App.__init__(self)
+        self.theme_cls.primary_palette = 'Green'
 
     def build(self):
-        # self.theme_cls.theme_style = 'Dark'
-        return InterfaceManager(configured=self.ioc.environment['configured'])
-
-    def on_pause(self):
-        return True
-
-    def on_stop(self):
-        self.ioc.workers.stop()
+        return Builder.load_string(MAIN)
 
 
-class Application(Worker):
-    """Docstring"""
-
-    def __init__(self, ioc):
-        Worker.__init__(self, ioc)
-        self.ioc.workers.add(Const.W_CLIENT_NAME, Const.G_CORE_NAME, self)
-        self.log = ioc.log.err()
-        self.app = None
-
-    def start(self):
-        self.run()
-
-    def _initialize(self):
-        logging.info('#'*10 + 'Entering ' + self.__class__.__name__ + '#'*10)
-        if self.ioc.environment['configured']:
-            self.ioc.facade.initialize()
-        self.ioc.message.add(Const.W_CLIENT_NAME)
-        self._thread = threading.currentThread()
-        self.__start_backend()
-
-    def _finalize(self):
-        self.ioc.message.remove(Const.W_CLIENT_NAME)
-        logging.info('#'*10 + 'Leaving ' + self.__class__.__name__ + '#'*10)
-
-    def run(self):
-        """Docstring"""
-        logging.info('Starting worker %s', id(self))
-        self._initialize()
-        try:
-            self.app = LogoApp()
-            Clock.schedule_interval(self.event_callback(), 1 / 10.)
-            self.app.ioc = self.ioc
-            self.app.run()
-        except KeyboardInterrupt:
-            pass
-        except Exception as e:
-            logging.exception(e)
-
-        self._finalize()
-        logging.info('Exiting worker %s', id(self))
-
-    def __start_backend(self):
-        logging.info('#'*10 + 'Entering __start_backend' + '#'*10)
-        be = Backend(self.ioc)
-        be.start()
-        self.ioc.workers.add(Const.W_BACKEND_NAME, Const.G_CORE_NAME, be)
-        logging.info('#'*10 + 'Leaving __start_Backend' + '#'*10)
-
-    def stop(self):
-        """Docstring"""
-        self._halt.set()
-
-    def event_callback(self):
-        def event_reader(dt):
-            event = self.ioc.message.receive(Const.W_CLIENT_NAME)
-
-            if event is None:
-                return not self._halt.is_set()
-            else:
-                logging.info(event)
-
-            if event.message == Messages.NEW_INTERFACE:
-                if event.data['ui'] is 'default':
-                    self.app.root.show_default()
-                elif event.data['ui'] is 'spinner':
-                    self.app.root.show_spinner()
-
-            if event.message == Messages.MSG_FLASH:
-                self.app.root.show_flash(event.data['msg'])
-
-            return not self._halt.is_set()
-
-        return event_reader
-
-
-class Client(Application):
-    """Docstring"""
-    pass
+def start():
+    """Entry point for client app."""
+    Client().run()

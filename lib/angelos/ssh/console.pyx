@@ -97,7 +97,7 @@ class BootServer(SSHServer):
 class AdminServer(SSHServer):
     """SSH Server for the admin console."""
 
-    commands = [EnvCommand, QuitCommand, ImportCommand, ExportCommand]
+    cmds = [EnvCommand, QuitCommand, ImportCommand, ExportCommand]
 
     def begin_auth(self, username):
         """Auth not required."""
@@ -124,5 +124,5 @@ class AdminServer(SSHServer):
         The terminal will be equipped for setup or startup.
         """
         return (await Terminal(
-            commands=AdminServer.commands,
+            commands=AdminServer.cmds,
             ioc=self.ioc, process=process).run())
