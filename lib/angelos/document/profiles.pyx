@@ -10,6 +10,7 @@ from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 class Address(BaseDocument):
     co = StringField(required=False)
     organisation = StringField(required=False)
+    department = StringField(required=False)
     apartment = StringField(required=False)
     floor = StringField(required=False)
     building = StringField(required=False)

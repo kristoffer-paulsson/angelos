@@ -12,7 +12,7 @@ from ..const import Const
 
 """Environment default values."""
 ENV_DEFAULT = {
-
+    'name': 'Logo'
 }
 
 """Environment immutable values."""
@@ -114,9 +114,5 @@ CONFIG_IMMUTABLE = {
         },
         # 'incrementel': False,
         'disable_existing_loggings': True
-    },
-    'terminal': {
-        'prompt': 'Angelos 0.1dX > ',
-        'message': 'Ἄγγελος safe messenging server'
     }
 }

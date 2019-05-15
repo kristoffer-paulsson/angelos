@@ -17,7 +17,7 @@ ENV_DEFAULT = {
 
 """Environment immutable values."""
 ENV_IMMUTABLE = {
-
+    'name': 'logo'
 }
 
 """Configuration default values"""

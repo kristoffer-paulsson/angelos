@@ -21,7 +21,7 @@ class Opts(BaseAuto):
 
 
 class Dir(BaseAuto):
-    def __init__(self):
+    def __init__(self, app_name):
         app = Util.app_dir()
 
         if '/usr/local/bin' in app:
@@ -36,9 +36,9 @@ class Dir(BaseAuto):
         # Current users directory
         self.home = Util.usr_dir()
         # Server root directory
-        self.root = os.path.join(self.stem, 'var/lib/angelos')
+        self.root = os.path.join(self.stem, 'var/lib/' + app_name)
         # Logging directory
-        self.log = os.path.join(self.stem, 'var/log/angelos')
+        self.log = os.path.join(self.stem, 'var/log/' + app_name)
         # Current working directory
         self.current = Util.exe_dir()
 
@@ -62,7 +62,7 @@ class Net(BaseAuto):
 class Automatic(BaseAuto):
     """Automatic values about the system."""
 
-    def __init__(self, parser=None):
+    def __init__(self, app_name, parser=None):
         """Generate the values and instanciate vars."""
         self.name = socket.gethostname()
         self.pid = os.getpid()
@@ -72,7 +72,7 @@ class Automatic(BaseAuto):
         self.id = plyer.uniqueid.id.decode()
 
         self.sys = Sys()
-        self.dir = Dir()
+        self.dir = Dir(app_name)
         self.net = Net(self.name)
 
         if parser:

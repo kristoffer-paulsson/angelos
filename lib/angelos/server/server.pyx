@@ -55,7 +55,7 @@ class Configuration(Config, Container):
             'nodes': lambda self: Handle(asyncio.base_events.Server),
             'hosts': lambda self: Handle(asyncio.base_events.Server),
             'opts': lambda self: Parser(),
-            'auto': lambda self: Automatic(self.opts),
+            'auto': lambda self: Automatic('angelos', self.opts),
             'quit': lambda self: Event(),
         }
 

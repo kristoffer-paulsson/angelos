@@ -5,12 +5,13 @@ import collections
 import json
 
 from kivy.app import App
-from kivy.lang import Builder
+from kivy.clock import Clock
+from kivy.uix.screenmanager import ScreenManager
 from kivymd.theming import ThemeManager
 
 from ..ioc import Container, ContainerAware, Config, Handle
-
-from ..utils import Event
+from ..utils import Util, Event
+from ..const import Const
 
 # from .state import StateMachine
 from ..logger import LogHandler
@@ -18,7 +19,10 @@ from ..ssh.ssh import SessionManager
 from ..facade.facade import Facade
 from ..automatic import Automatic
 
-from .ui.root import MAIN
+from .ui.root import UserScreen
+from .ui.wizard import SetupScreen
+from .ui.start import StartScreen
+
 from .vars import (
     ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE)
 
@@ -49,12 +53,19 @@ class Configuration(Config, Container):
             'log': lambda self: LogHandler(self.config['logger']),
             'session': lambda self: SessionManager(),
             'facade': lambda self: Handle(Facade),
-            'auto': lambda self: Automatic(self.opts),
+            'auto': lambda self: Automatic('Logo'),
             'quit': lambda self: Event(),
         }
 
 
-class Client(ContainerAware, App):
+"""
+class MainInterface(ScreenManager):
+    def __init__(self):
+        ScreenManager.__init__(self)
+"""
+
+
+class LogoMessenger(ContainerAware, App):
     theme_cls = ThemeManager()
 
     def __init__(self):
@@ -64,9 +75,29 @@ class Client(ContainerAware, App):
         self.theme_cls.primary_palette = 'Green'
 
     def build(self):
-        return Builder.load_string(MAIN)
+        self.title = 'Logo'
+        widget = ScreenManager(id='main_mngr')
+        widget.add_widget(StartScreen(name='splash'))
+        Clock.schedule_once(self.start, 3)
+        return widget
+
+    def start(self, timestamp):
+        vault_file = Util.path(self.user_data_dir, Const.CNL_VAULT)
+        print(vault_file)
+
+        if os.path.isfile(vault_file):
+            name = 'user'
+            screen = UserScreen(name=name)
+        else:
+            name = 'setup'
+            screen = SetupScreen(name=name)
+
+        self.root.add_widget(screen)
+        self.root.current = name
+        screen = self.root.get_screen('splash')
+        self.root.remove_widget(screen)
 
 
 def start():
     """Entry point for client app."""
-    Client().run()
+    LogoMessenger().run()
