@@ -14,8 +14,6 @@ Builder.load_string("""
 #:import MDToolbar kivymd.toolbar.MDToolbar
 #:import MDRaisedButton kivymd.button.MDRaisedButton
 
-#:import MDTabbedPanel kivymd.tabs.MDTabbedPanel
-
 <BasePanelScreen@Screen>
     title: ''
     id: ''
@@ -39,7 +37,7 @@ Builder.load_string("""
         orientation: 'vertical'
         MDToolbar:
             id: toolbar
-            title: 'Λόγῳ'
+            title: 'Logo messenger'
             md_bg_color: app.theme_cls.bg_light
             background_palette: 'Primary'
             background_hue: '500'

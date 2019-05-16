@@ -86,9 +86,10 @@ class Facade:
             entity, privkeys, keys, domain, node = cls.PREFS[1].create_new(
                 entity_data, role, server)
 
-            network = NetworkPolicy(entity, privkeys, keys)
-            network.generate(domain, node)
-            network = network.network
+            if server:
+                network = NetworkPolicy(entity, privkeys, keys)
+                network.generate(domain, node)
+                network = network.network
 
         entity, privkeys, keys, domain, node = cls.PREFS[1].import_ext(
             entity, privkeys, keys, domain, node, role, server)

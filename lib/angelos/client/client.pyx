@@ -20,7 +20,8 @@ from ..facade.facade import Facade
 from ..automatic import Automatic
 
 from .ui.root import UserScreen
-from .ui.wizard import SetupScreen
+from .ui.wizard import (
+    SetupScreen, PersonSetupGuide, MinistrySetupGuide, ChurchSetupGuide)
 from .ui.start import StartScreen
 
 from .vars import (
@@ -83,18 +84,31 @@ class LogoMessenger(ContainerAware, App):
 
     def start(self, timestamp):
         vault_file = Util.path(self.user_data_dir, Const.CNL_VAULT)
-        print(vault_file)
 
         if os.path.isfile(vault_file):
-            name = 'user'
-            screen = UserScreen(name=name)
+            self.switch('splash', UserScreen(name='user'))
         else:
-            name = 'setup'
-            screen = SetupScreen(name=name)
+            self.switch('splash', SetupScreen(name='setup'))
+
+    def goto_person_setup(self):
+        self.switch('setup', PersonSetupGuide(name='setup_guide'))
+
+    def goto_ministry_setup(self):
+        self.switch('setup', MinistrySetupGuide(name='setup_guide'))
+
+    def goto_church_setup(self):
+        self.switch('setup', ChurchSetupGuide(name='setup_guide'))
+
+    def goto_user2(self):
+        self.switch('setup_guide', UserScreen(name='user'))
+
+    def switch(self, old, screen):
+        """Switch to another main screen."""
 
         self.root.add_widget(screen)
-        self.root.current = name
-        screen = self.root.get_screen('splash')
+        self.root.current = screen.name
+
+        screen = self.root.get_screen(old)
         self.root.remove_widget(screen)
 
 

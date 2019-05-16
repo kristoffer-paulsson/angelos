@@ -309,8 +309,8 @@ class StringField(Field):
             value = [value]
 
         for v in value:
-            if not isinstance(v, (str, bytes, type(None))):
-            # if not isinstance(v, (str, type(None))):
+            # if not isinstance(v, (str, bytes, type(None))):
+            if not isinstance(v, (str, type(None))):
                 logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
