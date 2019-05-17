@@ -986,8 +986,8 @@ JSON = """
 """
 
 data = json.loads(JSON)
-info = '['
+info = '{'
 for i in data:
-    info += '\'' + i['name'].title() + '\', '
-info += ']'
+    info += '\'' + i['name'].title() + '\': \'' + i['code'].upper() + '\', '
+info += '}'
 print(info)

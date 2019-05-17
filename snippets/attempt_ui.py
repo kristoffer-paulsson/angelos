@@ -1,87 +1,118 @@
 from kivy.app import App
 from kivy.lang import Builder
-from kivy.factory import Factory
 from kivymd.theming import ThemeManager
-Builder.load_string('''
+kv = '''
 #:import MDToolbar kivymd.toolbar.MDToolbar
-#:import MDIconButton kivymd.button.MDIconButton
-#:import MDFloatingActionButton kivymd.button.MDFloatingActionButton
-#:import MDFlatButton kivymd.button.MDFlatButton
-#:import MDRaisedButton kivymd.button.MDRaisedButton
-#:import MDRectangleFlatButton kivymd.button.MDRectangleFlatButton
-#:import MDRoundFlatButton kivymd.button.MDRoundFlatButton
-#:import MDRoundFlatIconButton kivymd.button.MDRoundFlatIconButton
-#:import MDFillRoundFlatButton kivymd.button.MDFillRoundFlatButton
-#:import MDTextButton kivymd.button.MDTextButton
-<ExampleButtons@BoxLayout>
+#:import MDChip kivymd.chips.MDChip
+#:import MDChooseChip kivymd.chips.MDChooseChip
+#:import MDSeparator kivymd.cards.MDSeparator
+#:import MDLabel kivymd.label.MDLabel
+BoxLayout:
     orientation: 'vertical'
+    spacing: dp(10)
     MDToolbar:
-        id: toolbar
-        title: app.title
+        title: 'Example Chips'
         md_bg_color: app.theme_cls.primary_color
+        left_action_items: [['menu', lambda x: x]]
         background_palette: 'Primary'
-        elevation: 10
-        left_action_items: [['dots-vertical', lambda x: None]]
-    Screen:
-        BoxLayout:
+    ScrollView:
+        GridLayout:
+            padding: dp(10)
+            spacing: dp(10)
+            cols: 1
             size_hint_y: None
-            height: '100'
-            spacing: '10dp'
-            pos_hint: {'center_y': .9}
+            height: self.minimum_height
+            MDLabel:
+                text: 'Chips with color:'
+            MDSeparator:
+            StackLayout:
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(5)
+                MDChip:
+                    label: 'Coffee'
+                    color: .4470588235294118, .19607843137254902, 0, 1
+                    icon: 'coffee'
+                    callback: app.callback
+                MDChip:
+                    label: 'Duck'
+                    color: .9215686274509803, 0, 0, 1
+                    icon: 'duck'
+                    callback: app.callback
+                MDChip:
+                    label: 'Earth'
+                    color: .21176470588235294, .09803921568627451, 1, 1
+                    icon: 'earth'
+                    callback: app.callback
+                MDChip:
+                    label: 'Face'
+                    color: .20392156865098, .48235294117606, .43529411764705883, 1
+                    icon: 'face'
+                    callback: app.callback
+                MDChip:
+                    label: 'Facebook'
+                    color: .5607843137254902, .48235294164706, .435294117705883, 1
+                    icon: 'facebook'
+                    callback: app.callback
             Widget:
-            MDIconButton:
-                icon: 'sd'
-            MDFloatingActionButton:
-                icon: 'plus'
-                opposite_colors: True
-                elevation_normal: 8
-            MDFloatingActionButton:
-                icon: 'check'
-                opposite_colors: True
-                elevation_normal: 8
-                md_bg_color: app.theme_cls.primary_color
-            MDIconButton:
-                icon: 'sd'
-                theme_text_color: 'Custom'
-                text_color: app.theme_cls.primary_color
+                size_hint_y: None
+                height: dp(5)
+            MDLabel:
+                text: 'Chip without icon:'
+            MDSeparator:
+            StackLayout:
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(5)
+                MDChip:
+                    label: 'Without icon'
+                    icon: ''
+                    callback: app.callback
             Widget:
-        MDFlatButton:
-            text: 'MDFlatButton'
-            pos_hint: {'center_x': .5, 'center_y': .75}
-        MDRaisedButton:
-            text: "MDRaisedButton"
-            elevation_normal: 2
-            opposite_colors: True
-            pos_hint: {'center_x': .5, 'center_y': .65}
-        MDRectangleFlatButton:
-            text: "MDRectangleFlatButton"
-            pos_hint: {'center_x': .5, 'center_y': .55}
-        MDRectangleFlatIconButton:
-            text: "MDRectangleFlatIconButton"
-            icon: "language-python"
-            pos_hint: {'center_x': .5, 'center_y': .45}
-            width: dp(230)
-        MDRoundFlatButton:
-            text: "MDRoundFlatButton"
-            icon: "language-python"
-            pos_hint: {'center_x': .5, 'center_y': .35}
-        MDRoundFlatIconButton:
-            text: "MDRoundFlatIconButton"
-            icon: "language-python"
-            pos_hint: {'center_x': .5, 'center_y': .25}
-            width: dp(200)
-        MDFillRoundFlatButton:
-            text: "MDFillRoundFlatButton"
-            pos_hint: {'center_x': .5, 'center_y': .15}
-        MDTextButton:
-            text: "MDTextButton"
-            pos_hint: {'center_x': .5, 'center_y': .05}
-''')
-class Example(App):
+                size_hint_y: None
+                height: dp(5)
+            MDLabel:
+                text: 'Chips with check:'
+            MDSeparator:
+            StackLayout:
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(5)
+                MDChip:
+                    label: 'Check'
+                    icon: ''
+                    check: True
+                    callback: app.callback
+                MDChip:
+                    label: 'Check with icon'
+                    icon: 'city'
+                    check: True
+                    callback: app.callback
+            Widget:
+                size_hint_y: None
+                height: dp(5)
+            MDLabel:
+                text: 'Choose chip:'
+            MDSeparator:
+            MDChooseChip:
+                MDChip:
+                    label: 'Earth'
+                    icon: 'earth'
+                    callback: app.callback
+                MDChip:
+                    label: 'Face'
+                    icon: 'face'
+                    callback: app.callback
+                MDChip:
+                    label: 'Facebook'
+                    icon: 'facebook'
+                    callback: app.callback
+'''
+class MyApp(App):
     theme_cls = ThemeManager()
-    theme_cls.primary_palette = 'Blue'
-    title = "Example Buttons"
-    main_widget = None
+    theme_cls.primary_palette = 'Red'
+    def callback(self, name_chip):
+        pass
     def build(self):
-        return Factory.ExampleButtons()
-Example().run()
+        return Builder.load_string(kv)
+MyApp().run()
