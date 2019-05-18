@@ -31,4 +31,6 @@ MANIFEST
 /clientroot/**
 !/clientroot/.gitkeep
 
-/tests/asyncssh
+!/tests/communities/
+/tests/communities/**
+!/tests/communities/.gitkeep

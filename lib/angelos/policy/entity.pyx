@@ -22,7 +22,7 @@ class BaseGeneratePolicy(Policy):
         args = set(kwargs.keys())
 
         if len(args - fields):
-            raise IndexError()
+            raise IndexError('Illegal extra fields', args - fields)
 
         entity = self.ENTITY[0](nd=kwargs)
         entity.issuer = entity.id

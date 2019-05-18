@@ -12,7 +12,7 @@ from ..utils import Util
 from ..const import Const
 from ..document.entities import Entity, PrivateKeys, Keys
 from ..document.domain import Domain, Node, Location, Network, Host
-from ..automatic import Automatic
+from ..automatic import Net
 
 
 class NodePolicy(Policy):
@@ -54,10 +54,10 @@ class NodePolicy(Policy):
 
         location = None
         if server:
-            auto = Automatic()
+            net = Net()
             location = Location(nd={
-                'hostname': [auto.net.domain],
-                'ip': [ipaddress.ip_address(auto.net.ip)]
+                'hostname': [net.domain],
+                'ip': [ipaddress.ip_address(net.ip)]
             })
 
         node = Node(nd={

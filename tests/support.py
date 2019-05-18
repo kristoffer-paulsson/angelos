@@ -4,7 +4,8 @@ import random
 import string
 import datetime
 
-from lipsum import SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES, CHURCHES
+from lipsum import (
+    SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES, LIPSUM_WORDS, CHURCHES)
 
 
 def filesize(file):
@@ -17,11 +18,11 @@ def filesize(file):
 def random_person_entity_data(num=1):
     identities = []
     for i in range(num):
-        gender = random.choices(
+        sex = random.choices(
             ['man', 'woman', 'undefined'], cum_weights=[49, 49, 2])[0]
-        if gender == 'man':
+        if sex == 'man':
             names = random.choices(MALE_NAMES, k=random.randrange(2, 5))
-        elif gender == 'woman':
+        elif sex == 'woman':
             names = random.choices(FEMALE_NAMES, k=random.randrange(2, 5))
         else:
             names = random.choices(
@@ -34,11 +35,28 @@ def random_person_entity_data(num=1):
             'given_name': names[0],
             'names': names,
             'family_name': random.choices(SURNAMES, k=1)[0].capitalize(),
-            'gender': gender,
+            'sex': sex,
             'born': born
         })
 
     return identities
+
+
+def random_ministry_entity_data(num=1):
+    ministries = []
+    for i in range(num):
+        ministry = random.choices(LIPSUM_WORDS, k=random.randrange(3, 7))
+        vision = random.choices(LIPSUM_WORDS, k=random.randrange(20, 25))
+        founded = datetime.date.today(
+            ) - datetime.timedelta(days=random.randrange(365, 29220))
+
+        ministries.append({
+            'ministry': ' '.join(ministry).capitalize(),
+            'vision': ' '.join(vision).capitalize(),
+            'founded': founded
+        })
+
+    return ministries
 
 
 def random_church_entity_data(num=1):

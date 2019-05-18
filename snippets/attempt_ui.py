@@ -1,118 +1,91 @@
+
 from kivy.app import App
 from kivy.lang import Builder
+from kivy.factory import Factory
 from kivymd.theming import ThemeManager
-kv = '''
+Builder.load_string('''
 #:import MDToolbar kivymd.toolbar.MDToolbar
-#:import MDChip kivymd.chips.MDChip
-#:import MDChooseChip kivymd.chips.MDChooseChip
-#:import MDSeparator kivymd.cards.MDSeparator
-#:import MDLabel kivymd.label.MDLabel
-BoxLayout:
+#:import MDTextField kivymd.textfields.MDTextField
+#:import MDTextFieldClear kivymd.textfields.MDTextFieldClear
+#:import MDTextFieldRect kivymd.textfields.MDTextFieldRect
+<ExampleTextFields@BoxLayout>
     orientation: 'vertical'
-    spacing: dp(10)
     MDToolbar:
-        title: 'Example Chips'
+        id: toolbar
+        title: app.title
         md_bg_color: app.theme_cls.primary_color
-        left_action_items: [['menu', lambda x: x]]
         background_palette: 'Primary'
+        elevation: 10
+        left_action_items: [['dots-vertical', lambda x: None]]
     ScrollView:
-        GridLayout:
-            padding: dp(10)
-            spacing: dp(10)
-            cols: 1
+        BoxLayout:
+            orientation: 'vertical'
             size_hint_y: None
             height: self.minimum_height
-            MDLabel:
-                text: 'Chips with color:'
-            MDSeparator:
-            StackLayout:
-                size_hint_y: None
-                height: self.minimum_height
-                spacing: dp(5)
-                MDChip:
-                    label: 'Coffee'
-                    color: .4470588235294118, .19607843137254902, 0, 1
-                    icon: 'coffee'
-                    callback: app.callback
-                MDChip:
-                    label: 'Duck'
-                    color: .9215686274509803, 0, 0, 1
-                    icon: 'duck'
-                    callback: app.callback
-                MDChip:
-                    label: 'Earth'
-                    color: .21176470588235294, .09803921568627451, 1, 1
-                    icon: 'earth'
-                    callback: app.callback
-                MDChip:
-                    label: 'Face'
-                    color: .20392156865098, .48235294117606, .43529411764705883, 1
-                    icon: 'face'
-                    callback: app.callback
-                MDChip:
-                    label: 'Facebook'
-                    color: .5607843137254902, .48235294164706, .435294117705883, 1
-                    icon: 'facebook'
-                    callback: app.callback
+            padding: dp(48)
+            spacing: dp(15)
+            MDTextFieldRound:
+                hint_text: 'Password'
+                icon: 'lock-outline'
+                active_color: [0, 0, 0, .2]
+                normal_color: [0, 0, 0, .5]
+            MDTextField:
+                hint_text: "No helper text"
+            MDTextField:
+                hint_text: "Helper text on focus"
+                helper_text: "This will disappear when you click off"
+                helper_text_mode: "on_focus"
+            MDTextField:
+                hint_text: "Persistent helper text"
+                helper_text: "Text is always here"
+                helper_text_mode: "persistent"
             Widget:
                 size_hint_y: None
                 height: dp(5)
-            MDLabel:
-                text: 'Chip without icon:'
-            MDSeparator:
-            StackLayout:
-                size_hint_y: None
-                height: self.minimum_height
-                spacing: dp(5)
-                MDChip:
-                    label: 'Without icon'
-                    icon: ''
-                    callback: app.callback
+            MDTextField:
+                id: text_field_error
+                hint_text: "Helper text on error (Hit Enter with  two characters here)"
+                helper_text: "Two is my least favorite number"
+                helper_text_mode: "on_error"
+            MDTextField:
+                hint_text: "Max text length = 10"
+                max_text_length: 10
+            MDTextField:
+                hint_text: "required = True"
+                required: True
+                helper_text_mode: "on_error"
+            MDTextField:
+                multiline: True
+                hint_text: "Multi-line text"
+                helper_text: "Messages are also supported here"
+                helper_text_mode: "persistent"
+            MDTextField:
+                hint_text: "color_mode = \'accent\'"
+                color_mode: 'accent'
+            MDTextField:
+                hint_text: "color_mode = \'custom\'"
+                color_mode: 'custom'
+                helper_text_mode: "on_focus"
+                helper_text: "Color is defined by \'line_color_focus\' property"
+                line_color_focus: self.theme_cls.opposite_bg_normal
+            MDTextField:
+                hint_text: "disabled = True"
+                disabled: True
+            MDTextFieldRect:
+                size_hint: None, None
+                size: app.Window.width - dp(40), dp(30)
+                pos_hint: {'center_y': .5, 'center_x': .5}
             Widget:
                 size_hint_y: None
                 height: dp(5)
-            MDLabel:
-                text: 'Chips with check:'
-            MDSeparator:
-            StackLayout:
-                size_hint_y: None
-                height: self.minimum_height
-                spacing: dp(5)
-                MDChip:
-                    label: 'Check'
-                    icon: ''
-                    check: True
-                    callback: app.callback
-                MDChip:
-                    label: 'Check with icon'
-                    icon: 'city'
-                    check: True
-                    callback: app.callback
-            Widget:
-                size_hint_y: None
-                height: dp(5)
-            MDLabel:
-                text: 'Choose chip:'
-            MDSeparator:
-            MDChooseChip:
-                MDChip:
-                    label: 'Earth'
-                    icon: 'earth'
-                    callback: app.callback
-                MDChip:
-                    label: 'Face'
-                    icon: 'face'
-                    callback: app.callback
-                MDChip:
-                    label: 'Facebook'
-                    icon: 'facebook'
-                    callback: app.callback
-'''
-class MyApp(App):
+            MDTextFieldClear:
+                hint_text: "Text field with clearing type"
+''')
+class Example(App):
     theme_cls = ThemeManager()
-    theme_cls.primary_palette = 'Red'
-    def callback(self, name_chip):
-        pass
+    theme_cls.primary_palette = 'Blue'
+    title = "Example Text Fields"
+    main_widget = None
     def build(self):
-        return Builder.load_string(kv)
-MyApp().run()
+        return Factory.ExampleTextFields()
+Example().run()

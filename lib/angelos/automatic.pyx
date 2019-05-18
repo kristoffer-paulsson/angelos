@@ -53,7 +53,8 @@ class Sys(BaseAuto):
 
 
 class Net(BaseAuto):
-    def __init__(self, name):
+    def __init__(self):
+        name = socket.gethostname()
         self.hostname = name.lower()
         self.ip = socket.gethostbyname(name)
         self.domain = socket.getfqdn()
@@ -73,7 +74,7 @@ class Automatic(BaseAuto):
 
         self.sys = Sys()
         self.dir = Dir(app_name)
-        self.net = Net(self.name)
+        self.net = Net()
 
         if parser:
             self.opts = Opts(parser)

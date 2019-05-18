@@ -25,15 +25,17 @@ class Const:
 
     A_USE_VAULT             Archive used as vault
     A_USE_HOME              Archive used as an encrypted home directory
-    A_USE_MAIL              Archive used as mail router pool
+    A_USE_MAIL              Archive used as intrachurch mail routing pool
     A_USE_POOL              Archive used as public document pool
     A_USE_FTP               Archive used as encrypted ftp file system
+    A_USE_ROUTING           Archive used as interchurch mail routing pool
 
     CNL_VAULT               Vault file path
     CNL_HOME                Encrypted home directory file path
-    CNL_MAIL                Mail router pool file path
+    CNL_MAIL                Mail routing pool file path
     CNL_POOL                Public document pool file path
     CNL_FTP                 Encrypted ftp file path
+    CNL_ROUTING             Mail routing pool file path
 
     LOG_ERR                 Logger for technical error messages
     LOG_APP                 Logger for application related events
@@ -60,12 +62,14 @@ class Const:
     A_USE_MAIL = ord(b'm')
     A_USE_POOL = ord(b'p')
     A_USE_FTP = ord(b'f')
+    A_USE_ROUTING = ord(b'r')
 
     CNL_VAULT = 'vault.ar7.cnl'
     CNL_HOME = 'home.ar7.cnl'
     CNL_MAIL = 'mail.ar7.cnl'
     CNL_POOL = 'pool.ar7.cnl'
     CNL_FTP = 'ftp.ar7.cnl'
+    CNL_ROUTING = 'routing.ar7.cnl'
 
     LOG_ERR = 'err'
     LOG_APP = 'app'
