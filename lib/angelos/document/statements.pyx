@@ -2,6 +2,7 @@
 """Module docstring."""
 from .model import BaseDocument, TypeField
 from .document import Document, OwnerMixin, IssueMixin
+from .model import UuidField
 
 
 class Statement(Document):
@@ -39,6 +40,7 @@ class Trusted(Statement, OwnerMixin):
 
 class Revoked(Statement):
     type = TypeField(value=Document.Type.STAT_REVOKED)
+    issuance = UuidField()
 
     def _validate(self):
         self._check_type(Document.Type.STAT_REVOKED)

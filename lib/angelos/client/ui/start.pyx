@@ -11,7 +11,7 @@ Builder.load_string("""
     FloatLayout:
         canvas:
             Color:
-                rgba: .5, .5, .5, 1
+                rgba: .85, .85, .85, 1
             Rectangle:
                 size: self.size
                 pos: self.pos

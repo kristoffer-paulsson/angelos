@@ -19,7 +19,7 @@ def random_person_entity_data(num=1):
     identities = []
     for i in range(num):
         sex = random.choices(
-            ['man', 'woman', 'undefined'], cum_weights=[49, 49, 2])[0]
+            ['man', 'woman', 'undefined'], [.495, .495, .01], k=1)[0]
         if sex == 'man':
             names = random.choices(MALE_NAMES, k=random.randrange(2, 5))
         elif sex == 'woman':

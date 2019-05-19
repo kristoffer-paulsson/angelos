@@ -28,7 +28,7 @@ class Crypto:
             elif isinstance(item, (bytes, bytearray)):
                 stream += item
             else:
-                Util.is_type(item, (bytes, bytearray))
+                Util.is_type(item, (bytes, bytearray, type(None)))
 
         return stream
 
@@ -43,7 +43,7 @@ class Crypto:
             elif isinstance(data, (bytes, bytearray)):
                 stream += data
             else:
-                Util.is_type(data, (bytes, bytearray))
+                Util.is_type(data, (bytes, bytearray, type(None)))
 
         return stream
 

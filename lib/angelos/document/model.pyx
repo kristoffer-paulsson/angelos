@@ -61,6 +61,10 @@ class Field:
         """Abstract for converting value to bytes."""
         raise NotImplementedError()
 
+    def yaml(self, v):
+        """Abstract for converting value to bytes."""
+        return v
+
 
 def conv_dont(f, v):
     """None convertion activator."""
@@ -75,6 +79,11 @@ def conv_str(f, v):
 def conv_bytes(f, v):
     """Bytes convertion activator."""
     return f.bytes(v) if v else b''
+
+
+def conv_yaml(f, v):
+    """Bytes convertion activator."""
+    return f.yaml(v) if v else None
 
 
 class DocumentMeta(type):
@@ -175,6 +184,9 @@ class BaseDocument(metaclass=DocumentMeta):
     def export_bytes(self):
         return self.export(conv_bytes)
 
+    def export_yaml(self):
+        return self.export(conv_yaml)
+
     def _validate(self):
         """Validate all fields."""
         for name in self._fields.keys():
@@ -241,6 +253,10 @@ class UuidField(Field):
     def bytes(self, value):
         """Bytes converter."""
         return value.bytes
+
+    def yaml(self, value):
+        """YAML converter."""
+        return str(value)
 
 
 class IPField(Field):
@@ -350,6 +366,10 @@ class TypeField(Field):
         """Bytes converter."""
         return bytes([value])
 
+    def yaml(self, value):
+        """YAML converter."""
+        return int(value)
+
 
 class BinaryField(Field):
     def __init__(self, value=None, required=True,
@@ -389,6 +409,10 @@ class BinaryField(Field):
     def bytes(self, value):
         """Bytes converter."""
         return value
+
+    def yaml(self, value):
+        """YAML converter."""
+        return base64.standard_b64encode(value).decode('utf-8')
 
 
 class SignatureField(BinaryField):

@@ -51,7 +51,7 @@ class Instant(Message):
 class Mail(Message):
     type = TypeField(value=Document.Type.COM_MAIL)
     subject = StringField(required=False)
-    attachment = DocumentField(required=False, t=Attachment, multiple=True)
+    attachments = DocumentField(required=False, t=Attachment, multiple=True)
 
     def _validate(self):
         self._check_type(Document.Type.COM_MAIL)
