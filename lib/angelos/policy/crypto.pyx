@@ -6,9 +6,12 @@ import datetime
 from ..utils import Util
 from ..document.document import Document
 from ..document.entities import Entity, PrivateKeys, Keys
+from ..document.envelope import Envelope, Header
 
 
 class Crypto:
+    """"""
+
     @staticmethod
     def _document_data(document, exclude=[]):
         new_dict = {}
@@ -49,6 +52,7 @@ class Crypto:
 
     @staticmethod
     def sign(document, entity, privkeys, keys, exclude=[], multiple=False):
+        """Main document signing algorithm."""
         Util.is_type(document, Document)
         Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -90,6 +94,7 @@ class Crypto:
 
     @staticmethod
     def verify(document, entity, keys, exclude=[]):
+        """Main document verifying algorithm."""
         Util.is_type(document, Document)
         Util.is_type(entity, Entity)
         Util.is_type(keys, Keys)
@@ -116,3 +121,36 @@ class Crypto:
             except ValueError:
                 pass
         return False
+
+    @staticmethod
+    def sign_header(envelope, header, entity, privkeys, keys):
+        Util.is_type(envelope, Envelope)
+        Util.is_type(header, Header)
+        Util.is_type(entity, Entity)
+        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(keys, Keys)
+
+        if not (header.issuer == keys.issuer == entity.id):
+            raise RuntimeError(
+                'Header/Keys "issuer" or Entity "id" doesn\'t match')
+
+        today = datetime.date.today()
+        if today > entity.expires:
+            raise RuntimeError('The signing entity has expired')
+
+        if today > keys.expires:
+            raise RuntimeError('The verifying keys has expired')
+
+        if header.signature:
+            raise RuntimeError('Document already signed')
+
+        if len(envelope.header):
+            old_signature = envelope.header[-1].signature
+        else:
+            old_signature = envelope.signature
+
+        data = old_signature + Crypto._document_data(header)
+        signature = libnacl.sign.Signer(privkeys.seed).signature(data)
+
+        header.signature = signature
+        return header

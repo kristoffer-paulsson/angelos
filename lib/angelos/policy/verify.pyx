@@ -9,8 +9,8 @@ from ..document.statements import Verified, Trusted, Revoked
 class StatementPolicy(SignPolicy):
     """Policy for issuing statements."""
 
-    def __init__(self, entity, privkeys, keys):
-        SignPolicy.__init__(self, entity, privkeys, keys)
+    def __init__(self, **kwargs):
+        SignPolicy.__init__(self, **kwargs)
         self.statement = None
 
     def verified(self, entity):

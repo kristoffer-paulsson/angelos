@@ -53,6 +53,10 @@ class Field:
             })
         return True
 
+    def from_bytes(self, v):
+        """Abstract to restore field from bytes."""
+        raise NotImplementedError()
+
     def str(self, v):
         """Abstract for converting value to string."""
         raise NotImplementedError()
@@ -152,6 +156,20 @@ class BaseDocument(metaclass=DocumentMeta):
         else:
             raise AttributeError('Unknown field "%s"'.format(key))
 
+    @classmethod
+    def build(cls, data):
+        params = {}
+
+        for item in data.keys():
+            if data[item] is list:
+                nl = []
+                for value in data[item]:
+                    nl.append(cls._fields[item].from_bytes(value))
+                params[item] = nl
+            else:
+                params[item] = cls._fields[item].from_bytes(data[item])
+        return cls(nd=params)
+
     def export(self, c=conv_dont):
         """
         Export a document as a dictionary.
@@ -229,6 +247,9 @@ class DocumentField(Field):
 
         return True
 
+    def from_bytes(self, value):
+        return self.t.build(value)
+
 
 class UuidField(Field):
     def validate(self, value):
@@ -245,6 +266,9 @@ class UuidField(Field):
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'uuid.UUID', 'current': type(v)})
         return True
+
+    def from_bytes(self, value):
+        return uuid.UUID(bytes=value)
 
     def str(self, value):
         """Str converter."""
@@ -277,6 +301,15 @@ class IPField(Field):
                      'current': type(v)})
         return True
 
+    def from_bytes(self, value):
+        length = len(value)
+        if length == 4:
+            return ipaddress.IPv4Address(value)
+        elif length == 8:
+            return ipaddress.IPv6Address(value)
+        else:
+            raise TypeError('Not bytes of length 4 or 8')
+
     def str(self, value):
         """Str converter."""
         return str(value)
@@ -307,6 +340,9 @@ class DateField(Field):
                     {'expected': 'datetime.date', 'current': type(v)})
         return True
 
+    def from_bytes(self, value):
+        return datetime.date.fromisoformat(value.encode())
+
     def str(self, value):
         """Str converter."""
         return value.isoformat()
@@ -333,6 +369,9 @@ class StringField(Field):
                     {'expected': 'str', 'current': type(v)})
         return True
 
+    def from_bytes(self, value):
+        return value.encode()
+
     def str(self, value):
         """Str converter."""
         return value
@@ -357,6 +396,9 @@ class TypeField(Field):
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'int', 'current': type(v)})
         return True
+
+    def from_bytes(self, value):
+        return int.from_bytes(value)
 
     def str(self, value):
         """Str converter."""
@@ -401,6 +443,9 @@ class BinaryField(Field):
                     Error.FIELD_BEYOND_LIMIT,
                     {'limit': self.limit, 'size': len(v)})
         return True
+
+    def from_bytes(self, value):
+        return value
 
     def str(self, value):
         """Str converter."""
@@ -469,6 +514,9 @@ class ChoiceField(Field):
                     {'expected': self.choices, 'current': v})
         return True
 
+    def from_bytes(self, value):
+        return value.encode()
+
     def str(self, value):
         """Str converter."""
         return value
@@ -506,6 +554,9 @@ class EmailField(Field):
                 raise Util.exception(
                     Error.FIELD_INVALID_EMAIL, {'email': v})
         return True
+
+    def from_bytes(self, value):
+        return value.encode()
 
     def str(self, value):
         """Str converter."""

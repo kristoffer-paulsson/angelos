@@ -83,7 +83,7 @@ class Worker(ContainerAware):
         if context.future:
             exc2 = context.future.exception()
 
-        if exc1 == exc2 and exc1 != None:
+        if exc1 == exc2 and exc1 is not None:
             logging.exception(exc1)
         else:
             logging.exception(exc1)

@@ -3,4 +3,4 @@
 
 
 class Operation:
-    pass
+    """Operation baseclass."""

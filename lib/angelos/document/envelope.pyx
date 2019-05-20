@@ -1,21 +1,27 @@
 # cython: language_level=3
 """Module docstring."""
 import datetime
+import enum
 
 from ..utils import Util
 from ..error import Error
 
 from .model import (
     BaseDocument, DateField, StringField, UuidField, DocumentField,
-    BinaryField, TypeField)
+    BinaryField, TypeField, SignatureField)
 from .document import Document, OwnerMixin, IssueMixin
 
 
 class Header(BaseDocument):
     op = StringField()
-    domain = UuidField()
-    node = UuidField()
-    signature = StringField()
+    issuer = UuidField()
+    timestamp = StringField()
+    signature = SignatureField()
+
+    class Op(enum.Enum):
+        SEND = b'SEND'
+        ROUTE = b'RTE'
+        RECEIVE = b'RECV'
 
 
 class Envelope(Document, OwnerMixin):
