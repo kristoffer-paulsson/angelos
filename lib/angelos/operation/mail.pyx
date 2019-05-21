@@ -1,3 +1,4 @@
+# cython: language_level=3
 """Mail related operations."""
 from .operation import Operation
 from ..policy.policy import SignPolicy

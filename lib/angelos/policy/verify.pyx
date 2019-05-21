@@ -1,3 +1,4 @@
+# cython: language_level=3
 """Verify entities by issuing statements."""
 from ..utils import Util
 from .policy import SignPolicy

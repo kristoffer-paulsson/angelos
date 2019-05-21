@@ -1,3 +1,4 @@
+# cython: language_level=3
 {
     'Unsolicited': 'Unwanted messages you do not wish to receive.',
     'Spam': 'Unsolicited advertisment.',

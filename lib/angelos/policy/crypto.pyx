@@ -1,5 +1,5 @@
 # cython: language_level=3
-"""Module docstring."""
+"""Conceal/unveal algorithms."""
 import libnacl
 import datetime
 
@@ -10,7 +10,7 @@ from ..document.envelope import Envelope, Header
 
 
 class Crypto:
-    """"""
+    """Conceal/unveil policy."""
 
     @staticmethod
     def _document_data(document, exclude=[]):
@@ -49,6 +49,70 @@ class Crypto:
                 Util.is_type(data, (bytes, bytearray, type(None)))
 
         return stream
+
+    @staticmethod
+    def conceal(data, sender, privkeys, receiver, keys):
+        """Conceal data."""
+        Util.is_type(sender, Entity)
+        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(receiver, Entity)
+        Util.is_type(keys, Keys)
+
+        if not (privkeys.issuer == sender.id):
+            raise RuntimeError(
+                'PrivateKeys "issuer" and sender "id" doesn\'t match')
+
+        if not (keys.issuer == receiver.id):
+            raise RuntimeError(
+                'Keys "issuer" and receiver "id" doesn\'t match')
+
+        today = datetime.date.today()
+
+        if today > sender.expires:
+            raise RuntimeError('The sending entity has expired')
+
+        if today > privkeys.expires:
+            raise RuntimeError('The concealing keys has expired')
+
+        if today > receiver.expires:
+            raise RuntimeError('The receiving entity has expired')
+
+        if today > keys.expires:
+            raise RuntimeError('The receiving keys has expired')
+
+        return libnacl.public.Box(privkeys.secret, keys.public).encrypt(data)
+
+    @staticmethod
+    def unveil(data, receiver, privkeys, sender, keys):
+        """Unveil data."""
+        Util.is_type(receiver, Entity)
+        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(sender, Entity)
+        Util.is_type(keys, Keys)
+
+        if not (privkeys.issuer == receiver.id):
+            raise RuntimeError(
+                'PrivateKeys "issuer" and receiver "id" doesn\'t match')
+
+        if not (keys.issuer == sender.id):
+            raise RuntimeError(
+                'Keys "issuer" and sender "id" doesn\'t match')
+
+        today = datetime.date.today()
+
+        if today > receiver.expires:
+            raise RuntimeError('The receiving entity has expired')
+
+        if today > privkeys.expires:
+            raise RuntimeError('The receiving keys has expired')
+
+        if today > sender.expires:
+            raise RuntimeError('The sending entity has expired')
+
+        if today > keys.expires:
+            raise RuntimeError('The concealing keys has expired')
+
+        return libnacl.public.Box(privkeys.secret, keys.public).decrypt(data)
 
     @staticmethod
     def sign(document, entity, privkeys, keys, exclude=[], multiple=False):
@@ -124,6 +188,7 @@ class Crypto:
 
     @staticmethod
     def sign_header(envelope, header, entity, privkeys, keys):
+        """Sign envelope header"""
         Util.is_type(envelope, Envelope)
         Util.is_type(header, Header)
         Util.is_type(entity, Entity)
@@ -149,8 +214,39 @@ class Crypto:
         else:
             old_signature = envelope.signature
 
-        data = old_signature + Crypto._document_data(header)
+        data = old_signature + bytes(
+            entity.id.bytes) + Crypto._document_data(header)
         signature = libnacl.sign.Signer(privkeys.seed).signature(data)
 
         header.signature = signature
         return header
+
+    @staticmethod
+    def verify_header(envelope, header_no, entity, keys):
+        """Verify envelope header."""
+        Util.is_type(envelope, Envelope)
+        Util.is_type(header_no, Header)
+        Util.is_type(entity, Entity)
+        Util.is_type(keys, Keys)
+
+        header = envelope.header[header_no-1]
+
+        if not (header.issuer == keys.issuer == entity.id):
+            raise RuntimeError(
+                'Header/Keys issuer or Entity id doesn\'t match')
+
+        if header_no - 2 > 0:
+            old_signature = envelope.header[header_no-1]
+        else:
+            old_signature = envelope.signature
+
+        data = old_signature + bytes(
+                    entity.id.bytes) + Crypto._document_data(header)
+        verifier = libnacl.sign.Verifier(keys.verify.hex())
+
+        try:
+            verifier.verify(header.signature + data)
+            return True
+        except ValueError:
+            pass
+        return False

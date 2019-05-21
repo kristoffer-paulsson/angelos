@@ -1,12 +1,14 @@
+# cython: language_level=3
 """Generate and verify messages."""
 import enum
 import datetime
+import pickle
 
 from ..utils import Util
 from .crypto import Crypto
 from .policy import SignPolicy
-from ..document.entities import Person, Ministry, Church
-from ..document.messages import Message, Instant, Note
+from ..document.entities import Person, Ministry, Church, Keys
+from ..document.messages import Message, Instant, Note, Mail, Report, Share
 from ..document.envelope import Envelope, Header
 
 
@@ -117,11 +119,49 @@ class EnvelopePolicy(SignPolicy):
         """Sign an envelope header."""
         Util.is_type(envelope, Envelope)
 
-    def wrap(self, message, entity, keys):
-        """Wrap a message in an envelope."""
+        if envelope.header[-1].op == Header.Op.RECEIVE:
+            raise RuntimeError('Envelope already received.')
 
-    def open(self):
-        """Open a envelope and unveil the message."""
+        self._add_header(envelope, Header.Op.ROUTE)
+        return envelope
+
+    def wrap(self, message, receiver, keys):
+        """Wrap a message in an envelope."""
+        Util.is_type(message, (Note, Instant, Mail, Share, Report))
+        Util.is_type(receiver, (Person, Ministry, Church))
+        Util.is_type(keys, Keys)
+
+        message = Crypto.sign(message, self.entity, self.privkeys, self.keys)
+        message.validate()
+
+        envelope = Envelope(nd={
+            'owner': message.owner,
+            'message': Crypto.conceal(
+                pickle.dumps(message), self.entity,
+                self.privkeys, receiver, keys),
+        })
+
+        envelope = Crypto.sign(envelope, self.entity, self.privkeys, self.keys)
+        envelope.validate()
+
+        return envelope
+
+    def open(self, envelope, sender, keys):
+        """Open an envelope and unveil the message."""
+        Util.is_type(envelope, Envelope)
+        Util.is_type(sender, (Person, Ministry, Church))
+        Util.is_type(keys, Keys)
+
+        envelope = Crypto.verify(envelope, sender, keys)
+        envelope.validate()
+
+        message = pickle.loads(Crypto.unveil(
+            envelope.message, self.entity, self.privkeys, sender, keys))
+
+        message = Crypto.verify(message, sender, keys)
+        message.validate()
+
+        return message
 
     def _add_header(self, envelope, operation):
         if operation not in list(map(Header.Op)):
@@ -133,7 +173,7 @@ class EnvelopePolicy(SignPolicy):
             'timestamp': datetime.datetime.now()
         })
 
-        data = operation + self.entity.id.bytes + \
-            bytes(now.isoformat(), 'utf-8') + envelope.header[-1].signature
+        header = Crypto.sign_header(
+            envelope, header, self.entity, self.privkeys, self.leys)
 
-        envelope.header.append()
+        envelope.header.append(header)
