@@ -49,7 +49,7 @@ class Example(App):
         self.set_list()
         return self.screen
     def set_list(self):
-        names_icons_list = list(md_icons.keys())[self.x:self.y]
+        names_icons_list = list(md_icons.keys())  # [self.x:self.y]
         for name_icon in names_icons_list:
             self.screen.ids.box.add_widget(
                 ItemForList(icon=name_icon, text=name_icon))

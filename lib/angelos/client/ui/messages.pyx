@@ -1,8 +1,10 @@
 # cython: language_level=3
 from kivy.lang import Builder
 from kivy.clock import Clock
+from kivymd.label import MDLabel
 
 from .common import BasePanelScreen
+from ...document.envelope import Envelope
 
 
 Builder.load_string("""
@@ -14,10 +16,18 @@ Builder.load_string("""
 #:import MDScrollViewRefreshLayout kivymd.refreshlayout.MDScrollViewRefreshLayout
 
 
+<EmptyInbox>:
+    text: 'The inbox is empty!\\n[size=14sp][i]Check for messages on the network\\nby pull-and-release.[/i][/size]'
+    markup: True
+    halign: 'center'
+    valign: 'middle'
+
+
 <MessagesScreen@BasePanelScreen>:
     id: 'messages'
     title: 'Messages'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
     BoxLayout:
         orientation: 'vertical'
         MDToolbar:
@@ -30,23 +40,25 @@ Builder.load_string("""
             left_action_items:
                 [['menu', lambda x: root.parent.parent.parent.toggle_nav_drawer()]]
             right_action_items:
-                [['refresh', lambda x: root.refresh_callback()]]
+                [['dots-vertical', lambda x: root.menu(root.ids.bottom_nav.ids.tab_manager.current)]]
         MDBottomNavigation
-            id: person_entity
+            id: bottom_nav
             tab_display_mode: 'icons'
             MDBottomNavigationItem:
-                id: 'inbox'
+                name: 'inbox'
                 text: "Inbox"
                 icon: 'inbox-arrow-down'
-                MDScrollViewRefreshLayout:
-                    id: refresh_inbox
-                    refresh_callback: root.refresh_callback
-                    root_layout: self
-                    MDLabel:
-                        font_style: 'Body1'
-                        theme_text_color: 'Primary'
-                        text: 'I love Python'
-                        halign: 'center'
+                on_pre_enter: root.get_inbox()
+                on_leave: print('On leave')
+                # MDScrollViewRefreshLayout:
+                #    id: refresh_inbox
+                #    refresh_callback: root.refresh_callback
+                #    root_layout: self
+                #    MDLabel:
+                #        font_style: 'Body1'
+                #        theme_text_color: 'Primary'
+                #        text: 'I love Python'
+                #        halign: 'center'
             MDBottomNavigationItem:
                 name: 'outbox'
                 text: "Outbox"
@@ -55,7 +67,7 @@ Builder.load_string("""
             MDBottomNavigationItem:
                 name: 'drafts'
                 text: "Drafts"
-                icon: 'message-text-outline'
+                icon: 'file-multiple'
                 BoxLayout:
             MDBottomNavigationItem:
                 name: 'read'
@@ -70,7 +82,22 @@ Builder.load_string("""
 """)  # noqa E501
 
 
+class EmptyInbox(MDLabel):
+    pass
+
+
 class MessagesScreen(BasePanelScreen):
+    def load(self):
+        self.get_inbox()
+        print('Load:', type(self))
+
+    def unload(self):
+        print('Unload:', type(self))
+
+    def menu(self, name):
+        """Show appropriate menu for each tab."""
+        print('Menu for:', name)
+
     def refresh_callback(self, *args):
         '''A method that updates the state of your application
         while the spinner remains on the screen.'''
@@ -86,3 +113,16 @@ class MessagesScreen(BasePanelScreen):
             self.ids.refresh_layout.refresh_done()
             self.tick = 0
         Clock.schedule_once(refresh_callback, 1)
+
+    def get_inbox(self):
+        messages = self.app.ioc.facade.load_inbox()
+        widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('inbox')
+        if not messages:
+            widget.add_widget(EmptyInbox())
+            return
+        for msg in messages:
+            if isinstance(msg[1], type(None)):
+                pass
+            else:
+                pass
+        #

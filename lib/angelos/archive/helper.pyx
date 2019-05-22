@@ -49,20 +49,56 @@ class Glue:
         return doclist
 
     @staticmethod
+    def doc_validate(datalist, _type):
+        doclist = []
+
+        for data in datalist:
+            try:
+                doc = None
+                doc = pickle.loads(data)
+                Util.is_type(doc, _type)
+                doc.validate()
+                doclist.append(doc)
+            except Exception as e:
+                pass
+
+        return doclist
+
+    @staticmethod
+    def doc_validate_report(datalist, _type):
+        doclist = []
+
+        for data in datalist:
+            try:
+                doc = None
+                doc = pickle.loads(data)
+                Util.is_type(doc, _type)
+                doc.validate()
+                doclist.append((doc, None))
+            except Exception as e:
+                doclist.append((doc if doc else data, str(e)))
+
+        return doclist
+
+    @staticmethod
     def run_async(*aws, raise_exc=True):
         loop = asyncio.get_event_loop()
         gathering = asyncio.gather(
             *aws, loop=loop, return_exceptions=True)
         loop.run_until_complete(gathering)
 
+        result_list = gathering.result()
         exc = None
-        for result in gathering.result():
+        for result in result_list:
             if isinstance(result, Exception):
                 exc = result if not exc else exc
                 logging.error('Operation failed: %s' % result)
         if exc:
             raise exc
-        return result
+        if len(result_list) > 1:
+            return result_list
+        else:
+            return result_list[0]
 
 
 class Globber:
@@ -98,6 +134,26 @@ class Globber:
 
         with archive.lock:
             sq = Archive7.Query(path).owner(owner).type(b'f')
+            idxs = archive.ioc.entries.search(sq)
+            ids = archive.ioc.hierarchy.ids
+
+            files = []
+            for i in idxs:
+                idx, entry = i
+                if entry.parent.int == 0:
+                    name = '/'+str(entry.name, 'utf-8')
+                else:
+                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                files.append((name, entry.id, entry.created))
+
+        return files
+
+    @staticmethod
+    def path(archive, path='*'):
+        Util.is_type(archive, Archive7)
+
+        with archive.lock:
+            sq = Archive7.Query(path).type(b'f')
             idxs = archive.ioc.entries.search(sq)
             ids = archive.ioc.hierarchy.ids
 
@@ -178,7 +234,7 @@ class ThreadProxy(Proxy):
                 result = task.callable(**task.params)
                 logging.info(
                     'Proxy execution: "%s"' % str(task.callable.__name__))
-                task.result = result if result else None
+                task.result = result  # if result else None
             except Exception as e:
                 logging.error(
                     'Proxy execution failed: "%s"' % str(
@@ -194,7 +250,8 @@ class AsyncProxy(Proxy):
         self.task = asyncio.ensure_future(self.run())
 
     async def call(self, callback, priority=1024, timeout=10, **kwargs):
-        Util.is_type(callback, (types.FunctionType, types.MethodType))
+        if not callable(callback):
+            raise TypeError('Not a callable. Type: %s' % type(callback))
         if self._quit:
             raise RuntimeError('Proxy has quit, no more calls')
 
@@ -222,7 +279,7 @@ class AsyncProxy(Proxy):
         try:
             result = task.callable(**task.params)
             logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
-            task.result = result if result else None
+            task.result = result  # if result else None
         except Exception as e:
             logging.error(
                 'Proxy execution failed: "%s"' % str(task.callable.__name__))

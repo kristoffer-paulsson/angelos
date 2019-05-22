@@ -12,6 +12,8 @@ from kivymd.theming import ThemeManager
 from ..ioc import Container, ContainerAware, Config, Handle
 from ..utils import Util, Event
 from ..const import Const
+from ..archive.helper import Glue
+from ..policy.lock import KeyLoader
 
 # from .state import StateMachine
 from ..logger import LogHandler
@@ -86,6 +88,9 @@ class LogoMessenger(ContainerAware, App):
         vault_file = Util.path(self.user_data_dir, Const.CNL_VAULT)
 
         if os.path.isfile(vault_file):
+            facade = Glue.run_async(
+                Facade.open(self.user_data_dir, KeyLoader.get()))
+            self.ioc.facade = facade
             self.switch('splash', UserScreen(name='user'))
         else:
             self.switch('splash', SetupScreen(name='setup'))

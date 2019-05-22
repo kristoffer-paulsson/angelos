@@ -10,6 +10,7 @@ from ..const import Const
 
 from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from ..document.domain import Domain, Node, Network
+from ..document.envelope import Envelope
 from ..document.statements import Trusted
 from ..archive.vault import Vault
 from ..archive.helper import Glue
@@ -419,6 +420,12 @@ class ClientFacadeMixin(TypeFacadeMixin):
     async def _post_init(self):
         """Post init async work."""
         pass
+
+    def load_inbox(self):
+        doclist = Glue.run_async(
+            self._vault.search(path=Vault.INBOX, limit=100))
+        result = Glue.doc_validate_report(doclist, Envelope)
+        return result
 
 
 class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):

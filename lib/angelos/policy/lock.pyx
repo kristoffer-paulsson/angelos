@@ -16,16 +16,18 @@ class KeyLoader(Policy):
         if key is None:
             key = KeyLoader.new()
 
-        plyer.keystore.set_key('Λόγῳ', 'conceal', base64.b64encode(key).decode())
+        plyer.keystore.set_key(
+            'Λόγῳ', 'conceal', base64.b64encode(key).decode())
         box = libnacl.secret.SecretBox(key)
         plyer.keystore.set_key(
-            'Λόγῳ', 'masterkey', base64.b64encode(box.encrypt(master)).decode())
+            'Λόγῳ', 'masterkey', base64.b64encode(
+                box.encrypt(master)).decode())
 
     @staticmethod
     def get():
-        key = base64.decode(plyer.keystore.get_key('Λόγῳ', 'conceal'))
+        key = base64.b64decode(plyer.keystore.get_key('Λόγῳ', 'conceal'))
         box = libnacl.secret.SecretBox(key)
-        master = base64.decode(plyer.keystore.get_key('Λόγῳ', 'masterkey'))
+        master = base64.b64decode(plyer.keystore.get_key('Λόγῳ', 'masterkey'))
         return box.decrypt(master)
 
     @staticmethod

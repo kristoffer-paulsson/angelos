@@ -27,7 +27,7 @@ setup(
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Environment :: Console',
-        # 'Environment :: Handhelds/PDA\'s',
+        'Environment :: Handhelds/PDA\'s',
         # 'Environment :: MacOS X',
         # 'Environment :: Win32 (MS Windows)',
         'Environment :: No Input/Output (Daemon)',

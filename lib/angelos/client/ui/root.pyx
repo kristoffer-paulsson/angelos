@@ -10,7 +10,8 @@ Builder.load_string("""
 <ContactsScreen@BasePanelScreen>:
     name: 'contacts'
     title: 'Contacts'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
 """)  # noqa E501
 
 
@@ -22,7 +23,8 @@ Builder.load_string("""
 <DocumentsScreen@BasePanelScreen>:
     name: 'documents'
     title: 'Documents'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
 """)  # noqa E501
 
 
@@ -34,7 +36,8 @@ Builder.load_string("""
 <FilesScreen@BasePanelScreen>:
     name: 'files'
     title: 'Files'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
 """)  # noqa E501
 
 
@@ -46,7 +49,8 @@ Builder.load_string("""
 <NetworksScreen@BasePanelScreen>:
     name: 'networks'
     title: 'Networks'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
 """)  # noqa E501
 
 
@@ -58,7 +62,8 @@ Builder.load_string("""
 <ProfileScreen@BasePanelScreen>:
     name: 'profile'
     title: 'Profile'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
 """)  # noqa E501
 
 
@@ -70,7 +75,8 @@ Builder.load_string("""
 <SettingsScreen@BasePanelScreen>:
     name: 'settings'
     title: 'Settings'
-    # on_pre_enter: self.load()
+    on_pre_enter: self.load()
+    on_leave: self.unload()
 """)  # noqa E501
 
 
@@ -145,11 +151,11 @@ Builder.load_string("""
         on_release: root.ids.scr_mngr.current = 'contacts'
     NavigationDrawerIconButton:
         text: 'Documents'
-        icon: 'verified'
+        icon: 'shield-account'
         on_release: root.ids.scr_mngr.current = 'documents'
     NavigationDrawerIconButton:
         text: 'Files'
-        icon: 'file-document'
+        icon: 'folder-account'
         on_release: root.ids.scr_mngr.current = 'files'
     NavigationDrawerIconButton:
         text: 'Networks'
@@ -180,11 +186,11 @@ Builder.load_string("""
                 on_release: root.goto_contacts(app)
             NavigationDrawerIconButton:
                 text: 'Documents'
-                icon: 'verified'
+                icon: 'shield-account'
                 on_release: root.goto_documents(app)
             NavigationDrawerIconButton:
                 text: 'Files'
-                icon: 'file-document'
+                icon: 'folder-account'
                 on_release: root.goto_files(app)
             NavigationDrawerIconButton:
                 text: 'Networks'
@@ -206,28 +212,36 @@ Builder.load_string("""
 
 class UserScreen(Screen):
     def goto_main(self, app):
-        self.switch(MainScreen(app, name='main'))
+        if self.ids.scr_mngr.current != 'main':
+            self.switch(MainScreen(app, name='main'))
 
     def goto_messages(self, app):
-        self.switch(MessagesScreen(app, name='messages'))
+        if self.ids.scr_mngr.current != 'messages':
+            self.switch(MessagesScreen(app, name='messages'))
 
     def goto_contacts(self, app):
-        self.switch(ContactsScreen(app, name='contacts'))
+        if self.ids.scr_mngr.current != 'contacts':
+            self.switch(ContactsScreen(app, name='contacts'))
 
     def goto_documents(self, app):
-        self.switch(DocumentsScreen(app, name='documents'))
+        if self.ids.scr_mngr.current != 'documents':
+            self.switch(DocumentsScreen(app, name='documents'))
 
     def goto_files(self, app):
-        self.switch(FilesScreen(app, name='files'))
+        if self.ids.scr_mngr.current != 'files':
+            self.switch(FilesScreen(app, name='files'))
 
     def goto_networks(self, app):
-        self.switch(NetworksScreen(app, name='networks'))
+        if self.ids.scr_mngr.current != 'networks':
+            self.switch(NetworksScreen(app, name='networks'))
 
     def goto_profile(self, app):
-        self.switch(ProfileScreen(app, name='profile'))
+        if self.ids.scr_mngr.current != 'profile':
+            self.switch(ProfileScreen(app, name='profile'))
 
     def goto_settings(self, app):
-        self.switch(SettingsScreen(app, name='settings'))
+        if self.ids.scr_mngr.current != 'settings':
+            self.switch(SettingsScreen(app, name='settings'))
 
     def switch(self, screen):
         """Switch to another main screen."""

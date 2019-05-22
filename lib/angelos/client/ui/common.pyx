@@ -28,4 +28,7 @@ class BasePanelScreen(Screen):
         self.app = app
 
     def load(self):
-        pass
+        raise NotImplementedError()
+
+    def unload(self):
+        raise NotImplementedError()

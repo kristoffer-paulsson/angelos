@@ -74,6 +74,8 @@ class Vault:
     NODES = '/settings/nodes'
     NETWORK = '/settings/network.pickle'
 
+    INBOX = '/messages/inbox/*'
+
     def __init__(self, filename, secret):
         """Initialize the Vault."""
         self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
@@ -179,8 +181,28 @@ class Vault:
 
     async def issuer(self, issuer, path='/', limit=1):
         """Search a folder for documents by issuer."""
+        raise DeprecationWarning('Use "search" instead of "issuer".')
+
         def callback():
             result = Globber.owner(self._archive, issuer, path)
+            result.sort(reverse=True, key=lambda e: e[2])
+
+            datalist = []
+            for r in result[:limit]:
+                datalist.append(self._archive.load(r[0]))
+
+            return datalist
+
+        return (await self._proxy.call(callback, 0, 5))
+
+    async def search(self, issuer=None, path='/', limit=1):
+        """Search a folder for documents by issuer and path."""
+        def callback():
+            if issuer:
+                result = Globber.owner(self._archive, issuer, path)
+            else:
+                result = Globber.path(self._archive, path)
+
             result.sort(reverse=True, key=lambda e: e[2])
 
             datalist = []
