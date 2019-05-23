@@ -7,7 +7,7 @@ import asyncssh
 
 from .utils import Util
 from .ioc import Container
-from .document.entities import Entity, PrivateKeys, Keys
+from .document import Entity, PrivateKeys, Keys
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.console import BootServer, AdminServer

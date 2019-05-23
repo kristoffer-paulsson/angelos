@@ -72,32 +72,33 @@ class Document(IssueMixin, BaseDocument):
         for cls in _list:
             cls._validate(self)
 
-    class Type(enum.IntEnum):
-        NONE = 0
 
-        KEYS_PRIVATE = 1
+class DocType(enum.IntEnum):
+    NONE = 0
 
-        KEYS = 10
+    KEYS_PRIVATE = 1
 
-        ENTITY_PERSON = 20
-        ENTITY_MINISTRY = 21
-        ENTITY_CHURCH = 22
-        PROF_PERSON = 30
-        PROF_MINISTRY = 31
-        PROF_CHURCH = 32
+    KEYS = 10
 
-        NET_DOMAIN = 40
-        NET_NODE = 41
-        NET_NETWORK = 42
+    ENTITY_PERSON = 20
+    ENTITY_MINISTRY = 21
+    ENTITY_CHURCH = 22
+    PROF_PERSON = 30
+    PROF_MINISTRY = 31
+    PROF_CHURCH = 32
 
-        STAT_VERIFIED = 50
-        STAT_TRUSTED = 51
-        STAT_REVOKED = 52
+    NET_DOMAIN = 40
+    NET_NODE = 41
+    NET_NETWORK = 42
 
-        COM_ENVELOPE = 60
+    STAT_VERIFIED = 50
+    STAT_TRUSTED = 51
+    STAT_REVOKED = 52
 
-        COM_NOTE = 70
-        COM_INSTANT = 71
-        COM_MAIL = 72
-        COM_SHARE = 73
-        COM_REPORT = 74
+    COM_ENVELOPE = 60
+
+    COM_NOTE = 70
+    COM_INSTANT = 71
+    COM_MAIL = 72
+    COM_SHARE = 73
+    COM_REPORT = 74

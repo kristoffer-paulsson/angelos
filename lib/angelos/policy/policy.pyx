@@ -1,7 +1,7 @@
 # cython: language_level=3
 """Baseclasses for policies."""
 from ..utils import Util
-from ..document.entities import Entity, PrivateKeys, Keys
+from ..document import Entity, PrivateKeys, Keys
 
 
 class Policy:

@@ -4,7 +4,8 @@ from kivy.clock import Clock
 from kivymd.label import MDLabel
 
 from .common import BasePanelScreen
-from ...document.envelope import Envelope
+from ...document import Envelope
+from ...dummy.support import random_person_entity_data
 
 
 Builder.load_string("""
@@ -88,6 +89,7 @@ class EmptyInbox(MDLabel):
 
 class MessagesScreen(BasePanelScreen):
     def load(self):
+        random_person_entity_data(num=1)
         self.get_inbox()
         print('Load:', type(self))
 

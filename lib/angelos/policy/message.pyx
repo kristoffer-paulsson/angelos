@@ -76,8 +76,8 @@ class CreateMessagePolicy(SignPolicy):
         TIFF = 'image/tiff'
         BMP = 'image/bmp'
 
-        MP4 = 'audio/mp4'
-        MPEG = 'audio/mpeg'
+        MP4_A = 'audio/mp4'
+        MPEG_A = 'audio/mpeg'
         AAC = 'audio/aac'
         WEBM = 'audio/webm'
         VORBIS = 'audio/vorbis'

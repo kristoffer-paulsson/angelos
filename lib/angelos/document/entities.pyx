@@ -1,18 +1,18 @@
 # cython: language_level=3
 """Module docstring."""
 from .model import BaseDocument, TypeField, BinaryField, SignatureField
-from .document import Document, UpdatedMixin, IssueMixin
+from .document import DocType, Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class PrivateKeys(Document):
-    type = TypeField(value=Document.Type.KEYS_PRIVATE)
+    type = TypeField(value=DocType.KEYS_PRIVATE)
     secret = BinaryField()
     seed = BinaryField()
     signature = SignatureField()
 
     def _validate(self):
-        self._check_type(Document.Type.KEYS_PRIVATE)
+        self._check_type(DocType.KEYS_PRIVATE)
         return True
 
     def validate(self):
@@ -22,13 +22,13 @@ class PrivateKeys(Document):
 
 
 class Keys(Document):
-    type = TypeField(value=Document.Type.KEYS)
+    type = TypeField(value=DocType.KEYS)
     verify = BinaryField()
     public = BinaryField()
     signature = SignatureField(multiple=True)
 
     def _validate(self):
-        self._check_type(Document.Type.KEYS)
+        self._check_type(DocType.KEYS)
         return True
 
     def validate(self):
@@ -43,10 +43,10 @@ class Entity(Document, UpdatedMixin):
 
 
 class Person(Entity, PersonMixin):
-    type = TypeField(value=Document.Type.ENTITY_PERSON)
+    type = TypeField(value=DocType.ENTITY_PERSON)
 
     def _validate(self):
-        self._check_type(Document.Type.ENTITY_PERSON)
+        self._check_type(DocType.ENTITY_PERSON)
         return True
 
     def validate(self):
@@ -57,10 +57,10 @@ class Person(Entity, PersonMixin):
 
 
 class Ministry(Entity, MinistryMixin):
-    type = TypeField(value=Document.Type.ENTITY_MINISTRY)
+    type = TypeField(value=DocType.ENTITY_MINISTRY)
 
     def _validate(self):
-        self._check_type(Document.Type.ENTITY_MINISTRY)
+        self._check_type(DocType.ENTITY_MINISTRY)
         return True
 
     def validate(self):
@@ -71,10 +71,10 @@ class Ministry(Entity, MinistryMixin):
 
 
 class Church(Entity, ChurchMixin):
-    type = TypeField(value=Document.Type.ENTITY_CHURCH)
+    type = TypeField(value=DocType.ENTITY_CHURCH)
 
     def _validate(self):
-        self._check_type(Document.Type.ENTITY_CHURCH)
+        self._check_type(DocType.ENTITY_CHURCH)
         return True
 
     def validate(self):

@@ -3,7 +3,7 @@
 from .model import (
     BaseDocument, StringField, IPField, UuidField, DocumentField, TypeField,
     ChoiceField)
-from .document import Document, UpdatedMixin, IssueMixin
+from .document import DocType, Document, UpdatedMixin, IssueMixin
 
 
 class Host(BaseDocument):
@@ -18,10 +18,10 @@ class Location(BaseDocument):
 
 
 class Domain(Document, UpdatedMixin):
-    type = TypeField(value=Document.Type.NET_DOMAIN)
+    type = TypeField(value=DocType.NET_DOMAIN)
 
     def _validate(self):
-        self._check_type(Document.Type.NET_DOMAIN)
+        self._check_type(DocType.NET_DOMAIN)
         return True
 
     def validate(self):
@@ -30,23 +30,8 @@ class Domain(Document, UpdatedMixin):
         return True
 
 
-class Network(Document, UpdatedMixin):
-    type = TypeField(value=Document.Type.NET_NETWORK)
-    domain = UuidField()
-    hosts = DocumentField(t=Host, multiple=True)
-
-    def _validate(self):
-        self._check_type(Document.Type.NET_NETWORK)
-        return True
-
-    def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Network, UpdatedMixin]
-        self._check_validate(validate)
-        return True
-
-
 class Node(Document, UpdatedMixin):
-    type = TypeField(value=Document.Type.NET_NODE)
+    type = TypeField(value=DocType.NET_NODE)
     domain = UuidField()
     role = ChoiceField(choices=['client', 'server', 'backup'])
     device = StringField()
@@ -54,10 +39,25 @@ class Node(Document, UpdatedMixin):
     location = DocumentField(required=False, t=Location)
 
     def _validate(self):
-        self._check_type(Document.Type.NET_NODE)
+        self._check_type(DocType.NET_NODE)
         return True
 
     def validate(self):
         validate = [BaseDocument, Document, IssueMixin, Node, UpdatedMixin]
+        self._check_validate(validate)
+        return True
+
+
+class Network(Document, UpdatedMixin):
+    type = TypeField(value=DocType.NET_NETWORK)
+    domain = UuidField()
+    hosts = DocumentField(t=Host, multiple=True)
+
+    def _validate(self):
+        self._check_type(DocType.NET_NETWORK)
+        return True
+
+    def validate(self):
+        validate = [BaseDocument, Document, IssueMixin, Network, UpdatedMixin]
         self._check_validate(validate)
         return True

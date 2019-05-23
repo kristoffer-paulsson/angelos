@@ -3,7 +3,7 @@
 from .model import (
     BaseDocument, StringField, DateField, ChoiceField, EmailField, BinaryField,
     DocumentField, TypeField)
-from .document import Document, UpdatedMixin, IssueMixin
+from .document import DocType, Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
@@ -41,13 +41,13 @@ class Profile(Document, UpdatedMixin):
 
 
 class PersonProfile(Profile, PersonMixin):
-    type = TypeField(value=Document.Type.PROF_PERSON)
+    type = TypeField(value=DocType.PROF_PERSON)
     gender = ChoiceField(required=False, choices=['man', 'woman', 'undefined'])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
     def _validate(self):
-        self._check_type(Document.Type.PROF_PERSON)
+        self._check_type(DocType.PROF_PERSON)
         return True
 
     def validate(self):
@@ -58,10 +58,10 @@ class PersonProfile(Profile, PersonMixin):
 
 
 class MinistryProfile(Profile, MinistryMixin):
-    type = TypeField(value=Document.Type.PROF_MINISTRY)
+    type = TypeField(value=DocType.PROF_MINISTRY)
 
     def _validate(self):
-        self._check_type(Document.Type.PROF_MINISTRY)
+        self._check_type(DocType.PROF_MINISTRY)
         return True
 
     def validate(self):
@@ -72,10 +72,10 @@ class MinistryProfile(Profile, MinistryMixin):
 
 
 class ChurchProfile(Profile, ChurchMixin):
-    type = TypeField(value=Document.Type.PROF_CHURCH)
+    type = TypeField(value=DocType.PROF_CHURCH)
 
     def _validate(self):
-        self._check_type(Document.Type.PROF_CHURCH)
+        self._check_type(DocType.PROF_CHURCH)
         return True
 
     def validate(self):

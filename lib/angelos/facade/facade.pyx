@@ -8,10 +8,9 @@ import asyncio
 from ..utils import Util
 from ..const import Const
 
-from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
-from ..document.domain import Domain, Node, Network
-from ..document.envelope import Envelope
-from ..document.statements import Trusted
+from ..document import (
+    Person, Ministry, Church, PrivateKeys, Keys, Domain, Node, Network,
+    Envelope, Trusted)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy.accept import ImportEntityPolicy, ImportUpdatePolicy

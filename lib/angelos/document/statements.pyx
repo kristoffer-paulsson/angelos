@@ -1,7 +1,7 @@
 # cython: language_level=3
 """Module docstring."""
 from .model import BaseDocument, TypeField
-from .document import Document, OwnerMixin, IssueMixin
+from .document import DocType, Document, OwnerMixin, IssueMixin
 from .model import UuidField
 
 
@@ -11,10 +11,10 @@ class Statement(Document):
 
 
 class Verified(Statement, OwnerMixin):
-    type = TypeField(value=Document.Type.STAT_VERIFIED)
+    type = TypeField(value=DocType.STAT_VERIFIED)
 
     def _validate(self):
-        self._check_type(Document.Type.STAT_VERIFIED)
+        self._check_type(DocType.STAT_VERIFIED)
         return True
 
     def validate(self):
@@ -25,10 +25,10 @@ class Verified(Statement, OwnerMixin):
 
 
 class Trusted(Statement, OwnerMixin):
-    type = TypeField(value=Document.Type.STAT_TRUSTED)
+    type = TypeField(value=DocType.STAT_TRUSTED)
 
     def _validate(self):
-        self._check_type(Document.Type.STAT_TRUSTED)
+        self._check_type(DocType.STAT_TRUSTED)
         return True
 
     def validate(self):
@@ -39,11 +39,11 @@ class Trusted(Statement, OwnerMixin):
 
 
 class Revoked(Statement):
-    type = TypeField(value=Document.Type.STAT_REVOKED)
+    type = TypeField(value=DocType.STAT_REVOKED)
     issuance = UuidField()
 
     def _validate(self):
-        self._check_type(Document.Type.STAT_REVOKED)
+        self._check_type(DocType.STAT_REVOKED)
         return True
 
     def validate(self):

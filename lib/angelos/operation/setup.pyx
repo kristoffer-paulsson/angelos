@@ -4,8 +4,8 @@ import logging
 
 from ..utils import Util
 
-from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
-from ..document.domain import Domain, Node
+from ..document import (
+    Person, Ministry, Church, PrivateKeys, Keys, Domain, Node)
 from .operation import Operation
 from ..policy.crypto import Crypto
 from ..policy.entity import (

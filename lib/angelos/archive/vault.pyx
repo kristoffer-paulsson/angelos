@@ -5,9 +5,7 @@ import asyncio
 
 from ..utils import Util
 
-from ..document.entities import (
-    Entity, PrivateKeys, Keys)
-from ..document.domain import Domain, Node, Network
+from ..document import Entity, PrivateKeys, Keys, Domain, Node, Network
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
 
@@ -96,10 +94,10 @@ class Vault:
 
     @staticmethod
     def setup(filename, secret,
-              entity, privkeys, keys, domain, node,
+              entity: Entity, privkeys, keys, domain, node,
               network=None, _type=None, role=None, use=None):
         """Create and setup the whole Vault according to policys."""
-        Util.is_type(entity, Entity)
+        # Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
         Util.is_type(keys, Keys)
         Util.is_type(domain, Domain)

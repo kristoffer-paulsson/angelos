@@ -6,7 +6,6 @@ import asyncio
 import logging
 import uuid
 import pickle
-import types
 
 from ..utils import Util
 from .archive7 import Archive7
@@ -174,7 +173,8 @@ class Proxy:
         self._quit = False
 
     def call(self, callback, priority=1024, timeout=10, **kwargs):
-        Util.is_type(callback, types.FunctionType)
+        if not callable(callback):
+            raise TypeError('Not a callable. Type: %s' % type(callback))
         if self._quit:
             raise RuntimeError('Proxy has quit, no more calls')
 
@@ -200,7 +200,8 @@ class Proxy:
 
 class NullProxy(Proxy):
     def call(self, callback, priority=1024, timeout=10, **kwargs):
-        Util.is_type(callback, (types.FunctionType, types.MethodType))
+        if not callable(callback):
+            raise TypeError('Not a callable. Type: %s' % type(callback))
         if self._quit:
             raise RuntimeError('Proxy has quit, no more calls')
         try:
@@ -219,7 +220,8 @@ class ThreadProxy(Proxy):
         self.__queue = threading.PriorityQueue(size)
 
     def call(self, callback, priority=1024, timeout=10, **kwargs):
-        Util.is_type(callback, (types.FunctionType, types.MethodType))
+        if not callable(callback):
+            raise TypeError('Not a callable. Type: %s' % type(callback))
         if self._quit:
             raise RuntimeError('Proxy has quit, no more calls')
 

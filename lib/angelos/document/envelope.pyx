@@ -9,7 +9,7 @@ from ..error import Error
 from .model import (
     BaseDocument, DateField, StringField, UuidField, DocumentField,
     BinaryField, TypeField, SignatureField)
-from .document import Document, OwnerMixin, IssueMixin
+from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
 class Header(BaseDocument):
@@ -25,14 +25,14 @@ class Header(BaseDocument):
 
 
 class Envelope(Document, OwnerMixin):
-    type = TypeField(value=Document.Type.COM_ENVELOPE)
+    type = TypeField(value=DocType.COM_ENVELOPE)
     expires = DateField(required=True, init=lambda: (
         datetime.date.today() + datetime.timedelta(31)))
     message = BinaryField(limit=131072)
     header = DocumentField(t=Header, multiple=True)
 
     def _validate(self):
-        self._check_type(Document.Type.COM_ENVELOPE)
+        self._check_type(DocType.COM_ENVELOPE)
 
         if self.expires - self.created > datetime.timedelta(31):
             raise Util.exception(

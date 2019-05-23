@@ -230,7 +230,7 @@ class DocumentField(Field):
         self.type = t
 
     def validate(self, value):
-        """Validate document type and inherited validation logic."""
+        """Validate DocType and inherited validation logic."""
         Field.validate(self, value)
 
         if not isinstance(value, list):

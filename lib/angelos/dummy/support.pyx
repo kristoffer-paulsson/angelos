@@ -1,14 +1,17 @@
+# cython: language_level=3
+"""Random dummy data generators."""
 import os
 import io
 import random
 import string
 import datetime
 
-from lipsum import (
+from .lipsum import (
     SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES, LIPSUM_WORDS, CHURCHES)
 
 
 def filesize(file):
+    """Real file filesize reader."""
     if isinstance(file, io.IOBase):
         return os.fstat(file.fileno()).st_size
     else:
@@ -16,6 +19,7 @@ def filesize(file):
 
 
 def random_person_entity_data(num=1):
+    """Generate random entity data for number of person entities."""
     identities = []
     for i in range(num):
         sex = random.choices(
@@ -43,6 +47,7 @@ def random_person_entity_data(num=1):
 
 
 def random_ministry_entity_data(num=1):
+    """Generate random entity data for number of ministry entities."""
     ministries = []
     for i in range(num):
         ministry = random.choices(LIPSUM_WORDS, k=random.randrange(3, 7))
@@ -60,6 +65,7 @@ def random_ministry_entity_data(num=1):
 
 
 def random_church_entity_data(num=1):
+    """Generate random entity data for number of church entities."""
     churches = []
     for i in range(num):
         church = random.choices(CHURCHES, k=1)[0]
@@ -77,6 +83,7 @@ def random_church_entity_data(num=1):
 
 
 def generate_data():
+    """Random lipsum data generator."""
     return ('\n'.join(
         random.choices(
             LIPSUM_LINES,
@@ -84,6 +91,7 @@ def generate_data():
 
 
 def generate_filename(postfix='.txt'):
+    """Random file name generator."""
     return ''.join(random.choices(
         string.ascii_lowercase + string.digits,
         k=random.randrange(5, 10))) + postfix
