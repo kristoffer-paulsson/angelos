@@ -5,6 +5,8 @@ import uuid
 import logging
 import asyncio
 
+from typing import Sequence
+
 from ..utils import Util
 from ..const import Const
 
@@ -13,6 +15,7 @@ from ..document import (
     Envelope, Trusted)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
+from ..policy.portfolio import Portfolio
 from ..policy.accept import ImportEntityPolicy, ImportUpdatePolicy
 from ..policy.domain import NetworkPolicy
 
@@ -147,25 +150,42 @@ class Facade:
         self.__domain = identity[3]
         self.__node = identity[4]
 
+    def load_portfolio(self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
+        """Load a portfolio belonging to id according to configuration."""
+        raise NotImplementedError()
+
+    def update_portfolio(self, portfolio: Portfolio) -> bool:
+        """Update a portfolio by comparison."""
+        raise NotImplementedError()
+
+    def import_portfolio(self, portfolio: Portfolio) -> bool:
+        """Import a portfolio of douments into the vault."""
+        raise NotImplementedError()
+
+    @property
+    def portfolio(self):
+        """Private portfolio getter."""
+        return self.__portfolio
+
     @property
     def entity(self):
         """Entity core document getter."""
-        return self.__entity
+        raise DeprecationWarning()
 
     @property
     def keys(self):
         """Public keys core document getter."""
-        return self.__keys
+        raise DeprecationWarning()
 
     @property
     def domain(self):
         """Domain core document getter."""
-        return self.__domain
+        raise DeprecationWarning()
 
     @property
     def node(self):
         """Node core document getter."""
-        return self.__node
+        raise DeprecationWarning()
 
     def import_entity(self, entity, keys):
         """

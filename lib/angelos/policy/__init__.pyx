@@ -8,7 +8,8 @@ from ._types import EntityData, PersonData, MinistryData, ChurchData
 from .crypto import Crypto
 from .entity import (
     PersonUpdatePolicy, MinistryUpdatePolicy, ChurchUpdatePolicy,
-    PersonGeneratePolicy, MinistryGeneratePolicy, ChurchGeneratePolicy)
+    PersonGeneratePolicy, MinistryGeneratePolicy, ChurchGeneratePolicy,
+    PersonPolicy, MinistryPolicy, ChurchPolicy)
 from .accept import ImportPolicy, ImportEntityPolicy, ImportUpdatePolicy
 from .domain import NodePolicy, DomainPolicy, NetworkPolicy
 from .verify import StatementPolicy
@@ -34,6 +35,9 @@ __all__ = [
     'PersonGeneratePolicy',
     'MinistryGeneratePolicy',
     'ChurchGeneratePolicy',
+    'PersonPolicy',
+    'MinistryPolicy',
+    'ChurchPolicy',
 
     'NodePolicy',
     'DomainPolicy',

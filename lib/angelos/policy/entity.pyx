@@ -1,6 +1,7 @@
 # cython: language_level=3
 """Module docstring."""
 import datetime
+from typing import List
 
 import libnacl.dual
 
@@ -8,8 +9,8 @@ from ..utils import Util
 from .policy import Policy
 from .crypto import Crypto
 from ..document import Entity, PrivateKeys, Keys, Person, Ministry, Church
-from ._types import EntityData, PersonData, MinistryData, ChurchData
-from .portfolio import PrivatePortfolio
+from ._types import (
+    EntityData, PersonData, MinistryData, ChurchData, PrivatePortfolioABC)
 
 
 class BaseGeneratePolicy(Policy):
@@ -159,9 +160,10 @@ class BaseEntityPolicy(Policy):
     def __init__(self):
         self._box = None
 
-    def _generate(
-            self, entity_type, entity_data: EntityData) -> PrivatePortfolio:
-        self._box = libnacl.dual.DualSecret()
+    @staticmethod
+    def _generate(entity_type, entity_data: EntityData
+                  ) -> (Entity, PrivateKeys, List[Keys]):
+        box = libnacl.dual.DualSecret()
         data = vars(entity_data)
         fields = set(type._fields.keys())
         args = set(data.keys())
@@ -171,32 +173,33 @@ class BaseEntityPolicy(Policy):
 
         entity = entity_type(nd=data)
         entity.issuer = entity.id
-        entity.signature = self._box.signature(
+        entity.signature = box.signature(
             bytes(entity.issuer.bytes) + Crypto._document_data(entity))
 
         privkeys = PrivateKeys(nd={
             'issuer': entity.id,
-            'secret': self._box.sk,
-            'seed': self._box.seed
+            'secret': box.sk,
+            'seed': box.seed
         })
-        privkeys.signature = self._box.signature(
+        privkeys.signature = box.signature(
             bytes(privkeys.issuer.bytes) + Crypto._document_data(privkeys))
 
         keys = Keys(nd={
             'issuer': entity.id,
-            'public': self._box.pk,
-            'verify': self._box.vk
+            'public': box.pk,
+            'verify': box.vk
         })
-        keys.signature = [self._box.signature(
+        keys.signature = [box.signature(
                 bytes(keys.issuer.bytes) + Crypto._document_data(keys))]
 
         entity.validate()
         privkeys.validate()
         keys.validate()
 
-        return PrivatePortfolio(entity=entity, privkeys=privkeys, keys=[keys])
+        return entity, privkeys, [keys]
 
-    def update(self, portfolio: PrivatePortfolio) -> bool:
+    @staticmethod
+    def update(portfolio: PrivatePortfolioABC) -> bool:
         """Renew the identity document expiry date"""
 
         entity = portfolio.entity
@@ -215,7 +218,8 @@ class BaseEntityPolicy(Policy):
 
         return True
 
-    def _change(self, entity: Entity, changed: dict, allowed: list) -> bool:
+    @staticmethod
+    def _change(entity: Entity, changed: dict, allowed: list) -> bool:
         """
         Change information on the identity.
         Don't forget to update the change.
@@ -231,22 +235,23 @@ class BaseEntityPolicy(Policy):
 
         return True
 
-    def newkeys(self, portfolio: PrivatePortfolio) -> bool:
+    @staticmethod
+    def newkeys(portfolio: PrivatePortfolioABC) -> bool:
         """Issue a new pair of keys"""
-        self._box = libnacl.dual.DualSecret()
+        box = libnacl.dual.DualSecret()
 
         new_pk = PrivateKeys(nd={
             'issuer': portfolio.entity.id,
-            'secret': self._box.sk,
-            'seed': self.box.seed
+            'secret': box.sk,
+            'seed': box.seed
         })
         new_pk = Crypto.sign(
             new_pk, portfolio.entity, portfolio.privkeys, portfolio.keys[0])
 
         new_keys = Keys(nd={
             'issuer': portfolio.entity.id,
-            'public': self._box.pk,
-            'verify': self._box.vk
+            'public': box.pk,
+            'verify': box.vk
         })
         new_keys = Crypto.sign(
             new_keys, portfolio.entity, portfolio.privkeys,
@@ -264,26 +269,33 @@ class BaseEntityPolicy(Policy):
 
 
 class PersonPolicy(BaseEntityPolicy):
-    def generate(self, person_data: PersonData) -> PrivatePortfolio:
-        return self._generate(self, Person, person_data)
+    """Create and maintain Person entity document with keys."""
 
-    def change(self, portfolio: PrivatePortfolio, changed: dict) -> bool:
-        return self._change(self, portfolio.entity, changed, ['family_name'])
+    def generate(person_data: PersonData) -> PrivatePortfolioABC:
+        return BaseEntityPolicy._generate(Person, person_data)
+
+    def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
+        return BaseEntityPolicy._change(
+            portfolio.entity, changed, ['family_name'])
 
 
 class MinistryPolicy(BaseEntityPolicy):
-    def generate(self, ministry_data: MinistryData) -> PrivatePortfolio:
-        return self._generate(self, Ministry, ministry_data)
+    """Create and maintain Ministry entity document with keys."""
 
-    def change(self, portfolio: PrivatePortfolio, changed: dict) -> bool:
-        return self._change(
-            self, portfolio.entity, changed, ['vision', 'ministry'])
+    def generate(ministry_data: MinistryData) -> PrivatePortfolioABC:
+        return BaseEntityPolicy._generate(Ministry, ministry_data)
+
+    def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
+        return BaseEntityPolicy._change(
+            portfolio.entity, changed, ['vision', 'ministry'])
 
 
 class ChurchPolicy(BaseEntityPolicy):
-    def generate(self, church_data: ChurchData) -> PrivatePortfolio:
-        return self._generate(self, Church, church_data)
+    """Create and maintain Church entity document with keys."""
 
-    def change(self, portfolio: PrivatePortfolio, changed: dict) -> bool:
-        return self._change(
-            self, portfolio.entity, changed, ['state', 'nation'])
+    def generate(church_data: ChurchData) -> PrivatePortfolioABC:
+        return BaseEntityPolicy._generate(Church, church_data)
+
+    def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
+        return BaseEntityPolicy._change(
+            portfolio.entity, changed, ['state', 'nation'])

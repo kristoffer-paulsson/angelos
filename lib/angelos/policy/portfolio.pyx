@@ -5,63 +5,12 @@ import enum
 from dataclasses import dataclass
 from typing import List, Set
 
+from ._types import (
+    PersonData, MinistryData, ChurchData, PortfolioABC, PrivatePortfolioABC)
+from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from ..document import (
     Entity, Profile, PrivateKeys, Keys, Domain, Node, Network, Verified,
     Trusted, Revoked)
-from ._types import PersonData, MinistryData, ChurchData
-
-
-@dataclass
-class Statements:
-    """
-    Statement portfolio
-
-    Portfolio of Statement documents.
-    """
-    __slots__ = ('verified', 'trusted', 'revoked')
-    verified: Set[Verified]
-    trusted: Set[Trusted]
-    revoked: Set[Revoked]
-
-
-@dataclass
-class Portfolio:
-    """
-    Document portfolio.
-
-    A portfolio class holds a set of documents that belongs to an entity. This
-    way it is easy to handle documents related to entities and execute policies
-    and operations that are related.
-    """
-    __slots__ = (
-        'entity', 'profile', 'keys', 'domain', 'nodes', 'network', 'issuer',
-        'owner')
-
-    entity: Entity
-    profile: Profile
-    keys: List[Keys]
-    domain: Domain
-    nodes: Set[Node]
-    network: Network
-    issuer: Statements
-    owner: Statements
-
-
-@dataclass
-class PrivatePortfolio(Portfolio):
-    """Adds private keys to portfolio."""
-    # __slots__ = ('privkeys')
-
-    privkeys: PrivateKeys = None
-
-    def from_person_data(data: PersonData):
-        pass
-
-    def from_ministry_data(data: MinistryData):
-        pass
-
-    def from_church_data(data: ChurchData):
-        pass
 
 
 class PortfolioLoader(enum.Enum):
@@ -104,3 +53,56 @@ class PortfolioLoader(enum.Enum):
     SHARE_MAX_COMMUNITY = (
         'entity', 'profile', 'keys', 'network', 'owner.verified',
         'owner.trusted')
+
+
+@dataclass
+class Statements:
+    """
+    Statement portfolio
+
+    Portfolio of Statement documents.
+    """
+    __slots__ = ('verified', 'trusted', 'revoked')
+    verified: Set[Verified]
+    trusted: Set[Trusted]
+    revoked: Set[Revoked]
+
+
+@dataclass
+class Portfolio(PortfolioABC):
+    """
+    Document portfolio.
+
+    A portfolio class holds a set of documents that belongs to an entity. This
+    way it is easy to handle documents related to entities and execute policies
+    and operations that are related.
+    """
+    __slots__ = (
+        'entity', 'profile', 'keys', 'domain', 'nodes', 'network', 'issuer',
+        'owner')
+
+    entity: Entity
+    profile: Profile
+    keys: List[Keys]
+    domain: Domain
+    nodes: Set[Node]
+    network: Network
+    issuer: Statements
+    owner: Statements
+
+
+@dataclass
+class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
+    """Adds private keys to Document portfolio."""
+    # __slots__ = ('privkeys')
+
+    privkeys: PrivateKeys = None
+
+    def from_person_data(data: PersonData) -> Portfolio:
+        return PrivatePortfolio(PersonPolicy.generate(data))
+
+    def from_ministry_data(data: MinistryData) -> Portfolio:
+        return PrivatePortfolio(MinistryPolicy.generate(data))
+
+    def from_church_data(data: ChurchData) -> Portfolio:
+        return PrivatePortfolio(ChurchPolicy.generate(data))

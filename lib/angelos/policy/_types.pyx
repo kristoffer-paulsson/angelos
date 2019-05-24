@@ -1,8 +1,17 @@
 # cython: language_level=3
 """Commonly used types and functions go here."""
 import datetime
+import abc
 from dataclasses import dataclass
 from typing import Union, List
+
+
+class PortfolioABC(metaclass=abc.ABCMeta):
+    pass
+
+
+class PrivatePortfolioABC(metaclass=abc.ABCMeta):
+    pass
 
 
 @dataclass
