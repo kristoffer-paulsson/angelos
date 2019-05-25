@@ -9,8 +9,8 @@ from ._types import (
     PersonData, MinistryData, ChurchData, PortfolioABC, PrivatePortfolioABC)
 from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from ..document import (
-    Entity, Profile, PrivateKeys, Keys, Domain, Node, Network, Verified,
-    Trusted, Revoked)
+    Document, Entity, Profile, PrivateKeys, Keys, Domain, Node, Network,
+    Statement, Verified, Trusted, Revoked)
 
 
 class PortfolioLoader(enum.Enum):
@@ -62,7 +62,8 @@ class Statements:
 
     Portfolio of Statement documents.
     """
-    __slots__ = ('verified', 'trusted', 'revoked')
+    __slots__ = ('_new', 'verified', 'trusted', 'revoked')
+    _new: Set[Statement]
     verified: Set[Verified]
     trusted: Set[Trusted]
     revoked: Set[Revoked]
@@ -78,9 +79,10 @@ class Portfolio(PortfolioABC):
     and operations that are related.
     """
     __slots__ = (
-        'entity', 'profile', 'keys', 'domain', 'nodes', 'network', 'issuer',
-        'owner')
+        '_new', 'entity', 'profile', 'keys', 'domain', 'nodes', 'network',
+        'issuer', 'owner')
 
+    _new: Set[Document]
     entity: Entity
     profile: Profile
     keys: List[Keys]

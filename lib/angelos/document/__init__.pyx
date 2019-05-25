@@ -24,6 +24,7 @@ Document = Union[
     Revoked, Note, Instant, Mail, Share, Report, Envelope]
 Entity = Union[Person, Ministry, Church]
 Profile = Union[PersonProfile, MinistryProfile, ChurchProfile]
+Statement = Union[Verified, Trusted, Revoked]
 
 
 __all__ = [

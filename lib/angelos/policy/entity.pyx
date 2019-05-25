@@ -161,7 +161,7 @@ class BaseEntityPolicy(Policy):
         self._box = None
 
     @staticmethod
-    def _generate(entity_type, entity_data: EntityData
+    def _generate(klass, entity_data: EntityData
                   ) -> (Entity, PrivateKeys, List[Keys]):
         box = libnacl.dual.DualSecret()
         data = vars(entity_data)
@@ -171,7 +171,7 @@ class BaseEntityPolicy(Policy):
         if len(args - fields):
             raise IndexError('Illegal extra fields', args - fields)
 
-        entity = entity_type(nd=data)
+        entity = klass(nd=data)
         entity.issuer = entity.id
         entity.signature = box.signature(
             bytes(entity.issuer.bytes) + Crypto._document_data(entity))

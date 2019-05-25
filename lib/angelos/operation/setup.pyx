@@ -7,40 +7,36 @@ from ..utils import Util
 from ..document import (
     Person, Ministry, Church, PrivateKeys, Keys, Domain, Node)
 from .operation import Operation
+from .policy._types import (
+    PersonData, MinistryData, ChurchData, PrivatePortfolioABC)
 from ..policy.crypto import Crypto
 from ..policy.entity import (
-    PersonGeneratePolicy, MinistryGeneratePolicy, ChurchGeneratePolicy)
+    PersonGeneratePolicy, MinistryGeneratePolicy, ChurchGeneratePolicy,
+    PersonPolicy, MinistryPolicy, ChurchPolicy)
 from ..policy.domain import DomainPolicy, NodePolicy
 
 
 class BaseSetupOperation(Operation):
     """Baseclass for entity setup/import operations."""
 
-    @classmethod
-    def create_new(cls, entity_data, role='client', server=False):
+    @staticmethod
+    def _generate(
+            portfolio: PrivatePortfolioABC,
+            role: str='client', server: bool=False):
         """
         Issue a new set of documents from entity data.
 
         The following documents will be issued:
         Entity, PrivateKeys, Keys, Domain and Node.
         """
-        Util.is_type(entity_data, dict)
 
-        logging.info('Creating new entity of type: %s' % type(cls.ENTITY[0]))
+        if not DomainPolicy.generate(portfolio):
+            raise RuntimeError('Domain document not generated')
 
-        ent_gen = cls.ENTITY[1]()
-        ent_gen.generate(**entity_data)
+        if not NodePolicy.current(portfolio, role, server):
+            raise RuntimeError('Node document not generated')
 
-        dom_gen = DomainPolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
-        dom_gen.generate()
-
-        nod_gen = NodePolicy(ent_gen.entity, ent_gen.privkeys, ent_gen.keys)
-        nod_gen.current(dom_gen.domain, role, server)
-
-        return (
-            ent_gen.entity, ent_gen.privkeys, ent_gen.keys,
-            dom_gen.domain, nod_gen.node
-        )
+        return True
 
     @classmethod
     def import_ext(cls, entity, privkeys, keys, domain,
@@ -116,14 +112,33 @@ class SetupPersonOperation(BaseSetupOperation):
 
     ENTITY = (Person, PersonGeneratePolicy)
 
+    @classmethod
+    def create(cls, data: PersonData, role: str='client', server: bool=False):
+        portfolio = PersonPolicy.generate(data)
+        BaseSetupOperation._generate(portfolio)
+        return portfolio
+
 
 class SetupMinistryOperation(BaseSetupOperation):
     """Ministry entity setup policy."""
 
     ENTITY = (Ministry, MinistryGeneratePolicy)
 
+    @classmethod
+    def create(
+            cls, data: MinistryData, role: str='client', server: bool=False):
+        portfolio = MinistryPolicy.generate(data)
+        BaseSetupOperation._generate(portfolio)
+        return portfolio
+
 
 class SetupChurchOperation(BaseSetupOperation):
     """Church entity setup policy."""
 
     ENTITY = (Church, ChurchGeneratePolicy)
+
+    @classmethod
+    def create(cls, data: ChurchData, role: str='client', server: bool=False):
+        portfolio = ChurchPolicy.generate(data)
+        BaseSetupOperation._generate(portfolio)
+        return portfolio

@@ -5,6 +5,7 @@ import ipaddress
 
 import plyer
 
+from ._types import PrivatePortfolioABC
 from .policy import Policy
 from .crypto import Crypto
 
@@ -31,13 +32,11 @@ class NodePolicy(Policy):
         self.__keys = keys
         self.node = None
 
-    def current(self, domain, role='client', server=False):
+    @staticmethod
+    def current(
+            portfolio: PrivatePortfolioABC,
+            role: str='client', server: bool=False):
         """Generate node document from the current node."""
-        Util.is_type(domain, Domain)
-        Util.is_type(role, (str, int, type(None)))
-        Util.is_type(server, (bool, type(None)))
-
-        self.node = None
 
         if isinstance(role, int):
             if role == Const.A_ROLE_PRIMARY:
@@ -48,7 +47,7 @@ class NodePolicy(Policy):
         if role not in NodePolicy.ROLE:
             raise ValueError('Unsupported node role')
 
-        if domain.issuer != self.__entity.issuer:
+        if portfolio.domain.issuer != portfolio.entity.issuer:
             raise RuntimeError(
                 'The domain must have same issuer as issuing entity.')
 
@@ -61,17 +60,21 @@ class NodePolicy(Policy):
             })
 
         node = Node(nd={
-            'domain': domain.id,
+            'domain': portfolio.domain.id,
             'role': role,
             'device': platform.platform(),
             'serial': plyer.uniqueid.id.decode('utf-8'),
-            'issuer': self.__entity.id,
+            'issuer': portfolio.entity.id,
             'location': location
         })
 
-        node = Crypto.sign(node, self.__entity, self.__privkeys, self.__keys)
+        node = Crypto.sign(node, portfolio.entity,
+                           portfolio.privkeys, portfolio.keys)
         node.validate()
-        self.node = node
+        if not portfolio.node:
+            portfolio.node = [node]
+        else:
+            portfolio.node.append(node)
 
         return True
 
@@ -93,18 +96,20 @@ class DomainPolicy(Policy):
         self.__keys = keys
         self.domain = None
 
-    def generate(self):
+    @staticmethod
+    def generate(portfolio: PrivatePortfolioABC):
         """Generate domain document from currently running node."""
-        self.domain = None
+        if portfolio.domain:
+            return False
 
         domain = Domain(nd={
-            'issuer': self.__entity.id
+            'issuer': portfolio.entity.id
         })
 
         domain = Crypto.sign(
-            domain, self.__entity, self.__privkeys, self.__keys)
+            domain, portfolio.entity, portfolio.privkeys, portfolio.keys)
         domain.validate()
-        self.domain = domain
+        portfolio.domain = domain
 
         return True
 
