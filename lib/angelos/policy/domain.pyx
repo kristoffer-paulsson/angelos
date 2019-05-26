@@ -9,9 +9,7 @@ from ._types import PrivatePortfolioABC
 from .policy import Policy
 from .crypto import Crypto
 
-from ..utils import Util
 from ..const import Const
-from ..document.entities import Entity, PrivateKeys, Keys
 from ..document.domain import Domain, Node, Location, Network, Host
 from ..automatic import Net
 
@@ -20,17 +18,6 @@ class NodePolicy(Policy):
     """Generate node documents."""
 
     ROLE = ('client', 'server', 'backup')
-
-    def __init__(self, entity, privkeys, keys):
-        """Init with Entity, PrivateKeys and Keys."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
-        Util.is_type(keys, Keys)
-
-        self.__entity = entity
-        self.__privkeys = privkeys
-        self.__keys = keys
-        self.node = None
 
     @staticmethod
     def current(
@@ -69,12 +56,9 @@ class NodePolicy(Policy):
         })
 
         node = Crypto.sign(node, portfolio.entity,
-                           portfolio.privkeys, portfolio.keys)
+                           portfolio.privkeys, next(iter(portfolio.keys)))
         node.validate()
-        if not portfolio.node:
-            portfolio.node = [node]
-        else:
-            portfolio.node.append(node)
+        portfolio.nodes.add(node)
 
         return True
 
@@ -86,15 +70,6 @@ class NodePolicy(Policy):
 
 
 class DomainPolicy(Policy):
-    def __init__(self, entity, privkeys, keys):
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
-        Util.is_type(keys, Keys)
-
-        self.__entity = entity
-        self.__privkeys = privkeys
-        self.__keys = keys
-        self.domain = None
 
     @staticmethod
     def generate(portfolio: PrivatePortfolioABC):
@@ -107,7 +82,8 @@ class DomainPolicy(Policy):
         })
 
         domain = Crypto.sign(
-            domain, portfolio.entity, portfolio.privkeys, portfolio.keys)
+            domain, portfolio.entity,
+            portfolio.privkeys, next(iter(portfolio.keys)))
         domain.validate()
         portfolio.domain = domain
 
@@ -118,24 +94,15 @@ class DomainPolicy(Policy):
 
 
 class NetworkPolicy(Policy):
-    def __init__(self, entity, privkeys, keys):
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
-        Util.is_type(keys, Keys)
 
-        self.__entity = entity
-        self.__privkeys = privkeys
-        self.__keys = keys
-        self.network = None
-
-    def generate(self, domain, *nodes):
+    @staticmethod
+    def generate(portfolio: PrivatePortfolioABC):
         """Generate network document from currently running node."""
-        Util.is_type(domain, Domain)
-        for node in nodes:
-            Util.is_type(node, Node)
+        if not portfolio.nodes:
+            raise ValueError('At least one node necessary to generate network')
 
         hosts = []
-        for node in nodes:
+        for node in portfolio.nodes:
             hosts.append(Host(nd={
                 'node': node.id,
                 'ip': node.location.ip,
@@ -143,15 +110,16 @@ class NetworkPolicy(Policy):
             }))
 
         network = Network(nd={
-            'domain': domain.id,
+            'domain': portfolio.domain.id,
             'hosts': hosts,
-            'issuer': self.__entity.id,
+            'issuer': portfolio.entity.id,
         })
 
         network = Crypto.sign(
-            network, self.__entity, self.__privkeys, self.__keys)
+            network, portfolio.entity,
+            portfolio.privkeys, next(iter(portfolio.keys)))
         network.validate()
-        self.network = network
+        portfolio.network = network
 
         return True
 

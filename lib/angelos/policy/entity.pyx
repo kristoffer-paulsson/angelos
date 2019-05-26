@@ -5,14 +5,16 @@ from typing import List
 
 import libnacl.dual
 
-from ..utils import Util
+# from ..utils import Util
 from .policy import Policy
 from .crypto import Crypto
 from ..document import Entity, PrivateKeys, Keys, Person, Ministry, Church
+from .portfolio import PrivatePortfolio
 from ._types import (
     EntityData, PersonData, MinistryData, ChurchData, PrivatePortfolioABC)
 
 
+"""
 class BaseGeneratePolicy(Policy):
     def __init__(self):
         self.box = libnacl.dual.DualSecret()
@@ -79,7 +81,6 @@ class BaseUpdatePolicy(Policy):
         self.keys = None
 
     def update(self, entity, privkeys, keys):
-        """Renew the identity document expirey date"""
         Util.is_type(entity, self.ENTITY[0])
 
         today = datetime.date.today()
@@ -96,10 +97,6 @@ class BaseUpdatePolicy(Policy):
         return True
 
     def change(self, entity, **kwargs):
-        """
-        Change information on the identity.
-        Don't forget to update the change.
-        """
         Util.is_type(entity, self.ENTITY[0])
 
         fields = set(self.ENTITY[1])
@@ -114,7 +111,6 @@ class BaseUpdatePolicy(Policy):
         return entity
 
     def newkeys(self, entity, privkeys, keys):
-        """Issue a new pair of keys"""
         Util.is_type(entity, self.ENTITY[0])
         self.box = libnacl.dual.DualSecret()
 
@@ -154,6 +150,7 @@ class MinistryUpdatePolicy(BaseUpdatePolicy):
 
 class ChurchUpdatePolicy(BaseUpdatePolicy):
     ENTITY = (Church, ['state', 'nation'])
+"""
 
 
 class BaseEntityPolicy(Policy):
@@ -164,14 +161,8 @@ class BaseEntityPolicy(Policy):
     def _generate(klass, entity_data: EntityData
                   ) -> (Entity, PrivateKeys, List[Keys]):
         box = libnacl.dual.DualSecret()
-        data = vars(entity_data)
-        fields = set(type._fields.keys())
-        args = set(data.keys())
 
-        if len(args - fields):
-            raise IndexError('Illegal extra fields', args - fields)
-
-        entity = klass(nd=data)
+        entity = klass(nd=entity_data._asdict())
         entity.issuer = entity.id
         entity.signature = box.signature(
             bytes(entity.issuer.bytes) + Crypto._document_data(entity))
@@ -196,7 +187,11 @@ class BaseEntityPolicy(Policy):
         privkeys.validate()
         keys.validate()
 
-        return entity, privkeys, [keys]
+        portfolio = PrivatePortfolio()
+        portfolio.entity = entity
+        portfolio.privkeys = privkeys
+        portfolio.keys = [keys]
+        return portfolio
 
     @staticmethod
     def update(portfolio: PrivatePortfolioABC) -> bool:
@@ -270,32 +265,41 @@ class BaseEntityPolicy(Policy):
 
 class PersonPolicy(BaseEntityPolicy):
     """Create and maintain Person entity document with keys."""
+    FIELDS = ('family_name', )
 
+    @staticmethod
     def generate(person_data: PersonData) -> PrivatePortfolioABC:
         return BaseEntityPolicy._generate(Person, person_data)
 
+    @staticmethod
     def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
         return BaseEntityPolicy._change(
-            portfolio.entity, changed, ['family_name'])
+            portfolio.entity, changed, PersonPolicy.FIELDS)
 
 
 class MinistryPolicy(BaseEntityPolicy):
     """Create and maintain Ministry entity document with keys."""
+    FIELDS = ('vision', 'ministry')
 
+    @staticmethod
     def generate(ministry_data: MinistryData) -> PrivatePortfolioABC:
         return BaseEntityPolicy._generate(Ministry, ministry_data)
 
+    @staticmethod
     def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
         return BaseEntityPolicy._change(
-            portfolio.entity, changed, ['vision', 'ministry'])
+            portfolio.entity, changed, MinistryPolicy.FIELDS)
 
 
 class ChurchPolicy(BaseEntityPolicy):
     """Create and maintain Church entity document with keys."""
+    FIELDS = ('state', 'nation')
 
+    @staticmethod
     def generate(church_data: ChurchData) -> PrivatePortfolioABC:
         return BaseEntityPolicy._generate(Church, church_data)
 
+    @staticmethod
     def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
         return BaseEntityPolicy._change(
-            portfolio.entity, changed, ['state', 'nation'])
+            portfolio.entity, changed, ChurchPolicy.FIELDS)

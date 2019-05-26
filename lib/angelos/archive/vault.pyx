@@ -2,10 +2,9 @@
 """Vault."""
 import pickle as pck
 import asyncio
+import uuid
 
-from ..utils import Util
-
-from ..document import Entity, PrivateKeys, Keys, Domain, Node, Network
+from ..policy import Portfolio, PrivatePortfolio
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
 
@@ -52,6 +51,8 @@ HIERARCHY = (
     # Preferences by the owning entity.
     '/settings',
     '/settings/nodes',
+
+    '/portfolios'
 )
 
 
@@ -93,35 +94,35 @@ class Vault:
             self._closed = True
 
     @staticmethod
-    def setup(filename, secret,
-              entity: Entity, privkeys, keys, domain, node,
-              network=None, _type=None, role=None, use=None):
+    def setup(filename, secret, portfolio: PrivatePortfolio,
+              _type=None, role=None, use=None):
         """Create and setup the whole Vault according to policys."""
-        # Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
-        Util.is_type(keys, Keys)
-        Util.is_type(domain, Domain)
-        Util.is_type(node, Node)
-        Util.is_type(network, (Network, type(None)))
 
         arch = Archive7.setup(
-            filename, secret, owner=entity.id,
-            node=node.id, domain=domain.id, title='Vault',
+            filename, secret, owner=portfolio.entity.id,
+            node=next(iter(portfolio.nodes)).id,
+            domain=portfolio.domain.id, title='Vault',
             _type=_type, role=role, use=use)
 
         for i in HIERARCHY:
             arch.mkdir(i)
 
-        key_path = '/keys/' + str(keys.id) + '.pickle'
+        key_path = '/keys/' + str(next(iter(portfolio.keys)).id) + '.pickle'
         files = [
-            (Vault.ENTITY, entity),
-            (Vault.PRIVATE, privkeys),
-            (key_path, keys),
-            (Vault.DOMAIN, domain),
-            ('/settings/nodes/' + str(node.id) + '.pickle', node),
+            (Vault.ENTITY, portfolio.entity),
+            (Vault.PRIVATE, portfolio.privkeys),
+            (Vault.DOMAIN, portfolio.domain),
         ]
-        if network:
-            files.append((Vault.NETWORK, network))
+        for node in portfolio.nodes:
+            files.append(
+                ('/settings/nodes/' + str(node.id) + '.pickle', node)),
+
+        for keys in portfolio.keys:
+            files.append(
+                ('/keys/' + str(keys.id) + '.pickle', keys)),
+
+        if portfolio.network:
+            files.append((Vault.NETWORK, portfolio.network))
 
         for f in files:
             created, updated, owner = Glue.doc_save(f[1])
@@ -210,3 +211,20 @@ class Vault:
             return datalist
 
         return (await self._proxy.call(callback, 0, 5))
+
+    def new_portfolio(self, portfolio: Portfolio) -> bool:
+        """Save a portfolio for the first time."""
+        raise NotImplementedError()
+
+    def load_portfolio(self, id: uuid.UUID) -> Portfolio:
+        """Load portfolio from uuid."""
+        raise NotImplementedError()
+
+    def reload_portfolio(self, portfolio: PrivatePortfolio) -> bool:
+        """Reload portfolio."""
+        raise NotImplementedError()
+
+    def save_portfolio(
+            self, portfolio: PrivatePortfolio) -> bool:
+        """Save a changed portfolio."""
+        raise NotImplementedError()

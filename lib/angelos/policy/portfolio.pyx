@@ -5,9 +5,7 @@ import enum
 from dataclasses import dataclass
 from typing import List, Set
 
-from ._types import (
-    PersonData, MinistryData, ChurchData, PortfolioABC, PrivatePortfolioABC)
-from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from ._types import PortfolioABC, PrivatePortfolioABC
 from ..document import (
     Document, Entity, Profile, PrivateKeys, Keys, Domain, Node, Network,
     Statement, Verified, Trusted, Revoked)
@@ -62,11 +60,21 @@ class Statements:
 
     Portfolio of Statement documents.
     """
-    __slots__ = ('_new', 'verified', 'trusted', 'revoked')
-    _new: Set[Statement]
+    __slots__ = ('_save', 'verified', 'trusted', 'revoked')
+
+    _save: Set[Statement]
     verified: Set[Verified]
     trusted: Set[Trusted]
     revoked: Set[Revoked]
+
+    def __init__(self, *args):
+        self._save = set()
+        self.verified = set()
+        self.trusted = set()
+        self.revoked = set()
+
+    def reset(self):
+        self._save = set()
 
 
 @dataclass
@@ -79,10 +87,10 @@ class Portfolio(PortfolioABC):
     and operations that are related.
     """
     __slots__ = (
-        '_new', 'entity', 'profile', 'keys', 'domain', 'nodes', 'network',
+        '_save', 'entity', 'profile', 'keys', 'domain', 'nodes', 'network',
         'issuer', 'owner')
 
-    _new: Set[Document]
+    _save: Set[Document]
     entity: Entity
     profile: Profile
     keys: List[Keys]
@@ -92,19 +100,30 @@ class Portfolio(PortfolioABC):
     issuer: Statements
     owner: Statements
 
+    def __init__(self):
+        self._save = set()
+        self.entity = None
+        self.profile = None
+        self.keys = []
+        self.domain = None
+        self.nodes = set()
+        self.network = None
+        self.issuer = Statements()
+        self.owner = Statements()
+
+    def reset(self):
+        self._save = set()
+
 
 @dataclass
 class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
     """Adds private keys to Document portfolio."""
-    # __slots__ = ('privkeys')
 
-    privkeys: PrivateKeys = None
+    privkeys: PrivateKeys
 
-    def from_person_data(data: PersonData) -> Portfolio:
-        return PrivatePortfolio(PersonPolicy.generate(data))
+    def __init__(self):
+        Portfolio.__init__(self)
+        self.privkeys = None
 
-    def from_ministry_data(data: MinistryData) -> Portfolio:
-        return PrivatePortfolio(MinistryPolicy.generate(data))
-
-    def from_church_data(data: ChurchData) -> Portfolio:
-        return PrivatePortfolio(ChurchPolicy.generate(data))
+    def to_portfolio(self) -> Portfolio:
+        return self.super()

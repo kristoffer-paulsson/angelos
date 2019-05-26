@@ -1,19 +1,9 @@
 # cython: language_level=3
 """Module docstring."""
-import logging
-
-from ..utils import Util
-
-from ..document import (
-    Person, Ministry, Church, PrivateKeys, Keys, Domain, Node)
 from .operation import Operation
-from .policy._types import (
-    PersonData, MinistryData, ChurchData, PrivatePortfolioABC)
-from ..policy.crypto import Crypto
-from ..policy.entity import (
-    PersonGeneratePolicy, MinistryGeneratePolicy, ChurchGeneratePolicy,
-    PersonPolicy, MinistryPolicy, ChurchPolicy)
-from ..policy.domain import DomainPolicy, NodePolicy
+from ..policy import (
+    PersonData, MinistryData, ChurchData, PrivatePortfolio, Crypto,
+    PersonPolicy, MinistryPolicy, ChurchPolicy, DomainPolicy, NodePolicy)
 
 
 class BaseSetupOperation(Operation):
@@ -21,8 +11,8 @@ class BaseSetupOperation(Operation):
 
     @staticmethod
     def _generate(
-            portfolio: PrivatePortfolioABC,
-            role: str='client', server: bool=False):
+            portfolio: PrivatePortfolio,
+            role: str='client', server: bool=False) -> bool:
         """
         Issue a new set of documents from entity data.
 
@@ -38,79 +28,82 @@ class BaseSetupOperation(Operation):
 
         return True
 
-    @classmethod
-    def import_ext(cls, entity, privkeys, keys, domain,
-                   node=None, role='client', server=False):
+    @staticmethod
+    def import_ext(
+            portfolio: PrivatePortfolio,
+            role: str='client', server: bool=False) -> bool:
         """Validate a set of documents related to an entity for import."""
-        Util.is_type(entity, cls.ENTITY[0])
-        Util.is_type(privkeys, PrivateKeys)
-        Util.is_type(keys, Keys)
-        Util.is_type(domain, Domain)
-        Util.is_type(node, (Node, type(None)))
 
-        logging.info(
-            'Importing entity of type: %s' % type(cls.ENTITY[0]))
-
-        if not node:
-            nod_gen = NodePolicy(entity, privkeys, keys)
-            nod_gen.current(domain, role=role, server=server)
-            node = nod_gen.node
+        if not portfolio.nodes:
+            NodePolicy.current(portfolio, role=role, server=server)
 
         valid = True
-        if not node.domain == domain.id:
-            logging.error('Node and Domain document mismatch')
+        for node in portfolio.nodes:
+            if not node.domain == portfolio.domain.id:
+                raise RuntimeError('Node and Domain document mismatch')
+                valid = False
+
+        if not portfolio.entity.validate():
+            raise RuntimeError('Entity document invalid')
             valid = False
 
-        if not entity.validate():
-            logging.error('Entity document invalid')
+        for keys in portfolio.keys:
+            if not keys.validate():
+                raise RuntimeError('Keys document invalid')
+                valid = False
+
+        if not portfolio.privkeys.validate():
+            raise RuntimeError('Private keys document invalid')
             valid = False
 
-        if not keys.validate():
-            logging.error('Keys document invalid')
+        if not portfolio.domain.validate():
+            raise RuntimeError('Domain document invalid')
             valid = False
 
-        if not privkeys.validate():
-            logging.error('Private keys document invalid')
+        for node in portfolio.nodes:
+            if not node.validate():
+                raise RuntimeError('Node document invalid')
+                valid = False
+
+        if not Crypto.verify(
+                portfolio.entity,
+                portfolio.entity,
+                next(iter(portfolio.keys))):
+            raise RuntimeError('Entity document verification failed')
             valid = False
 
-        if not domain.validate():
-            logging.error('Domain document invalid')
+        if not Crypto.verify(
+                next(iter(portfolio.keys)),
+                portfolio.entity,
+                next(iter(portfolio.keys))):
+            raise RuntimeError('Keys document verification failed')
             valid = False
 
-        if not node.validate():
-            logging.error('Node document invalid')
+        if not Crypto.verify(
+                portfolio.privkeys,
+                portfolio.entity,
+                next(iter(portfolio.keys))):
+            raise RuntimeError('Private keys document verification failed')
             valid = False
 
-        if not Crypto.verify(entity, entity, keys):
-            logging.error('Entity document verification failed')
+        if not Crypto.verify(
+                portfolio.domain,
+                portfolio.entity,
+                next(iter(portfolio.keys))):
+            raise RuntimeError('Domain document verification failed')
             valid = False
 
-        if not Crypto.verify(keys, entity, keys):
-            logging.error('Keys document verification failed')
-            valid = False
+        for node in portfolio.nodes:
+            if not Crypto.verify(
+                    node, portfolio.entity, next(iter(portfolio.keys))):
+                raise RuntimeError('Node document verification failed')
+                valid = False
 
-        if not Crypto.verify(privkeys, entity, keys):
-            logging.error('Private keys document verification failed')
-            valid = False
-
-        if not Crypto.verify(domain, entity, keys):
-            logging.error('Domain document verification failed')
-            valid = False
-
-        if not Crypto.verify(node, entity, keys):
-            logging.error('Node document verification failed')
-            valid = False
-
-        if not valid:
-            raise RuntimeError('Importing external documents failed')
-
-        return (entity, privkeys, keys, domain, node)
+        return valid
 
 
 class SetupPersonOperation(BaseSetupOperation):
     """Person entity setup policy."""
-
-    ENTITY = (Person, PersonGeneratePolicy)
 
     @classmethod
     def create(cls, data: PersonData, role: str='client', server: bool=False):
@@ -122,8 +115,6 @@ class SetupPersonOperation(BaseSetupOperation):
 class SetupMinistryOperation(BaseSetupOperation):
     """Ministry entity setup policy."""
 
-    ENTITY = (Ministry, MinistryGeneratePolicy)
-
     @classmethod
     def create(
             cls, data: MinistryData, role: str='client', server: bool=False):
@@ -134,8 +125,6 @@ class SetupMinistryOperation(BaseSetupOperation):
 
 class SetupChurchOperation(BaseSetupOperation):
     """Church entity setup policy."""
-
-    ENTITY = (Church, ChurchGeneratePolicy)
 
     @classmethod
     def create(cls, data: ChurchData, role: str='client', server: bool=False):

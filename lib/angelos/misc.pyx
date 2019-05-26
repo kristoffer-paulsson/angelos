@@ -1,5 +1,8 @@
 # cython: language_level=3
 """Module docstring."""
+import abc
+from dataclasses import dataclass, asdict as data_asdict
+
 from .utils import Util
 
 
@@ -35,3 +38,11 @@ class ThresholdCounter:
         Returns True when the threshold is met.
         """
         return self.__cnt >= self.__thr
+
+
+@dataclass
+class BaseDataClass(metaclass=abc.ABCMeta):
+    """A base dataclass with some basic functions"""
+
+    def _asdict(self) -> dict:
+        return data_asdict(self)

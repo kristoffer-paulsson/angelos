@@ -11,7 +11,7 @@ from ..document.envelope import Envelope
 from ..document.messages import Message
 
 from .entity import (
-    PersonUpdatePolicy, MinistryUpdatePolicy, ChurchUpdatePolicy)
+    PersonPolicy, MinistryPolicy, ChurchPolicy)
 from .crypto import Crypto
 from .policy import Policy
 
@@ -155,11 +155,11 @@ class ImportUpdatePolicy(Policy):
         Util.is_type(entity, (Person, Ministry, Church))
 
         if isinstance(entity, Person):
-            fields = PersonUpdatePolicy.ENTITY[1]
+            fields = PersonPolicy.FIELDS
         elif isinstance(entity, Ministry):
-            fields = MinistryUpdatePolicy.ENTITY[1]
+            fields = MinistryPolicy.FIELDS
         elif isinstance(entity, Church):
-            fields = ChurchUpdatePolicy.ENTITY[1]
+            fields = ChurchPolicy.FIELDS
 
         self._exception = None
         try:

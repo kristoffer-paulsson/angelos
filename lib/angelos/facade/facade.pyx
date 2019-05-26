@@ -15,9 +15,9 @@ from ..document import (
     Envelope, Trusted)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
-from ..policy.portfolio import Portfolio
-from ..policy.accept import ImportEntityPolicy, ImportUpdatePolicy
-from ..policy.domain import NetworkPolicy
+from ..policy import (
+    PrivatePortfolio, ImportEntityPolicy, ImportUpdatePolicy, NetworkPolicy,
+    EntityData)
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -49,27 +49,13 @@ class Facade:
                 os.path.join(home_dir, Const.CNL_VAULT), secret)
 
     @classmethod
-    async def setup(cls, home_dir, secret, role, entity_data=None, entity=None,
-                    privkeys=None, keys=None, domain=None, node=None):
+    async def setup(cls, home_dir: str, secret: bytes, role: int,
+                    entity_data: EntityData=None,
+                    portfolio: PrivatePortfolio=None):
         """Create the existence of a new facade from scratch."""
-        Util.is_type(home_dir, str)
-        Util.is_type(secret, bytes)
-        Util.is_type(role, int)
 
-        if entity_data:
-            Util.is_type(entity_data, dict)
-            Util.is_type(entity, type(None))
-            Util.is_type(privkeys, type(None))
-            Util.is_type(keys, type(None))
-            Util.is_type(domain, type(None))
-            Util.is_type(node, type(None))
-        else:
-            Util.is_type(entity_data, type(None))
-            Util.is_type(entity, cls.PREFS[0])
-            Util.is_type(privkeys, PrivateKeys)
-            Util.is_type(keys, Keys)
-            Util.is_type(domain, Domain)
-            Util.is_type(node, (Node, type(None)))
+        if entity_data and portfolio:
+            raise ValueError('Either entity_data or portfolio, not both')
 
         logging.info('Setting up facade of type: %s' % type(cls))
 
@@ -79,27 +65,30 @@ class Facade:
         if role not in [Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP, 0]:
             RuntimeError('Unsupported use of facade')
 
-        network = None
         if entity_data:
             server = True if cls.INFO[0] in (
                 Const.A_TYPE_PERSON_SERVER,
                 Const.A_TYPE_MINISTRY_SERVER,
                 Const.A_TYPE_CHURCH_SERVER
             ) else False
-            entity, privkeys, keys, domain, node = cls.PREFS[1].create_new(
-                entity_data, role, server)
+
+            if role is Const.A_ROLE_BACKUP:
+                role_str = 'backup'
+            elif role is Const.A_ROLE_PRIMARY and server:
+                role_str = 'server'
+            else:
+                role_str = 'client'
+
+            portfolio = cls.PREFS[1].create(entity_data, role_str, server)
 
             if server:
-                network = NetworkPolicy(entity, privkeys, keys)
-                network.generate(domain, node)
-                network = network.network
+                NetworkPolicy.generate(portfolio)
 
-        entity, privkeys, keys, domain, node = cls.PREFS[1].import_ext(
-            entity, privkeys, keys, domain, node, role, server)
+        if not cls.PREFS[1].import_ext(portfolio, role_str, server):
+            raise ValueError('Failed importing portfolio to new facade')
 
         vault = Vault.setup(
-            os.path.join(home_dir, Const.CNL_VAULT), secret,
-            entity, privkeys, keys, domain, node, network,
+            os.path.join(home_dir, Const.CNL_VAULT), secret, portfolio,
             _type=cls.INFO[0], role=role, use=Const.A_USE_VAULT)
 
         facade = cls(home_dir, secret, vault)
@@ -150,15 +139,18 @@ class Facade:
         self.__domain = identity[3]
         self.__node = identity[4]
 
-    def load_portfolio(self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
+    def load_portfolio(
+            self, id: uuid.UUID, conf: Sequence[str]) -> PrivatePortfolio:
         """Load a portfolio belonging to id according to configuration."""
         raise NotImplementedError()
 
-    def update_portfolio(self, portfolio: Portfolio) -> bool:
+    def update_portfolio(
+            self, portfolio: PrivatePortfolio) -> bool:
         """Update a portfolio by comparison."""
         raise NotImplementedError()
 
-    def import_portfolio(self, portfolio: Portfolio) -> bool:
+    def import_portfolio(
+            self, portfolio: PrivatePortfolio) -> bool:
         """Import a portfolio of douments into the vault."""
         raise NotImplementedError()
 

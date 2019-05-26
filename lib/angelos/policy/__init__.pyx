@@ -6,10 +6,7 @@ Policys that will secure the data imported and exported from the facade.
 """
 from ._types import EntityData, PersonData, MinistryData, ChurchData
 from .crypto import Crypto
-from .entity import (
-    PersonUpdatePolicy, MinistryUpdatePolicy, ChurchUpdatePolicy,
-    PersonGeneratePolicy, MinistryGeneratePolicy, ChurchGeneratePolicy,
-    PersonPolicy, MinistryPolicy, ChurchPolicy)
+from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from .accept import ImportPolicy, ImportEntityPolicy, ImportUpdatePolicy
 from .domain import NodePolicy, DomainPolicy, NetworkPolicy
 from .verify import StatementPolicy
@@ -32,9 +29,9 @@ __all__ = [
     'ImportPolicy',
     'ImportEntityPolicy',
     'ImportUpdatePolicy',
-    'PersonGeneratePolicy',
-    'MinistryGeneratePolicy',
-    'ChurchGeneratePolicy',
+    'PersonPolicy',
+    'MinistryPolicy',
+    'ChurchPolicy',
     'PersonPolicy',
     'MinistryPolicy',
     'ChurchPolicy',
@@ -42,10 +39,6 @@ __all__ = [
     'NodePolicy',
     'DomainPolicy',
     'NetworkPolicy',
-
-    'PersonUpdatePolicy',
-    'MinistryUpdatePolicy',
-    'ChurchUpdatePolicy',
 
     'CreateMessagePolicy',
     'EnvelopePolicy',

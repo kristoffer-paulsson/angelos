@@ -176,6 +176,11 @@ Builder.load_string("""
         MDNavigationDrawer:
             id: nav_drawer
             drawer_logo: './art/angelos.png'
+            drawer_title: 'Hello world'
+            NavigationDrawerIconButton:
+                text: 'Dashboard'
+                icon: 'monitor-dashboard'
+                on_release: root.goto_main(app)
             NavigationDrawerIconButton:
                 text: 'Messages'
                 icon: 'email-outline'
@@ -185,11 +190,11 @@ Builder.load_string("""
                 icon: 'contact-mail'
                 on_release: root.goto_contacts(app)
             NavigationDrawerIconButton:
-                text: 'Documents'
-                icon: 'shield-account'
+                text: 'Portfolios'
+                icon: 'briefcase-check'
                 on_release: root.goto_documents(app)
             NavigationDrawerIconButton:
-                text: 'Files'
+                text: 'Documents'
                 icon: 'folder-account'
                 on_release: root.goto_files(app)
             NavigationDrawerIconButton:
