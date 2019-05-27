@@ -3,10 +3,19 @@
 import pickle as pck
 import asyncio
 import uuid
+import logging
+from typing import Tuple
+from collections.abc import Iterable
 
-from ..policy import Portfolio, PrivatePortfolio
+import msgpack
+
+from ..policy import Portfolio, PrivatePortfolio, PField
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
+from ..document import (
+    DocType, PrivateKeys, Keys, Person, Ministry, Church, PersonProfile,
+    MinistryProfile, ChurchProfile, Domain, Node, Network, Verified, Trusted,
+    Revoked, Envelope, Note, Instant, Mail, Share, Report)
 
 
 HIERARCHY = (
@@ -54,6 +63,61 @@ HIERARCHY = (
 
     '/portfolios'
 )
+
+PORTFOLIO_TEMPLATE = {
+    PField.ENTITY: '{dir}/{file}.ent',
+    PField.PROFILE: '{dir}/{file}.pfl',
+    PField.PRIVKEYS: '{dir}/{file}.pky',
+    PField.KEYS: '{dir}/{file}.key',
+    PField.DOMAIN: '{dir}/{file}.dmn',
+    PField.NODES: '{dir}/{file}.nod',
+    PField.NET: '{dir}/{file}.net',
+    PField.ISSUER_VERIFIED: '{dir}/{file}.ver',
+    PField.ISSUER_TRUSTED: '{dir}/{file}.rst',
+    PField.ISSUER_REVOKED: '{dir}/{file}.rev',
+    PField.OWNER_VERIFIED: '{dir}/{file}.ver',
+    PField.OWNER_TRUSTED: '{dir}/{file}.rst',
+    PField.OWNER_REVOKED: '{dir}/{file}.rev'
+}
+
+PORTFOLIO_PATTERN = {
+    PField.ENTITY: '.ent',
+    PField.PROFILE: 'pfl',
+    PField.PRIVKEYS: '.pky',
+    PField.KEYS: '.key',
+    PField.DOMAIN: '.dmn',
+    PField.NODES: '.nod',
+    PField.NET: '.net',
+    PField.ISSUER_VERIFIED: '.ver',
+    PField.ISSUER_TRUSTED: '.rst',
+    PField.ISSUER_REVOKED: '.rev',
+    PField.OWNER_VERIFIED: '.ver',
+    PField.OWNER_TRUSTED: '.rst',
+    PField.OWNER_REVOKED: '.rev'
+}
+
+DOCUMENT_TYPE = {
+    DocType.KEYS_PRIVATE: PrivateKeys,
+    DocType.KEYS: Keys,
+    DocType.ENTITY_PERSON: Person,
+    DocType.ENTITY_MINISTRY: Ministry,
+    DocType.ENTITY_CHURCH: Church,
+    DocType.PROF_PERSON: PersonProfile,
+    DocType.PROF_MINISTRY: MinistryProfile,
+    DocType.PROF_CHURCH: ChurchProfile,
+    DocType.NET_DOMAIN: Domain,
+    DocType.NET_NODE: Node,
+    DocType.NET_NETWORK: Network,
+    DocType.STAT_VERIFIED: Verified,
+    DocType.STAT_TRUSTED: Trusted,
+    DocType.STAT_REVOKED: Revoked,
+    DocType.COM_ENVELOPE: Envelope,
+    DocType.COM_NOTE: Note,
+    DocType.COM_INSTANT: Instant,
+    DocType.COM_MAIL: Mail,
+    DocType.COM_SHARE: Share,
+    DocType.COM_REPORT: Report,
+}
 
 
 class Vault:
@@ -212,15 +276,125 @@ class Vault:
 
         return (await self._proxy.call(callback, 0, 5))
 
-    def new_portfolio(self, portfolio: Portfolio) -> bool:
+    async def new_portfolio(self, portfolio: Portfolio) -> bool:
         """Save a portfolio for the first time."""
-        raise NotImplementedError()
+        dirname = '/portfolios/{0}'.format(portfolio.entity.id)
+        if self._archive.isdir(dirname):
+            raise OSError('Portfolio already exists: %s' % portfolio.entity.id)
 
-    def load_portfolio(self, id: uuid.UUID) -> Portfolio:
+        files = []
+        self._archive.mkdir(dirname)
+        for name, doc in portfolio._disassemble():
+            if isinstance(doc, Iterable):
+                for item in doc:
+                    files.append(
+                        (PORTFOLIO_TEMPLATE[name].format(
+                            dirname, item.id), item))
+            else:
+                files.append(
+                    (PORTFOLIO_TEMPLATE[name].format(dirname, doc.id), doc))
+
+        ops = []
+        for doc in files:
+            created, updated, owner = Glue.doc_save(doc[1])
+            ops.append(self._proxy.call(
+                self._archive.mkfile, filename=doc[0],
+                data=msgpack.packb(
+                    doc[1].export_bytes(), use_bin_type=True, use_list=False),
+                id=doc[1].id, created=created, updated=updated, owner=owner,
+                compression=Entry.COMP_NONE))
+
+        results = await asyncio.shield(
+            asyncio.gather(*ops, return_exceptions=True))
+        success = True
+        for result in results:
+            if isinstance(result, Exception):
+                success = False
+                logging.warning('Failed to save document: %s' % result)
+        return success
+
+    async def load_portfolio(
+            self, id: uuid.UUID, config: Tuple[str]) -> Portfolio:
         """Load portfolio from uuid."""
-        raise NotImplementedError()
+        dirname = '/portfolios/{0}'.format(id)
+        if not self._archive.isdir(dirname):
+            raise OSError('Portfolio doesn\'t exists: %s' % id)
 
-    def reload_portfolio(self, portfolio: PrivatePortfolio) -> bool:
+        result = self._archive.glob(name='{dir}/*'.format(dirname), owner=id)
+
+        files = []
+        for field in config:
+            pattern = PORTFOLIO_PATTERN[field]
+            for filename in result:
+                if pattern == filename[-4:]:
+                    files.append(filename)
+
+        ops = []
+        for doc in files:
+            ops.append(self._proxy.call(
+                self._archive.load, filename=doc))
+
+        results = await asyncio.shield(
+            asyncio.gather(*ops, return_exceptions=True))
+
+        if PField.PRIVKEYS in config:
+            portfolio = PrivatePortfolio()
+        else:
+            portfolio = Portfolio()
+
+        for data in results:
+            if isinstance(data, Exception):
+                logging.warning('Failed to load document: %s' % data)
+                continue
+
+            docobj = msgpack.unpackb(data, raw=False, use_list=False)
+            document = DOCUMENT_TYPE[docobj['type']].build(docobj)
+
+            if isinstance(document, (Person, Ministry, Church)):
+                portfolio.entity = document
+
+            if isinstance(document, (
+                    PersonProfile, MinistryProfile, ChurchProfile)):
+                portfolio.profile = document
+
+            if isinstance(document, PrivateKeys):
+                portfolio.privkeys = document
+
+            if isinstance(document, Domain):
+                portfolio.domain = document
+
+            if isinstance(document, Network):
+                portfolio.network = document
+
+            if isinstance(document, Keys):
+                portfolio.keys.append(document)
+
+            if isinstance(document, Node):
+                portfolio.nodes.add(document)
+
+            if document.issuer.int != id.int:
+                if isinstance(document, Verified):
+                    portfolio.owner.verified.add(document)
+
+                if isinstance(document, Trusted):
+                    portfolio.owner.trusted.add(document)
+
+                if isinstance(document, Revoked):
+                    portfolio.owner.revoked.add(Revoked)
+            else:
+                if isinstance(document, Verified):
+                    portfolio.issuer.verified.add(document)
+
+                if isinstance(document, Trusted):
+                    portfolio.issuer.trusted.add(document)
+
+                if isinstance(document, Revoked):
+                    portfolio.issuer.revoked.add(Revoked)
+
+        return portfolio
+
+    def reload_portfolio(
+            self, portfolio: PrivatePortfolio, config: Tuple[str]) -> bool:
         """Reload portfolio."""
         raise NotImplementedError()
 

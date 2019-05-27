@@ -698,6 +698,14 @@ class Archive7(ContainerAware):
             entry = Entry(**entry)
             entries.update(entry, idx)
 
+    def isdir(self, dirname):
+        """Check if a path is a known directory."""
+        if dirname[0] is not '/':
+            dirname = '/' + dirname
+        if dirname[-1] is '/':
+            dirname = dirname[:-1]
+        return dirname in self.ioc.hierarchy.paths.keys()
+
     def mkdir(self, dirname, user=None, group=None, perms=None):
         """
         Make a new directory and super directories if missing.

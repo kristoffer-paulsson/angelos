@@ -59,7 +59,9 @@ setup(
     zip_safe=False,
     test_suite='',
     python_requires='~=3.7',
-    setup_requires=['cython', 'pyinstaller'],
+    setup_requires=[
+        'cython', 'pyinstaller', 'kivy', 'libnacl', 'plyer', 'asyncssh',
+        'keyring', 'msgpack'],  # kivymd
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
     packages=['angelos', 'eidon'],
@@ -67,3 +69,13 @@ setup(
     scripts=glob('bin/*'),
     ext_modules=cythonize('lib/angelos/**/*.pyx', build_dir="build")
 )
+
+# cython
+# pyinstaller
+# kivy
+# kivymd
+# libnacl
+# plyer
+# asyncssh
+# keyring
+# msgpack
