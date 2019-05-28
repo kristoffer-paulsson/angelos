@@ -2,7 +2,7 @@
 """Commonly used types and functions go here."""
 import datetime
 import abc
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Union, List
 
 from ..misc import BaseDataClass
@@ -19,7 +19,6 @@ class PrivatePortfolioABC(metaclass=abc.ABCMeta):
 @dataclass
 class PersonData(BaseDataClass):
     """Initial data for Person document."""
-    __slots__ = ('given_name', 'family_name', 'names', 'sex', 'born')
     given_name: str
     family_name: str
     names: List[str]
@@ -39,7 +38,6 @@ class PersonData(BaseDataClass):
 @dataclass
 class MinistryData(BaseDataClass):
     """Initial data for Ministry document."""
-    __slots__ = ('ministry', 'vision', 'founded')
     ministry: str
     vision: str
     founded: datetime.date
@@ -55,7 +53,6 @@ class MinistryData(BaseDataClass):
 @dataclass
 class ChurchData(BaseDataClass):
     """Initial data for Church document."""
-    __slots__ = ('city', 'region', 'country', 'founded')
     city: str
     region: str
     country: str

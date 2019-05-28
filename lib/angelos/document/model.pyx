@@ -248,7 +248,7 @@ class DocumentField(Field):
         return True
 
     def from_bytes(self, value):
-        return self.t.build(value)
+        return self.t.build(value) if value else None
 
 
 class UuidField(Field):
@@ -268,7 +268,7 @@ class UuidField(Field):
         return True
 
     def from_bytes(self, value):
-        return uuid.UUID(bytes=value)
+        return uuid.UUID(bytes=value) if value else None
 
     def str(self, value):
         """Str converter."""
@@ -303,7 +303,9 @@ class IPField(Field):
 
     def from_bytes(self, value):
         length = len(value)
-        if length == 4:
+        if length == 0:
+            return None
+        elif length == 4:
             return ipaddress.IPv4Address(value)
         elif length == 8:
             return ipaddress.IPv6Address(value)
@@ -341,7 +343,7 @@ class DateField(Field):
         return True
 
     def from_bytes(self, value):
-        return datetime.date.fromisoformat(value.encode())
+        return datetime.date.fromisoformat(value.decode()) if value else None
 
     def str(self, value):
         """Str converter."""
@@ -349,7 +351,8 @@ class DateField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return bytes(value.isoformat(), 'utf-8')
+        print('Date2bytes:', value.isoformat().encode())
+        return value.isoformat().encode()
 
 
 class StringField(Field):
@@ -370,7 +373,7 @@ class StringField(Field):
         return True
 
     def from_bytes(self, value):
-        return value.encode()
+        return value.decode() if value else None
 
     def str(self, value):
         """Str converter."""
@@ -378,7 +381,7 @@ class StringField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return bytes(value, 'utf-8')
+        return value.encode()
 
 
 class TypeField(Field):
@@ -398,7 +401,7 @@ class TypeField(Field):
         return True
 
     def from_bytes(self, value):
-        return int.from_bytes(value)
+        return int.from_bytes(value, byteorder='big') if value else None
 
     def str(self, value):
         """Str converter."""
@@ -445,7 +448,7 @@ class BinaryField(Field):
         return True
 
     def from_bytes(self, value):
-        return value
+        return value if value else None
 
     def str(self, value):
         """Str converter."""
@@ -515,7 +518,7 @@ class ChoiceField(Field):
         return True
 
     def from_bytes(self, value):
-        return value.encode()
+        return value.decode() if value else None
 
     def str(self, value):
         """Str converter."""
@@ -523,7 +526,7 @@ class ChoiceField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return bytes(value, 'utf-8')
+        return value.encode()
 
 
 class EmailField(Field):
@@ -556,7 +559,7 @@ class EmailField(Field):
         return True
 
     def from_bytes(self, value):
-        return value.encode()
+        return value.decode() if value else None
 
     def str(self, value):
         """Str converter."""
@@ -564,4 +567,4 @@ class EmailField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return bytes(value, 'utf-8')
+        return value.encode()

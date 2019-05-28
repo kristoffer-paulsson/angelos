@@ -7,17 +7,16 @@ import asyncio
 
 from typing import Sequence
 
-from ..utils import Util
 from ..const import Const
 
 from ..document import (
-    Person, Ministry, Church, PrivateKeys, Keys, Domain, Node, Network,
+    Person, Ministry, Church, Keys, Node, Network,
     Envelope, Trusted)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy import (
     PrivatePortfolio, ImportEntityPolicy, ImportUpdatePolicy, NetworkPolicy,
-    EntityData)
+    EntityData, PGroup)
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -91,6 +90,8 @@ class Facade:
             os.path.join(home_dir, Const.CNL_VAULT), secret, portfolio,
             _type=cls.INFO[0], role=role, use=Const.A_USE_VAULT)
 
+        await vault.new_portfolio(portfolio)
+
         facade = cls(home_dir, secret, vault)
         await facade._post_init()
         return facade
@@ -104,7 +105,7 @@ class Facade:
         can be instanciated.
         """
         vault = Vault(os.path.join(home_dir, Const.CNL_VAULT), secret)
-        _type = vault._archive.stats().type
+        _type = vault.stats.type
 
         if _type == Const.A_TYPE_PERSON_CLIENT:
             facade = PersonClientFacade(home_dir, secret, vault)
@@ -125,19 +126,16 @@ class Facade:
         return facade
 
     async def _post_init(self):
-        identity = await self._vault.load_identity()
+        """Load private portfolio for facade."""
+        server = True if self._vault.stats.type in (
+            Const.A_TYPE_PERSON_SERVER,
+            Const.A_TYPE_MINISTRY_SERVER,
+            Const.A_TYPE_CHURCH_SERVER
+        ) else False
 
-        Util.is_type(identity[0], self.PREFS[0])
-        Util.is_type(identity[1], PrivateKeys)
-        Util.is_type(identity[2], Keys)
-        Util.is_type(identity[3], Domain)
-        Util.is_type(identity[4], Node)
-
-        self.__entity = identity[0]
-        self.__privkeys = identity[1]
-        self.__keys = identity[2]
-        self.__domain = identity[3]
-        self.__node = identity[4]
+        self.__portfolio = await self._vault.load_portfolio(
+            self._vault.stats.owner,
+            PGroup.SERVER if server else PGroup.CLIENT)
 
     def load_portfolio(
             self, id: uuid.UUID, conf: Sequence[str]) -> PrivatePortfolio:
@@ -158,26 +156,6 @@ class Facade:
     def portfolio(self):
         """Private portfolio getter."""
         return self.__portfolio
-
-    @property
-    def entity(self):
-        """Entity core document getter."""
-        raise DeprecationWarning()
-
-    @property
-    def keys(self):
-        """Public keys core document getter."""
-        raise DeprecationWarning()
-
-    @property
-    def domain(self):
-        """Domain core document getter."""
-        raise DeprecationWarning()
-
-    @property
-    def node(self):
-        """Node core document getter."""
-        raise DeprecationWarning()
 
     def import_entity(self, entity, keys):
         """
@@ -293,11 +271,6 @@ class Facade:
         doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
         return Glue.doc_check(doclist, Keys, expiry_check)
 
-    @property
-    def __(self):
-        """Helper property."""
-        return self.__privkeys
-
     def find_entity(self, issuer, expiry_check=True):
         """
         Load foreign entity document.
@@ -366,14 +339,9 @@ class ServerFacadeMixin(TypeFacadeMixin):
     def __init__(self):
         TypeFacadeMixin.__init__(self)
 
-    @property
-    def network(self):
-        """Network core document getter."""
-        return self.__network
-
     async def _post_init(self):
         """Post init async work."""
-        self.__network = await self._vault.load_network()
+        pass
 
     async def load_client_auth(self, username):
         """Load documents required for Clients server authentication."""

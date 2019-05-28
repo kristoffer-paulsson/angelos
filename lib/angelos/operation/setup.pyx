@@ -108,7 +108,7 @@ class SetupPersonOperation(BaseSetupOperation):
     @classmethod
     def create(cls, data: PersonData, role: str='client', server: bool=False):
         portfolio = PersonPolicy.generate(data)
-        BaseSetupOperation._generate(portfolio)
+        BaseSetupOperation._generate(portfolio, role, server)
         return portfolio
 
 
@@ -119,7 +119,7 @@ class SetupMinistryOperation(BaseSetupOperation):
     def create(
             cls, data: MinistryData, role: str='client', server: bool=False):
         portfolio = MinistryPolicy.generate(data)
-        BaseSetupOperation._generate(portfolio)
+        BaseSetupOperation._generate(portfolio, role, server)
         return portfolio
 
 
@@ -129,5 +129,5 @@ class SetupChurchOperation(BaseSetupOperation):
     @classmethod
     def create(cls, data: ChurchData, role: str='client', server: bool=False):
         portfolio = ChurchPolicy.generate(data)
-        BaseSetupOperation._generate(portfolio)
+        BaseSetupOperation._generate(portfolio, role, server)
         return portfolio

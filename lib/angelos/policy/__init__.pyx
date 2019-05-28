@@ -11,10 +11,19 @@ from .accept import ImportPolicy, ImportEntityPolicy, ImportUpdatePolicy
 from .domain import NodePolicy, DomainPolicy, NetworkPolicy
 from .verify import StatementPolicy
 from .message import CreateMessagePolicy, EnvelopePolicy
-from .portfolio import Statements, Portfolio, PrivatePortfolio
+from .portfolio import (
+    Statements, Portfolio, PrivatePortfolio, PField, PGroup,
+    PORTFOLIO_TEMPLATE, PORTFOLIO_PATTERN, DOCUMENT_PATTERN, DOCUMENT_TYPE,
+    DOCUMENT_PATH, PortfolioPolicy)
 
 
 __all__ = [
+    'PORTFOLIO_TEMPLATE',
+    'PORTFOLIO_PATTERN',
+    'DOCUMENT_PATTERN',
+    'DOCUMENT_TYPE',
+    'DOCUMENT_PATH',
+
     'EntityData',
 
     'PersonData',
@@ -23,6 +32,9 @@ __all__ = [
     'Statements',
     'Portfolio',
     'PrivatePortfolio',
+    'PField',
+    'PGroup',
+    'PortfolioPolicy',
 
     'Crypto',
 

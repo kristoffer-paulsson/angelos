@@ -13,6 +13,7 @@ from ..utils import Util
 from ..error import Error
 from ..const import Const
 from .cmd import Command, Option
+from ..policy import PersonData, MinistryData, ChurchData
 from ..facade.facade import (
     Facade, PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
 from ..automatic import BaseAuto
@@ -129,63 +130,61 @@ documents and connect to the nodes on the current domain network.
         self._io << (
             'It is necessary to collect information for the person entity.\n')
         valid = False
-        data = {
-            'given_name': None,
-            'family_name': None,
-            'names': [],
-            'born': None,
-            'sex': None
-        }
+        data = PersonData()
+        data.given_name = None
+        data.family_name = None
+        data.names = []
+        data.born = None
+        data.sex = None
 
         while True:
             do = await self._io.menu('Person entity data, (* = mandatory)', [
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='First name',
-                    c='OK' if bool(data['given_name']) else 'N/A',
-                    v=data['given_name']),
+                    c='OK' if bool(data.given_name) else 'N/A',
+                    v=data.given_name),
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='Family name',
-                    c='OK' if bool(data['family_name']) else 'N/A',
-                    v=data['family_name']),
+                    c='OK' if bool(data.family_name) else 'N/A',
+                    v=data.family_name),
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='Middle names',
-                    c='OK' if bool(data['names']) else 'N/A', v=data['names']),
+                    c='OK' if bool(data.names) else 'N/A', v=data.names),
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='Birth date',
-                    c='OK' if bool(data['born']) else 'N/A', v=data['born']),
+                    c='OK' if bool(data.born) else 'N/A', v=data.born),
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='Sex',
-                    c='OK' if bool(data['sex']) else 'N/A', v=data['sex']),
+                    c='OK' if bool(data.sex) else 'N/A', v=data.sex),
                 '  Reset'
             ] + (['  Continue'] if valid else []))
 
             if do == 0:
                 name = await self._io.prompt('Given name')
-                data['given_name'] = name
-                data['names'].append(name)
+                data.given_name = name
+                data.names.append(name)
             elif do == 1:
-                data['family_name'] = await self._io.prompt('Family name')
+                data.family_name = await self._io.prompt('Family name')
             elif do == 2:
-                data['names'].append(await self._io.prompt(
+                data.names.append(await self._io.prompt(
                     'One (1) middle name'))
             elif do == 3:
-                data['born'] = await self._io.prompt(
+                data.born = await self._io.prompt(
                     'Birth date (YYYY-MM-DD)', t=datetime.date.fromisoformat)
             elif do == 4:
-                data['sex'] = await self._io.choose(
+                data.sex = await self._io.choose(
                     'Biological sex', ['man', 'woman', 'undefined'])
             elif do == 5:
-                data = {
-                    'given_name': None,
-                    'family_name': None,
-                    'names': [],
-                    'born': None,
-                    'sex': None
-                }
+                data = PersonData()
+                data.given_name = None
+                data.family_name = None
+                data.names = []
+                data.born = None
+                data.sex = None
             elif do == 6:
                 break
 
-            if all(data) and data['given_name'] in data['names']:
+            if all(data._asdict()) and data.given_name in data.names:
                 valid = True
             else:
                 valid = False
@@ -198,48 +197,46 @@ documents and connect to the nodes on the current domain network.
             'It is necessary to collect information ' +
             'for the ministry entity.\n')
         valid = False
-        data = {
-            'vision': None,
-            'ministry': None,
-            'founded': None,
-        }
+        data = MinistryData()
+        data.vision = None
+        data.ministry = None
+        data.founded = None
 
         while True:
             do = await self._io.menu('Ministry entity data, (* = mandatory)', [
                 '{m} {t:17} {c:4} {v}'.format(
                     m=' ', t='Vision',
-                    c='OK' if bool(data['vision']) else 'N/A',
-                    v=data['vision']),
+                    c='OK' if bool(data.vision) else 'N/A',
+                    v=data.vision),
                 '{m} {t:17} {c:4} {v}'.format(
                     m='*', t='Ministry name',
-                    c='OK' if bool(data['ministry']) else 'N/A',
-                    v=data['ministry']),
+                    c='OK' if bool(data.ministry) else 'N/A',
+                    v=data.ministry),
                 '{m} {t:17} {c:4} {v}'.format(
                     m='*', t='Ministry founded',
-                    c='OK' if bool(data['founded']) else 'N/A',
-                    v=data['founded']),
+                    c='OK' if bool(data.founded) else 'N/A',
+                    v=data.founded),
                 '  Reset'
             ] + (['  Continue'] if valid else []))
 
             if do == 0:
                 vision = await self._io.prompt('Ministry vision')
-                data['vision'] = vision
+                data.vision = vision
             elif do == 1:
-                data['ministry'] = await self._io.prompt('Ministry name')
+                data.ministry = await self._io.prompt('Ministry name')
             elif do == 2:
-                data['founded'] = await self._io.prompt(
+                data.founded = await self._io.prompt(
                     'Ministry founded (YYYY-MM-DD)',
                     t=datetime.date.fromisoformat)
             elif do == 3:
-                data = {
-                    'vision': None,
-                    'ministry': None,
-                    'founded': None,
-                }
+                data = MinistryData()
+                data.vision = None
+                data.ministry = None
+                data.founded = None
             elif do == 4:
                 break
 
-            if all(data):
+            if all(data._asdict()):
                 valid = True
             else:
                 valid = False
@@ -251,31 +248,30 @@ documents and connect to the nodes on the current domain network.
         self._io << (
             'It is necessary to collect information for the church entity.\n')
         valid = False
-        data = {
-            'founded': None,
-            'city': None,
-            'region': None,
-            'country': None,
-        }
+        data = ChurchData()
+        data.founded = None
+        data.city = None
+        data.region = None
+        data.country = None
 
         while True:
             do = await self._io.menu('Church entity data, (* = mandatory)', [
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='Founded',
-                    c='OK' if bool(data['founded']) else 'N/A',
-                    v=data['founded']),
+                    c='OK' if bool(data.founded) else 'N/A',
+                    v=data.founded),
                 '{m} {t:15} {c:4} {v}'.format(
                     m='*', t='City',
-                    c='OK' if bool(data['city']) else 'N/A',
-                    v=data['city']),
+                    c='OK' if bool(data.city) else 'N/A',
+                    v=data.city),
                 '{m} {t:15} {c:4} {v}'.format(
                     m=' ', t='Region/state',
-                    c='OK' if bool(data['region']) else 'N/A',
-                    v=data['region']),
+                    c='OK' if bool(data.region) else 'N/A',
+                    v=data.region),
                 '{m} {t:15} {c:4} {v}'.format(
                     m=' ', t='Country/nation',
-                    c='OK' if bool(data['country']) else 'N/A',
-                    v=data['country']),
+                    c='OK' if bool(data.country) else 'N/A',
+                    v=data.country),
                 '  Reset'
             ] + (['  Continue'] if valid else []))
 
@@ -283,25 +279,24 @@ documents and connect to the nodes on the current domain network.
                 founded = await self._io.prompt(
                     'Church founded when (YYYY-MM-DD)',
                     t=datetime.date.fromisoformat)
-                data['founded'] = founded
+                data.founded = founded
             elif do == 1:
-                data['city'] = await self._io.prompt('Church of what city')
+                data.city = await self._io.prompt('Church of what city')
             elif do == 2:
-                data['region'] = await self._io.prompt(
+                data.region = await self._io.prompt(
                     'Region or state (if applicable)')
             elif do == 3:
-                data['country'] = await self._io.prompt('Country ')
+                data.country = await self._io.prompt('Country ')
             elif do == 4:
-                data = {
-                    'founded': None,
-                    'city': None,
-                    'region': None,
-                    'country': None,
-                }
+                data = ChurchData()
+                data.founded = None
+                data.city = None
+                data.region = None
+                data.country = None
             elif do == 5:
                 break
 
-            if all(data):
+            if all(data._asdict()):
                 valid = True
             else:
                 valid = False
@@ -350,9 +345,8 @@ class StartupCommand(Command):
 
                 facade = await Facade.open(self._root, secret)
                 self._ioc.facade = facade
-
                 self._io << '\nSuccessfully loaded the facade.\nID: %s\n\n' % (
-                        facade.entity.id)
+                        facade.portfolio.entity.id)
 
             self._io << (
                 'You just de-encrypted and loaded the Facade. Next step in\n' +

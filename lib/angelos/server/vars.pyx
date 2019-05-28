@@ -108,7 +108,7 @@ CONFIG_IMMUTABLE = {
             }
         },
         'root': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'filters': [],
             'handlers': ['console', 'default'],
         },

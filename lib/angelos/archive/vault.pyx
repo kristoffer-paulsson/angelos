@@ -5,17 +5,14 @@ import asyncio
 import uuid
 import logging
 from typing import Tuple
-from collections.abc import Iterable
 
 import msgpack
 
-from ..policy import Portfolio, PrivatePortfolio, PField
+from ..policy import (
+    Portfolio, PrivatePortfolio, PField, DOCUMENT_PATH, PORTFOLIO_PATTERN,
+    DOCUMENT_TYPE, PortfolioPolicy)
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
-from ..document import (
-    DocType, PrivateKeys, Keys, Person, Ministry, Church, PersonProfile,
-    MinistryProfile, ChurchProfile, Domain, Node, Network, Verified, Trusted,
-    Revoked, Envelope, Note, Instant, Mail, Share, Report)
 
 
 HIERARCHY = (
@@ -64,61 +61,6 @@ HIERARCHY = (
     '/portfolios'
 )
 
-PORTFOLIO_TEMPLATE = {
-    PField.ENTITY: '{dir}/{file}.ent',
-    PField.PROFILE: '{dir}/{file}.pfl',
-    PField.PRIVKEYS: '{dir}/{file}.pky',
-    PField.KEYS: '{dir}/{file}.key',
-    PField.DOMAIN: '{dir}/{file}.dmn',
-    PField.NODES: '{dir}/{file}.nod',
-    PField.NET: '{dir}/{file}.net',
-    PField.ISSUER_VERIFIED: '{dir}/{file}.ver',
-    PField.ISSUER_TRUSTED: '{dir}/{file}.rst',
-    PField.ISSUER_REVOKED: '{dir}/{file}.rev',
-    PField.OWNER_VERIFIED: '{dir}/{file}.ver',
-    PField.OWNER_TRUSTED: '{dir}/{file}.rst',
-    PField.OWNER_REVOKED: '{dir}/{file}.rev'
-}
-
-PORTFOLIO_PATTERN = {
-    PField.ENTITY: '.ent',
-    PField.PROFILE: 'pfl',
-    PField.PRIVKEYS: '.pky',
-    PField.KEYS: '.key',
-    PField.DOMAIN: '.dmn',
-    PField.NODES: '.nod',
-    PField.NET: '.net',
-    PField.ISSUER_VERIFIED: '.ver',
-    PField.ISSUER_TRUSTED: '.rst',
-    PField.ISSUER_REVOKED: '.rev',
-    PField.OWNER_VERIFIED: '.ver',
-    PField.OWNER_TRUSTED: '.rst',
-    PField.OWNER_REVOKED: '.rev'
-}
-
-DOCUMENT_TYPE = {
-    DocType.KEYS_PRIVATE: PrivateKeys,
-    DocType.KEYS: Keys,
-    DocType.ENTITY_PERSON: Person,
-    DocType.ENTITY_MINISTRY: Ministry,
-    DocType.ENTITY_CHURCH: Church,
-    DocType.PROF_PERSON: PersonProfile,
-    DocType.PROF_MINISTRY: MinistryProfile,
-    DocType.PROF_CHURCH: ChurchProfile,
-    DocType.NET_DOMAIN: Domain,
-    DocType.NET_NODE: Node,
-    DocType.NET_NETWORK: Network,
-    DocType.STAT_VERIFIED: Verified,
-    DocType.STAT_TRUSTED: Trusted,
-    DocType.STAT_REVOKED: Revoked,
-    DocType.COM_ENVELOPE: Envelope,
-    DocType.COM_NOTE: Note,
-    DocType.COM_INSTANT: Instant,
-    DocType.COM_MAIL: Mail,
-    DocType.COM_SHARE: Share,
-    DocType.COM_REPORT: Report,
-}
-
 
 class Vault:
     """
@@ -142,8 +84,14 @@ class Vault:
     def __init__(self, filename, secret):
         """Initialize the Vault."""
         self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
+        self.__stats = self._archive.stats()
         self._closed = False
         self._proxy = AsyncProxy(200)
+
+    @property
+    def stats(self):
+        """Stats of underlying archive."""
+        return self.__stats
 
     @property
     def closed(self):
@@ -171,6 +119,7 @@ class Vault:
         for i in HIERARCHY:
             arch.mkdir(i)
 
+        """
         key_path = '/keys/' + str(next(iter(portfolio.keys)).id) + '.pickle'
         files = [
             (Vault.ENTITY, portfolio.entity),
@@ -197,6 +146,7 @@ class Vault:
                 compression=Entry.COMP_NONE)
 
         arch.link(Vault.KEYS_LINK, key_path)
+        """
         arch.close()
 
         return Vault(filename, secret)
@@ -282,32 +232,31 @@ class Vault:
         if self._archive.isdir(dirname):
             raise OSError('Portfolio already exists: %s' % portfolio.entity.id)
 
-        files = []
         self._archive.mkdir(dirname)
-        for name, doc in portfolio._disassemble():
-            if isinstance(doc, Iterable):
-                for item in doc:
-                    files.append(
-                        (PORTFOLIO_TEMPLATE[name].format(
-                            dirname, item.id), item))
-            else:
-                files.append(
-                    (PORTFOLIO_TEMPLATE[name].format(dirname, doc.id), doc))
+
+        files = []
+        issuer, owner = portfolio.to_sets()
+        for doc in issuer | owner:
+            print(doc)
+            files.append(
+                (DOCUMENT_PATH[doc.type].format(
+                    dir=dirname, file=doc.id), doc))
 
         ops = []
         for doc in files:
             created, updated, owner = Glue.doc_save(doc[1])
             ops.append(self._proxy.call(
                 self._archive.mkfile, filename=doc[0],
-                data=msgpack.packb(
-                    doc[1].export_bytes(), use_bin_type=True, use_list=False),
-                id=doc[1].id, created=created, updated=updated, owner=owner,
+                data=msgpack.packb(doc[1].export_bytes(),
+                                   use_bin_type=True, strict_types=True),
+                id=doc[1].id, created=created, modified=updated, owner=owner,
                 compression=Entry.COMP_NONE))
 
         results = await asyncio.shield(
             asyncio.gather(*ops, return_exceptions=True))
         success = True
         for result in results:
+            logging.debug('%s' % result)
             if isinstance(result, Exception):
                 success = False
                 logging.warning('Failed to save document: %s' % result)
@@ -320,14 +269,14 @@ class Vault:
         if not self._archive.isdir(dirname):
             raise OSError('Portfolio doesn\'t exists: %s' % id)
 
-        result = self._archive.glob(name='{dir}/*'.format(dirname), owner=id)
+        result = self._archive.glob(name='{0}/*'.format(dirname), owner=id)
 
-        files = []
+        files = set()
         for field in config:
             pattern = PORTFOLIO_PATTERN[field]
             for filename in result:
                 if pattern == filename[-4:]:
-                    files.append(filename)
+                    files.add(filename)
 
         ops = []
         for doc in files:
@@ -337,68 +286,129 @@ class Vault:
         results = await asyncio.shield(
             asyncio.gather(*ops, return_exceptions=True))
 
-        if PField.PRIVKEYS in config:
-            portfolio = PrivatePortfolio()
-        else:
-            portfolio = Portfolio()
-
+        issuer = set()
+        owner = set()
         for data in results:
             if isinstance(data, Exception):
                 logging.warning('Failed to load document: %s' % data)
                 continue
 
-            docobj = msgpack.unpackb(data, raw=False, use_list=False)
-            document = DOCUMENT_TYPE[docobj['type']].build(docobj)
-
-            if isinstance(document, (Person, Ministry, Church)):
-                portfolio.entity = document
-
-            if isinstance(document, (
-                    PersonProfile, MinistryProfile, ChurchProfile)):
-                portfolio.profile = document
-
-            if isinstance(document, PrivateKeys):
-                portfolio.privkeys = document
-
-            if isinstance(document, Domain):
-                portfolio.domain = document
-
-            if isinstance(document, Network):
-                portfolio.network = document
-
-            if isinstance(document, Keys):
-                portfolio.keys.append(document)
-
-            if isinstance(document, Node):
-                portfolio.nodes.add(document)
+            docobj = msgpack.unpackb(data, raw=False)
+            document = DOCUMENT_TYPE[ord(docobj['type'])].build(docobj)
 
             if document.issuer.int != id.int:
-                if isinstance(document, Verified):
-                    portfolio.owner.verified.add(document)
-
-                if isinstance(document, Trusted):
-                    portfolio.owner.trusted.add(document)
-
-                if isinstance(document, Revoked):
-                    portfolio.owner.revoked.add(Revoked)
+                owner.add(document)
             else:
-                if isinstance(document, Verified):
-                    portfolio.issuer.verified.add(document)
+                issuer.add(document)
 
-                if isinstance(document, Trusted):
-                    portfolio.issuer.trusted.add(document)
+        if PField.PRIVKEYS in config:
+            portfolio = PrivatePortfolio()
+        else:
+            portfolio = Portfolio()
 
-                if isinstance(document, Revoked):
-                    portfolio.issuer.revoked.add(Revoked)
-
+        portfolio.from_sets(issuer, owner)
         return portfolio
 
-    def reload_portfolio(
+    async def reload_portfolio(
             self, portfolio: PrivatePortfolio, config: Tuple[str]) -> bool:
         """Reload portfolio."""
-        raise NotImplementedError()
+        dirname = '/portfolios/{0}'.format(portfolio.entity.id)
+        if not self._archive.isdir(dirname):
+            raise OSError('Portfolio doesn\'t exists: %s' % id)
 
-    def save_portfolio(
+        result = self._archive.glob(
+            name='{dir}/*'.format(dirname), owner=portfolio.entity.id)
+
+        files = set()
+        for field in config:
+            pattern = PORTFOLIO_PATTERN[field]
+            for filename in result:
+                if pattern == filename[-4:]:
+                    files.add(filename)
+
+        available = set()
+        for filename in files:
+            available.add(PortfolioPolicy.path2fileident(filename))
+
+        issuer, owner = portfolio.to_sets()
+        loaded = set()
+        for doc in issuer + owner:
+            loaded.add(PortfolioPolicy.doc2fileident(doc))
+
+        toload = available - loaded
+        files2 = set()
+        for filename in files:
+            if PortfolioPolicy.path2fileident(filename) not in toload:
+                files2.add(filename)
+
+        files = files - files2
+
+        ops = []
+        for doc in files:
+            ops.append(self._proxy.call(
+                self._archive.load, filename=doc))
+
+        results = await asyncio.shield(
+            asyncio.gather(*ops, return_exceptions=True))
+
+        issuer = set()
+        owner = set()
+        for data in results:
+            if isinstance(data, Exception):
+                logging.warning('Failed to load document: %s' % data)
+                continue
+
+            docobj = msgpack.unpackb(data, raw=False)
+            document = DOCUMENT_TYPE[ord(docobj['type'])].build(docobj)
+
+            if document.issuer.int != id.int:
+                owner.add(document)
+            else:
+                issuer.add(document)
+
+        portfolio.from_sets(issuer, owner)
+        return portfolio
+
+    async def save_portfolio(
             self, portfolio: PrivatePortfolio) -> bool:
         """Save a changed portfolio."""
-        raise NotImplementedError()
+        dirname = '/portfolios/{0}'.format(portfolio.entity.id)
+        if not self._archive.isdir(dirname):
+            raise OSError('Portfolio doesn\'t exists: %s' % id)
+
+        files = self._archive.glob(
+            name='{dir}/*'.format(dirname), owner=portfolio.entity.id)
+
+        ops = []
+        save = portfolio._save | portfolio.issuer._save | portfolio.owner._save
+
+        for doc in save:
+            filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
+            if filename in files:
+                ops.append(self._proxy.call(
+                    self._archive.save, filename=filename,
+                    data=msgpack.packb(doc.export_bytes(),
+                                       use_bin_type=True, strict_types=True),
+                    compression=Entry.COMP_NONE))
+            else:
+                created, updated, owner = Glue.doc_save(doc)
+                ops.append(self._proxy.call(
+                    self._archive.mkfile, filename=filename,
+                    data=msgpack.packb(
+                        doc.export_bytes(), use_bin_type=True, use_list=False),
+                    id=doc.id, created=created, updated=updated, owner=owner,
+                    compression=Entry.COMP_NONE))
+
+        results = await asyncio.shield(
+            asyncio.gather(*ops, return_exceptions=True))
+
+        portfolio.reset()
+        portfolio.issuer.reset()
+        portfolio.owner.reset()
+
+        success = True
+        for result in results:
+            if isinstance(result, Exception):
+                success = False
+                logging.warning('Failed to save document: %s' % result)
+        return success
