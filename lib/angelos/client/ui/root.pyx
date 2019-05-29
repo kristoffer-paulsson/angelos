@@ -1,4 +1,6 @@
 # cython: language_level=3
+import logging
+
 from kivy.lang import Builder
 from kivy.uix.screenmanager import Screen
 
@@ -87,7 +89,8 @@ class SettingsScreen(BasePanelScreen):
 Builder.load_string("""
 <MainScreen@Screen>:
     name: 'main'
-    on_pre_enter: profile.load(app)
+    # on_pre_enter: self.load()
+    # on_leave: self.unload()
     BoxLayout:
         orientation: 'vertical'
         MDToolbar:
@@ -127,6 +130,12 @@ class MainScreen(Screen):
     def __init__(self, app, **kwargs):
         Screen.__init__(self, **kwargs)
         self.app = app
+
+    def load(self):
+        logging.error('\'load\' not implemented')
+
+    def unload(self):
+        logging.error('\'unload\' not implemented')
 
 
 Builder.load_string("""

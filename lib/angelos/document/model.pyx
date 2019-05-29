@@ -158,8 +158,30 @@ class BaseDocument(metaclass=DocumentMeta):
 
     @classmethod
     def build(cls, data):
-        params = {}
+        """Build document from dictionary, takes dict or list of dicts."""
+        doc = cls(nd={})
+        logging.debug('Exporting document %s' % type(cls))
 
+        for name, field in doc._fields.items():
+            value = data[name]
+            logging.debug('%s, %s, %s' % (type(field), name, value))
+
+            if not field.multiple:
+                setattr(doc, name, field.from_bytes(value))
+                # nd[name] = field.from_bytes(value) if not isinstance(
+                #    value, BaseDocument) else value.export(c)
+            elif isinstance(value, type(None)):
+                setattr(doc, name, [])
+            else:
+                item_list = []
+                for item in value:
+                    item_list.append(field.from_bytes(item))
+                    # item_list.append(c(field, item) if not isinstance(
+                    #    item, BaseDocument) else item.export(c))
+                setattr(doc, name, item_list)
+        return doc
+
+        """params = {}
         for item in data.keys():
             if data[item] is list:
                 nl = []
@@ -168,7 +190,7 @@ class BaseDocument(metaclass=DocumentMeta):
                 params[item] = nl
             else:
                 params[item] = cls._fields[item].from_bytes(data[item])
-        return cls(nd=params)
+        return cls(nd=params)"""
 
     def export(self, c=conv_dont):
         """
@@ -248,7 +270,7 @@ class DocumentField(Field):
         return True
 
     def from_bytes(self, value):
-        return self.t.build(value) if value else None
+        return self.type.build(value) if value else None
 
 
 class UuidField(Field):
@@ -310,7 +332,8 @@ class IPField(Field):
         elif length == 8:
             return ipaddress.IPv6Address(value)
         else:
-            raise TypeError('Not bytes of length 4 or 8')
+            raise TypeError(
+                'Not bytes of length 4 or 8. %s %s' % (length, value))
 
     def str(self, value):
         """Str converter."""
@@ -323,7 +346,7 @@ class IPField(Field):
         if isinstance(value, ipaddress.IPv6Address):
             return int(value).to_bytes(8, byteorder='big')
         else:
-            raise TypeError()
+            raise TypeError('Arbitrary size: %s' % len(value))
 
 
 class DateField(Field):
@@ -351,7 +374,6 @@ class DateField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        print('Date2bytes:', value.isoformat().encode())
         return value.isoformat().encode()
 
 
@@ -409,7 +431,7 @@ class TypeField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return bytes([value])
+        return int(value).to_bytes(4, byteorder='big')
 
     def yaml(self, value):
         """YAML converter."""

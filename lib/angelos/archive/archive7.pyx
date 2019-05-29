@@ -435,11 +435,15 @@ class Archive7(ContainerAware):
         self.__header = Header.deserialize(self.__file.read(
                 struct.calcsize(Header.FORMAT)))
 
-        self.__file.seek(1024)
+        offset = self.__file.seek(1024)
+        if offset != 1024:
+            raise Util.exception(Error.AR7_INVALID_SEEK, {
+                'position': offset})
+
         entries = []
         for i in range(self.__header.entries):
-            entries.append(Entry.deserialize(self.__file.read(
-                    struct.calcsize(Entry.FORMAT))))
+            entries.append(Entry.deserialize(
+                self.__file.read(struct.calcsize(Entry.FORMAT))))
 
         ContainerAware.__init__(self, Container(config={
             'archive': lambda s: self,
@@ -516,6 +520,7 @@ class Archive7(ContainerAware):
         with self.__lock:
             if not self.__closed:
                 self.__file.close()
+                self.__closed = True
 
     def stats(self):
         """Archive stats."""

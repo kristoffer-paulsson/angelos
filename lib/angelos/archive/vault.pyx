@@ -4,6 +4,7 @@ import pickle as pck
 import asyncio
 import uuid
 import logging
+import atexit
 from typing import Tuple
 
 import msgpack
@@ -24,18 +25,11 @@ HIERARCHY = (
     '/contacts/friend',
     '/contacts/all',
     '/contacts/blocked',
-    # Imported entities
-    '/entities',
-    '/entities/churches',
-    '/entities/ministries',
-    '/entities/persons',
     # Issued statements by the vaults entity
     '/issued',
     '/issued/verified',
     '/issued/trusted',
     '/issued/revoked',
-    # Public keys, mainly from other entities
-    '/keys',
     # Messages, ingoing and outgoung correspondence
     '/messages',
     '/messages/inbox',
@@ -47,13 +41,6 @@ HIERARCHY = (
     '/messages/trash',
     # Networks, for other hostts that are strusted
     '/networks'
-    # Pool with imported statements about entity and others
-    '/pool',
-    '/pool/verified',
-    '/pool/trusted',
-    '/pool/revoked',
-    # Imported entities profiles anv v-cards.
-    '/profiles',
     # Preferences by the owning entity.
     '/settings',
     '/settings/nodes',
@@ -84,6 +71,7 @@ class Vault:
     def __init__(self, filename, secret):
         """Initialize the Vault."""
         self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
+        atexit.register(self._archive.close)
         self.__stats = self._archive.stats()
         self._closed = False
         self._proxy = AsyncProxy(200)
@@ -102,6 +90,7 @@ class Vault:
         """Close the Vault."""
         if not self._closed:
             self._proxy.quit()
+            atexit.unregister(self._archive.close)
             self._archive.close()
             self._closed = True
 
@@ -237,7 +226,6 @@ class Vault:
         files = []
         issuer, owner = portfolio.to_sets()
         for doc in issuer | owner:
-            print(doc)
             files.append(
                 (DOCUMENT_PATH[doc.type].format(
                     dir=dirname, file=doc.id), doc))
@@ -260,6 +248,7 @@ class Vault:
             if isinstance(result, Exception):
                 success = False
                 logging.warning('Failed to save document: %s' % result)
+                logging.exception(result)
         return success
 
     async def load_portfolio(
@@ -291,10 +280,12 @@ class Vault:
         for data in results:
             if isinstance(data, Exception):
                 logging.warning('Failed to load document: %s' % data)
+                logging.exception(data)
                 continue
 
             docobj = msgpack.unpackb(data, raw=False)
-            document = DOCUMENT_TYPE[ord(docobj['type'])].build(docobj)
+            doctype = int.from_bytes(docobj['type'], byteorder='big')
+            document = DOCUMENT_TYPE[doctype].build(docobj)
 
             if document.issuer.int != id.int:
                 owner.add(document)
@@ -359,7 +350,8 @@ class Vault:
                 continue
 
             docobj = msgpack.unpackb(data, raw=False)
-            document = DOCUMENT_TYPE[ord(docobj['type'])].build(docobj)
+            doctype = int.from_bytes(docobj['type'], byteorder='big')
+            document = DOCUMENT_TYPE[doctype].build(docobj)
 
             if document.issuer.int != id.int:
                 owner.add(document)

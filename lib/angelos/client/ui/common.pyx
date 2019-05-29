@@ -1,4 +1,6 @@
 # cython: language_level=3
+import logging
+
 from kivy.lang import Builder
 from kivy.uix.screenmanager import Screen
 
@@ -28,7 +30,7 @@ class BasePanelScreen(Screen):
         self.app = app
 
     def load(self):
-        raise NotImplementedError()
+        logging.error('\'load\' not implemented')
 
     def unload(self):
-        raise NotImplementedError()
+        logging.error('\'unload\' not implemented')

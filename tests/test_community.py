@@ -120,11 +120,11 @@ class TestCommunity(unittest.TestCase):
         person_datas = random_person_entity_data(201)
         persons = []
         for person_data in person_datas:
-            persons.append(SetupPersonOperation.create_new(person_data))
+            persons.append(SetupPersonOperation.create(person_data))
 
         # Generate a church
         church_data = random_church_entity_data(1)[0]
-        entity, privkeys, keys, domain, node = SetupChurchOperation.create_new(
+        entity, privkeys, keys, domain, node = SetupChurchOperation.create(
             church_data, 'server', True)
         net = NetworkPolicy(entity, privkeys, keys)
         net.generate(domain, node)

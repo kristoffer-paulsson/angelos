@@ -17,6 +17,7 @@ import pathlib
 import libnacl
 
 from .archive7 import Archive7, Entry
+from ..error import ArchiveInvalidSeek
 
 
 BYTES_SUF = ('B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB')
@@ -95,7 +96,10 @@ def run_test(args, parser):
                 filename = ids[entry.parent]+'/'+str(
                     entry.name, 'utf-8')
 
-            data = ops.load_data(entry)
+            try:
+                data = ops.load_data(entry)
+            except ArchiveInvalidSeek as e:
+                corruption.append((str(e) + ', failed loading.', ))
             cur_valid = True
             if entry.compression:
                 try:

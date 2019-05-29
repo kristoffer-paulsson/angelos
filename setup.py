@@ -79,3 +79,4 @@ setup(
 # asyncssh
 # keyring
 # msgpack
+# pyyaml
