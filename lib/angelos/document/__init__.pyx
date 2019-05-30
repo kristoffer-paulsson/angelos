@@ -25,6 +25,7 @@ Document = Union[
 Entity = Union[Person, Ministry, Church]
 Profile = Union[PersonProfile, MinistryProfile, ChurchProfile]
 Statement = Union[Verified, Trusted, Revoked]
+Message = Union[Note, Instant, Mail, Share, Report]
 
 
 __all__ = [
@@ -56,5 +57,6 @@ __all__ = [
     'Share',
     'Report',
     'Envelope',
-    'Header'
+    'Header',
+    'Message'
 ]

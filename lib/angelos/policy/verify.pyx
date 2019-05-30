@@ -1,60 +1,64 @@
 # cython: language_level=3
 """Verify entities by issuing statements."""
-from ..utils import Util
-from .policy import SignPolicy
+from .policy import Policy
 from .crypto import Crypto
-from ..document.entities import Person, Ministry, Church
-from ..document.statements import Verified, Trusted, Revoked
+from .portfolio import Portfolio, PrivatePortfolio
+from ..document import Verified, Trusted, Revoked, Statement
 
 
-class StatementPolicy(SignPolicy):
+class StatementPolicy(Policy):
     """Policy for issuing statements."""
 
-    def __init__(self, **kwargs):
-        SignPolicy.__init__(self, **kwargs)
-        self.statement = None
-
-    def verified(self, entity):
+    @staticmethod
+    def verified(issuer: PrivatePortfolio, owner: Portfolio) -> bool:
         """Issue a verified statement."""
-        Util.is_type(entity, (Person, Ministry, Church))
 
-        new_stat = Verified(nd={
-            'issuer': self.entity.id,
-            'owner': entity.id
+        verified = Verified(nd={
+            'issuer': issuer.entity.id,
+            'owner': owner.entity.id
         })
 
-        new_stat = Crypto.sign(new_stat, self.entity, self.privkeys, self.keys)
-        new_stat.validate()
+        verified = Crypto.sign(
+            verified, issuer.entity, issuer.privkeys, next(iter(issuer.keys)))
+        verified.validate()
 
-        self.statement = new_stat
+        issuer.issuer.verified.add(verified)
+        owner.owner.verified.add(verified)
+
         return True
 
-    def trusted(self, entity):
+    @staticmethod
+    def trusted(issuer: PrivatePortfolio, owner: Portfolio) -> bool:
         """Issue a trusted statement."""
-        Util.is_type(entity, (Person, Ministry, Church))
 
-        new_stat = Trusted(nd={
-            'issuer': self.entity.id,
-            'owner': entity.id
+        trusted = Trusted(nd={
+            'issuer': issuer.entity.id,
+            'owner': owner.entity.id
         })
 
-        new_stat = Crypto.sign(new_stat, self.entity, self.privkeys, self.keys)
-        new_stat.validate()
+        trusted = Crypto.sign(
+            trusted, issuer.entity, issuer.privkeys, next(iter(issuer.keys)))
+        trusted.validate()
 
-        self.statement = new_stat
+        issuer.issuer.trusted.add(trusted)
+        owner.owner.trusted.add(trusted)
+
         return True
 
-    def revoked(self, statement):
+    @staticmethod
+    def revoked(issuer: PrivatePortfolio, statement: Statement):
         """Revoke earlier statement."""
-        Util.is_type(statement, (Verified, Trusted))
 
-        new_stat = Revoked(nd={
-            'issuer': self.entity.id,
+        if isinstance(statement, Revoked):
+            return False
+
+        revoked = Revoked(nd={
+            'issuer': issuer.entity.id,
             'issuance': statement.id
         })
 
-        new_stat = Crypto.sign(new_stat, self.entity, self.privkeys, self.keys)
-        new_stat.validate()
+        revoked = Crypto.sign(
+            revoked, issuer.entity, issuer.privkeys, next(iter(issuer.keys)))
+        revoked.validate()
 
-        self.statement = new_stat
         return True

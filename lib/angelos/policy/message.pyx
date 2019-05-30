@@ -2,178 +2,311 @@
 """Generate and verify messages."""
 import enum
 import datetime
-import pickle
 
-from ..utils import Util
+from typing import List
+
 from .crypto import Crypto
-from .policy import SignPolicy
-from ..document.entities import Person, Ministry, Church, Keys
-from ..document.messages import Message, Instant, Note, Mail, Report, Share
-from ..document.envelope import Envelope, Header
+from .policy import Policy
+from .portfolio import PrivatePortfolio, Portfolio, PortfolioPolicy
+from ..document import (
+    Message, Instant, Note, Mail, Report, Share, Envelope, Header, Attachement)
 
 
-class CreateMessagePolicy(SignPolicy):
+REPORT_TEXT = {
+    'Unsolicited': 'Unwanted messages you do not wish to receive.',
+    'Spam': 'Unsolicited advertisment.',
+    'Suspicious':
+        'Professional messages that seem to be deceptive or fraudulent.',
+    'Harmful':
+        'Promotion of behaviors or actions which harmful if carried out.',
+    'Defamation':
+        'A message which content is defaming or slanderous towards someone.',
+    'Offensive': 'A message which content is detestable or repulsive.',
+    'Hateful': 'A message that is malicious or insulting and spreads hate.',
+    'Incitement': 'Incitement to mischief and spread hate or commit crimes.',
+    'Harassment': 'A message is considered to be harassment or stalking.',
+    'Menace':
+        'A message is intimidating and menacing or contains direct threats.',
+    'Blackmail': 'A message that intimidates you to conform to demands.',
+    'Solicitation': 'Solicitation for criminal purposes.',
+    'Conspiracy': 'Conspiracy to commit a crime.',
+    'Graphic': 'Undesirable graphic content.',
+    'Adult': 'Mature content of sexual nature.'
+}
+
+
+class MimeTypes(enum.Enum):
+    TEXT = 'text/plain'
+    MARKDOWN = 'text/markdown'
+    HTML = 'text/html'
+    RTF = 'text/rtf'
+    VCARD = 'text/vcard'
+    CALENDAR = 'text/calendar'
+
+    JPEG = 'image/jpeg'
+    WEBP = 'image/webp'
+    PNG = 'image/png'
+    TIFF = 'image/tiff'
+    BMP = 'image/bmp'
+
+    MP4_A = 'audio/mp4'
+    MPEG_A = 'audio/mpeg'
+    AAC = 'audio/aac'
+    WEBM = 'audio/webm'
+    VORBIS = 'audio/vorbis'
+
+    MP4 = 'video/mp4'
+    MPEG = 'video/mpeg'
+    QUICKTIME = 'video/quicktime'
+    H261 = 'video/H261'
+    H263 = 'video/H263'
+    H264 = 'video/H264'
+    H265 = 'video/H265'
+    OGG = 'video/ogg'
+
+    ZIP = 'application/zip'
+    _7Z = 'application/x-7z-compressed'
+
+
+class ReportType(enum.Enum):
+    UNSOLICITED = 'Unsolicited'
+    SPAM = 'Spam'
+    SUSPICIOUS = 'Suspicious'
+    HARMFUL = 'Harmful'
+    DEFAMATION = 'Defamation'
+    OFFENSIVE = 'Offensive'
+    HATEFUL = 'Hateful'
+    INCITEMENT = 'Incitement'
+    HARASSMENT = 'Harassment'
+    MENACE = 'Menace'
+    BLACKMAIL = 'Blackmail'
+    SOLICITATION = 'Solicitation'
+    CONSPIRACY = 'Conspiracy'
+    GRAPHIC = 'Graphic'
+    ADULT = 'Adult'
+
+
+class MailBuilder:
+    """Mail building class."""
+
+    def __init__(
+            self, sender: PrivatePortfolio, mail: Mail):
+        """Init the mail builder"""
+        self.__sender = sender
+        self.__mail = mail
+
+    def message(self, subject: str, body: str, reply: Mail=None):
+        """Add mail body, subject and reply-to."""
+        self.__mail.subject = subject
+        self.__mail.body = body
+        self.__mail.reply = reply.id
+
+    def add(self, name: str, data: bytes, mime: str):
+        """Add an attachment to the mail."""
+        attachement = Attachement(nd={
+            'name': name,
+            'mime': mime,
+            'data': data
+        })
+        attachement.validate()
+        self.__mail.attachments.append(attachement)
+
+    def done(self) -> Mail:
+        """Finalize the mail message."""
+        self.__mail.expires = datetime.date.today() + datetime.timedelta(30)
+        self.__mail.posted = datetime.datetime.now()
+
+        mail = Crypto.sign(
+            self.__mail, self.__sender.entity, self.__sender.privkeys,
+            next(iter(self.__sender.keys)))
+        mail.validate()
+
+        return mail
+
+    def draft(self):
+        """Export draft mail document"""
+        return self.__mail
+
+
+class ShareBuilder(MailBuilder):
+    def share(self, portfolio: Portfolio) -> Share:
+        """Create a Share message containing documents to be shared."""
+        mime = 'application/octet-stream'
+        issuer, owner = portfolio.to_sets()
+        for doc in issuer | owner:
+            self.add(doc.__class__.__name__,
+                     PortfolioPolicy.serialze(doc), mime)
+
+        return self.done()
+
+
+class ReportBuilder(MailBuilder):
+    def report(
+            self, message: Message, envelope: Envelope,
+            claims: List[str], msg: str) -> Report:
+        """Create a Share message containing documents to be shared."""
+        if len(claims) < 1 or len(claims) > 3:
+            raise ValueError('At least 1 and most 3 claims.')
+
+        mime = 'application/octet-stream'
+        for doc in set(message, envelope):
+            self.add(doc.__class__.__name__,
+                     PortfolioPolicy.serialze(doc), mime)
+
+        text = '\n'.join(['{0}: {1}'.format(
+            claim, REPORT_TEXT[claim]) for claim in claims])
+
+        self.message(
+            'Claims: {0}'.format(', '.join(claims)),
+            'MESSAGE:\n{0}\n\nCLAIMS:\n{1}'.format(
+                msg if msg else 'n/a', text))
+        return self.done()
+
+
+class CreateMessagePolicy(Policy):
     """Generate messages."""
 
-    def __init__(self, **kwargs):
-        SignPolicy.__init__(self, **kwargs)
-        self.message = None
-
-    def instant(self, recepient, data, mime, reply=None):
+    @staticmethod
+    def instant(
+            sender: PrivatePortfolio, recipient: Portfolio, data: bytes,
+            mime: str, reply: Instant=None) -> Instant:
         """Issue an instant message."""
-        Util.is_type(recepient, (Person, Ministry, Church))
-        Util.is_type(data, bytes)
-        Util.is_type(reply, (Instant, type(None)))
-
-        if mime not in list(map(str, CreateMessagePolicy.MimeTypes)):
+        if mime not in list(map(str, MimeTypes)):
             raise ValueError('Unsupported mime-type for instant messages.')
 
         instant = Instant(nd={
-            'owner': recepient.id,
-            'issuer': self.entity.id,
+            'owner': recipient.entity.id,
+            'issuer': sender.entity.id,
             'mime': mime,
             'body': data,
-            'reply': reply
+            'reply': None if not reply else reply.id,
+            'expires': datetime.date.today() + datetime.timedelta(30),
+            'posted': datetime.datetime.now()
         })
 
-        instant = Crypto.sign(instant, self.entity, self.privkeys, self.keys)
+        instant = Crypto.sign(
+            instant, sender.entity, sender.privkeys, next(iter(sender.keys)))
         instant.validate()
 
-        self.message = instant
-        return True
+        return instant
 
-    def note(self, recepient, body, reply=None):
+    @staticmethod
+    def note(
+            sender: PrivatePortfolio, recipient: Portfolio, body: str,
+            reply: Note=None) -> Note:
         """Issue an instant message."""
-        Util.is_type(recepient, (Person, Ministry, Church))
-        Util.is_type(body, str)
-        Util.is_type(reply, (Message, type(None)))
-
         note = Note(nd={
-            'owner': recepient.id,
-            'issuer': self.entity.id,
+            'owner': recipient.entity.id,
+            'issuer': sender.entity.id,
             'body': body,
-            'reply': reply
+            'reply': None if not reply else reply.id,
+            'expires': datetime.date.today() + datetime.timedelta(30),
+            'posted': datetime.datetime.now()
         })
 
-        note = Crypto.sign(note, self.entity, self.privkeys, self.keys)
+        note = Crypto.sign(
+            note, sender.entity, sender.privkeys, next(iter(sender.keys)))
         note.validate()
 
-        self.message = note
-        return True
+        return note
 
-    class MimeTypes(enum.Enum):
+    @staticmethod
+    def mail(sender: PrivatePortfolio, recipient: Portfolio) -> MailBuilder:
+        """Compose a mail by using a mailbuilder."""
+        mail = Mail(nd={
+            'owner': recipient.entity.id,
+            'issuer': sender.entity.id,
+        })
+        return MailBuilder(sender, mail)
 
-        TEXT = 'text/plain'
-        MARKDOWN = 'text/markdown'
-        HTML = 'text/html'
-        RTF = 'text/rtf'
-        VCARD = 'text/vcard'
-        CALENDAR = 'text/calendar'
+    @staticmethod
+    def share(sender: PrivatePortfolio, recipient: Portfolio) -> ShareBuilder:
+        """Compose a share of documents by using a mailbuilder."""
+        share = Share(nd={
+            'owner': recipient.entity.id,
+            'issuer': sender.entity.id,
+        })
+        return ShareBuilder(sender, share)
 
-        JPEG = 'image/jpeg'
-        WEBP = 'image/webp'
-        PNG = 'image/png'
-        TIFF = 'image/tiff'
-        BMP = 'image/bmp'
-
-        MP4_A = 'audio/mp4'
-        MPEG_A = 'audio/mpeg'
-        AAC = 'audio/aac'
-        WEBM = 'audio/webm'
-        VORBIS = 'audio/vorbis'
-
-        MP4 = 'video/mp4'
-        MPEG = 'video/mpeg'
-        QUICKTIME = 'video/quicktime'
-        H261 = 'video/H261'
-        H263 = 'video/H263'
-        H264 = 'video/H264'
-        H265 = 'video/H265'
-        OGG = 'video/ogg'
-
-        ZIP = 'application/zip'
-        _7Z = 'application/x-7z-compressed'
-
-    class Report(enum.Enum):
-        UNSOLICITED = 'Unsolicited'
-        SPAM = 'Spam'
-        SUSPICIOUS = 'Suspicious'
-        HARMFUL = 'Harmful'
-        DEFAMATION = 'Defamation'
-        OFFENSIVE = 'Offensive'
-        HATEFUL = 'Hateful'
-        INCITEMENT = 'Incitement'
-        HARASSMENT = 'Harassment'
-        MENACE = 'Menace'
-        BLACKMAIL = 'Blackmail'
-        SOLICITATION = 'Solicitation'
-        CONSPIRACY = 'Conspiracy'
-        GRAPHIC = 'Graphic'
-        ADULT = 'Adult'
+    @staticmethod
+    def report(
+            sender: PrivatePortfolio, recipient: Portfolio) -> ReportBuilder:
+        """Compose a report by using a mailbuilder."""
+        report = Report(nd={
+            'owner': recipient.entity.id,
+            'issuer': sender.entity.id,
+        })
+        return ReportBuilder(sender, report)
 
 
-class EnvelopePolicy(SignPolicy):
+class EnvelopePolicy(Policy):
     """Envelope handling policy."""
 
-    def route(self, envelope):
+    @staticmethod
+    def route(router: PrivatePortfolio, envelope: Envelope) -> Envelope:
         """Sign an envelope header."""
-        Util.is_type(envelope, Envelope)
-
         if envelope.header[-1].op == Header.Op.RECEIVE:
             raise RuntimeError('Envelope already received.')
 
-        self._add_header(envelope, Header.Op.ROUTE)
+        EnvelopePolicy._add_header(router, envelope, Header.Op.ROUTE)
         return envelope
 
-    def wrap(self, message, receiver, keys):
+    @staticmethod
+    def wrap(
+            sender: PrivatePortfolio, recipient: Portfolio,
+            message: Message) -> Envelope:
         """Wrap a message in an envelope."""
-        Util.is_type(message, (Note, Instant, Mail, Share, Report))
-        Util.is_type(receiver, (Person, Ministry, Church))
-        Util.is_type(keys, Keys)
-
-        message = Crypto.sign(message, self.entity, self.privkeys, self.keys)
+        message = Crypto.sign(
+            message, sender.entity, sender.privkeys, next(iter(sender.keys)))
         message.validate()
 
         envelope = Envelope(nd={
             'owner': message.owner,
             'message': Crypto.conceal(
-                pickle.dumps(message), self.entity,
-                self.privkeys, receiver, keys),
+                PortfolioPolicy.serialize(message), sender.entity,
+                sender.privkeys, recipient.entity, next(iter(recipient.keys))),
         })
 
-        envelope = Crypto.sign(envelope, self.entity, self.privkeys, self.keys)
+        envelope = Crypto.sign(
+            envelope, sender.entity, sender.privkeys, next(iter(sender.keys)))
         envelope.validate()
 
+        EnvelopePolicy._add_header(sender, envelope, Header.Op.SEND)
         return envelope
 
-    def open(self, envelope, sender, keys):
+    @staticmethod
+    def open(
+            recipient: PrivatePortfolio, sender: Portfolio,
+            envelope) -> Message:
         """Open an envelope and unveil the message."""
-        Util.is_type(envelope, Envelope)
-        Util.is_type(sender, (Person, Ministry, Church))
-        Util.is_type(keys, Keys)
-
-        envelope = Crypto.verify(envelope, sender, keys)
+        envelope = Crypto.verify(
+            envelope, sender.entity, next(iter(sender.keys)))
         envelope.validate()
 
-        message = pickle.loads(Crypto.unveil(
-            envelope.message, self.entity, self.privkeys, sender, keys))
+        message = PortfolioPolicy.deserialize(Crypto.unveil(
+            envelope.message, recipient.entity, recipient.privkeys,
+            sender.entity, next(iter(sender.keys))))
 
-        message = Crypto.verify(message, sender, keys)
+        message = Crypto.verify(
+            message, sender.entity, next(iter(sender.keys)))
         message.validate()
 
+        EnvelopePolicy._add_header(recipient, envelope, Header.Op.RECEIVE)
         return message
 
-    def _add_header(self, envelope, operation):
+    def _add_header(
+            handler: PrivatePortfolio, envelope: Envelope, operation: bytes):
         if operation not in list(map(Header.Op)):
             raise ValueError('Illegal header operation.')
 
         header = Header(nd={
             'op': operation,
-            'issuer': self.entity,
+            'issuer': handler.entity.id,
             'timestamp': datetime.datetime.now()
         })
 
         header = Crypto.sign_header(
-            envelope, header, self.entity, self.privkeys, self.leys)
+            envelope, header, handler.entity,
+            handler.privkeys, next(iter(handler.keys)))
 
         envelope.header.append(header)

@@ -11,6 +11,7 @@ from lipsum import (
 
 from angelos.policy import PersonData, MinistryData, ChurchData
 
+
 def filesize(file):
     """Real file filesize reader."""
     if isinstance(file, io.IOBase):
@@ -73,7 +74,7 @@ def random_church_entity_data(num=1):
         founded = datetime.date.today(
             ) - datetime.timedelta(days=random.randrange(730, 29220))
 
-        entity = PersonData()
+        entity = ChurchData()
         entity.founded = founded
         entity.city = church[0]
         entity.region = church[1]

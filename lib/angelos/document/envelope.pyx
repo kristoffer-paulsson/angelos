@@ -8,7 +8,7 @@ from ..error import Error
 
 from .model import (
     BaseDocument, DateField, StringField, UuidField, DocumentField,
-    BinaryField, TypeField, SignatureField)
+    BinaryField, TypeField, SignatureField, DateTimeField)
 from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
@@ -30,6 +30,7 @@ class Envelope(Document, OwnerMixin):
         datetime.date.today() + datetime.timedelta(31)))
     message = BinaryField(limit=131072)
     header = DocumentField(t=Header, multiple=True)
+    posted = DateTimeField()
 
     def _validate(self):
         self._check_type(DocType.COM_ENVELOPE)

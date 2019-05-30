@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple
 from collections.abc import Iterable
 
+import msgpack
+
 from ._types import PortfolioABC, PrivatePortfolioABC
 from ..document import (
     DocType, Document, Entity, Profile, PrivateKeys, Keys, Domain, Node,
@@ -115,9 +117,9 @@ DOCUMENT_PATTERN = {
     DocType.ENTITY_PERSON: '.ent',
     DocType.ENTITY_MINISTRY: '.ent',
     DocType.ENTITY_CHURCH: '.ent',
-    DocType.PROF_PERSON: 'pfl',
-    DocType.PROF_MINISTRY: 'pfl',
-    DocType.PROF_CHURCH: 'pfl',
+    DocType.PROF_PERSON: '.pfl',
+    DocType.PROF_MINISTRY: '.pfl',
+    DocType.PROF_CHURCH: '.pfl',
     DocType.NET_DOMAIN: '.dmn',
     DocType.NET_NODE: '.nod',
     DocType.NET_NETWORK: '.net',
@@ -341,6 +343,19 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
 
 class PortfolioPolicy:
     """Portfolio load configurations."""
+
+    @staticmethod
+    def serialize(document: Document) -> bytes:
+        """"Serialize document into streams of bytes."""
+        return msgpack.packb(
+            document.export_bytes(), use_bin_type=True, strict_types=True)
+
+    @staticmethod
+    def deserialize(data: bytes) -> Document:
+        """Restore document from stream of bytes."""
+        docobj = msgpack.unpackb(data, raw=False)
+        return DOCUMENT_TYPE[int.from_bytes(
+            docobj['type'], byteorder='big')].build(docobj)
 
     @staticmethod
     def validate(portfolio: Portfolio, config: Tuple[str]) -> bool:

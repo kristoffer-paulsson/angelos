@@ -11,7 +11,7 @@ import msgpack
 
 from ..policy import (
     Portfolio, PrivatePortfolio, PField, DOCUMENT_PATH, PORTFOLIO_PATTERN,
-    DOCUMENT_TYPE, PortfolioPolicy)
+    PortfolioPolicy)
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
 
@@ -235,8 +235,7 @@ class Vault:
             created, updated, owner = Glue.doc_save(doc[1])
             ops.append(self._proxy.call(
                 self._archive.mkfile, filename=doc[0],
-                data=msgpack.packb(doc[1].export_bytes(),
-                                   use_bin_type=True, strict_types=True),
+                data=PortfolioPolicy.serialize(doc[1]),
                 id=doc[1].id, created=created, modified=updated, owner=owner,
                 compression=Entry.COMP_NONE))
 
@@ -283,9 +282,7 @@ class Vault:
                 logging.exception(data)
                 continue
 
-            docobj = msgpack.unpackb(data, raw=False)
-            doctype = int.from_bytes(docobj['type'], byteorder='big')
-            document = DOCUMENT_TYPE[doctype].build(docobj)
+            document = PortfolioPolicy.deserialize(data)
 
             if document.issuer.int != id.int:
                 owner.add(document)
@@ -349,9 +346,7 @@ class Vault:
                 logging.warning('Failed to load document: %s' % data)
                 continue
 
-            docobj = msgpack.unpackb(data, raw=False)
-            doctype = int.from_bytes(docobj['type'], byteorder='big')
-            document = DOCUMENT_TYPE[doctype].build(docobj)
+            document = PortfolioPolicy.deserialize(data)
 
             if document.issuer.int != id.int:
                 owner.add(document)
@@ -386,8 +381,7 @@ class Vault:
                 created, updated, owner = Glue.doc_save(doc)
                 ops.append(self._proxy.call(
                     self._archive.mkfile, filename=filename,
-                    data=msgpack.packb(
-                        doc.export_bytes(), use_bin_type=True, use_list=False),
+                    data=PortfolioPolicy.serialize(doc),
                     id=doc.id, created=created, updated=updated, owner=owner,
                     compression=Entry.COMP_NONE))
 

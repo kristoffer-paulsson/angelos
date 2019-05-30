@@ -115,78 +115,46 @@ class TestCommunity(unittest.TestCase):
         """Generate one thousand persons."""
         logging.info('====== %s ======' % 'test_03_generate_persons')
 
-        # (entity, privkeys, keys, domain, node)
-        # Generate persons to the community
         person_datas = random_person_entity_data(201)
         persons = []
         for person_data in person_datas:
             persons.append(SetupPersonOperation.create(person_data))
 
         # Generate a church
-        church_data = random_church_entity_data(1)[0]
-        entity, privkeys, keys, domain, node = SetupChurchOperation.create(
-            church_data, 'server', True)
-        net = NetworkPolicy(entity, privkeys, keys)
-        net.generate(domain, node)
-        church = (entity, privkeys, keys, domain, node, net.network)
-
-        verifieds = []
-        trusts = []
-        stat_policy = StatementPolicy(entity, privkeys, keys)
+        church = SetupChurchOperation.create(
+            random_church_entity_data(1)[0], 'server', True)
+        NetworkPolicy.generate(church)
 
         for person in persons:
-            stat_policy.verified(person[0])
-            verifieds.append(stat_policy.statement)
-            stat_policy.trusted(person[0])
-            trusts.append(stat_policy.statement)
-
-            stat_p2 = StatementPolicy(person[0], person[1], person[2])
-            stat_p2.trusted(entity)
-            trusts.append(stat_p2.statement)
+            StatementPolicy.verified(church, person)
+            StatementPolicy.trusted(church, person)
+            StatementPolicy.trusted(person, church)
 
         for triad in range(67):
             offset = triad*3
             triple = persons[offset:offset+3]
 
-            stat_p1 = StatementPolicy(triple[0][0], triple[0][1], triple[0][2])
-            stat_p1.trusted(triple[1][0])
-            verifieds.append(stat_p1.statement)
-            stat_p1.trusted(triple[2][0])
-            verifieds.append(stat_p1.statement)
+            StatementPolicy.trusted(triple[0], triple[1])
+            StatementPolicy.trusted(triple[0], triple[2])
 
-            stat_p2 = StatementPolicy(triple[1][0], triple[1][1], triple[1][2])
-            stat_p2.trusted(triple[0][0])
-            verifieds.append(stat_p2.statement)
-            stat_p2.trusted(triple[2][0])
-            verifieds.append(stat_p2.statement)
+            StatementPolicy.trusted(triple[1], triple[0])
+            StatementPolicy.trusted(triple[1], triple[2])
 
-            stat_p3 = StatementPolicy(triple[2][0], triple[2][1], triple[2][2])
-            stat_p3.trusted(triple[0][0])
-            verifieds.append(stat_p3.statement)
-            stat_p3.trusted(triple[1][0])
-            verifieds.append(stat_p3.statement)
+            StatementPolicy.trusted(triple[2], triple[0])
+            StatementPolicy.trusted(triple[2], triple[1])
 
-        kw = {
-            'explicit_start': True,
-            'explicit_end': True
-        }
-        print(yaml.dump(church[0].export_yaml(), **kw))
-        print(yaml.dump(church[1].export_yaml(), **kw))
-        print(yaml.dump(church[2].export_yaml(), **kw))
-        print(yaml.dump(church[3].export_yaml(), **kw))
-        print(yaml.dump(church[4].export_yaml(), **kw))
+        pool = set()
 
-        for pd in persons:
-            print(yaml.dump(pd[0].export_yaml(), **kw))
-            print(yaml.dump(pd[1].export_yaml(), **kw))
-            print(yaml.dump(pd[2].export_yaml(), **kw))
-            print(yaml.dump(pd[3].export_yaml(), **kw))
-            print(yaml.dump(pd[4].export_yaml(), **kw))
+        owner, issuer = church.to_sets()
+        pool |= owner | issuer
 
-        for vd in verifieds:
-            print(yaml.dump(vd.export_yaml(), **kw))
-        for td in trusts:
-            print(yaml.dump(td.export_yaml(), **kw))
+        for person in persons:
+            owner, issuer = person.to_sets()
+            pool |= owner | issuer
+
+        for doc in pool:
+            print(yaml.dump(
+                doc.export_yaml(), explicit_start=True, explicit_end=True))
 
 
 if __name__ == '__main__':

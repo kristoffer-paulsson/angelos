@@ -168,29 +168,14 @@ class BaseDocument(metaclass=DocumentMeta):
 
             if not field.multiple:
                 setattr(doc, name, field.from_bytes(value))
-                # nd[name] = field.from_bytes(value) if not isinstance(
-                #    value, BaseDocument) else value.export(c)
             elif isinstance(value, type(None)):
                 setattr(doc, name, [])
             else:
                 item_list = []
                 for item in value:
                     item_list.append(field.from_bytes(item))
-                    # item_list.append(c(field, item) if not isinstance(
-                    #    item, BaseDocument) else item.export(c))
                 setattr(doc, name, item_list)
         return doc
-
-        """params = {}
-        for item in data.keys():
-            if data[item] is list:
-                nl = []
-                for value in data[item]:
-                    nl.append(cls._fields[item].from_bytes(value))
-                params[item] = nl
-            else:
-                params[item] = cls._fields[item].from_bytes(data[item])
-        return cls(nd=params)"""
 
     def export(self, c=conv_dont):
         """
@@ -367,6 +352,35 @@ class DateField(Field):
 
     def from_bytes(self, value):
         return datetime.date.fromisoformat(value.decode()) if value else None
+
+    def str(self, value):
+        """Str converter."""
+        return value.isoformat()
+
+    def bytes(self, value):
+        """Bytes converter."""
+        return value.isoformat().encode()
+
+
+class DateTimeField(Field):
+    def validate(self, value):
+        """Validate field type as DateTime and inherited validation logic."""
+        Field.validate(self, value)
+
+        if not isinstance(value, list):
+            value = [value]
+
+        for v in value:
+            if not isinstance(v, (datetime.datetime, type(None))):
+                logging.debug('Field is not datetime.date but %s' % type(v))
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {'expected': 'datetime.date', 'current': type(v)})
+        return True
+
+    def from_bytes(self, value):
+        return datetime.dateime.fromisoformat(
+            value.decode()) if value else None
 
     def str(self, value):
         """Str converter."""

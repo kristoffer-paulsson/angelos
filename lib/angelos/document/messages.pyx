@@ -2,7 +2,7 @@
 """Module docstring."""
 from .model import (
     BaseDocument, StringField, DateField, BinaryField, DocumentField,
-    UuidField, TypeField)
+    UuidField, TypeField, DateTimeField)
 from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
@@ -16,6 +16,7 @@ class Message(Document, OwnerMixin):
     expires = DateField(required=False)
     reply = UuidField(required=False)
     body = StringField(required=False)
+    posted = DateTimeField()
 
 
 class Note(Message):

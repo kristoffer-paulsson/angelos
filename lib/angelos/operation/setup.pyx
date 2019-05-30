@@ -106,7 +106,9 @@ class SetupPersonOperation(BaseSetupOperation):
     """Person entity setup policy."""
 
     @classmethod
-    def create(cls, data: PersonData, role: str='client', server: bool=False):
+    def create(
+            cls, data: PersonData, role: str='client',
+            server: bool=False) -> PrivatePortfolio:
         portfolio = PersonPolicy.generate(data)
         BaseSetupOperation._generate(portfolio, role, server)
         return portfolio
@@ -117,7 +119,8 @@ class SetupMinistryOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-            cls, data: MinistryData, role: str='client', server: bool=False):
+            cls, data: MinistryData, role: str='client',
+            server: bool=False) -> PrivatePortfolio:
         portfolio = MinistryPolicy.generate(data)
         BaseSetupOperation._generate(portfolio, role, server)
         return portfolio
@@ -127,7 +130,9 @@ class SetupChurchOperation(BaseSetupOperation):
     """Church entity setup policy."""
 
     @classmethod
-    def create(cls, data: ChurchData, role: str='client', server: bool=False):
+    def create(
+            cls, data: ChurchData, role: str='client',
+            server: bool=False) -> PrivatePortfolio:
         portfolio = ChurchPolicy.generate(data)
         BaseSetupOperation._generate(portfolio, role, server)
         return portfolio
