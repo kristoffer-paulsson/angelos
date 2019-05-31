@@ -6,8 +6,10 @@ import random
 import string
 import datetime
 
-from .lipsum import (
+from lipsum import (
     SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES, LIPSUM_WORDS, CHURCHES)
+
+from angelos.policy import PersonData, MinistryData, ChurchData
 
 
 def filesize(file):
@@ -35,13 +37,13 @@ def random_person_entity_data(num=1):
         born = datetime.date.today(
             ) - datetime.timedelta(days=random.randrange(4748, 29220))
 
-        identities.append({
-            'given_name': names[0],
-            'names': names,
-            'family_name': random.choices(SURNAMES, k=1)[0].capitalize(),
-            'sex': sex,
-            'born': born
-        })
+        entity = PersonData()
+        entity.given_name = names[0]
+        entity.names = names
+        entity.family_name = random.choices(SURNAMES, k=1)[0].capitalize()
+        entity.sex = sex
+        entity.born = born
+        identities.append(entity)
 
     return identities
 
@@ -55,11 +57,11 @@ def random_ministry_entity_data(num=1):
         founded = datetime.date.today(
             ) - datetime.timedelta(days=random.randrange(365, 29220))
 
-        ministries.append({
-            'ministry': ' '.join(ministry).capitalize(),
-            'vision': ' '.join(vision).capitalize(),
-            'founded': founded
-        })
+        entity = MinistryData()
+        entity.ministry = ' '.join(ministry).capitalize()
+        entity.vision = ' '.join(vision).capitalize()
+        entity.founded = founded
+        ministries.append(entity)
 
     return ministries
 
@@ -72,12 +74,12 @@ def random_church_entity_data(num=1):
         founded = datetime.date.today(
             ) - datetime.timedelta(days=random.randrange(730, 29220))
 
-        churches.append({
-            'founded': founded,
-            'city': church[0],
-            'region': church[1],
-            'country': church[2]
-        })
+        entity = ChurchData()
+        entity.founded = founded
+        entity.city = church[0]
+        entity.region = church[1]
+        entity.country = church[2]
+        churches.append(entity)
 
     return churches
 

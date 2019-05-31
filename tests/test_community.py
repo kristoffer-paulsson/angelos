@@ -11,11 +11,11 @@ import yaml
 
 from support import (
     random_church_entity_data, random_ministry_entity_data,
-    random_person_entity_data)
+    random_person_entity_data, generate_filename, generate_data)
 from angelos.operation.setup import (
     SetupChurchOperation, SetupMinistryOperation, SetupPersonOperation)
-from angelos.policy.domain import NetworkPolicy
-from angelos.policy.verify import StatementPolicy
+from angelos.policy import (
+    NetworkPolicy, StatementPolicy, MessagePolicy, EnvelopePolicy)
 
 
 class TestCommunity(unittest.TestCase):
@@ -125,10 +125,15 @@ class TestCommunity(unittest.TestCase):
             random_church_entity_data(1)[0], 'server', True)
         NetworkPolicy.generate(church)
 
+        mail = set()
         for person in persons:
             StatementPolicy.verified(church, person)
             StatementPolicy.trusted(church, person)
             StatementPolicy.trusted(person, church)
+            mail.add(EnvelopePolicy.wrap(person, church, MessagePolicy.mail(
+                person, church).message(
+                    generate_filename(postfix='.'),
+                    generate_data().decode()).done()))
 
         for triad in range(67):
             offset = triad*3
@@ -146,7 +151,7 @@ class TestCommunity(unittest.TestCase):
         pool = set()
 
         owner, issuer = church.to_sets()
-        pool |= owner | issuer
+        pool |= owner | issuer | mail
 
         for person in persons:
             owner, issuer = person.to_sets()

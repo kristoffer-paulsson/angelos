@@ -10,13 +10,12 @@ from typing import Sequence
 from ..const import Const
 
 from ..document import (
-    Person, Ministry, Church, Keys, Node, Network,
-    Envelope, Trusted)
+    Document, Person, Ministry, Church, Keys, Node, Network, Envelope, Trusted)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy import (
-    PrivatePortfolio, ImportEntityPolicy, ImportUpdatePolicy, NetworkPolicy,
-    EntityData, PGroup)
+    PrivatePortfolio, Portfolio, ImportEntityPolicy, ImportUpdatePolicy,
+    NetworkPolicy, EntityData, PGroup)
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -138,18 +137,21 @@ class Facade:
             PGroup.SERVER if server else PGroup.CLIENT)
 
     def load_portfolio(
-            self, id: uuid.UUID, conf: Sequence[str]) -> PrivatePortfolio:
+            self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
         """Load a portfolio belonging to id according to configuration."""
         raise NotImplementedError()
 
-    def update_portfolio(
-            self, portfolio: PrivatePortfolio) -> bool:
+    def update_portfolio(self, portfolio: Portfolio) -> bool:
         """Update a portfolio by comparison."""
         raise NotImplementedError()
 
-    def import_portfolio(
-            self, portfolio: PrivatePortfolio) -> bool:
+    def import_portfolio(self, portfolio: Portfolio) -> bool:
         """Import a portfolio of douments into the vault."""
+        
+
+    def docs_to_portfolio(
+            self, portfolio: uuid.UUID, documents: Sequence[Document]):
+        """import loose documents into a portfolio."""
         raise NotImplementedError()
 
     @property

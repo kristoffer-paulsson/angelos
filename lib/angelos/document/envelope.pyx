@@ -15,21 +15,21 @@ from .document import DocType, Document, OwnerMixin, IssueMixin
 class Header(BaseDocument):
     op = StringField()
     issuer = UuidField()
-    timestamp = StringField()
+    timestamp = DateTimeField()
     signature = SignatureField()
 
-    class Op(enum.Enum):
-        SEND = b'SEND'
-        ROUTE = b'RTE'
-        RECEIVE = b'RECV'
+    class Op:
+        SEND = 'SEND'
+        ROUTE = 'RTE'
+        RECEIVE = 'RECV'
 
 
 class Envelope(Document, OwnerMixin):
     type = TypeField(value=DocType.COM_ENVELOPE)
-    expires = DateField(required=True, init=lambda: (
+    expires = DateField(init=lambda: (
         datetime.date.today() + datetime.timedelta(31)))
     message = BinaryField(limit=131072)
-    header = DocumentField(t=Header, multiple=True)
+    header = DocumentField(required=False, t=Header, multiple=True)
     posted = DateTimeField()
 
     def _validate(self):

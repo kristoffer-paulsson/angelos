@@ -12,7 +12,7 @@ from .profiles import (
     PersonProfile, MinistryProfile, ChurchProfile, Address, Social)
 from .domain import Domain, Node, Network, Host, Location
 from .statements import Verified, Trusted, Revoked
-from .messages import Note, Instant, Mail, Share, Report
+from .messages import Note, Instant, Mail, Share, Report, Attachment
 from .envelope import Envelope, Header
 
 from typing import Union
@@ -58,5 +58,6 @@ __all__ = [
     'Report',
     'Envelope',
     'Header',
-    'Message'
+    'Message',
+    'Attachment'
 ]

@@ -9,7 +9,7 @@ from .crypto import Crypto
 from .policy import Policy
 from .portfolio import PrivatePortfolio, Portfolio, PortfolioPolicy
 from ..document import (
-    Message, Instant, Note, Mail, Report, Share, Envelope, Header, Attachement)
+    Message, Instant, Note, Mail, Report, Share, Envelope, Header, Attachment)
 
 
 REPORT_TEXT = {
@@ -95,15 +95,21 @@ class MailBuilder:
         self.__sender = sender
         self.__mail = mail
 
-    def message(self, subject: str, body: str, reply: Mail=None):
+    def message(
+            self, subject: str, body: str,
+            reply: Mail=None):  # -> MailBuilder:
         """Add mail body, subject and reply-to."""
         self.__mail.subject = subject
         self.__mail.body = body
-        self.__mail.reply = reply.id
+        self.__mail.reply = None if not reply else reply.id
 
-    def add(self, name: str, data: bytes, mime: str):
+        return self
+
+    def add(
+            self, name: str, data: bytes,
+            mime: str):  # -> MailBuilder:
         """Add an attachment to the mail."""
-        attachement = Attachement(nd={
+        attachement = Attachment(nd={
             'name': name,
             'mime': mime,
             'data': data
@@ -111,19 +117,19 @@ class MailBuilder:
         attachement.validate()
         self.__mail.attachments.append(attachement)
 
+        return self
+
     def done(self) -> Mail:
         """Finalize the mail message."""
         self.__mail.expires = datetime.date.today() + datetime.timedelta(30)
         self.__mail.posted = datetime.datetime.now()
 
-        mail = Crypto.sign(
-            self.__mail, self.__sender.entity, self.__sender.privkeys,
-            next(iter(self.__sender.keys)))
+        mail = Crypto.sign(self.__mail, self.__sender)
         mail.validate()
 
         return mail
 
-    def draft(self):
+    def draft(self) -> Mail:
         """Export draft mail document"""
         return self.__mail
 
@@ -163,7 +169,7 @@ class ReportBuilder(MailBuilder):
         return self.done()
 
 
-class CreateMessagePolicy(Policy):
+class MessagePolicy(Policy):
     """Generate messages."""
 
     @staticmethod
@@ -184,8 +190,7 @@ class CreateMessagePolicy(Policy):
             'posted': datetime.datetime.now()
         })
 
-        instant = Crypto.sign(
-            instant, sender.entity, sender.privkeys, next(iter(sender.keys)))
+        instant = Crypto.sign(instant, sender.entity)
         instant.validate()
 
         return instant
@@ -204,8 +209,7 @@ class CreateMessagePolicy(Policy):
             'posted': datetime.datetime.now()
         })
 
-        note = Crypto.sign(
-            note, sender.entity, sender.privkeys, next(iter(sender.keys)))
+        note = Crypto.sign(note, sender)
         note.validate()
 
         return note
@@ -256,22 +260,29 @@ class EnvelopePolicy(Policy):
             sender: PrivatePortfolio, recipient: Portfolio,
             message: Message) -> Envelope:
         """Wrap a message in an envelope."""
-        message = Crypto.sign(
-            message, sender.entity, sender.privkeys, next(iter(sender.keys)))
+        Crypto.verify(message, sender)
         message.validate()
 
+        if not ((message.issuer == sender.entity.id
+                 ) and (message.owner == recipient.entity.id)):
+            raise ValueError(
+                'Message sender and recepient not the same as on envelope.')
+
         envelope = Envelope(nd={
+            'issuer': message.issuer,
             'owner': message.owner,
             'message': Crypto.conceal(
-                PortfolioPolicy.serialize(message), sender.entity,
-                sender.privkeys, recipient.entity, next(iter(recipient.keys))),
+                PortfolioPolicy.serialize(message), sender, recipient.entity),
+            'expires': datetime.date.today() + datetime.timedelta(30),
+            'posted': datetime.datetime.now(),
+            'header': []
         })
 
-        envelope = Crypto.sign(
-            envelope, sender.entity, sender.privkeys, next(iter(sender.keys)))
-        envelope.validate()
+        envelope = Crypto.sign(envelope, sender, exclude=['header'])
 
         EnvelopePolicy._add_header(sender, envelope, Header.Op.SEND)
+        envelope.validate()
+
         return envelope
 
     @staticmethod
@@ -279,24 +290,21 @@ class EnvelopePolicy(Policy):
             recipient: PrivatePortfolio, sender: Portfolio,
             envelope) -> Message:
         """Open an envelope and unveil the message."""
-        envelope = Crypto.verify(
-            envelope, sender.entity, next(iter(sender.keys)))
+        envelope = Crypto.verify(envelope, sender, exclude=['header'])
         envelope.validate()
 
         message = PortfolioPolicy.deserialize(Crypto.unveil(
-            envelope.message, recipient.entity, recipient.privkeys,
-            sender.entity, next(iter(sender.keys))))
+            envelope.message, recipient, sender))
 
-        message = Crypto.verify(
-            message, sender.entity, next(iter(sender.keys)))
+        message = Crypto.verify(message, sender)
         message.validate()
 
         EnvelopePolicy._add_header(recipient, envelope, Header.Op.RECEIVE)
         return message
 
     def _add_header(
-            handler: PrivatePortfolio, envelope: Envelope, operation: bytes):
-        if operation not in list(map(Header.Op)):
+            handler: PrivatePortfolio, envelope: Envelope, operation: str):
+        if operation not in ('SEND', 'RTE', 'RECV'):
             raise ValueError('Illegal header operation.')
 
         header = Header(nd={
@@ -305,8 +313,5 @@ class EnvelopePolicy(Policy):
             'timestamp': datetime.datetime.now()
         })
 
-        header = Crypto.sign_header(
-            envelope, header, handler.entity,
-            handler.privkeys, next(iter(handler.keys)))
-
+        header = Crypto.sign_header(envelope, header, handler)
         envelope.header.append(header)

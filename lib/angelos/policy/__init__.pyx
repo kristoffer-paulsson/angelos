@@ -10,7 +10,9 @@ from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from .accept import ImportPolicy, ImportEntityPolicy, ImportUpdatePolicy
 from .domain import NodePolicy, DomainPolicy, NetworkPolicy
 from .verify import StatementPolicy
-from .message import CreateMessagePolicy, EnvelopePolicy
+from .message import (
+    MessagePolicy, EnvelopePolicy, MimeTypes, ReportType, MailBuilder,
+    ShareBuilder, ReportBuilder)
 from .portfolio import (
     Statements, Portfolio, PrivatePortfolio, PField, PGroup,
     PORTFOLIO_TEMPLATE, PORTFOLIO_PATTERN, DOCUMENT_PATTERN, DOCUMENT_TYPE,
@@ -52,8 +54,13 @@ __all__ = [
     'DomainPolicy',
     'NetworkPolicy',
 
-    'CreateMessagePolicy',
+    'MessagePolicy',
     'EnvelopePolicy',
+    'MimeTypes',
+    'ReportType',
+    'MailBuilder',
+    'ShareBuilder',
+    'ReportBuilder',
 
     'StatementPolicy',
 ]

@@ -33,23 +33,25 @@ class Field:
         self.multiple = multiple
         self.init = init
 
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate according to basic field functionality."""
         if self.required and not bool(value):
             logging.debug('Field with "required" not set. (%s)' % value)
-            raise Util.exception(Error.FIELD_NOT_SET)
+            raise Util.exception(Error.FIELD_NOT_SET, {'field': name})
 
         if not self.multiple and isinstance(value, list):
             logging.debug('Field not "multiple" but list. (%s)' % value)
             raise Util.exception(Error.FIELD_NOT_MULTIPLE, {
                 'type': type(self),
                 'value': value,
+                'field': name
             })
         if self.multiple and not isinstance(value, (list, type(None))):
             logging.debug('Field "multiple" but not list. (%s)' % value)
             raise Util.exception(Error.FIELD_IS_MULTIPLE, {
                 'type': type(self),
                 'value': value,
+                'field': name
             })
         return True
 
@@ -148,7 +150,7 @@ class BaseDocument(metaclass=DocumentMeta):
         Sets a field and validates transparently.
         """
         if key in self._fields:
-            if self._fields[key].validate(value):
+            if self._fields[key].validate(value, key):
                 object.__setattr__(self, key, value)
             else:
                 raise AttributeError(
@@ -215,7 +217,7 @@ class BaseDocument(metaclass=DocumentMeta):
     def _validate(self):
         """Validate all fields."""
         for name in self._fields.keys():
-            self._fields[name].validate(getattr(self, name))
+            self._fields[name].validate(getattr(self, name), name)
         return True
 
     def validate(self):
@@ -236,9 +238,9 @@ class DocumentField(Field):
         """Set a type to be accepted in particular"""
         self.type = t
 
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate DocType and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -250,7 +252,9 @@ class DocumentField(Field):
                 logging.debug('Field is not BaseDocument but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': type(BaseDocument), 'current': type(v)})
+                    {'expected': type(BaseDocument),
+                     'current': type(v),
+                     'field': name})
 
         return True
 
@@ -259,9 +263,9 @@ class DocumentField(Field):
 
 
 class UuidField(Field):
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate data type as UUID and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -271,7 +275,8 @@ class UuidField(Field):
                 logging.debug('Field is not UUID but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'uuid.UUID', 'current': type(v)})
+                    {'expected': 'uuid.UUID',
+                     'current': type(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -291,9 +296,9 @@ class UuidField(Field):
 
 
 class IPField(Field):
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate data type as IPvXAddress and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -305,7 +310,7 @@ class IPField(Field):
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
                     {'expected': 'ipaddress.IPv[4|6]Address',
-                     'current': type(v)})
+                     'current': type(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -335,9 +340,9 @@ class IPField(Field):
 
 
 class DateField(Field):
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate field type as Date and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -347,7 +352,8 @@ class DateField(Field):
                 logging.debug('Field is not datetime.date but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'datetime.date', 'current': type(v)})
+                    {'expected': 'datetime.date',
+                     'current': type(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -363,9 +369,9 @@ class DateField(Field):
 
 
 class DateTimeField(Field):
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate field type as DateTime and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -375,7 +381,8 @@ class DateTimeField(Field):
                 logging.debug('Field is not datetime.date but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'datetime.date', 'current': type(v)})
+                    {'expected': 'datetime.date',
+                     'current': type(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -392,9 +399,9 @@ class DateTimeField(Field):
 
 
 class StringField(Field):
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate field type as String and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -405,7 +412,7 @@ class StringField(Field):
                 logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'str', 'current': type(v)})
+                    {'expected': 'str', 'current': type(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -421,9 +428,9 @@ class StringField(Field):
 
 
 class TypeField(Field):
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate field type as Int and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -433,7 +440,7 @@ class TypeField(Field):
                 logging.debug('Field is not "int" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'int', 'current': type(v)})
+                    {'expected': 'int', 'current': type(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -458,12 +465,12 @@ class BinaryField(Field):
         Field.__init__(self, value, required, multiple, init)
         self.limit = limit
 
-    def validate(self, value):
+    def validate(self, value, name):
         """
         Validate field type as Bytes and within limits
         and inherited validation logic.
         """
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -473,14 +480,14 @@ class BinaryField(Field):
                 logging.debug('Field is not "bytes" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'bytes', 'current': type(v)})
+                    {'expected': 'bytes', 'current': type(v), 'field': name})
 
             if not isinstance(v, type(None)) and len(v) > self.limit:
                 logging.debug('Field beyond limit %s but %s' % (
                     self.limit, len(v)))
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
-                    {'limit': self.limit, 'size': len(v)})
+                    {'limit': self.limit, 'size': len(v), 'field': name})
         return True
 
     def from_bytes(self, value):
@@ -506,10 +513,10 @@ class SignatureField(BinaryField):
         self.limit = limit
         self.redo = False
 
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate field type as String and inherited validation logic."""
         if not self.redo:
-            Field.validate(self, value)
+            Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -519,14 +526,14 @@ class SignatureField(BinaryField):
                 logging.debug('Field is not "bytes" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'bytes', 'current': type(v)})
+                    {'expected': 'bytes', 'current': type(v), 'field': name})
 
             if not isinstance(v, type(None)) and len(v) > self.limit:
                 logging.debug('Field beyond limit %s but %s' % (
                     self.size, len(v)))
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
-                    {'limit': self.limit, 'size': len(v)})
+                    {'limit': self.limit, 'size': len(v), 'field': name})
         return True
 
 
@@ -538,9 +545,9 @@ class ChoiceField(Field):
             raise TypeError()
         self.choices = choices
 
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate field type as String and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -573,9 +580,9 @@ class EmailField(Field):
         Field.__init__(self, value, required, multiple, init)
         self.choices = choices
 
-    def validate(self, value):
+    def validate(self, value, name):
         """Validate as Email address and inherited validation logic."""
-        Field.validate(self, value)
+        Field.validate(self, value, name)
 
         if not isinstance(value, list):
             value = [value]
@@ -585,13 +592,13 @@ class EmailField(Field):
                 logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'str', 'current': type(v)})
+                    {'expected': 'str', 'current': type(v), 'field': name})
 
             if not isinstance(v, type(None)) and not bool(
                     re.match(EmailField.EMAIL_REGEX, v)):
                 logging.debug('Field is not valid email but %s' % type(v))
                 raise Util.exception(
-                    Error.FIELD_INVALID_EMAIL, {'email': v})
+                    Error.FIELD_INVALID_EMAIL, {'email': v, 'field': name})
         return True
 
     def from_bytes(self, value):

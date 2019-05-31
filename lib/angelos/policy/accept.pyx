@@ -1,15 +1,12 @@
 # cython: language_level=3
 """Module docstring."""
 import datetime
+import logging
+
 from ..utils import Util
-
-from ..document.entities import Entity, Person, Ministry, Church, Keys
-from ..document.statements import Statement
-from ..document.domain import Domain, Node, Network
-from ..document.profiles import Profile
-from ..document.envelope import Envelope
-from ..document.messages import Message
-
+from ..document.entities import (
+    Entity, Person, Ministry, Church, Keys, Statement, Domain, Node, Network,
+    Profile, Envelope, Message)
 from .entity import (
     PersonPolicy, MinistryPolicy, ChurchPolicy)
 from .crypto import Crypto
@@ -17,55 +14,15 @@ from .policy import Policy
 
 
 class ImportPolicy(Policy):
-    def __init__(self, entity, keys):
-        Util.is_type(entity, Entity)
-        Util.is_type(keys, Keys)
+    """Validate documents before import to facade."""
+    def __init__(self, portfolio: Portfolio):
+        self._portfolio = portfolio
 
-        self.__entity = entity
-        self.__keys = keys
-        self._exception = None
-
-    def document(self, document):
-        Util.is_type(document, (
-            Statement, Profile, Domain, Node, Network, Message))
-        self._exception = None
+    def entity(self) -> (Entity, Keys):
+        """Validate entity for import, use internal portfolio."""
         valid = True
-        try:
-            if datetime.date.today() > document.expires:
-                valid = False
-            valid = False if not document.validate() else valid
-            valid = False if not Crypto.verify(
-                document, self.__entity, self.__keys) else valid
-        except Exception as e:
-            self._exception = e
-            valid = False
-
-        return valid
-
-    def envelope(self, envelope):
-        Util.is_type(envelope, Envelope)
-        self._exception = None
-        valid = True
-        try:
-            if datetime.date.today() > envelope.expires:
-                valid = False
-            valid = False if not envelope.validate() else valid
-            valid = False if not Crypto.verify(
-                envelope, self.__entity, self.__keys, exclude=['header']
-                ) else valid
-        except Exception as e:
-            self._exception = e
-            valid = False
-
-        return valid
-
-
-class ImportEntityPolicy(Policy):
-    def __init__(self):
-        self.__exception = None
-
-    def __validate(self, entity, keys):
-        valid = True
+        entity = self._portfolio.entity
+        keys = next(iter(self._portfolio.keys))
 
         today = datetime.date.today()
         valid = False if entity.expires < today else valid
@@ -77,28 +34,88 @@ class ImportEntityPolicy(Policy):
             if datetime.date.today() > entity.expires:
                 valid = False
         except Exception as e:
-            self._exception = e
+            logging.info('%s' % str(e))
             valid = False
 
         valid = False if not Crypto.verify(keys, entity, keys) else valid
         valid = False if not Crypto.verify(entity, entity, keys) else valid
 
-        return valid
+        if valid:
+            return entity, keys
+        else:
+            return None, None
 
-    def person(self, entity, keys):
-        Util.is_type(entity, Person)
-        Util.is_type(keys, Keys)
-        return self.__validate(entity, keys)
+    def issued_document(
+            self, document: Document) -> Document:
+        """Validate document issued by internal portfolio."""
+        Util.is_type(document, (
+            Statement, Profile, Domain, Node, Network))
+        valid = True
+        try:
+            if document.issuer != self._portfolio.entity.id:
+                valid = False
+            if datetime.date.today() > document.expires:
+                valid = False
+            valid = False if not document.validate() else valid
+            valid = False if not Crypto.verify(
+                document, self._portfolio.entity,
+                self._portfolio.keys) else valid
+        except Exception as e:
+            logging.info('%s' % str(e))
+            valid = False
 
-    def ministry(self, entity, keys):
-        Util.is_type(entity, Ministry)
-        Util.is_type(keys, Keys)
-        return self.__validate(entity, keys)
+        if valid:
+            return document
+        else:
+            return None
 
-    def church(self, entity, keys):
-        Util.is_type(entity, Church)
-        Util.is_type(keys, Keys)
-        return self.__validate(entity, keys)
+    def owned_document(
+            self, issuer: Portfolio, document: Statement) -> Statement:
+        """Validate document owned by internal portfolio."""
+        Util.is_type(document, Statement)
+        valid = True
+        try:
+            if document.owner != self._portfolio.entity.id:
+                valid = False
+            if document.issuer != issuer.entity.id:
+                valid = False
+            if datetime.date.today() > document.expires:
+                valid = False
+            valid = False if not document.validate() else valid
+            valid = False if not Crypto.verify(
+                document, issuer.entity, issuer.keys) else valid
+        except Exception as e:
+            logging.info('%s' % str(e))
+            valid = False
+
+        if valid:
+            return document
+        else:
+            return None
+
+    def envelope(self, sender: Portfolio, envelope: Envelope) -> Envelope:
+        """Validate an envelope addressed to the internal portfolio."""
+        Util.is_type(envelope, Envelope)
+        valid = True
+        try:
+            if envelope.owner != self._portfolio.entity.id:
+                valid = False
+            if envelope.issuer != sender.entity.id:
+                valid = False
+            if datetime.date.today() > envelope.expires:
+                valid = False
+            valid = False if not envelope.validate() else valid
+            valid = False if not Crypto.verify(
+                envelope, sender.entity, sender.keys, exclude=['header']
+                ) else valid
+        except Exception as e:
+            logging.info('%s' % str(e))
+            valid = False
+
+        if valid:
+            return envelope
+        else:
+            return None
 
 
 class ImportUpdatePolicy(Policy):

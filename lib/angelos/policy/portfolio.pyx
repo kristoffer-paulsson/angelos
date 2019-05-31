@@ -1,7 +1,7 @@
 # cython: language_level=3
 """Policy classes for document portfolios."""
 from dataclasses import dataclass
-from typing import List, Set, Tuple
+from typing import Set, Tuple
 from collections.abc import Iterable
 
 import msgpack
@@ -211,7 +211,7 @@ class Portfolio(PortfolioABC):
     _save: Set[Document]
     entity: Entity
     profile: Profile
-    keys: List[Keys]
+    keys: Set[Keys]
     domain: Domain
     nodes: Set[Node]
     network: Network

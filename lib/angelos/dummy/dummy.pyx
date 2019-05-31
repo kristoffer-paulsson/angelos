@@ -3,9 +3,13 @@
 
 import random
 
-from .support import random_church_entity_data
+from .support import (
+    random_church_entity_data, random_person_entity_data, generate_filename,
+    generate_data)
 from ..operation.setup import SetupChurchOperation
-from ..policy.domain import NetworkPolicy
+from ..policy import (
+    NetworkPolicy, StatementPolicy, MessagePolicy, EnvelopePolicy)
+from ..operation.setup import SetupPersonOperation
 
 
 class DummyPolicy:
@@ -31,3 +35,50 @@ class DummyPolicy:
         facade.import_entity()
 
         return sets
+
+    def make_community(self, facade):
+        person_datas = random_person_entity_data(201)
+        persons = []
+        for person_data in person_datas:
+            persons.append(SetupPersonOperation.create(person_data))
+
+        # Generate a church
+        church = SetupChurchOperation.create(
+            random_church_entity_data(1)[0], 'server', True)
+        NetworkPolicy.generate(church)
+
+        mail = set()
+        for person in persons:
+            StatementPolicy.verified(church, person)
+            StatementPolicy.trusted(church, person)
+            StatementPolicy.trusted(person, church)
+            mail.add(EnvelopePolicy.wrap(person, church, MessagePolicy.mail(
+                person, church).message(
+                    generate_filename(postfix='.'),
+                    generate_data().decode()).done()))
+
+        for triad in range(67):
+            offset = triad*3
+            triple = persons[offset:offset+3]
+
+            StatementPolicy.trusted(triple[0], triple[1])
+            StatementPolicy.trusted(triple[0], triple[2])
+
+            StatementPolicy.trusted(triple[1], triple[0])
+            StatementPolicy.trusted(triple[1], triple[2])
+
+            StatementPolicy.trusted(triple[2], triple[0])
+            StatementPolicy.trusted(triple[2], triple[1])
+
+        pool = set()
+
+        issuer, owner = church.to_sets()
+        pool |= issuer | owner | mail
+
+        for person in persons:
+            issuer, owner = person.to_sets()
+            pool |= issuer | owner
+
+        for doc in pool:
+            print(yaml.dump(
+                doc.export_yaml(), explicit_start=True, explicit_end=True))

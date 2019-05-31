@@ -55,8 +55,7 @@ class NodePolicy(Policy):
             'location': location
         })
 
-        node = Crypto.sign(node, portfolio.entity,
-                           portfolio.privkeys, next(iter(portfolio.keys)))
+        node = Crypto.sign(node, portfolio)
         node.validate()
         portfolio.nodes.add(node)
 
@@ -81,9 +80,7 @@ class DomainPolicy(Policy):
             'issuer': portfolio.entity.id
         })
 
-        domain = Crypto.sign(
-            domain, portfolio.entity,
-            portfolio.privkeys, next(iter(portfolio.keys)))
+        domain = Crypto.sign(domain, portfolio)
         domain.validate()
         portfolio.domain = domain
 
@@ -115,9 +112,7 @@ class NetworkPolicy(Policy):
             'issuer': portfolio.entity.id,
         })
 
-        network = Crypto.sign(
-            network, portfolio.entity,
-            portfolio.privkeys, next(iter(portfolio.keys)))
+        network = Crypto.sign(network, portfolio)
         network.validate()
         portfolio.network = network
 
