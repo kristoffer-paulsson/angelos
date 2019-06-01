@@ -1,7 +1,8 @@
 cython
 pyinstaller
 kivy
-kivymd
+# kivymd
+git+git://github.com/HeaTTheatR/KivyMD@master
 libnacl
 plyer
 asyncssh

@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -88,5 +88,6 @@ class DummyPolicy:
             pool |= issuer | owner
 
         for doc in pool:
-            print(yaml.dump(
-                doc.export_yaml(), explicit_start=True, explicit_end=True))
+            pass
+            # print(yaml.dump(
+            #    doc.export_yaml(), explicit_start=True, explicit_end=True))

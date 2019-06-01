@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -9,21 +9,23 @@ This file is distributed under the terms of the MIT license.
 Module docstring.
 """
 import os
+import copy
 import uuid
 import logging
 import asyncio
 
-from typing import Sequence
+from typing import Sequence, Set
 
 from ..const import Const
 
 from ..document import (
-    Document, Person, Ministry, Church, Keys, Node, Network, Envelope, Trusted)
+    Document, Person, Ministry, Church, Keys, Node, Network, Envelope, Trusted,
+    Verified)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy import (
-    PrivatePortfolio, Portfolio, ImportEntityPolicy, ImportUpdatePolicy,
-    NetworkPolicy, EntityData, PGroup)
+    PrivatePortfolio, Portfolio, ImportUpdatePolicy, ImportPolicy,
+    NetworkPolicy, EntityData, PGroup, DOCUMENT_PATH)
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -144,28 +146,119 @@ class Facade:
             self._vault.stats.owner,
             PGroup.SERVER if server else PGroup.CLIENT)
 
-    def load_portfolio(
+    async def load_portfolio(
             self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
         """Load a portfolio belonging to id according to configuration."""
-        raise NotImplementedError()
+        return await self._vault.load_portfolio(id, conf)
 
     def update_portfolio(self, portfolio: Portfolio) -> bool:
         """Update a portfolio by comparison."""
         raise NotImplementedError()
 
-    def import_portfolio(self, portfolio: Portfolio) -> bool:
-        """Import a portfolio of douments into the vault."""
+    async def import_portfolio(
+            self, portfolio: Portfolio) -> (
+                bool, Set[Document], Set[Document]):
+        """
+        Import a portfolio of douments into the vault.
 
+        All policies are being applied, invalid documents or documents that
+        require extra portfolios for validation are rejected. That includes
+        the owner documents.
 
-    def docs_to_portfolio(
-            self, portfolio: uuid.UUID, documents: Sequence[Document]):
-        """import loose documents into a portfolio."""
-        raise NotImplementedError()
+        Return wether portfolio was imported True/False and rejected documents
+        and removed documents.
+        """
+        rejected = set()
+        portfolio = copy.copy(portfolio)
+        policy = ImportPolicy(portfolio)
+
+        entity, keys = policy.entity()
+        if (entity, keys) == (None, None):
+            logging.error('Portfolio entity and keys doesn\'t validate')
+            return False
+
+        rejected |= policy._filter_set(portfolio.keys)
+        portfolio.keys.add(keys)
+
+        if not policy.issued_document(portfolio.profile):
+            rejected.add(portfolio.profile)
+            portfolio.profile = None
+            logging.warning('Removed invalid profile from portfolio')
+
+        if not policy.issued_document(portfolio.network):
+            rejected.add(portfolio.network)
+            portfolio.network = None
+            logging.warning('Removed invalid network from portfolio')
+
+        rejected |= policy._filter_set(portfolio.issuer.revoked)
+        rejected |= policy._filter_set(portfolio.issuer.verified)
+        rejected |= policy._filter_set(portfolio.issuer.trusted)
+
+        if isinstance(portfolio, PrivatePortfolio):
+            if not policy.issued_document(portfolio.privkeys):
+                rejected.add(portfolio.privkeys)
+                portfolio.privkeys = None
+                logging.warning('Removed invalid private keys from portfolio')
+
+            if not policy.issued_document(portfolio.domain):
+                rejected.add(portfolio.domain)
+                portfolio.domain = None
+                logging.warning('Removed invalid domain from portfolio')
+
+            rejected |= policy._filter_set(portfolio.nodes)
+
+        removed = (
+            portfolio.owner.revoked | portfolio.owner.trusted |
+            portfolio.owner.verified)
+
+        result = await self._vault.new_portfolio(portfolio)
+        return result, rejected, removed
+
+    async def docs_to_portfolio(
+            self, portfolio: uuid.UUID,
+            documents: Sequence[Document]) -> Set[Document]:
+        """import loose documents into a portfolio, (Statements)."""
+        if portfolio.int == self.portfolio.entity.id.int:
+            portfolio = self.portfolio
+        else:
+            portfolio = await self._vault.load_portfolio(
+                portfolio, PGroup.VERIFIER)
+
+        policy = ImportPolicy(portfolio)
+        issuer = await self._vault.load_portfolio(
+            next(iter(documents)).issuer, PGroup.VERIFIER_REVOKED)
+        save = set()
+        reject = set()
+
+        for document in sorted(documents, key=lambda doc: doc.issuer.int):
+            if not isinstance(document, (Trusted, Verified)):
+                raise TypeError('Document must be of type Trusted or Verified')
+            if issuer.entity.id != document.issuer:
+                issuer = await self._vault.load_portfolio(
+                    document.issuer, PGroup.VERIFIER_REVOKED)
+
+            result = policy.owned_document(issuer, document)
+            if result:
+                save.add(document)
+            else:
+                reject.add(document)
+
+        for document in save:
+            await self._vault.save(DOCUMENT_PATH[document.type].format(
+                dir='/portfolio/{0}'.format(document.owner),
+                file=document.id), document)
+
+        return reject
 
     @property
     def portfolio(self):
         """Private portfolio getter."""
         return self.__portfolio
+
+    @property
+    def mail(self):
+        """Mail interface getter."""
+        return self.__mail
 
     def import_entity(self, entity, keys):
         """
@@ -176,7 +269,7 @@ class Facade:
         """
         valid = True
         dir = None
-        policy = ImportEntityPolicy()
+        policy = ImportPolicy()
         if isinstance(entity, Person):
             valid = policy.person(entity, keys)
             dir = '/entities/persons'

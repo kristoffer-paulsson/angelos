@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -10,13 +10,16 @@ Module docstring."""
 import datetime
 import logging
 
+from typing import Set
+
 from ..utils import Util
-from ..document.entities import (
+from ..document import (
     Entity, Person, Ministry, Church, Keys, Statement, Domain, Node, Network,
-    Profile, Envelope, Message)
+    Profile, Envelope, Message, Document, PrivateKeys)
 from .entity import (
     PersonPolicy, MinistryPolicy, ChurchPolicy)
 from .crypto import Crypto
+from .portfolio import Portfolio
 from .policy import Policy
 
 
@@ -29,7 +32,7 @@ class ImportPolicy(Policy):
         """Validate entity for import, use internal portfolio."""
         valid = True
         entity = self._portfolio.entity
-        keys = next(iter(self._portfolio.keys))
+        keys = Crypto._latestkey(self._portfolio.keys)
 
         today = datetime.date.today()
         valid = False if entity.expires < today else valid
@@ -52,11 +55,10 @@ class ImportPolicy(Policy):
         else:
             return None, None
 
-    def issued_document(
-            self, document: Document) -> Document:
+    def issued_document(self, document: Document) -> Document:
         """Validate document issued by internal portfolio."""
         Util.is_type(document, (
-            Statement, Profile, Domain, Node, Network))
+            Statement, Profile, Domain, Node, Network, Keys, PrivateKeys))
         valid = True
         try:
             if document.issuer != self._portfolio.entity.id:
@@ -75,6 +77,15 @@ class ImportPolicy(Policy):
             return document
         else:
             return None
+
+    def _filter_set(self, documents: Set[Document]) -> Set[Document]:
+        removed = set()
+        for doc in documents:
+            if not self.issued_document(doc):
+                removed.add(doc)
+
+        documents -= removed
+        return removed
 
     def owned_document(
             self, issuer: Portfolio, document: Statement) -> Statement:
@@ -113,8 +124,7 @@ class ImportPolicy(Policy):
                 valid = False
             valid = False if not envelope.validate() else valid
             valid = False if not Crypto.verify(
-                envelope, sender.entity, sender.keys, exclude=['header']
-                ) else valid
+                envelope, sender, exclude=['header']) else valid
         except Exception as e:
             logging.info('%s' % str(e))
             valid = False
@@ -124,8 +134,31 @@ class ImportPolicy(Policy):
         else:
             return None
 
+    def message(self, sender: Portfolio, message: Message) -> Message:
+        """Validate a message addressed to the internal portfolio."""
+        Util.is_type(message, Message)
+        valid = True
+        try:
+            if message.owner != self._portfolio.entity.id:
+                valid = False
+            if message.issuer != sender.entity.id:
+                valid = False
+            if datetime.date.today() > message.expires:
+                valid = False
+            valid = False if not message.validate() else valid
+            valid = False if not Crypto.verify(message, sender) else valid
+        except Exception as e:
+            logging.info('%s' % str(e))
+            valid = False
+
+        if valid:
+            return message
+        else:
+            return None
+
 
 class ImportUpdatePolicy(Policy):
+    """Policy for accepting updateable documents."""
     def __init__(self, entity, keys):
         Util.is_type(entity, Entity)
         Util.is_type(keys, Keys)
@@ -135,6 +168,7 @@ class ImportUpdatePolicy(Policy):
         self._exception = None
 
     def keys(self, newkeys):
+        """Validate newky generated keys."""
         Util.is_type(newkeys, Keys)
         self._exception = None
         valid = True
@@ -175,6 +209,7 @@ class ImportUpdatePolicy(Policy):
         return valid
 
     def entity(self, entity):
+        """Validate updated entity."""
         Util.is_type(entity, type(self.__entity))
         Util.is_type(entity, (Person, Ministry, Church))
 

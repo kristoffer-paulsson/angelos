@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -296,8 +296,9 @@ class EnvelopePolicy(Policy):
     @staticmethod
     def open(
             recipient: PrivatePortfolio, sender: Portfolio,
-            envelope) -> Message:
+            envelope: Envelope) -> Message:
         """Open an envelope and unveil the message."""
+
         envelope = Crypto.verify(envelope, sender, exclude=['header'])
         envelope.validate()
 
@@ -307,8 +308,17 @@ class EnvelopePolicy(Policy):
         message = Crypto.verify(message, sender)
         message.validate()
 
-        EnvelopePolicy._add_header(recipient, envelope, Header.Op.RECEIVE)
         return message
+
+    def receive(recipient: PrivatePortfolio, envelope: Envelope) -> Envelope:
+        if not envelope.validate():
+            return None
+
+        if envelope.owner.int != recipient.entity.id.int:
+            return None
+
+        EnvelopePolicy._add_header(recipient, envelope, Header.Op.RECEIVE)
+        return envelope
 
     def _add_header(
             handler: PrivatePortfolio, envelope: Envelope, operation: str):

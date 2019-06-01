@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -65,16 +65,8 @@ class Vault:
     the private entity data.
     """
 
-    IDENTITY = '/identity.pickle'
-    ENTITY = '/entities/entity.pickle'
-    PROFILE = '/profile.pickle'
-    PRIVATE = '/settings/private.pickle'
-    KEYS_LINK = '/keys/public.link'
-    DOMAIN = '/settings/domain.pickle'
     NODES = '/settings/nodes'
-    NETWORK = '/settings/network.pickle'
-
-    INBOX = '/messages/inbox/*'
+    INBOX = '/messages/inbox/'
 
     def __init__(self, filename, secret):
         """Initialize the Vault."""
@@ -173,8 +165,8 @@ class Vault:
 
         return (
             await self._proxy.call(
-                self._archive.mkfile, filename=filename, data=pck.dumps(
-                    document, pck.DEFAULT_PROTOCOL),
+                self._archive.mkfile, filename=filename,
+                data=PortfolioPolicy.serialize(document),
                 id=document.id, owner=owner, created=created, modified=updated,
                 compression=Entry.COMP_NONE)
             )

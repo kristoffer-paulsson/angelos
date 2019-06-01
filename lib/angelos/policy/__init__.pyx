@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -13,7 +13,7 @@ Policys that will secure the data imported and exported from the facade.
 from ._types import EntityData, PersonData, MinistryData, ChurchData
 from .crypto import Crypto
 from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
-from .accept import ImportPolicy, ImportEntityPolicy, ImportUpdatePolicy
+from .accept import ImportPolicy, ImportUpdatePolicy
 from .domain import NodePolicy, DomainPolicy, NetworkPolicy
 from .verify import StatementPolicy
 from .message import (
@@ -47,7 +47,6 @@ __all__ = [
     'Crypto',
 
     'ImportPolicy',
-    'ImportEntityPolicy',
     'ImportUpdatePolicy',
     'PersonPolicy',
     'MinistryPolicy',

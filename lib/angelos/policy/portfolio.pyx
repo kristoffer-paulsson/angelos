@@ -1,7 +1,7 @@
 # cython: language_level=3
 """
 
-Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
 This file is distributed under the terms of the MIT license.
 
@@ -45,6 +45,8 @@ class PGroup:
 
     # Basic set for verifying documents
     VERIFIER = (PField.ENTITY, PField.KEYS)
+    # Set for verifying documents and check revoked documents
+    VERIFIER_REVOKED = (PField.ENTITY, PField.KEYS, PField.ISSUER_REVOKED)
     # Basic set for signing documents
     SIGNER = (PField.ENTITY, PField.PRIVKEYS, PField.KEYS)
     # Basic set for running Client Facade
@@ -80,7 +82,7 @@ class PGroup:
         PField.OWNER_VERIFIED, PField.OWNER_TRUSTED)
     # Complete set of documents of all types
     ALL = (
-        PField.ENTITY, PField.PROFILE, PField.PROFILE, PField.KEYS,
+        PField.ENTITY, PField.PROFILE, PField.PRIVKEYS, PField.KEYS,
         PField.DOMAIN, PField.NODE, PField.NODES, PField.NET,
         PField.ISSUER_VERIFIED, PField.ISSUER_TRUSTED, PField.ISSUER_REVOKED,
         PField.OWNER_VERIFIED, PField.OWNER_TRUSTED, PField.OWNER_REVOKED)
@@ -133,6 +135,8 @@ DOCUMENT_PATTERN = {
     DocType.STAT_VERIFIED: '.ver',
     DocType.STAT_TRUSTED: '.rst',
     DocType.STAT_REVOKED: '.rev',
+    DocType.STAT_REVOKED: '.rev',
+    DocType.COM_ENVELOPE: '.env',
 }
 
 DOCUMENT_TYPE = {
@@ -173,6 +177,7 @@ DOCUMENT_PATH = {
     DocType.STAT_VERIFIED: '{dir}/{file}.ver',
     DocType.STAT_TRUSTED: '{dir}/{file}.rst',
     DocType.STAT_REVOKED: '{dir}/{file}.rev',
+    DocType.COM_ENVELOPE: '{dir}/{file}.env',
 }
 
 
@@ -219,8 +224,6 @@ class Portfolio(PortfolioABC):
     entity: Entity
     profile: Profile
     keys: Set[Keys]
-    domain: Domain
-    nodes: Set[Node]
     network: Network
     issuer: Statements
     owner: Statements
@@ -231,8 +234,6 @@ class Portfolio(PortfolioABC):
         self.entity = None
         self.profile = None
         self.keys = []
-        self.domain = None
-        self.nodes = set()
         self.network = None
         self.issuer = Statements()
         self.owner = Statements()
@@ -247,8 +248,6 @@ class Portfolio(PortfolioABC):
             PField.ENTITY: self.entity,
             PField.PROFILE: self.profile,
             PField.KEYS: self.keys,
-            PField.DOMAIN: self.domain,
-            PField.NODES: self.nodes,
             PField.NET: self.network,
             PField.ISSUER_VERIFIED: self.issuer.verified,
             PField.ISSUER_TRUSTED: self.issuer.trusted,
@@ -258,7 +257,7 @@ class Portfolio(PortfolioABC):
             PField.OWNER_REVOKED: self.owner.revoked
         }
 
-    def to_sets(self):  # -> Set[Document], Set[Document]:
+    def to_sets(self) -> (Set[Document], Set[Document]):
         """Export documents of portfolio as two sets of docs"""
         issuer = (
             set([self.entity, self.profile, self.domain,
@@ -331,11 +330,15 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
     """Adds private keys to Document portfolio."""
 
     privkeys: PrivateKeys
+    domain: Domain
+    nodes: Set[Node]
 
     def __init__(self):
         """Init private portfolio with empty values."""
         Portfolio.__init__(self)
         self.privkeys = None
+        self.domain = None
+        self.nodes = set()
 
     def to_portfolio(self) -> Portfolio:
         """Get portfolio of private."""
@@ -345,6 +348,8 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
         """Disassemble portfolio into dictionary."""
         assembly = self.super()._disassemble()
         assembly[PField.PRIVKEYS] = self.privkeys
+        assembly[PField.DOMAIN] = self.domain
+        assembly[PField.NODES] = self.nodes
         return assembly
 
 
