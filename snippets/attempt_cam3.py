@@ -1,3 +1,11 @@
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+"""
 from kivy.app import App
 from kivy.properties import ObjectProperty
 from kivy.uix.floatlayout import FloatLayout

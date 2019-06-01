@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Entity mixin for shared fields."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Entity mixin for shared fields.
+"""
 from ..utils import Util
 from ..error import Error
 

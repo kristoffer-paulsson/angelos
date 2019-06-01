@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Module docstring."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Module docstring.
+"""
 from .model import BaseDocument, TypeField
 from .document import DocType, Document, OwnerMixin, IssueMixin
 from .model import UuidField

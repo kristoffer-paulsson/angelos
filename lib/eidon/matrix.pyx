@@ -1,4 +1,14 @@
 # cython: language_level=3
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+"""
+
+
 class Matrix:
     ZIGZAG = (
         (0, 0), (1, 0), (0, 1), (0, 2), (1, 1), (2, 0), (3, 0), (2, 1),

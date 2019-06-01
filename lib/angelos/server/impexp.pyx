@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Import and export commands."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Import and export commands."""
 import pickle
 import base64
 

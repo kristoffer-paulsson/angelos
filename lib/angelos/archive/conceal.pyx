@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Conceal is transparent file encryption."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Conceal is transparent file encryption.
+"""
 import io
 import os
 import math

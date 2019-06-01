@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""State machine."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+State machine."""
 import asyncio
 
 from ..utils import Event

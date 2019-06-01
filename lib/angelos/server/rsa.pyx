@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""RSA keys for the boot and shell server."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+RSA keys for the boot and shell server."""
 
 """
 This RSA key is the official private key of the server, it should either only

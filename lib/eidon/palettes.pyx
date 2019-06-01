@@ -1,4 +1,14 @@
 # cython: language_level=3
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+"""
+
+
 class Palette:
     YCBCR766 = (
         (0, 0, 0),       (0, 0, 52),      (0, 0, 102),     (0, 0, 154),

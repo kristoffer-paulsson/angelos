@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""SSH Bootstrap code for the Angelos server."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+SSH Bootstrap code for the Angelos server."""
 import os
 import uuid
 import logging

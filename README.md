@@ -37,20 +37,3 @@ The platform is mainly being developed in Python 3.7~ and relies heavily on the 
 ## How to use
 
 Assume that some believers living in a city somewhere with or without persecution, wants to be able to communicate and organize securely. They decide to download the Angelos server and install it on a server hotel connected to the internet. They also download the app and installs it on their smartphones and computers. They logon to the local Angelos server and verify each others credibility, which is their social trust to each other in that local network. More people joins the Christian network, they download the app and connect to the current server. When they verify with already trusted persons, the services on the platform becomes available for them. All app-to-server communication is encrypted, all data saved on the apps is encrypted, also the servers. After some time one of the believers realize that Christians in the neighbor city also runs an Angelos city network, they decide to interconnect their networks, now christians in both cities can communicate securely with each other. After some time there is a nationwide use of the Angelos system interconnected between cities. If persecution is starting, anyone can report that to other interconnected city churches. There is no risk that information can be stolen by rouge entities.
-
-## Basic setup
-
-Install the requirements:
-```
-$ pip install -r requirements.txt
-```
-
-Run the application:
-```
-$ python -m angelos --help
-```
-
-To run the tests:
-```
-    $ pytest
-```

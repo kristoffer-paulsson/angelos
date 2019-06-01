@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Server commands."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Server commands."""
 import os
 import signal
 import asyncio

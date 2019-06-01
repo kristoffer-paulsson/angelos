@@ -1,3 +1,11 @@
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+"""
 import random
 import io
 from kivy.graphics.texture import Texture

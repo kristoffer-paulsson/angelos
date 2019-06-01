@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Dummy lipsum data of different types."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Dummy lipsum data of different types."""
 
 LIPSUM = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer interdum a dolor at pharetra. Morbi fermentum accumsan massa. Mauris varius erat eu odio auctor, ut tincidunt diam pretium. Cras laoreet erat sit amet libero congue, vel tristique neque finibus. Phasellus vitae dictum lacus. Pellentesque tristique lectus at pretium ultricies. Maecenas tincidunt sem tortor, sed efficitur est elementum vel. Proin auctor ac orci sit amet malesuada. Duis nec sollicitudin neque. Sed at molestie nulla. Morbi sit amet ornare urna, nec commodo ipsum. Donec efficitur metus egestas arcu tempor placerat. In et pulvinar purus. Fusce ipsum quam, mollis eget justo id, consectetur ornare justo. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Praesent et dolor luctus enim fermentum facilisis id sed urna.
 

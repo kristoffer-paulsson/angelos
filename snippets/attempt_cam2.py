@@ -1,30 +1,11 @@
-'''
-Camera
-======
+"""
 
-The :class:`Camera` widget is used to capture and display video from a camera.
-Once the widget is created, the texture inside the widget will be automatically
-updated. Our :class:`~kivy.core.camera.CameraBase` implementation is used under
-the hood::
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
-    cam = Camera()
+This file is distributed under the terms of the MIT license.
 
-By default, the first camera found on your system is used. To use a different
-camera, set the index property::
 
-    cam = Camera(index=1)
-
-You can also select the camera resolution::
-
-    cam = Camera(resolution=(320, 240))
-
-.. warning::
-
-    The camera texture is not updated as soon as you have created the object.
-    The camera initialization is asynchronous, so there may be a delay before
-    the requested texture is created.
-'''
-
+"""
 __all__ = ('Camera', )
 
 from kivy.app import App

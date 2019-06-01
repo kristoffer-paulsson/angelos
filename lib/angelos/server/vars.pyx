@@ -1,5 +1,11 @@
 # cython: language_level=3
 """
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
 Environment and configuration variables for the server.
 
 The difference between environmental and configurational variables are how they

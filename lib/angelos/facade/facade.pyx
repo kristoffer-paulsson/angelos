@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Module docstring."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Module docstring.
+"""
 import os
 import uuid
 import logging
@@ -147,7 +155,7 @@ class Facade:
 
     def import_portfolio(self, portfolio: Portfolio) -> bool:
         """Import a portfolio of douments into the vault."""
-        
+
 
     def docs_to_portfolio(
             self, portfolio: uuid.UUID, documents: Sequence[Document]):

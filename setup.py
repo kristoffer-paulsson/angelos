@@ -1,5 +1,12 @@
 #!/usr/bin/env python
-"""Angelos build script."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Angelos build script."""
 from glob import glob
 from setuptools import setup
 from Cython.Build import cythonize

@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Policy classes for document portfolios."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Policy classes for document portfolios."""
 from dataclasses import dataclass
 from typing import Set, Tuple
 from collections.abc import Iterable

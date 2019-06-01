@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Generate and verify messages."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Generate and verify messages.
+"""
 import enum
 import datetime
 
@@ -122,7 +130,7 @@ class MailBuilder:
     def done(self) -> Mail:
         """Finalize the mail message."""
         self.__mail.expires = datetime.date.today() + datetime.timedelta(30)
-        self.__mail.posted = datetime.datetime.now()
+        self.__mail.posted = datetime.datetime.utcnow()
 
         mail = Crypto.sign(self.__mail, self.__sender)
         mail.validate()
@@ -274,7 +282,7 @@ class EnvelopePolicy(Policy):
             'message': Crypto.conceal(
                 PortfolioPolicy.serialize(message), sender, recipient.entity),
             'expires': datetime.date.today() + datetime.timedelta(30),
-            'posted': datetime.datetime.now(),
+            'posted': datetime.datetime.utcnow(),
             'header': []
         })
 
@@ -310,7 +318,7 @@ class EnvelopePolicy(Policy):
         header = Header(nd={
             'op': operation,
             'issuer': handler.entity.id,
-            'timestamp': datetime.datetime.now()
+            'timestamp': datetime.datetime.utcnow()
         })
 
         header = Crypto.sign_header(envelope, header, handler)

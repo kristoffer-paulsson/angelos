@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Random dummy data generators."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Random dummy data generators.
+"""
 import os
 import io
 import random

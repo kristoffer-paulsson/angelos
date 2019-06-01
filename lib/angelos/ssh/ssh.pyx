@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Module docstring."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Module docstring."""
 import asyncio
 import uuid
 import logging

@@ -1,5 +1,13 @@
 # cython: language_level=3
-"""Mail related operations."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Mail related operations.
+"""
 from .operation import Operation
 from ..policy.policy import SignPolicy
 

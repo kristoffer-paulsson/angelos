@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Asynchronous multithreaded worker."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Asynchronous multithreaded worker."""
 import asyncio
 import logging
 import threading

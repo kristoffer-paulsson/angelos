@@ -1,5 +1,12 @@
 # cython: language_level=3
-"""Logger service that offers specialized logs."""
+"""
+
+Copyright (c) 2018-1019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+
+This file is distributed under the terms of the MIT license.
+
+
+Logger service that offers specialized logs."""
 import logging
 from logging.config import dictConfig
 from .const import Const
