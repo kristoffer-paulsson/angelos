@@ -20,7 +20,7 @@ from .message import (
     MessagePolicy, EnvelopePolicy, MimeTypes, ReportType, MailBuilder,
     ShareBuilder, ReportBuilder)
 from .portfolio import (
-    Statements, Portfolio, PrivatePortfolio, PField, PGroup,
+    Statements, Portfolio, PrivatePortfolio, PField, PGroup, DocSet,
     PORTFOLIO_TEMPLATE, PORTFOLIO_PATTERN, DOCUMENT_PATTERN, DOCUMENT_TYPE,
     DOCUMENT_PATH, PortfolioPolicy)
 
@@ -43,6 +43,7 @@ __all__ = [
     'PField',
     'PGroup',
     'PortfolioPolicy',
+    'DocSet',
 
     'Crypto',
 

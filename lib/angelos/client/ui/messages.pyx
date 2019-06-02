@@ -11,9 +11,8 @@ from kivy.lang import Builder
 from kivy.clock import Clock
 from kivymd.label import MDLabel
 
+from ...archive.helper import Glue
 from .common import BasePanelScreen
-from ...document import Envelope
-from ...dummy.support import random_person_entity_data
 
 
 Builder.load_string("""
@@ -97,7 +96,6 @@ class EmptyInbox(MDLabel):
 
 class MessagesScreen(BasePanelScreen):
     def load(self):
-        random_person_entity_data(num=1)
         self.get_inbox()
         print('Load:', type(self))
 
@@ -125,14 +123,15 @@ class MessagesScreen(BasePanelScreen):
         Clock.schedule_once(refresh_callback, 1)
 
     def get_inbox(self):
-        messages = self.app.ioc.facade.load_inbox()
+        messages = Glue.run_async(self.app.ioc.facade.mail.load_inbox())
+        print(messages)
         widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('inbox')
         if not messages:
             widget.add_widget(EmptyInbox())
             return
         for msg in messages:
+            print(msg)
             if isinstance(msg[1], type(None)):
                 pass
             else:
                 pass
-        #

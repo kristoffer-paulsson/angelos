@@ -60,10 +60,11 @@ class DummyPolicy:
             StatementPolicy.verified(church, person)
             StatementPolicy.trusted(church, person)
             StatementPolicy.trusted(person, church)
-            mail.add(EnvelopePolicy.wrap(person, church, MessagePolicy.mail(
-                person, church).message(
-                    generate_filename(postfix='.'),
-                    generate_data().decode()).done()))
+            mail.add(EnvelopePolicy.wrap(
+                person, facade.portfolio, MessagePolicy.mail(
+                    person, facade.portfolio).message(
+                        generate_filename(postfix='.'),
+                        generate_data().decode()).done()))
 
         for triad in range(67):
             offset = triad*3
@@ -83,13 +84,11 @@ class DummyPolicy:
         StatementPolicy.trusted(church, facade.portfolio)
         StatementPolicy.trusted(facade.portfolio, church)
 
-        # Import persons into vault
+        ownjected = set()
         for person in persons:
             _, _, owner = await facade.import_portfolio(person)
-            _ = await facade.docs_to_portfolio(person.entity.id, owner)
-
+            ownjected |= owner
         _, _, owner = await facade.import_portfolio(church)
-        _ = await facade.docs_to_portfolio(church.entity.id, owner)
-
-        _, owner = facade.portfolio.to_sets()
-        _ = await facade.docs_to_portfolio(facade.portfolio.entity.id, owner)
+        ownjected |= owner
+        rejected = await facade.docs_to_portfolios(ownjected)  # noqa f841
+        inboxed = await facade.mail.mail_to_inbox(mail)  # noqa f841

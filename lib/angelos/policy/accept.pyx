@@ -60,7 +60,7 @@ class ImportPolicy(Policy):
         """Validate document issued by internal portfolio."""
         Util.is_type(document, (
             Revoked, Trusted, Verified, PersonProfile, MinistryProfile,
-            ChurchProfile, Domain, Node, Network, Keys, PrivateKeys))
+            ChurchProfile, Domain, Network, Keys, PrivateKeys))
         if document is None:
             return document
 
@@ -90,6 +90,32 @@ class ImportPolicy(Policy):
 
         documents -= removed
         return removed
+
+    def node_document(self, node: Node) -> Document:
+        """Validate document issued by internal portfolio."""
+        Util.is_type(node, Node)
+        if node is None:
+            return node
+
+        valid = True
+        try:
+            if node.issuer != self._portfolio.entity.id:
+                valid = False
+            if node.domain != self._portfolio.domain.id:
+                valid = False
+            if datetime.date.today() > node.expires:
+                valid = False
+            valid = False if not node.validate() else valid
+            valid = False if not Crypto.verify(
+                node, self._portfolio) else valid
+        except Exception as e:
+            logging.info('%s' % str(e))
+            valid = False
+
+        if valid:
+            return node
+        else:
+            return None
 
     def owned_document(
             self, issuer: Portfolio, document: Statement) -> Statement:

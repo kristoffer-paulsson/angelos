@@ -7,6 +7,7 @@ This file is distributed under the terms of the MIT license.
 
 
 Policy classes for document portfolios."""
+import uuid
 from dataclasses import dataclass
 from typing import Set, Tuple
 from collections.abc import Iterable
@@ -461,3 +462,31 @@ class PortfolioPolicy:
             portfolio.owner.revoked = assembly[PField.OWNER_REVOKED]
 
         return portfolio
+
+
+class DocSet:
+    """Class for sets of documents"""
+
+    def __init__(self, documents: Set[Document]):
+        """Init docset with a set of docs."""
+        self._docs = documents
+
+    def __len__(self) -> int:
+        """The length of the set."""
+        return len(self._docs)
+
+    def issuers(self) -> Set[uuid.UUID]:
+        """Unique set of all the issuers."""
+        return {doc.issuer for doc in self._docs}
+
+    def get_issuer(self, issuer: uuid.UUID) -> Set[Document]:
+        """Get all documents of issuer and subtract from set."""
+        get = {doc for doc in self._docs if doc.issuer.int == issuer.int}
+        self._docs -= get
+        return get
+
+    def get_owner(self, owner: uuid.UUID) -> Set[Document]:
+        """Get all documents of owner and subract from set."""
+        get = {doc for doc in self._docs if doc.owner.int == owner.int}
+        self._docs -= get
+        return get

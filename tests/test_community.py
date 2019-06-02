@@ -67,7 +67,6 @@ class TestCommunity(unittest.TestCase):
             StatementPolicy.verified(church, person)
             StatementPolicy.trusted(church, person)
             StatementPolicy.trusted(person, church)
-            print(church, type(church))
             mail.add(EnvelopePolicy.wrap(person, church, MessagePolicy.mail(
                 person, church).message(
                     generate_filename(postfix='.'),
@@ -92,34 +91,18 @@ class TestCommunity(unittest.TestCase):
         StatementPolicy.trusted(self.facade.portfolio, church)
 
         # Import persons into vault
+        ownjected = set()
         for person in persons:
             _, _, owner = Glue.run_async(self.facade.import_portfolio(person))
-        for person in persons:
-            issuer, owner = person.to_sets()
-            _ = Glue.run_async(
-                self.facade.docs_to_portfolio(person.entity.id, owner))
-
+            ownjected |= owner
         _, _, owner = Glue.run_async(self.facade.import_portfolio(church))
-        _ = Glue.run(self.facade.docs_to_portfolio(church.entity.id, owner))
+        ownjected |= owner
+        rejected = Glue.run_async(self.facade.docs_to_portfolios(ownjected))
 
-        _, owner = self.facade.portfolio.to_sets()
-        _ = Glue.run_async(self.facade.docs_to_portfolio(  # noqa F841
-            self.facade.portfolio.entity.id, owner))
+        inboxed = Glue.run_async(self.facade.mail.mail_to_inbox(mail))
 
-        """
-        pool = set()
-
-        owner, issuer = church.to_sets()
-        pool |= owner | issuer | mail
-
-        for person in persons:
-            owner, issuer = person.to_sets()
-            pool |= owner | issuer
-
-        for doc in pool:
-            print(yaml.dump(
-                doc.export_yaml(), explicit_start=True, explicit_end=True))
-                """
+        print(rejected)
+        print(inboxed)
 
 
 if __name__ == '__main__':

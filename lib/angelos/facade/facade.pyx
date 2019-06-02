@@ -16,16 +16,17 @@ import asyncio
 
 from typing import Sequence, Set
 
+from .mail import Mail
 from ..const import Const
 
 from ..document import (
-    Document, Person, Ministry, Church, Keys, Node, Network, Envelope, Trusted,
-    Verified)
+    Document, Person, Ministry, Church, Keys, Node, Network, Trusted, Verified,
+    Revoked)
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy import (
     PrivatePortfolio, Portfolio, ImportUpdatePolicy, ImportPolicy,
-    NetworkPolicy, EntityData, PGroup, DOCUMENT_PATH)
+    NetworkPolicy, EntityData, PGroup, DOCUMENT_PATH, DocSet)
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
@@ -145,6 +146,7 @@ class Facade:
         self.__portfolio = await self._vault.load_portfolio(
             self._vault.stats.owner,
             PGroup.SERVER if server else PGroup.CLIENT)
+        self.__mail = Mail(self.__portfolio, self._vault)
 
     async def load_portfolio(
             self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
@@ -207,51 +209,48 @@ class Facade:
                 portfolio.domain = None
                 logging.warning('Removed invalid domain from portfolio')
 
-            rejected |= policy._filter_set(portfolio.nodes)
+            for node in portfolio.nodes:
+                if node and not policy.node_document(node):
+                    rejected.add(node)
+                    portfolio.nodes.remove(node)
+                    logging.warning('Removed invalid node from portfolio')
 
         removed = (
             portfolio.owner.revoked | portfolio.owner.trusted |
             portfolio.owner.verified)
 
-        print(portfolio.entity.id)
+        # Really remove files that can't be verified
+        portfolio.owner.revoked = set()
+        portfolio.owner.trusted = set()
+        portfolio.owner.verified = set()
+
         result = await self._vault.new_portfolio(portfolio)
         return result, rejected, removed
 
-    async def docs_to_portfolio(
-            self, portfolio: uuid.UUID,
-            documents: Sequence[Document]) -> Set[Document]:
+    async def docs_to_portfolios(
+            self, documents: Set[Document]) -> Set[Document]:
         """import loose documents into a portfolio, (Statements)."""
-        if portfolio.int == self.portfolio.entity.id.int:
-            portfolio = self.portfolio
-        else:
-            portfolio = await self._vault.load_portfolio(
-                portfolio, PGroup.VERIFIER)
-
-        policy = ImportPolicy(portfolio)
-        issuer = await self._vault.load_portfolio(
-            next(iter(documents)).issuer, PGroup.VERIFIER_REVOKED)
-        save = set()
+        documents = DocSet(documents)
         rejected = set()
 
-        for document in sorted(documents, key=lambda doc: doc.issuer.int):
-            if not isinstance(document, (Trusted, Verified)):
-                raise TypeError('Document must be of type Trusted or Verified')
-            if issuer.entity.id != document.issuer:
-                issuer = await self._vault.load_portfolio(
-                    document.issuer, PGroup.VERIFIER_REVOKED)
+        ops = []
+        for issuer_id in documents.issuers():
+            policy = ImportPolicy(await self._vault.load_portfolio(
+                issuer_id, PGroup.VERIFIER_REVOKED))
+            for document in documents.get_issuer(issuer_id):
+                if not isinstance(document, (Trusted, Verified, Revoked)):
+                    raise TypeError(
+                        'Document must be subtype of Statement')
+                if policy.issued_document(document):
+                    ops.append(
+                        self._vault.save(DOCUMENT_PATH[document.type].format(
+                            dir='/portfolios/{0}'.format(document.owner),
+                            file=document.id), document))
+                else:
+                    rejected.add(document)
 
-            result = policy.owned_document(issuer, document)
-            if result:
-                save.add(document)
-            else:
-                rejected.add(document)
-
-        for document in save:
-            await self._vault.save(DOCUMENT_PATH[document.type].format(
-                dir='/portfolio/{0}'.format(document.owner),
-                file=document.id), document)
-
-        return rejected
+        result = await asyncio.gather(*ops, return_exceptions=True)
+        return rejected, result
 
     @property
     def portfolio(self):
@@ -505,12 +504,6 @@ class ClientFacadeMixin(TypeFacadeMixin):
     async def _post_init(self):
         """Post init async work."""
         pass
-
-    def load_inbox(self):
-        doclist = Glue.run_async(
-            self._vault.search(path=Vault.INBOX, limit=100))
-        result = Glue.doc_validate_report(doclist, Envelope)
-        return result
 
 
 class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):

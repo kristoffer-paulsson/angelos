@@ -392,7 +392,7 @@ class DateTimeField(Field):
         return True
 
     def from_bytes(self, value):
-        return datetime.dateime.fromisoformat(
+        return datetime.datetime.fromisoformat(
             value.decode()) if value else None
 
     def str(self, value):
