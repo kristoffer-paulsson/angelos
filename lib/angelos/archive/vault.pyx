@@ -177,8 +177,8 @@ class Vault:
 
         return (
             await self._proxy.call(
-                self._archive.save, filename=filename, data=pck.dumps(
-                    document, pck.DEFAULT_PROTOCOL), modified=updated)
+                self._archive.save, filename=filename,
+                data=PortfolioPolicy.serialize(document), modified=updated)
             )
 
     async def issuer(self, issuer, path='/', limit=1):

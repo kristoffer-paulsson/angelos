@@ -15,7 +15,8 @@ from typing import Set
 from ..utils import Util
 from ..document import (
     Entity, Person, Ministry, Church, Keys, Statement, Domain, Node, Network,
-    Profile, Envelope, Message, Document, PrivateKeys)
+    Envelope, Message, Document, PrivateKeys, Revoked, Trusted, Verified,
+    PersonProfile, MinistryProfile, ChurchProfile, Note, Instant, Mail)
 from .entity import (
     PersonPolicy, MinistryPolicy, ChurchPolicy)
 from .crypto import Crypto
@@ -32,7 +33,7 @@ class ImportPolicy(Policy):
         """Validate entity for import, use internal portfolio."""
         valid = True
         entity = self._portfolio.entity
-        keys = Crypto._latestkey(self._portfolio.keys)
+        keys = Crypto._latestkeys(self._portfolio.keys)
 
         today = datetime.date.today()
         valid = False if entity.expires < today else valid
@@ -47,8 +48,8 @@ class ImportPolicy(Policy):
             logging.info('%s' % str(e))
             valid = False
 
-        valid = False if not Crypto.verify(keys, entity, keys) else valid
-        valid = False if not Crypto.verify(entity, entity, keys) else valid
+        valid = False if not Crypto.verify(keys, self._portfolio) else valid
+        valid = False if not Crypto.verify(entity, self._portfolio) else valid
 
         if valid:
             return entity, keys
@@ -58,7 +59,11 @@ class ImportPolicy(Policy):
     def issued_document(self, document: Document) -> Document:
         """Validate document issued by internal portfolio."""
         Util.is_type(document, (
-            Statement, Profile, Domain, Node, Network, Keys, PrivateKeys))
+            Revoked, Trusted, Verified, PersonProfile, MinistryProfile,
+            ChurchProfile, Domain, Node, Network, Keys, PrivateKeys))
+        if document is None:
+            return document
+
         valid = True
         try:
             if document.issuer != self._portfolio.entity.id:
@@ -67,8 +72,7 @@ class ImportPolicy(Policy):
                 valid = False
             valid = False if not document.validate() else valid
             valid = False if not Crypto.verify(
-                document, self._portfolio.entity,
-                self._portfolio.keys) else valid
+                document, self._portfolio) else valid
         except Exception as e:
             logging.info('%s' % str(e))
             valid = False
@@ -81,7 +85,7 @@ class ImportPolicy(Policy):
     def _filter_set(self, documents: Set[Document]) -> Set[Document]:
         removed = set()
         for doc in documents:
-            if not self.issued_document(doc):
+            if doc and not self.issued_document(doc):
                 removed.add(doc)
 
         documents -= removed
@@ -90,7 +94,10 @@ class ImportPolicy(Policy):
     def owned_document(
             self, issuer: Portfolio, document: Statement) -> Statement:
         """Validate document owned by internal portfolio."""
-        Util.is_type(document, Statement)
+        Util.is_type(document, (Revoked, Trusted, Verified))
+        if document is None:
+            return document
+
         valid = True
         try:
             if document.owner != self._portfolio.entity.id:
@@ -136,7 +143,7 @@ class ImportPolicy(Policy):
 
     def message(self, sender: Portfolio, message: Message) -> Message:
         """Validate a message addressed to the internal portfolio."""
-        Util.is_type(message, Message)
+        Util.is_type(message, (Note, Instant, Mail))
         valid = True
         try:
             if message.owner != self._portfolio.entity.id:

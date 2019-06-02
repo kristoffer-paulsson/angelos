@@ -72,37 +72,25 @@ class BaseSetupOperation(Operation):
                 raise RuntimeError('Node document invalid')
                 valid = False
 
-        if not Crypto.verify(
-                portfolio.entity,
-                portfolio.entity,
-                next(iter(portfolio.keys))):
+        if not Crypto.verify(portfolio.entity, portfolio):
             raise RuntimeError('Entity document verification failed')
             valid = False
 
-        if not Crypto.verify(
-                next(iter(portfolio.keys)),
-                portfolio.entity,
-                next(iter(portfolio.keys))):
-            raise RuntimeError('Keys document verification failed')
-            valid = False
+        for keys in portfolio.keys:
+            if not Crypto.verify(keys, portfolio):
+                raise RuntimeError('Keys document verification failed')
+                valid = False
 
-        if not Crypto.verify(
-                portfolio.privkeys,
-                portfolio.entity,
-                next(iter(portfolio.keys))):
+        if not Crypto.verify(portfolio.privkeys, portfolio):
             raise RuntimeError('Private keys document verification failed')
             valid = False
 
-        if not Crypto.verify(
-                portfolio.domain,
-                portfolio.entity,
-                next(iter(portfolio.keys))):
+        if not Crypto.verify(portfolio.domain, portfolio):
             raise RuntimeError('Domain document verification failed')
             valid = False
 
         for node in portfolio.nodes:
-            if not Crypto.verify(
-                    node, portfolio.entity, next(iter(portfolio.keys))):
+            if not Crypto.verify(node, portfolio):
                 raise RuntimeError('Node document verification failed')
                 valid = False
 

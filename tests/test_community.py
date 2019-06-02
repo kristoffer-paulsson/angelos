@@ -1,4 +1,5 @@
 """
+Testcase community generation.
 
 Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 
@@ -12,118 +13,46 @@ sys.path.append('../angelos')  # noqa
 import unittest
 import argparse
 import logging
-import os
-import pickle
+import tempfile
 
 import yaml
+import libnacl
 
 from support import (
-    random_church_entity_data, random_ministry_entity_data,
-    random_person_entity_data, generate_filename, generate_data)
-from angelos.operation.setup import (
-    SetupChurchOperation, SetupMinistryOperation, SetupPersonOperation)
+    random_church_entity_data, random_person_entity_data, generate_filename,
+    generate_data)
+from angelos.const import Const
 from angelos.policy import (
     NetworkPolicy, StatementPolicy, MessagePolicy, EnvelopePolicy)
+from angelos.facade.facade import PersonClientFacade
+from angelos.archive.helper import Glue
+from angelos.operation.setup import SetupPersonOperation, SetupChurchOperation
 
 
 class TestCommunity(unittest.TestCase):
+    """Testcase to generate a fake community."""
+
     @classmethod
     def setUpClass(cls):
-        # cls.dir = os.path.join(os.path.dirname(__file__), 'communities')
-        # cls.churches = os.path.join(cls.dir, 'churches')
-        # os.mkdir(cls.churches)
-        # cls.ministries = os.path.join(cls.dir, 'ministries')
-        # os.mkdir(cls.ministries)
-        # cls.persons = os.path.join(cls.dir, 'persons')
-        # os.mkdir(cls.persons)
-        pass
+        """Set up and prepare."""
+        cls.dir = tempfile.TemporaryDirectory()
+        cls.home = cls.dir.name
+        cls.secret = libnacl.secret.SecretBox().sk
+        cls.facade = Glue.run_async(PersonClientFacade.setup(
+            cls.home, cls.secret, Const.A_ROLE_PRIMARY,
+            random_person_entity_data(1)[0]))
 
-    def blatest_01_generate_churches(self):
-        """Generate five churches."""
-        logging.info('====== %s ======' % 'test_01_generate_churches')
+    @classmethod
+    def tearDownClass(cls):
+        """Tear down and clean up."""
+        del cls.facade
+        cls.dir.cleanup()
 
-        churches = random_church_entity_data(5)
-
-        for church_data in churches:
-            (entity, privkeys, keys, domain, node
-             ) = SetupChurchOperation.create_new(church_data, 'server', True)
-            net = NetworkPolicy(entity, privkeys, keys)
-            net.generate(domain, node)
-
-            cpath = os.path.join(self.churches, str(entity.id))
-            os.mkdir(cpath)
-
-            with open(os.path.join(cpath, 'entity.pickle'), 'wb') as f:
-                f.write(pickle.dumps(entity))
-            with open(os.path.join(cpath, 'keys.pickle'), 'wb') as f:
-                f.write(pickle.dumps(keys))
-            with open(os.path.join(cpath, 'privkeys.pickle'), 'wb') as f:
-                f.write(pickle.dumps(privkeys))
-            with open(os.path.join(cpath, 'domain.pickle'), 'wb') as f:
-                f.write(pickle.dumps(domain))
-            with open(os.path.join(cpath, 'node.pickle'), 'wb') as f:
-                f.write(pickle.dumps(node))
-            with open(os.path.join(cpath, 'network.pickle'), 'wb') as f:
-                f.write(pickle.dumps(net.network))
-
-    def blatest_02_generate_ministries(self):
-        """Generate ten ministries."""
-        logging.info('====== %s ======' % 'test_02_generate_ministries')
-
-        minitries = random_ministry_entity_data(10)
-
-        for ministry_data in minitries:
-            (entity, privkeys, keys, domain, node
-             ) = SetupMinistryOperation.create_new(
-                 ministry_data, 'server', True)
-            net = NetworkPolicy(entity, privkeys, keys)
-            net.generate(domain, node)
-
-            mpath = os.path.join(self.ministries, str(entity.id))
-            os.mkdir(mpath)
-
-            with open(os.path.join(mpath, 'entity.pickle'), 'wb') as f:
-                f.write(pickle.dumps(entity))
-            with open(os.path.join(mpath, 'keys.pickle'), 'wb') as f:
-                f.write(pickle.dumps(keys))
-            with open(os.path.join(mpath, 'privkeys.pickle'), 'wb') as f:
-                f.write(pickle.dumps(privkeys))
-            with open(os.path.join(mpath, 'domain.pickle'), 'wb') as f:
-                f.write(pickle.dumps(domain))
-            with open(os.path.join(mpath, 'node.pickle'), 'wb') as f:
-                f.write(pickle.dumps(node))
-            with open(os.path.join(mpath, 'network.pickle'), 'wb') as f:
-                f.write(pickle.dumps(net.network))
-
-    def blatest_03_generate_persons(self):
+    def test_generate_community(self):
         """Generate one thousand persons."""
         logging.info('====== %s ======' % 'test_03_generate_persons')
 
-        persons = random_person_entity_data(1000)
-
-        for person_data in persons:
-            (entity, privkeys, keys, domain, node
-             ) = SetupPersonOperation.create_new(person_data)
-
-            ppath = os.path.join(self.persons, str(entity.id))
-            os.mkdir(ppath)
-
-            with open(os.path.join(ppath, 'entity.pickle'), 'wb') as f:
-                f.write(pickle.dumps(entity))
-            with open(os.path.join(ppath, 'keys.pickle'), 'wb') as f:
-                f.write(pickle.dumps(keys))
-            with open(os.path.join(ppath, 'privkeys.pickle'), 'wb') as f:
-                f.write(pickle.dumps(privkeys))
-            with open(os.path.join(ppath, 'domain.pickle'), 'wb') as f:
-                f.write(pickle.dumps(domain))
-            with open(os.path.join(ppath, 'node.pickle'), 'wb') as f:
-                f.write(pickle.dumps(node))
-
-    def test_04_generate_community(self):
-        """Generate one thousand persons."""
-        logging.info('====== %s ======' % 'test_03_generate_persons')
-
-        person_datas = random_person_entity_data(201)
+        person_datas = random_person_entity_data(3)  # 201
         persons = []
         for person_data in person_datas:
             persons.append(SetupPersonOperation.create(person_data))
@@ -138,12 +67,13 @@ class TestCommunity(unittest.TestCase):
             StatementPolicy.verified(church, person)
             StatementPolicy.trusted(church, person)
             StatementPolicy.trusted(person, church)
+            print(church, type(church))
             mail.add(EnvelopePolicy.wrap(person, church, MessagePolicy.mail(
                 person, church).message(
                     generate_filename(postfix='.'),
                     generate_data().decode()).done()))
 
-        for triad in range(67):
+        for triad in range(1):  # 67
             offset = triad*3
             triple = persons[offset:offset+3]
 
@@ -156,6 +86,27 @@ class TestCommunity(unittest.TestCase):
             StatementPolicy.trusted(triple[2], triple[0])
             StatementPolicy.trusted(triple[2], triple[1])
 
+        # Connect between facade and church
+        StatementPolicy.verified(church, self.facade.portfolio)
+        StatementPolicy.trusted(church, self.facade.portfolio)
+        StatementPolicy.trusted(self.facade.portfolio, church)
+
+        # Import persons into vault
+        for person in persons:
+            _, _, owner = Glue.run_async(self.facade.import_portfolio(person))
+        for person in persons:
+            issuer, owner = person.to_sets()
+            _ = Glue.run_async(
+                self.facade.docs_to_portfolio(person.entity.id, owner))
+
+        _, _, owner = Glue.run_async(self.facade.import_portfolio(church))
+        _ = Glue.run(self.facade.docs_to_portfolio(church.entity.id, owner))
+
+        _, owner = self.facade.portfolio.to_sets()
+        _ = Glue.run_async(self.facade.docs_to_portfolio(  # noqa F841
+            self.facade.portfolio.entity.id, owner))
+
+        """
         pool = set()
 
         owner, issuer = church.to_sets()
@@ -168,6 +119,7 @@ class TestCommunity(unittest.TestCase):
         for doc in pool:
             print(yaml.dump(
                 doc.export_yaml(), explicit_start=True, explicit_end=True))
+                """
 
 
 if __name__ == '__main__':

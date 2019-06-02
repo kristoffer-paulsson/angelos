@@ -274,13 +274,13 @@ class EnvelopePolicy(Policy):
         if not ((message.issuer == sender.entity.id
                  ) and (message.owner == recipient.entity.id)):
             raise ValueError(
-                'Message sender and recepient not the same as on envelope.')
+                'Message sender and recipient not the same as on envelope.')
 
         envelope = Envelope(nd={
             'issuer': message.issuer,
             'owner': message.owner,
             'message': Crypto.conceal(
-                PortfolioPolicy.serialize(message), sender, recipient.entity),
+                PortfolioPolicy.serialize(message), sender, recipient),
             'expires': datetime.date.today() + datetime.timedelta(30),
             'posted': datetime.datetime.utcnow(),
             'header': []

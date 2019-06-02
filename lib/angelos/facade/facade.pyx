@@ -175,17 +175,17 @@ class Facade:
         entity, keys = policy.entity()
         if (entity, keys) == (None, None):
             logging.error('Portfolio entity and keys doesn\'t validate')
-            return False
+            return False, None, None
 
         rejected |= policy._filter_set(portfolio.keys)
         portfolio.keys.add(keys)
 
-        if not policy.issued_document(portfolio.profile):
+        if portfolio.profile and not policy.issued_document(portfolio.profile):
             rejected.add(portfolio.profile)
             portfolio.profile = None
             logging.warning('Removed invalid profile from portfolio')
 
-        if not policy.issued_document(portfolio.network):
+        if portfolio.network and not policy.issued_document(portfolio.network):
             rejected.add(portfolio.network)
             portfolio.network = None
             logging.warning('Removed invalid network from portfolio')
@@ -195,12 +195,14 @@ class Facade:
         rejected |= policy._filter_set(portfolio.issuer.trusted)
 
         if isinstance(portfolio, PrivatePortfolio):
-            if not policy.issued_document(portfolio.privkeys):
+            if portfolio.privkeys and not policy.issued_document(
+                    portfolio.privkeys):
                 rejected.add(portfolio.privkeys)
                 portfolio.privkeys = None
                 logging.warning('Removed invalid private keys from portfolio')
 
-            if not policy.issued_document(portfolio.domain):
+            if portfolio.domain and not policy.issued_document(
+                    portfolio.domain):
                 rejected.add(portfolio.domain)
                 portfolio.domain = None
                 logging.warning('Removed invalid domain from portfolio')
@@ -211,6 +213,7 @@ class Facade:
             portfolio.owner.revoked | portfolio.owner.trusted |
             portfolio.owner.verified)
 
+        print(portfolio.entity.id)
         result = await self._vault.new_portfolio(portfolio)
         return result, rejected, removed
 
@@ -228,7 +231,7 @@ class Facade:
         issuer = await self._vault.load_portfolio(
             next(iter(documents)).issuer, PGroup.VERIFIER_REVOKED)
         save = set()
-        reject = set()
+        rejected = set()
 
         for document in sorted(documents, key=lambda doc: doc.issuer.int):
             if not isinstance(document, (Trusted, Verified)):
@@ -241,14 +244,14 @@ class Facade:
             if result:
                 save.add(document)
             else:
-                reject.add(document)
+                rejected.add(document)
 
         for document in save:
             await self._vault.save(DOCUMENT_PATH[document.type].format(
                 dir='/portfolio/{0}'.format(document.owner),
                 file=document.id), document)
 
-        return reject
+        return rejected
 
     @property
     def portfolio(self):

@@ -7,9 +7,12 @@ This file is distributed under the terms of the MIT license.
 
 
 Facade mail API."""
+from typing import List, Set
+
 from ..policy import PrivatePortfolio, EnvelopePolicy, DOCUMENT_PATH
 from ..document import Envelope
 from ..archive.vault import Vault
+from ..archive.helper import Glue
 
 
 class Mail:
@@ -20,17 +23,27 @@ class Mail:
         self.__portfolio = portfolio
         self.__vault = vault
 
-    def mail_to_inbox(self, envelope: Envelope) -> bool:
+    def mail_to_inbox(self, envelopes: Envelope) -> (bool, Set[Envelope]):
         """Import envelope to inbox. Check owner and then validate."""
-        envelope = EnvelopePolicy.receive(self.__portfolio, envelope)
-        if not envelope:
-            return False
+        reject = set()
+        savelist = []
 
-        self.__vault.save(
-            DOCUMENT_PATH[envelope.type].format(
-                Vault.INBOX, envelope.id), envelope)
-        return True
+        for envelope in envelopes:
+            envelope = EnvelopePolicy.receive(self.__portfolio, envelope)
+            if not envelope:
+                reject.add(envelope)
+                continue
 
-    def load_inbox(self) -> Envelope:
+            savelist.append(self.__vault.save(
+                DOCUMENT_PATH[envelope.type].format(
+                    Vault.INBOX, envelope.id), envelope))
+
+        Glue.run_async(savelist)
+        return True, reject
+
+    def load_inbox(self) -> List[Envelope]:
         """Load envelopes from the inbox."""
-        pass
+        doclist = Glue.run_async(self._vault.search(
+            self.__portfolio.entity.id, Vault.INBOX + '*', limit=200))
+        result = Glue.doc_validate_report(doclist, Envelope)
+        return result

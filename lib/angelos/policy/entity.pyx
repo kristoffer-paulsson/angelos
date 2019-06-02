@@ -8,7 +8,6 @@ This file is distributed under the terms of the MIT license.
 
 Module docstring."""
 import datetime
-from typing import List
 
 import libnacl.dual
 
@@ -26,14 +25,13 @@ class BaseEntityPolicy(Policy):
         self._box = None
 
     @staticmethod
-    def _generate(klass, entity_data: EntityData
-                  ) -> (Entity, PrivateKeys, List[Keys]):
+    def _generate(klass, entity_data: EntityData) -> (PrivatePortfolio):
         box = libnacl.dual.DualSecret()
 
         entity = klass(nd=entity_data._asdict())
         entity.issuer = entity.id
         entity.signature = box.signature(
-            bytes(entity.issuer.bytes) + Crypto._document_data(entity))
+            entity.issuer.bytes + Crypto._document_data(entity))
 
         privkeys = PrivateKeys(nd={
             'issuer': entity.id,
@@ -41,7 +39,7 @@ class BaseEntityPolicy(Policy):
             'seed': box.seed
         })
         privkeys.signature = box.signature(
-            bytes(privkeys.issuer.bytes) + Crypto._document_data(privkeys))
+            privkeys.issuer.bytes + Crypto._document_data(privkeys))
 
         keys = Keys(nd={
             'issuer': entity.id,
@@ -49,7 +47,7 @@ class BaseEntityPolicy(Policy):
             'verify': box.vk
         })
         keys.signature = [box.signature(
-                bytes(keys.issuer.bytes) + Crypto._document_data(keys))]
+                keys.issuer.bytes + Crypto._document_data(keys))]
 
         entity.validate()
         privkeys.validate()
@@ -58,7 +56,7 @@ class BaseEntityPolicy(Policy):
         portfolio = PrivatePortfolio()
         portfolio.entity = entity
         portfolio.privkeys = privkeys
-        portfolio.keys = [keys]
+        portfolio.keys.add(keys)
         return portfolio
 
     @staticmethod
@@ -126,7 +124,7 @@ class BaseEntityPolicy(Policy):
         new_keys.validate()
 
         portfolio.privkeys = new_pk
-        portfolio.keys.insert(0, new_keys)
+        portfolio.keys.add(new_keys)
 
         return True
 

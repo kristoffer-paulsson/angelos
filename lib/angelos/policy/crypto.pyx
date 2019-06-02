@@ -71,17 +71,17 @@ class Crypto:
         """
         if document is UpdatedMixin:
             if document.updated:
-                return keys.created < document.updated and (
-                    keys.expires > document.updated)
+                return keys.created <= document.updated and (
+                    keys.expires >= document.updated)
             else:
-                return keys.created < document.created and (
-                    keys.expires > document.created)
+                return keys.created <= document.created and (
+                    keys.expires >= document.created)
         else:
-            return keys.created < document.created and (
-                keys.expires > document.created)
+            return keys.created <= document.created and (
+                keys.expires >= document.created)
 
     @staticmethod
-    def _latestkey(keys: Set[Keys]) -> Keys:
+    def _latestkeys(keys: Set[Keys]) -> Keys:
         """Return latest key from set."""
         return sorted(keys, key=lambda doc: doc.created, reverse=True)[0]
 
@@ -108,7 +108,7 @@ class Crypto:
         if today > sender.privkeys.expires:
             raise RuntimeError('The concealing keys has expired')
 
-        if today > receiver.expires:
+        if today > receiver.entity.expires:
             raise RuntimeError('The receiving entity has expired')
 
         if today > keys.expires:
@@ -202,7 +202,6 @@ class Crypto:
             if not (document.issuer == keys.issuer == signer.entity.id):
                 raise RuntimeError(
                     'Document/Keys issuer or Entity id doesn\'t match')
-
             data = bytes(document.issuer.bytes) + Crypto._document_data(
                 document, exclude)
             verifier = libnacl.sign.Verifier(keys.verify.hex())

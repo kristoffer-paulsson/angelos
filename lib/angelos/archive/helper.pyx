@@ -12,10 +12,10 @@ import threading
 import asyncio
 import logging
 import uuid
-import pickle
 
 from ..utils import Util
 from .archive7 import Archive7
+from ..policy import PortfolioPolicy
 
 
 class Glue:
@@ -44,7 +44,7 @@ class Glue:
         doclist = []
 
         for data in datalist:
-            doc = pickle.loads(data)
+            doc = PortfolioPolicy.deserialize(data)
             if isinstance(doc, _type):
                 # doc.validate()
                 if expiry_check and doc.expires > validity:
@@ -61,7 +61,7 @@ class Glue:
         for data in datalist:
             try:
                 doc = None
-                doc = pickle.loads(data)
+                doc = PortfolioPolicy.deserialize(data)
                 Util.is_type(doc, _type)
                 doc.validate()
                 doclist.append(doc)
@@ -77,7 +77,7 @@ class Glue:
         for data in datalist:
             try:
                 doc = None
-                doc = pickle.loads(data)
+                doc = PortfolioPolicy.deserialize(data)
                 Util.is_type(doc, _type)
                 doc.validate()
                 doclist.append((doc, None))

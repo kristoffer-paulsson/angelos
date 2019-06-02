@@ -233,7 +233,7 @@ class Portfolio(PortfolioABC):
         self._save = set()
         self.entity = None
         self.profile = None
-        self.keys = []
+        self.keys = set()
         self.network = None
         self.issuer = Statements()
         self.owner = Statements()
@@ -262,7 +262,7 @@ class Portfolio(PortfolioABC):
         issuer = (
             set([self.entity, self.profile, self.domain,
                  self.network, self.privkeys]) |
-            set(self.keys) | self.nodes | self.issuer.verified |
+            self.keys | self.nodes | self.issuer.verified |
             self.issuer.trusted | self.issuer.revoked)
         owner = self.owner.verified | self.owner.trusted | self.owner.revoked
 
@@ -300,7 +300,7 @@ class Portfolio(PortfolioABC):
             elif isinstance(doc, Network):
                 self.network = doc
             elif isinstance(doc, Keys):
-                self.keys.append(doc)
+                self.keys.add(doc)
             elif isinstance(doc, Node):
                 self.nodes.add(doc)
             elif isinstance(doc, Verified):

@@ -44,7 +44,7 @@ class DummyPolicy:
 
         return sets
 
-    def make_community(self, facade):
+    async def make_community(self, facade):
         person_datas = random_person_entity_data(201)
         persons = []
         for person_data in person_datas:
@@ -78,16 +78,18 @@ class DummyPolicy:
             StatementPolicy.trusted(triple[2], triple[0])
             StatementPolicy.trusted(triple[2], triple[1])
 
-        pool = set()
+        # Connect between facade and church
+        StatementPolicy.verified(church, facade.portfolio)
+        StatementPolicy.trusted(church, facade.portfolio)
+        StatementPolicy.trusted(facade.portfolio, church)
 
-        issuer, owner = church.to_sets()
-        pool |= issuer | owner | mail
-
+        # Import persons into vault
         for person in persons:
-            issuer, owner = person.to_sets()
-            pool |= issuer | owner
+            _, _, owner = await facade.import_portfolio(person)
+            _ = await facade.docs_to_portfolio(person.entity.id, owner)
 
-        for doc in pool:
-            pass
-            # print(yaml.dump(
-            #    doc.export_yaml(), explicit_start=True, explicit_end=True))
+        _, _, owner = await facade.import_portfolio(church)
+        _ = await facade.docs_to_portfolio(church.entity.id, owner)
+
+        _, owner = facade.portfolio.to_sets()
+        _ = await facade.docs_to_portfolio(facade.portfolio.entity.id, owner)
