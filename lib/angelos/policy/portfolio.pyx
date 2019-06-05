@@ -179,6 +179,11 @@ DOCUMENT_PATH = {
     DocType.STAT_TRUSTED: '{dir}/{file}.rst',
     DocType.STAT_REVOKED: '{dir}/{file}.rev',
     DocType.COM_ENVELOPE: '{dir}/{file}.env',
+    DocType.COM_NOTE: '{dir}/{file}.msg',
+    DocType.COM_INSTANT: '{dir}/{file}.msg',
+    DocType.COM_MAIL: '{dir}/{file}.msg',
+    DocType.COM_SHARE: '{dir}/{file}.msg',
+    DocType.COM_REPORT: '{dir}/{file}.msg',
 }
 
 

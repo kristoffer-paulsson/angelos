@@ -9,7 +9,6 @@ This file is distributed under the terms of the MIT license.
 Module docstring.
 """
 import datetime
-import enum
 
 from ..utils import Util
 from ..error import Error

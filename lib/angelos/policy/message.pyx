@@ -299,18 +299,23 @@ class EnvelopePolicy(Policy):
             envelope: Envelope) -> Message:
         """Open an envelope and unveil the message."""
 
-        envelope = Crypto.verify(envelope, sender, exclude=['header'])
-        envelope.validate()
+        if not Crypto.verify(envelope, sender, exclude=['header']):
+            return None
+        if not envelope.validate():
+            return None
 
         message = PortfolioPolicy.deserialize(Crypto.unveil(
             envelope.message, recipient, sender))
 
-        message = Crypto.verify(message, sender)
-        message.validate()
+        if not Crypto.verify(message, sender):
+            return None
+        if not message.validate():
+            return None
 
         return message
 
     def receive(recipient: PrivatePortfolio, envelope: Envelope) -> Envelope:
+        """Receive the envelope when it reaches its final domain."""
         if not envelope.validate():
             return None
 

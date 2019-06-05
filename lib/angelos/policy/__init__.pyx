@@ -23,9 +23,12 @@ from .portfolio import (
     Statements, Portfolio, PrivatePortfolio, PField, PGroup, DocSet,
     PORTFOLIO_TEMPLATE, PORTFOLIO_PATTERN, DOCUMENT_PATTERN, DOCUMENT_TYPE,
     DOCUMENT_PATH, PortfolioPolicy)
+from .print import PrintPolicy
 
 
 __all__ = [
+    'PrintPolicy',
+
     'PORTFOLIO_TEMPLATE',
     'PORTFOLIO_PATTERN',
     'DOCUMENT_PATTERN',

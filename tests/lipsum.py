@@ -454,7 +454,7 @@ MALE_NAMES = [
     'Edward', 'Evan', 'Elijah', 'Luis', 'Chad', 'Mason', 'Luke', 'Carlos',
     'Bradley', 'Jack', 'Isaac', 'Alex', 'Hunter', 'Dustin', 'Derek', 'Lucas',
     'Ian', 'Nathaniel', 'Peter', 'Angel', 'Jared', 'Adrian', 'Marcus',
-    'George', 'Jackson', 'Connor', 'Antonio', 'Isaiah', 'Jesus', 'Donald',
+    'George', 'Jackson', 'Connor', 'Antonio', 'Isaiah', 'Donald',
     'Keith', 'Ronald', 'Jayden', 'Shane', 'Corey', 'Jeremiah', 'Joel', 'Aiden',
     'Victor', 'Gavin', 'Blake', 'Henry', 'Vincent', 'Raymond', 'Trevor',
     'Seth', 'Julian', 'Chase', 'Miguel', 'Devin', 'Douglas', 'Gary', 'Liam',
