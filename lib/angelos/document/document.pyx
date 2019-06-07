@@ -110,3 +110,5 @@ class DocType(enum.IntEnum):
     COM_MAIL = 72
     COM_SHARE = 73
     COM_REPORT = 74
+
+    CACHED_MSG = 700

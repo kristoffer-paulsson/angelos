@@ -19,7 +19,7 @@ from ..document import (
     DocType, Document, Entity, Profile, PrivateKeys, Keys, Domain, Node,
     Network, Statement, Verified, Trusted, Revoked, Person, Ministry, Church,
     PersonProfile, MinistryProfile, ChurchProfile, Envelope, Note, Instant,
-    Mail, Share, Report)
+    Mail, Share, Report, StoredLetter)
 
 
 class PField:
@@ -161,6 +161,7 @@ DOCUMENT_TYPE = {
     DocType.COM_MAIL: Mail,
     DocType.COM_SHARE: Share,
     DocType.COM_REPORT: Report,
+    DocType.CACHED_MSG: StoredLetter,
 }
 
 DOCUMENT_PATH = {
@@ -184,6 +185,7 @@ DOCUMENT_PATH = {
     DocType.COM_MAIL: '{dir}/{file}.msg',
     DocType.COM_SHARE: '{dir}/{file}.msg',
     DocType.COM_REPORT: '{dir}/{file}.msg',
+    DocType.CACHED_MSG: '{dir}/{file}.cmsg',
 }
 
 

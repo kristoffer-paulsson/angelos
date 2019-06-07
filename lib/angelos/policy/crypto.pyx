@@ -35,7 +35,7 @@ class Crypto:
     @staticmethod
     def _list_data(_list: list) -> bytes:
         stream = bytes()
-        for item in sorted(_list):
+        for item in _list:
             if isinstance(item, dict):
                 stream += Crypto._dict_data(item)
             elif isinstance(item, (bytes, bytearray)):

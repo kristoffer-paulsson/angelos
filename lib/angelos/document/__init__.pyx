@@ -20,6 +20,7 @@ from .domain import Domain, Node, Network, Host, Location
 from .statements import Verified, Trusted, Revoked
 from .messages import Note, Instant, Mail, Share, Report, Attachment
 from .envelope import Envelope, Header
+from .misc import StoredLetter
 
 from typing import Union
 
@@ -65,5 +66,6 @@ __all__ = [
     'Envelope',
     'Header',
     'Message',
-    'Attachment'
+    'Attachment',
+    'StoredLetter'
 ]

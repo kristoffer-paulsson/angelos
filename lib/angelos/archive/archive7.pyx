@@ -625,13 +625,13 @@ class Archive7(ContainerAware):
             entry = Entry(**entry)
             self.ioc.entries.update(entry, idx)
 
-    def remove(self, path, mode=None):
+    def remove(self, filename, mode=None):
         """Remove file or dir."""
         with self.__lock:
             ops = self.ioc.operations
             entries = self.ioc.entries
 
-            dirname, name = os.path.split(path)
+            dirname, name = os.path.split(filename)
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(name, pid)
 

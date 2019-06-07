@@ -7,6 +7,9 @@ This file is distributed under the terms of the MIT license.
 
 
 """
+from typing import List, Any
+from functools import partial
+
 from kivy.lang import Builder
 from kivy.properties import StringProperty
 from kivy.clock import Clock
@@ -21,7 +24,8 @@ from kivymd.button import MDIconButton
 from kivymd.menus import MDDropdownMenu
 
 from ...archive.helper import Glue
-from ...policy import EnvelopePolicy, PGroup, PrintPolicy
+from ...policy import EnvelopePolicy, PGroup, PrintPolicy, PrivatePortfolio
+from ...operation.mail import MailOperation
 from .common import BasePanelScreen
 
 
@@ -191,20 +195,14 @@ class ReadMessage(BaseDialog):
         if self._msg:
             self._sender = Glue.run_async(app.ioc.facade.load_portfolio(
                 self._msg.issuer, PGroup.VERIFIER))
-            self.subject = '[b]' + self._msg.subject + '[/b]'
-            self.body = self._msg.body
-            self.sender = PrintPolicy.title(self._sender)
-            self.posted = '{:%c}'.format(self._msg.posted)
         else:
-            self._env = Glue.run_async(mail.load_envelope(message_id))
-            self._sender = Glue.run_async(app.ioc.facade.load_portfolio(
-                self._env.issuer, PGroup.VERIFIER))
-            self._msg = EnvelopePolicy.open(
-                app.ioc.facade.portfolio, self._sender, self._env)
-            self.subject = '[b]' + self._msg.subject + '[/b]'
-            self.body = self._msg.body
-            self.sender = PrintPolicy.title(self._sender)
-            self.posted = '{:%c}'.format(self._msg.posted)
+            self._msg, self._sender = Glue.run_async(
+                MailOperation.open_envelope(app.ioc.facade, message_id))
+
+        self.subject = '[b]' + self._msg.subject + '[/b]'
+        self.body = self._msg.body
+        self.sender = PrintPolicy.title(self._sender)
+        self.posted = '{:%c}'.format(self._msg.posted)
 
     def dropdown(self, anchor):
         return MDDropdownMenu(
@@ -278,8 +276,60 @@ class MessagesScreen(BasePanelScreen):
         Clock.schedule_once(refresh_callback, 1)
 
     def get_inbox(self):
+        """Load the unopened envelopes in the inbox."""
         messages = Glue.run_async(self.app.ioc.facade.mail.load_inbox())
         widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('inbox')
+        widget.clear_widgets()
+
+        if not messages:
+            widget.add_widget(EmptyInbox())
+            return
+
+        sv = ScrollView()
+        inbox = MDList()
+        sv.add_widget(inbox)
+        widget.add_widget(sv)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_inbox_item, self.app.ioc.facade.portfolio,
+                messages, inbox))
+
+    def show_inbox_item(
+            self, portfolio: PrivatePortfolio,
+            messages: List[Any], inbox: MDList, dt):
+        """Print envelop to list kivy-async."""
+
+        msg = messages.pop()
+        if isinstance(msg[1], type(None)):
+            try:
+                sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
+                    msg[0].issuer, PGroup.VERIFIER))
+                message = EnvelopePolicy.open(portfolio, sender, msg[0])
+                headline = message.subject
+                title = PrintPolicy.title(sender)
+                source = './data/icon_72x72.png'
+            except OSError:
+                headline = '<Unknown>'
+                title = '<Unidentified sender>'
+                source = './data/anonymous.png'
+            item = InboxItem(
+                text=headline,
+                secondary_text=title,
+            )
+            item.envelope_id = msg[0].id
+            item.add_widget(DummyPhoto(source=source))
+            inbox.add_widget(item)
+        else:
+            print(msg)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_inbox_item, portfolio, messages, inbox))
+
+    def get_read(self):
+        messages = Glue.run_async(self.app.ioc.facade.mail.load_read())
+        widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('read')
         widget.clear_widgets()
 
         if not messages:

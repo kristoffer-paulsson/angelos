@@ -27,6 +27,7 @@ from .helper import Glue, Globber, AsyncProxy
 HIERARCHY = (
     '/',
     '/cache',
+    '/cache/msg',
     # Contact profiles and links based on directory.
     '/contacts',
     '/contacts/favorites',
@@ -170,6 +171,12 @@ class Vault:
                 id=document.id, owner=owner, created=created, modified=updated,
                 compression=Entry.COMP_NONE)
             )
+
+    async def delete(self, filename):
+        """Remove a document at a certian location."""
+        return (
+            await self._proxy.call(
+                self._archive.remove, filename=filename))
 
     async def update(self, filename, document):
         """Update a document on file."""
