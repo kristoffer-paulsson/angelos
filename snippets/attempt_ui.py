@@ -1,89 +1,163 @@
-
 from kivy.app import App
+from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
-from kivy.factory import Factory
-from kivymd.cards import MDCardPost
-from kivymd.theming import ThemeManager
-from kivymd.toast import toast
-
-TEXT = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer interdum a dolor at pharetra. Morbi fermentum accumsan massa. Mauris varius erat eu odio auctor, ut tincidunt diam pretium. Cras laoreet erat sit amet libero congue, vel tristique neque finibus. Phasellus vitae dictum lacus. Pellentesque tristique lectus at pretium ultricies. Maecenas tincidunt sem tortor, sed efficitur est elementum vel. Proin auctor ac orci sit amet malesuada. Duis nec sollicitudin neque. Sed at molestie nulla. Morbi sit amet ornare urna, nec commodo ipsum. Donec efficitur metus egestas arcu tempor placerat. In et pulvinar purus. Fusce ipsum quam, mollis eget justo id, consectetur ornare justo. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Praesent et dolor luctus enim fermentum facilisis id sed urna.
-
-Donec et bibendum dui. Maecenas ex risus, semper in aliquam convallis, varius id velit. Mauris rutrum ex vitae libero scelerisque, vitae lobortis erat porttitor. Nunc sed ex id augue ornare imperdiet. Duis ac ex quis tellus luctus sagittis eu vulputate eros. Integer nec consequat enim, quis condimentum urna. Nullam risus urna, maximus sed finibus sed, dictum quis mauris. Suspendisse fermentum ut lacus nec laoreet. Curabitur blandit varius porta. Fusce aliquet dolor leo, at viverra neque rhoncus sit amet."""
-
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
+from kivy.properties import NumericProperty, ListProperty, BooleanProperty, ObjectProperty
+from kivy.uix.recycleview import RecycleView
+from kivy.uix.recyclegridlayout import RecycleGridLayout
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
+from kivy.uix.label import Label
+from kivy.uix.recycleboxlayout import RecycleBoxLayout
+from kivy.uix.behaviors import FocusBehavior
+from kivy.uix.recycleview.layout import LayoutSelectionBehavior
 
 Builder.load_string('''
-#:import MDToolbar kivymd.toolbar.MDToolbar
-<ExampleCardPost@BoxLayout>
+<Body>:
+    canvas:
+        Color:
+            rgba:(1, 1, 1, 1)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+
+<DropDownWidget>:
+    canvas:
+        Color:
+            rgba:(1, 1, 1, 1)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
     orientation: 'vertical'
-    spacing: dp(5)
-    MDToolbar:
-        id: toolbar
-        title: app.title
-        left_action_items: [['menu', lambda x: None]]
-        elevation: 10
-        md_bg_color: app.theme_cls.primary_color
-    ScrollView:
-        id: scroll
-        size_hint: 1, 1
-        do_scroll_x: False
-        GridLayout:
-            id: grid_card
-            cols: 1
-            spacing: dp(5)
-            padding: dp(5)
-            size_hint_y: None
-            height: self.minimum_height
-''')
-class Example(App):
-    theme_cls = ThemeManager()
-    theme_cls.primary_palette = 'Teal'
-    title = "Card Post"
-    cards_created = False
+    spacing: 2
+    txt_input: txt_input
+    rv: rv
+
+    MyTextInput:
+        id: txt_input
+        size_hint_y: None
+        height: 50
+    RV:
+        id: rv
+
+<MyTextInput>:
+    readonly: False
+    multiline: False
+
+<SelectableLabel>:
+    # Draw a background to indicate selection
+    color: 0,0,0,1
+    canvas.before:
+        Color:
+            rgba: (0, 0, 1, .5) if self.selected else (1, 1, 1, 1)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+<RV>:
+    canvas:
+        Color:
+            rgba: 0,0,0,.2
+
+        Line:
+            rectangle: self.x +1 , self.y, self.width - 2, self.height -2
+
+    bar_width: 10
+    scroll_type:['bars']
+    viewclass: 'SelectableLabel'
+    SelectableRecycleBoxLayout:
+        default_size: None, dp(20)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        ''')
+
+class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
+                                 RecycleBoxLayout):
+    ''' Adds selection and focus behaviour to the view. '''
+
+
+class SelectableLabel(RecycleDataViewBehavior, Label):
+    ''' Add selection support to the Label '''
+    index = None
+    selected = BooleanProperty(False)
+    selectable = BooleanProperty(True)
+
+    def refresh_view_attrs(self, rv, index, data):
+        ''' Catch and handle the view changes '''
+        self.index = index
+        return super(SelectableLabel, self).refresh_view_attrs(
+            rv, index, data)
+
+    def on_touch_down(self, touch):
+        ''' Add selection on touch down '''
+        if super(SelectableLabel, self).on_touch_down(touch):
+            return True
+        if self.collide_point(*touch.pos) and self.selectable:
+            return self.parent.select_with_touch(self.index, touch)
+
+    def apply_selection(self, rv, index, is_selected):
+        ''' Respond to the selection of items in the view. '''
+        self.selected = is_selected
+        if is_selected:
+            print("selection changed to {0}".format(rv.data[index]))
+
+class RV(RecycleView):
+    def __init__(self, **kwargs):
+        super(RV, self).__init__(**kwargs)
+
+class DropDownWidget(BoxLayout):
+    txt_input = ObjectProperty()
+    rv = ObjectProperty()
+
+class MyTextInput(TextInput):
+    txt_input = ObjectProperty()
+    flt_list = ObjectProperty()
+    word_list = ListProperty()
+    #this is the variable storing the number to which the look-up will start
+    starting_no = NumericProperty(3)
+    suggestion_text = ''
+
+    def __init__(self, **kwargs):
+        super(MyTextInput, self).__init__(**kwargs)
+
+    def on_text(self, instance, value):
+        #find all the occurrence of the word
+        self.parent.ids.rv.data = []
+        matches = [self.word_list[i] for i in range(len(self.word_list)) if self.word_list[i][:self.starting_no] == value[:self.starting_no]]
+        #display the data in the recycleview
+        display_data = []
+        for i in matches:
+            display_data.append({'text':i})
+        self.parent.ids.rv.data = display_data
+        #ensure the size is okay
+        if len(matches) <= 10:
+            self.parent.height = (50 + (len(matches)*20))
+        else:
+            self.parent.height = 240
+
+    def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        if self.suggestion_text and keycode[1] == 'tab':
+            self.insert_text(self.suggestion_text + ' ')
+            return True
+        return super(MyTextInput, self).keyboard_on_key_down(window, keycode, text, modifiers)
+
+class Body(FloatLayout):
+    def __init__(self, **kwargs):
+        super(Body, self).__init__(**kwargs)
+        widget_1 = DropDownWidget(pos_hint = {'center_x':.5,'center_y':.5}, \
+                               size_hint = (None, None), size = (600, 60))
+        widget_1.ids.txt_input.word_list = ['how to use python', 'how to use kivy', 'how to ...']
+        widget_1.ids.txt_input.starting_no = 3
+        self.add_widget(widget_1)
+
+class MyApp(App):
+
     def build(self):
-        self.screen = Factory.ExampleCardPost()
-        return self.screen
-    def on_start(self):
-        def callback_for_menu_items(text_item):
-            toast(text_item)
-        def callback(instance, value):
-            if value and isinstance(value, int):
-                toast('Set like in %d stars' % value)
-            elif value and isinstance(value, str):
-                toast('Repost with %s ' % value)
-            elif value and isinstance(value, list):
-                toast(value[1])
-            else:
-                toast('Delete post %s' % str(instance))
-        instance_grid_card = self.screen.ids.grid_card
-        buttons = ['facebook', 'vk', 'twitter']
-        menu_items = [
-            {'viewclass': 'MDMenuItem',
-             'text': 'Example item %d' % i,
-             'callback': callback_for_menu_items}
-            for i in range(2)
-        ]
-        if not self.cards_created:
-            self.cards_created = True
-            instance_grid_card.add_widget(
-                MDCardPost(text_post='Card with text',
-                           swipe=True, callback=callback))
-            instance_grid_card.add_widget(
-                MDCardPost(
-                    right_menu=menu_items, swipe=True,
-                    text_post=TEXT,
-                    callback=callback))
-            instance_grid_card.add_widget(
-                MDCardPost(
-                    likes_stars=True, callback=callback, swipe=True,
-                    text_post='Card with asterisks for voting.'))
-            instance_grid_card.add_widget(
-                MDCardPost(
-                    source="./assets/kitten-1049129_1280.jpg",
-                    tile_text="Little Baby",
-                    tile_font_style="H5",
-                    text_post="This is my favorite cat. He's only six months "
-                              "old. He loves milk and steals sausages :) "
-                              "And he likes to play in the garden.",
-                    with_image=True, swipe=True, callback=callback,
-                    buttons=buttons))
-Example().run()
+        return Body()
+
+if __name__ == "__main__":
+    MyApp().run()

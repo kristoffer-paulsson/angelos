@@ -16,7 +16,7 @@ import asyncio
 
 from typing import Sequence, Set
 
-from .mail import Mail
+from .mail import MailAPI
 from ..const import Const
 
 from ..document import (
@@ -146,7 +146,7 @@ class Facade:
         self.__portfolio = await self._vault.load_portfolio(
             self._vault.stats.owner,
             PGroup.SERVER if server else PGroup.CLIENT)
-        self.__mail = Mail(self.__portfolio, self._vault)
+        self.__mail = MailAPI(self.__portfolio, self._vault)
 
     async def load_portfolio(
             self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:

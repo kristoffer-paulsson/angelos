@@ -8,7 +8,6 @@ This file is distributed under the terms of the MIT license.
 
 Vault.
 """
-import pickle as pck
 import asyncio
 import uuid
 import logging
@@ -109,56 +108,9 @@ class Vault:
         for i in HIERARCHY:
             arch.mkdir(i)
 
-        """
-        key_path = '/keys/' + str(next(iter(portfolio.keys)).id) + '.pickle'
-        files = [
-            (Vault.ENTITY, portfolio.entity),
-            (Vault.PRIVATE, portfolio.privkeys),
-            (Vault.DOMAIN, portfolio.domain),
-        ]
-        for node in portfolio.nodes:
-            files.append(
-                ('/settings/nodes/' + str(node.id) + '.pickle', node)),
-
-        for keys in portfolio.keys:
-            files.append(
-                ('/keys/' + str(keys.id) + '.pickle', keys)),
-
-        if portfolio.network:
-            files.append((Vault.NETWORK, portfolio.network))
-
-        for f in files:
-            created, updated, owner = Glue.doc_save(f[1])
-            arch.mkfile(
-                f[0], data=pck.dumps(
-                    f[1], pck.DEFAULT_PROTOCOL),
-                id=f[1].id, owner=owner, created=created, modified=updated,
-                compression=Entry.COMP_NONE)
-
-        arch.link(Vault.KEYS_LINK, key_path)
-        """
         arch.close()
 
         return Vault(filename, secret)
-
-    async def load_identity(self):
-        """Load the entity core documents."""
-        load_ops = [
-            self._proxy.call(self._archive.load, filename=Vault.ENTITY),
-            self._proxy.call(self._archive.load, filename=Vault.PRIVATE),
-            self._proxy.call(self._archive.load, filename=Vault.KEYS_LINK),
-            self._proxy.call(self._archive.load, filename=Vault.DOMAIN),
-            self._proxy.call(
-                self._archive.load, filename='/settings/nodes/' + str(
-                    self._archive.stats().node) + '.pickle')
-        ]
-        result = await asyncio.gather(*load_ops, return_exceptions=True)
-        return [pck.loads(_) for _ in result]
-
-    async def load_network(self):
-        """Load the entity core documents."""
-        return pck.loads(await self._proxy.call(
-            self._archive.load, filename=Vault.NETWORK))
 
     async def save(self, filename, document):
         """Save a document at a certian location."""

@@ -71,7 +71,7 @@ class Glue:
         return doclist
 
     @staticmethod
-    def doc_validate_report(datalist, _type):
+    def doc_validate_report(datalist, _type, validate=True):
         doclist = []
 
         for data in datalist:
@@ -79,7 +79,8 @@ class Glue:
                 doc = None
                 doc = PortfolioPolicy.deserialize(data)
                 Util.is_type(doc, _type)
-                doc.validate()
+                if validate:
+                    doc.validate()
                 doclist.append((doc, None))
             except Exception as e:
                 doclist.append((doc if doc else data, str(e)))

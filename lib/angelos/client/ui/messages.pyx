@@ -18,13 +18,15 @@ from kivy.uix.image import AsyncImage
 from kivymd.label import MDLabel
 from kivymd.list import (
     TwoLineAvatarListItem, MDList, ILeftBody, IRightBodyTouch)
-from kivymd.popupscreen import MDPopupScreen
 from kivymd.dialog import BaseDialog
 from kivymd.button import MDIconButton
 from kivymd.menus import MDDropdownMenu
 
+from ...document import Mail
 from ...archive.helper import Glue
-from ...policy import EnvelopePolicy, PGroup, PrintPolicy, PrivatePortfolio
+from ...policy import (
+    EnvelopePolicy, MessagePolicy, PGroup, PrintPolicy, PrivatePortfolio,
+    Portfolio)
 from ...operation.mail import MailOperation
 from .common import BasePanelScreen
 
@@ -38,14 +40,14 @@ Builder.load_string("""
 #:import MDScrollViewRefreshLayout kivymd.refreshlayout.MDScrollViewRefreshLayout
 
 
-<EmptyInbox>:
-    text: 'The inbox is empty!\\n[size=14sp][i]Check for messages on the network\\nby pull-and-release.[/i][/size]'
+<EmptyList>:
+    text: ''
     markup: True
     halign: 'center'
     valign: 'middle'
 
 
-<InboxItem>:
+<MsgListItem>:
     text: '<Unknown subject>'
     secondary_text: '<Unkown sender>'
     on_press: root.show_message(app)
@@ -66,7 +68,7 @@ Builder.load_string("""
             left_action_items:
                 [['chevron-left', lambda x: root.dismiss()]]
             right_action_items:
-                [['alert-circle-outline',  lambda x: root.dismiss()], ['reply',  lambda x: root.dismiss()]]
+                [['alert-circle-outline',  lambda x: root.dismiss()], ['reply',  lambda x: root.ddm_reply(0)]]
         BoxLayout:
             orientation: 'vertical'
             MDList:
@@ -92,7 +94,44 @@ Builder.load_string("""
 
 
 <WriteMessage>:
-
+    background_color: app.theme_cls.primary_color
+    background: ''
+    BoxLayout:
+        orientation: 'vertical'
+        MDToolbar:
+            id: root.id
+            title: root.title
+            md_bg_color: app.theme_cls.primary_color
+            background_palette: 'Primary'
+            background_hue: '500'
+            elevation: 10
+            left_action_items:
+                [['chevron-left', lambda x: root.dismiss()]]
+            right_action_items:
+                [['content-save',  lambda x: root.save()], ['send',  lambda x: root.send()]]
+        ScrollView:
+            do_scroll_x: False
+            BoxLayout:
+                orientation: 'vertical'
+                MDList:
+                    OneLineAvatarListItem:
+                        text: root.recipient
+                        markup: True
+                        AvatarLeftWidget:
+                            source: './data/icon_72x72.png'
+                BoxLayout:
+                    orientation: 'vertical'
+                    valign: 'top'
+                    padding: dp(25), dp(25)
+                    MDTextField:
+                        text: root.subject
+                        id: subject
+                        hint_text: 'Subject'
+                    MDTextField:
+                        id: body
+                        hint_text: 'Message'
+                        multiline: True
+                    Widget:
 
 <MessagesScreen@BasePanelScreen>:
     id: 'messages'
@@ -111,7 +150,7 @@ Builder.load_string("""
             left_action_items:
                 [['menu', lambda x: root.parent.parent.parent.toggle_nav_drawer()]]
             right_action_items:
-                [['dots-vertical', lambda x: root.menu(root.ids.bottom_nav.ids.tab_manager.current)]]
+                [['email-plus-outline', lambda x: root.menu(root.ids.bottom_nav.ids.tab_manager.current)]]
         MDBottomNavigation
             id: bottom_nav
             tab_display_mode: 'icons'
@@ -134,22 +173,26 @@ Builder.load_string("""
                 name: 'outbox'
                 text: "Outbox"
                 icon: 'inbox-arrow-up'
-                BoxLayout:
+                on_pre_enter: root.get_outbox()
+                on_leave: print('On leave')
             MDBottomNavigationItem:
                 name: 'drafts'
                 text: "Drafts"
                 icon: 'file-multiple'
-                BoxLayout:
+                on_pre_enter: root.get_drafts()
+                on_leave: print('On leave')
             MDBottomNavigationItem:
                 name: 'read'
                 text: "Read"
                 icon: 'email-open'
-                BoxLayout:
+                on_pre_enter: root.get_read()
+                on_leave: print('On leave')
             MDBottomNavigationItem:  # Button to empty trash
                 name: 'trash'
                 text: "Trash"
                 icon: 'delete'
-                BoxLayout:
+                on_pre_enter: root.get_trash()
+                on_leave: print('On leave')
 """)  # noqa E501
 
 
@@ -161,7 +204,14 @@ class IconRightMenu(IRightBodyTouch, MDIconButton):
     pass
 
 
-class EmptyInbox(MDLabel):
+EMPTY_INBOX = """The inbox is empty!\n[size=14sp][i]Check for messages on the network\nby pull-and-release.[/i][/size]"""  # noqa E501
+EMPTY_OUTBOX = """The outbox is empty!\n[size=14sp][i]This list emtpies when you\nsend the mails to the network.[/i][/size]"""  # noqa E501
+EMPTY_DRAFTS = """There is no drafts!\n[size=14sp][i]Drafts are saved here\nuntil you send them.[/i][/size]"""  # noqa E501
+EMPTY_READ = """There is no read message!\n[size=14sp][i]This list fills up when you\nstart reading your inbox.[/i][/size]"""  # noqa E501
+EMPTY_TRASH = """No garbage in the trash!\n[size=14sp][i]This list fills up when you\nstart throwing messages away.[/i][/size]"""  # noqa E501
+
+
+class EmptyList(MDLabel):
     pass
 
 
@@ -169,14 +219,14 @@ class DummyPhoto(ILeftBody, AsyncImage):
         pass
 
 
-class InboxItem(TwoLineAvatarListItem):
-    envelope_id = None
+class MsgListItem(TwoLineAvatarListItem):
+    msg_id = None
 
     def show_message(self, app):
         self.parent.remove_widget(self)
 
         reader = ReadMessage()
-        reader.load(app, self.envelope_id)
+        reader.load(app, self.msg_id)
         reader.open()
 
 
@@ -189,6 +239,7 @@ class ReadMessage(BaseDialog):
     body = StringProperty()
 
     def load(self, app, message_id):
+        self._app = app
         mail = app.ioc.facade.mail
         self._msg = Glue.run_async(mail.load_message(message_id))
 
@@ -223,18 +274,28 @@ class ReadMessage(BaseDialog):
                     'viewclass': 'MDMenuItem',
                     'text': 'Compose new',
                     'callback': self.ddm_compose,
+                }, {
+                    'viewclass': 'MDMenuItem',
+                    'text': 'Trash it',
+                    'callback': self.ddm_trash,
                 }
             ],
             width_mult=3).open(anchor)
 
     def ddm_reply(self, arg):
-        print(arg)
+        writer = WriteMessage()
+        writer.load(self._app, self._sender, self._msg)
+        writer.open()
+        self.dismiss()
 
     def ddm_forward(self, arg):
         print(arg)
 
     def ddm_compose(self, arg):
-        print(arg)
+        writer = WriteMessage()
+        writer.load(self._app, self._sender)
+        writer.open()
+        self.dismiss()
 
     def ddm_share(self, arg):
         print(arg)
@@ -242,9 +303,47 @@ class ReadMessage(BaseDialog):
     def ddm_report(self, arg):
         print(arg)
 
+    def ddm_trash(self, arg):
+        print(arg)
 
-class WriteMessage(MDPopupScreen):
-    pass
+
+class WriteMessage(BaseDialog):
+    id = ''
+    title = 'Compose message'
+    recipient = StringProperty()
+    subject = StringProperty()
+    body = StringProperty()
+
+    def load(self, app, recipient: Portfolio, reply: Mail=None):
+        """Prepare the message composer dialog box."""
+        self._app = app
+        self._recipient = recipient
+        self._builder = MessagePolicy.mail(app.ioc.facade.portfolio, recipient)
+        self._reply = reply
+
+        self.recipient = '[size=14sp][b]' + PrintPolicy.title(recipient) + '[/b][/size]'  # noqa E501
+        if reply:
+            self.subject = 'Reply to: ' + reply.subject if (
+                reply.subject) else str(reply.id)
+
+    def send(self):
+        """Compile and send message from dialog data."""
+        mail = self._app.ioc.facade.mail
+        msg = self._builder.message(
+            self.subject, self.body, self._reply).done()
+        envelope = EnvelopePolicy.wrap(
+            self._app.ioc.facade.portfolio, self._recipient, msg)
+        Glue.run_async(mail.save_outbox(envelope))
+        Glue.run_async(mail.save_sent(msg))
+        self.dismiss()
+
+    def save(self):
+        """Compile and save message as draft from dialog data."""
+        draft = self._builder.message(
+            self.subject, self.body, self._reply).draft()
+        print(draft)
+        Glue.run_async(self._app.ioc.facade.mail.save_draft(draft))
+        self.dismiss()
 
 
 class MessagesScreen(BasePanelScreen):
@@ -256,8 +355,10 @@ class MessagesScreen(BasePanelScreen):
         print('Unload:', type(self))
 
     def menu(self, name):
-        """Show appropriate menu for each tab."""
-        print('Menu for:', name)
+        """Compose button."""
+        writer = WriteMessage()
+        # writer.load(app, self.msg_id)
+        writer.open()
 
     def refresh_callback(self, *args):
         '''A method that updates the state of your application
@@ -282,7 +383,9 @@ class MessagesScreen(BasePanelScreen):
         widget.clear_widgets()
 
         if not messages:
-            widget.add_widget(EmptyInbox())
+            label = EmptyList()
+            label.text = EMPTY_INBOX
+            widget.add_widget(label)
             return
 
         sv = ScrollView()
@@ -313,11 +416,11 @@ class MessagesScreen(BasePanelScreen):
                 headline = '<Unknown>'
                 title = '<Unidentified sender>'
                 source = './data/anonymous.png'
-            item = InboxItem(
+            item = MsgListItem(
                 text=headline,
                 secondary_text=title,
             )
-            item.envelope_id = msg[0].id
+            item.msg_id = msg[0].id
             item.add_widget(DummyPhoto(source=source))
             inbox.add_widget(item)
         else:
@@ -327,48 +430,210 @@ class MessagesScreen(BasePanelScreen):
             Clock.schedule_once(partial(
                 self.show_inbox_item, portfolio, messages, inbox))
 
+    def get_outbox(self):
+        messages = Glue.run_async(self.app.ioc.facade.mail.load_outbox())
+        widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('outbox')
+        widget.clear_widgets()
+
+        if not messages:
+            label = EmptyList()
+            label.text = EMPTY_OUTBOX
+            widget.add_widget(label)
+            return
+
+        sv = ScrollView()
+        outbox = MDList()
+        sv.add_widget(outbox)
+        widget.add_widget(sv)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_outbox_item, self.app.ioc.facade.portfolio,
+                messages, outbox))
+
+    def show_outbox_item(
+            self, portfolio: PrivatePortfolio,
+            messages: List[Any], outbox: MDList, dt):
+        """Print envelop to list kivy-async."""
+
+        msg = messages.pop()
+        if isinstance(msg[1], type(None)):
+            try:
+                sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
+                    msg[0].owner, PGroup.VERIFIER))
+                headline = str(msg[0].id)
+                title = PrintPolicy.title(sender)
+                source = './data/icon_72x72.png'
+            except OSError:
+                headline = '<Unknown>'
+                title = '<Unidentified sender>'
+                source = './data/anonymous.png'
+            item = MsgListItem(
+                text=headline,
+                secondary_text=title,
+            )
+            item.msg_id = msg[0].id
+            item.add_widget(DummyPhoto(source=source))
+            outbox.add_widget(item)
+        else:
+            print(msg)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_outbox_item, portfolio, messages, outbox))
+
+    def get_drafts(self):
+        messages = Glue.run_async(self.app.ioc.facade.mail.load_drafts())
+        widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('drafts')
+        widget.clear_widgets()
+
+        if not messages:
+            label = EmptyList()
+            label.text = EMPTY_DRAFTS
+            widget.add_widget(label)
+            return
+
+        sv = ScrollView()
+        drafts = MDList()
+        sv.add_widget(drafts)
+        widget.add_widget(sv)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_drafts_item, self.app.ioc.facade.portfolio,
+                messages, drafts))
+
+    def show_drafts_item(
+            self, portfolio: PrivatePortfolio,
+            messages: List[Any], drafts: MDList, dt):
+        """Print envelop to list kivy-async."""
+
+        msg = messages.pop()
+        if isinstance(msg[1], type(None)):
+            try:
+                sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
+                    msg[0].issuer, PGroup.VERIFIER))
+                headline = msg[0].subject
+                title = PrintPolicy.title(sender)
+                source = './data/icon_72x72.png'
+            except OSError:
+                headline = '<Unknown>'
+                title = '<Unidentified sender>'
+                source = './data/anonymous.png'
+            item = MsgListItem(
+                text=headline,
+                secondary_text=title,
+            )
+            item.msg_id = msg[0].id
+            item.add_widget(DummyPhoto(source=source))
+            drafts.add_widget(item)
+        else:
+            print('MESSAGE:', msg[1])
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_drafts_item, portfolio, messages, drafts))
+
     def get_read(self):
         messages = Glue.run_async(self.app.ioc.facade.mail.load_read())
         widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('read')
         widget.clear_widgets()
 
         if not messages:
-            widget.add_widget(EmptyInbox())
+            label = EmptyList()
+            label.text = EMPTY_READ
+            widget.add_widget(label)
             return
 
         sv = ScrollView()
-        ml = MDList()
-        sv.add_widget(ml)
+        read = MDList()
+        sv.add_widget(read)
         widget.add_widget(sv)
 
-        portfolio = self.app.ioc.facade.portfolio
-        for msg in messages:
-            if isinstance(msg[1], type(None)):
-                try:
-                    sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
-                        msg[0].issuer, PGroup.VERIFIER))
-                    message = EnvelopePolicy.open(portfolio, sender, msg[0])
-                    headling = message.subject
-                    title = PrintPolicy.title(sender)
-                    source = './data/icon_72x72.png'
-                except OSError:
-                    headling = '<Unknown>'
-                    title = '<Unidentified sender>'
-                    source = './data/anonymous.png'
-                # if message.type == DocType.COM_NOTE:
-                #    pass
-                # elif message.type == DocType.COM_MAIL:
-                #    pass
-                # elif message.type == DocType.COM_SHARE:
-                #    pass
-                # elif message.type == DocType.COM_REPORT:
-                #    pass
-                inboxitem = InboxItem(
-                    text=headling,
-                    secondary_text=title,
-                )
-                inboxitem.envelope_id = msg[0].id
-                inboxitem.add_widget(DummyPhoto(source=source))
-                ml.add_widget(inboxitem)
-            else:
-                print(msg)
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_read_item, self.app.ioc.facade.portfolio,
+                messages, read))
+
+    def show_read_item(
+            self, portfolio: PrivatePortfolio,
+            messages: List[Any], inbox: MDList, dt):
+        """Print envelop to list kivy-async."""
+
+        msg = messages.pop()
+        if isinstance(msg[1], type(None)):
+            try:
+                sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
+                    msg[0].issuer, PGroup.VERIFIER))
+                headline = msg[0].subject
+                title = PrintPolicy.title(sender)
+                source = './data/icon_72x72.png'
+            except OSError:
+                headline = '<Unknown>'
+                title = '<Unidentified sender>'
+                source = './data/anonymous.png'
+            item = MsgListItem(
+                text=headline,
+                secondary_text=title,
+            )
+            item.msg_id = msg[0].id
+            item.add_widget(DummyPhoto(source=source))
+            inbox.add_widget(item)
+        else:
+            print(msg)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_read_item, portfolio, messages, inbox))
+
+    def get_trash(self):
+        messages = Glue.run_async(self.app.ioc.facade.mail.load_trash())
+        widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('trash')
+        widget.clear_widgets()
+
+        if not messages:
+            label = EmptyList()
+            label.text = EMPTY_TRASH
+            widget.add_widget(label)
+            return
+
+        sv = ScrollView()
+        trash = MDList()
+        sv.add_widget(trash)
+        widget.add_widget(sv)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_trash_item, self.app.ioc.facade.portfolio,
+                messages, trash))
+
+    def show_trash_item(
+            self, portfolio: PrivatePortfolio,
+            messages: List[Any], trash: MDList, dt):
+        """Print envelop to list kivy-async."""
+
+        msg = messages.pop()
+        if isinstance(msg[1], type(None)):
+            try:
+                sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
+                    msg[0].issuer, PGroup.VERIFIER))
+                headline = msg[0].subject
+                title = PrintPolicy.title(sender)
+                source = './data/icon_72x72.png'
+            except OSError:
+                headline = '<Unknown>'
+                title = '<Unidentified sender>'
+                source = './data/anonymous.png'
+            item = MsgListItem(
+                text=headline,
+                secondary_text=title,
+            )
+            item.msg_id = msg[0].id
+            item.add_widget(DummyPhoto(source=source))
+            trash.add_widget(item)
+        else:
+            print(msg)
+
+        if messages:
+            Clock.schedule_once(partial(
+                self.show_trash_item, portfolio, messages, trash))

@@ -13,17 +13,21 @@ import uuid
 from typing import List, Set
 
 from ..policy import PrivatePortfolio, EnvelopePolicy, DOCUMENT_PATH, Crypto
-from ..document import Envelope, Mail, Message, DocType, StoredLetter
+from ..document import Envelope, Message, DocType, StoredLetter, Mail
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 
 
-class Mail:
+class MailAPI:
     """An interface class to be placed on the facade."""
 
-    INBOX = '/messages/inbox/'
-    READ = '/messages/read/'
-    CACHE = '/cache/msg/'
+    INBOX = '/messages/inbox'
+    READ = '/messages/read'
+    CACHE = '/cache/msg'
+    OUTBOX = '/messages/outbox'
+    SENT = '/messages/sent'
+    DRAFT = '/messages/drafts'
+    TRASH = '/messages/trash'
 
     def __init__(self, portfolio: PrivatePortfolio, vault: Vault):
         """Init mail interface."""
@@ -44,7 +48,7 @@ class Mail:
 
             savelist.append(self.__vault.save(
                 DOCUMENT_PATH[envelope.type].format(
-                    dir=Mail.INBOX, file=envelope.id), envelope))
+                    dir=MailAPI.INBOX, file=envelope.id), envelope))
 
         result = await asyncio.gather(*savelist, return_exceptions=True)
         return True, reject, result
@@ -52,7 +56,7 @@ class Mail:
     async def load_inbox(self) -> List[Envelope]:
         """Load envelopes from the inbox."""
         doclist = await self.__vault.search(
-            self.__portfolio.entity.id, Mail.INBOX + '*', limit=200)
+            self.__portfolio.entity.id, MailAPI.INBOX + '/*', limit=200)
         result = Glue.doc_validate_report(doclist, Envelope)
         return result
 
@@ -60,7 +64,7 @@ class Mail:
         """Load specific envelope from the inbox."""
         doclist = await self.__vault.search(
             path=DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=Mail.INBOX, file=envelope_id), limit=1)
+                dir=MailAPI.INBOX, file=envelope_id), limit=1)
         if not doclist:
             return None
         result = Glue.doc_validate_report(doclist, Envelope)
@@ -73,7 +77,7 @@ class Mail:
         """Load specific message from the read folder."""
         doclist = await self.__vault.search(
             path=DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=Mail.READ, file=message_id), limit=1)
+                dir=MailAPI.READ, file=message_id), limit=1)
         if not doclist:
             return None
         result = Glue.doc_validate_report(doclist, Mail)
@@ -109,13 +113,13 @@ class Mail:
 
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.CACHED_MSG].format(
-                dir=Mail.CACHE, file=letter.id), letter)
+                dir=MailAPI.CACHE, file=letter.id), letter)
         if isinstance(result, Exception):
             raise result
 
         result = await self.__vault.delete(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=Mail.INBOX, file=envelope.id))
+                dir=MailAPI.INBOX, file=envelope.id))
         if isinstance(result, Exception):
             raise result
 
@@ -123,13 +127,57 @@ class Mail:
 
     async def save_read(self, message: Mail):
         """Save a message as read in the read message folder."""
-        await self.__vault.save(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=Mail.READ, file=message.id), message)
+        result = await self.__vault.save(
+            DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailAPI.READ, file=message.id), message)
+        if isinstance(result, Exception):
+            raise result
         return True
 
     async def load_read(self) -> List[Mail]:
         """Load read folder from the messages store."""
         doclist = await self.__vault.search(
-            self.__portfolio.entity.id, Mail.READ + '*', limit=100)
+            self.__portfolio.entity.id, MailAPI.READ + '/*', limit=100)
+        result = Glue.doc_validate_report(doclist, Mail)
+        return result
+
+    async def save_outbox(self, envelope: Envelope):
+        """Save a message to outbox folder to be sent."""
+        result = await self.__vault.save(
+            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+                dir=MailAPI.OUTBOX, file=envelope.id), envelope)
+        if isinstance(result, Exception):
+            raise result
+        return True
+
+    async def load_outbox(self) -> List[Envelope]:
+        """Load letters from outbox folder."""
+        doclist = await self.__vault.search(
+            path=MailAPI.OUTBOX + '/*', limit=100)
+        result = Glue.doc_validate_report(doclist, Envelope)
+        return result
+
+    async def save_sent(self, message: Mail):
+        """Save a message to sent folder for archiving."""
+        result = await self.__vault.save(
+            DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailAPI.SENT, file=message.id), message)
+        if isinstance(result, Exception):
+            raise result
+        return True
+
+    async def save_draft(self, message: Mail):
+        """Save a message to draft folder for archiving."""
+        result = await self.__vault.save(
+            DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailAPI.DRAFT, file=message.id), message)
+        if isinstance(result, Exception):
+            raise result
+        return True
+
+    async def load_drafts(self) -> List[Mail]:
+        """Load read folder from the messages store."""
+        doclist = await self.__vault.search(
+            path=MailAPI.DRAFT + '/*', limit=100)
         result = Glue.doc_validate_report(doclist, Mail)
         return result
