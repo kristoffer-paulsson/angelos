@@ -179,5 +179,5 @@ class MailAPI:
         """Load read folder from the messages store."""
         doclist = await self.__vault.search(
             path=MailAPI.DRAFT + '/*', limit=100)
-        result = Glue.doc_validate_report(doclist, Mail)
+        result = Glue.doc_validate_report(doclist, Mail, False)
         return result

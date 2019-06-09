@@ -20,7 +20,7 @@ import base64
 import logging
 
 from ..utils import Util
-from ..error import Error
+from ..error import Error, ModelException
 
 
 class Field:
@@ -156,17 +156,42 @@ class BaseDocument(metaclass=DocumentMeta):
         Sets a field and validates transparently.
         """
         if key in self._fields:
-            if self._fields[key].validate(value, key):
-                object.__setattr__(self, key, value)
-            else:
-                raise AttributeError(
-                    'Invalid value "%s" for field "%s"'.format(value, key))
+            try:
+                if self._fields[key].validate(value, key):
+                    object.__setattr__(self, key, value)
+                else:
+                    raise AttributeError(
+                        'Invalid value "%s" for field "%s"'.format(value, key))
+            except ModelException:
+                pass
         else:
             raise AttributeError('Unknown field "%s"'.format(key))
 
     @classmethod
     def build(cls, data):
         """Build document from dictionary, takes dict or list of dicts."""
+        doc = {}
+        logging.debug('Exporting document %s' % type(cls))
+
+        for name, field in cls._fields.items():
+            value = data[name]
+            logging.debug('%s, %s, %s' % (type(field), name, value))
+
+            if not field.multiple:
+                doc[name] = field.from_bytes(value)
+            elif isinstance(value, type(None)):
+                doc[name] = []
+            else:
+                item_list = []
+                for item in value:
+                    item_list.append(field.from_bytes(item))
+                doc[name] = item_list
+        return cls(nd=doc, strict=False)
+
+    """
+    @classmethod
+    def build(cls, data):
+        ""Build document from dictionary, takes dict or list of dicts.""
         doc = cls(nd={})
         logging.debug('Exporting document %s' % type(cls))
 
@@ -184,6 +209,7 @@ class BaseDocument(metaclass=DocumentMeta):
                     item_list.append(field.from_bytes(item))
                 setattr(doc, name, item_list)
         return doc
+    """
 
     def export(self, c=conv_dont):
         """

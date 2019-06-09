@@ -9,8 +9,8 @@ This file is distributed under the terms of the MIT license.
 Module docstring."""
 import logging
 
-from ..starter import Starter
 from .ssh import SSHServer
+from .nacl import NaClKey
 
 
 class NodesServer(SSHServer):
@@ -21,7 +21,7 @@ class NodesServer(SSHServer):
 
         auth = self.ioc.load_node_auth(username)
         if auth[0]:
-            self._client_keys = [Starter.public_key(self.ioc.facade.keys)]
+            self._client_keys = [NaClKey.factory(self.ioc.facade.keys)]
 
         return True
 

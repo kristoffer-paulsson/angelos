@@ -89,8 +89,8 @@ class Server(ContainerAware):
         self._worker.run_coroutine(self.boot_server())
         self._worker.run_coroutine(self.admin_server())
         self._worker.run_coroutine(self.clients_server())
-        # self._worker.run_coroutine(self.hosts_server())
-        # self._worker.run_coroutine(self.nodes_server())
+        self._worker.run_coroutine(self.hosts_server())
+        self._worker.run_coroutine(self.nodes_server())
         self._worker.run_coroutine(self.boot_activator())
 
         self._applog.info('Starting boot server.')

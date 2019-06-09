@@ -402,7 +402,7 @@ class Command(FactoryInterface):
 
             'depends': ['spam', 'ham', 'eggs']
 
-        Combine with, abbreviated "combo". Requires an option only to be
+        Combine with, abbreviated "combo". Requires one option only to be
         present in combination with one in the tuple/list.
 
             ('foo', 'bar', 'baz')
@@ -481,7 +481,7 @@ class Command(FactoryInterface):
             if opt in rules.keys():
                 rule = rules[opt]
                 if rule[0]:
-                    self._rule_combo(rule[0], opt_keys)
+                    self._rule_combo(rule[0], (), opt_keys)
                 if rule[1]:
                     self._rule_option(rule[1], opt_keys)
                 if rule[2]:

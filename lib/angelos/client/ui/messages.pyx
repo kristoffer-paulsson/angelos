@@ -250,6 +250,8 @@ class ReadMessage(BaseDialog):
             self._msg, self._sender = Glue.run_async(
                 MailOperation.open_envelope(app.ioc.facade, message_id))
 
+        # Add support to open draft if no envelope
+
         self.subject = '[b]' + self._msg.subject + '[/b]'
         self.body = self._msg.body
         self.sender = PrintPolicy.title(self._sender)
@@ -513,7 +515,7 @@ class MessagesScreen(BasePanelScreen):
             try:
                 sender = Glue.run_async(self.app.ioc.facade.load_portfolio(
                     msg[0].issuer, PGroup.VERIFIER))
-                headline = msg[0].subject
+                headline = msg[0].subject if msg[0].subject else ''
                 title = PrintPolicy.title(sender)
                 source = './data/icon_72x72.png'
             except OSError:

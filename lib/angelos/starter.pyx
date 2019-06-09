@@ -18,6 +18,7 @@ from .document import Entity, PrivateKeys, Keys
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.console import BootServer, AdminServer
+from .ssh.client import ClientsServer
 from .server.rsa import SERVER_RSA_PRIVATE
 
 
@@ -148,7 +149,7 @@ class Starter:
         Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': lambda: BootServer(ioc),
+            'server_factory': lambda: ClientsServer(ioc),
             'host': host,
             'port': port,
             'server_host_keys': [Starter._private_key(privkeys)],
