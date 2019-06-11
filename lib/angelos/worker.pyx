@@ -62,7 +62,7 @@ class Worker(ContainerAware):
                 target=self.__run, name=name
             ).start()
 
-        self.__workers[self.__thread.name] = self
+        self.__workers[name] = self
 
     @property
     def workers(self):

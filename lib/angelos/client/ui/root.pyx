@@ -14,6 +14,7 @@ from kivy.uix.screenmanager import Screen
 
 from .common import BasePanelScreen
 from .messages import MessagesScreen
+from .portfolios import PortfoliosScreen
 
 
 Builder.load_string("""
@@ -26,19 +27,6 @@ Builder.load_string("""
 
 
 class ContactsScreen(BasePanelScreen):
-    pass
-
-
-Builder.load_string("""
-<DocumentsScreen@BasePanelScreen>:
-    name: 'documents'
-    title: 'Documents'
-    on_pre_enter: self.load()
-    on_leave: self.unload()
-""")  # noqa E501
-
-
-class DocumentsScreen(BasePanelScreen):
     pass
 
 
@@ -167,9 +155,9 @@ Builder.load_string("""
         icon: 'contact-mail'
         on_release: root.ids.scr_mngr.current = 'contacts'
     NavigationDrawerIconButton:
-        text: 'Documents'
+        text: 'Portfolios'
         icon: 'shield-account'
-        on_release: root.ids.scr_mngr.current = 'documents'
+        on_release: root.ids.scr_mngr.current = 'portfolios'
     NavigationDrawerIconButton:
         text: 'Files'
         icon: 'folder-account'
@@ -209,7 +197,7 @@ Builder.load_string("""
             NavigationDrawerIconButton:
                 text: 'Portfolios'
                 icon: 'briefcase-check'
-                on_release: root.goto_documents(app)
+                on_release: root.goto_portfolios(app)
             NavigationDrawerIconButton:
                 text: 'Documents'
                 icon: 'folder-account'
@@ -245,9 +233,9 @@ class UserScreen(Screen):
         if self.ids.scr_mngr.current != 'contacts':
             self.switch(ContactsScreen(app, name='contacts'))
 
-    def goto_documents(self, app):
-        if self.ids.scr_mngr.current != 'documents':
-            self.switch(DocumentsScreen(app, name='documents'))
+    def goto_portfolios(self, app):
+        if self.ids.scr_mngr.current != 'portfolios':
+            self.switch(PortfoliosScreen(app, name='portfolios'))
 
     def goto_files(self, app):
         if self.ids.scr_mngr.current != 'files':

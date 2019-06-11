@@ -17,6 +17,7 @@ Builder.load_string("""
 <BasePanelScreen@Screen>:
     title: ''
     id: ''
+    right_action_items: []
     BoxLayout:
         orientation: 'vertical'
         MDToolbar:
@@ -28,6 +29,7 @@ Builder.load_string("""
             elevation: 10
             left_action_items:
                 [['menu', lambda x: root.parent.parent.parent.toggle_nav_drawer()]]
+            right_action_items: root.right_action_items
         Widget:
 """)  # noqa E501
 

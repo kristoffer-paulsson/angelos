@@ -370,6 +370,10 @@ class IPField(Field):
         else:
             raise TypeError('Arbitrary size: %s' % len(value))
 
+    def yaml(self, value):
+        """YAML converter."""
+        return str(value)
+
 
 class DateField(Field):
     def validate(self, value, name):
@@ -448,7 +452,7 @@ class StringField(Field):
         return True
 
     def from_bytes(self, value):
-        return value.decode() if value else None
+        return str(value, 'utf-8') if value else None
 
     def str(self, value):
         """Str converter."""

@@ -33,7 +33,7 @@ from .common import BasePanelScreen
 
 Builder.load_string("""
 #:import MDLabel kivymd.label.MDLabel
-#:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
+# #:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
 #:import MDTextField kivymd.textfields.MDTextField
 #:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
 
@@ -150,7 +150,8 @@ Builder.load_string("""
             left_action_items:
                 [['menu', lambda x: root.parent.parent.parent.toggle_nav_drawer()]]
             right_action_items:
-                [['email-plus-outline', lambda x: root.menu(root.ids.bottom_nav.ids.tab_manager.current)]]
+                [['reload', lambda x: app.check_mail()]]
+                # [['email-plus-outline', lambda x: root.menu(root.ids.bottom_nav.ids.tab_manager.current)]]
         MDBottomNavigation
             id: bottom_nav
             tab_display_mode: 'icons'
@@ -343,7 +344,6 @@ class WriteMessage(BaseDialog):
         """Compile and save message as draft from dialog data."""
         draft = self._builder.message(
             self.subject, self.body, self._reply).draft()
-        print(draft)
         Glue.run_async(self._app.ioc.facade.mail.save_draft(draft))
         self.dismiss()
 

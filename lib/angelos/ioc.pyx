@@ -81,8 +81,6 @@ class Handle:
 
         Handle is immutable and can only be set once.
         """
-        if self.__value: raise ValueError(  # noqa E701
-            'Handle already set for %s' % self.__name)
         Util.is_type(value, self.__type)
         self.__value = value
 
@@ -93,3 +91,17 @@ class Handle:
     def __set_name__(self, owner, name):
         """Set the attribute name."""
         self.__name = name
+
+
+class StaticHandle(Handle):
+
+    def __set__(self, instance, value):
+        """
+        Set the handle instance.
+
+        Handle is immutable and can only be set once.
+        """
+        if self.__value: raise ValueError(  # noqa E701
+            'Handle already set for %s' % self.__name)
+        Util.is_type(value, self.__type)
+        self.__value = value

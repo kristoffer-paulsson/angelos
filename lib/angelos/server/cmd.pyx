@@ -55,6 +55,27 @@ class ConsoleIO:
 
         return input
 
+    async def multiline(self, msg='', t=str):
+        """Prompt for multiline user input."""
+        lines = ''
+        while True:
+            self._stdout.write('%s:\n' % msg)
+
+            while True:
+                input = await self._stdin.readline()
+                if not input.strip():
+                    break
+                lines += input
+
+            try:
+                input = t(lines.strip())
+                break
+            except ValueError:
+                self._stdout.write('Invalid data entered.\n')
+                continue
+
+        return lines
+
     async def confirm(self, msg='', em=True):
         """Ask for user choice."""
         ans = ['Y', 'N'] if em else ['y', 'n']

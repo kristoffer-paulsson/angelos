@@ -267,11 +267,15 @@ class Portfolio(PortfolioABC):
 
     def to_sets(self) -> (Set[Document], Set[Document]):
         """Export documents of portfolio as two sets of docs"""
-        issuer = (
-            set([self.entity, self.profile, self.domain,
-                 self.network, self.privkeys]) |
-            self.keys | self.nodes | self.issuer.verified |
-            self.issuer.trusted | self.issuer.revoked)
+        issuer = set()
+        for attr in ('entity', 'profile', 'domain', 'network', 'privkeys'):
+            if hasattr(self, attr):
+                issuer.add(getattr(self, attr))
+
+        issuer |= (self.keys | self.issuer.verified |
+                   self.issuer.trusted | self.issuer.revoked)
+        if hasattr(self, 'nodes'):
+            issuer |= getattr(self, 'nodes')
         owner = self.owner.verified | self.owner.trusted | self.owner.revoked
 
         try:
@@ -286,9 +290,9 @@ class Portfolio(PortfolioABC):
 
         return issuer, owner
 
-    def from_sets(self,
-                  issuer: Set[Document]=set(),
-                  owner: Set[Document]=set()) -> bool:
+    def from_sets(
+            self, issuer: Set[Document]=set(),
+            owner: Set[Document]=set()) -> bool:
         """
         Import documents to portfolio from two sets of docs.
 
@@ -311,7 +315,11 @@ class Portfolio(PortfolioABC):
                 self.keys.add(doc)
             elif isinstance(doc, Node):
                 self.nodes.add(doc)
-            elif isinstance(doc, Verified):
+
+        for doc in issuer:
+            if doc.issuer != self.entity.id:
+                continue
+            if isinstance(doc, Verified):
                 self.issuer.verified.add(doc)
             elif isinstance(doc, Trusted):
                 self.issuer.trusted.add(doc)
@@ -321,6 +329,11 @@ class Portfolio(PortfolioABC):
                 all = False
 
         for doc in owner:
+            if not hasattr(doc, 'owner'):
+                continue
+            if doc.owner != self.entity.id:
+                continue
+
             if isinstance(doc, Verified):
                 self.owner.verified.add(doc)
             elif isinstance(doc, Trusted):
@@ -376,6 +389,30 @@ class PortfolioPolicy:
         docobj = msgpack.unpackb(data, raw=False)
         return DOCUMENT_TYPE[int.from_bytes(
             docobj['type'], byteorder='big')].build(docobj)
+
+    @staticmethod
+    def exports(portfolio: Portfolio) -> bytes:
+        """Export portfolio of documents to bytes."""
+        issuer, owner = portfolio.to_sets()
+        docs = []
+        for doc in issuer | owner:
+            docs.append(doc.export_bytes())
+
+        return msgpack.packb(
+            docs, use_bin_type=True, strict_types=True)
+
+    @staticmethod
+    def imports(data: bytes) -> Portfolio:
+        """Import portfolio of documents from bytes."""
+        docobjs = msgpack.unpackb(data, raw=False)
+        docs = set()
+        for obj in docobjs:
+            docs.add(DOCUMENT_TYPE[int.from_bytes(
+                obj['type'], byteorder='big')].build(obj))
+
+        portfolio = Portfolio()
+        portfolio.from_sets(docs, docs)
+        return portfolio
 
     @staticmethod
     def validate(portfolio: Portfolio, config: Tuple[str]) -> bool:

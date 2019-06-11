@@ -28,7 +28,11 @@ ENV_IMMUTABLE = {
 
 """Configuration default values"""
 CONFIG_DEFAULT = {
-
+    'ports': {
+        'nodes': 3,
+        'hosts': 4,
+        'clients': 5,
+    }
 }
 
 """Configuration immutable values"""

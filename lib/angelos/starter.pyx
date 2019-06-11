@@ -14,7 +14,8 @@ import asyncssh
 
 from .utils import Util
 from .ioc import Container
-from .document import Entity, PrivateKeys, Keys
+from .document import Keys
+from .policy import PrivatePortfolio, Portfolio
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.console import BootServer, AdminServer
@@ -47,10 +48,9 @@ class Starter:
 
     @classmethod
     def nodes_server(
-            self, entity, privkeys, host, port=3, ioc=None, loop=None):
+            self, portfolio, host, port=3, ioc=None, loop=None):
         """Start server for incoming node/domain communications."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host, str)
         Util.is_type(port, int)
         Util.is_type(ioc, Container)
@@ -60,7 +60,7 @@ class Starter:
             'server_factory': SSHServer,
             'host': host,
             'port': port,
-            'server_host_keys': [Starter._private_key(privkeys)],
+            'server_host_keys': [Starter._private_key(portfolio.privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
             'loop': loop,
@@ -70,20 +70,19 @@ class Starter:
         return Starter.__start_server(params)
 
     @classmethod
-    def nodes_client(self, entity, privkeys, host_keys, host, port=3):
+    def nodes_client(self, portfolio, host_keys, host, port=3):
         """Start client for outgoing node/domain communications."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host_keys, Keys)
         Util.is_type(host, str)
         Util.is_type(port, int)
 
         params = {
-            'username': str(entity.id),
-            'client_username': str(entity.id),
+            'username': str(portfolio.entity.id),
+            'client_username': str(portfolio.entity.id),
             'host': host,
             'port': port,
-            'client_keys': [Starter._private_key(privkeys)],
+            'client_keys': [Starter._private_key(portfolio.privkeys)],
             'known_hosts': Starter.__known_host(host_keys),
             'client_factory': SSHClient
         }
@@ -93,10 +92,9 @@ class Starter:
 
     @classmethod
     def hosts_server(
-            self, entity, privkeys, host, port=4, ioc=None, loop=None):
+            self, portfolio, host, port=4, ioc=None, loop=None):
         """Start server for incoming host/host communications."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host, str)
         Util.is_type(port, int)
         Util.is_type(ioc, Container)
@@ -106,7 +104,7 @@ class Starter:
             'server_factory': SSHServer,
             'host': host,
             'port': port,
-            'server_host_keys': [Starter._private_key(privkeys)],
+            'server_host_keys': [Starter._private_key(portfolio.privkeys)],
             'process_factory': lambda: None,
             'session_factory': lambda: None,
             'loop': loop,
@@ -116,20 +114,19 @@ class Starter:
         return Starter.__start_server(params)
 
     @classmethod
-    def hosts_client(self, entity, privkeys, host_keys, host, port=4):
+    def hosts_client(self, portfolio, host_keys, host, port=4):
         """Start client for outgoing host/host communications."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host_keys, Keys)
         Util.is_type(host, str)
         Util.is_type(port, int)
 
         params = {
-            'username': str(entity.id),
-            'client_username': str(entity.id),
+            'username': str(portfolio.entity.id),
+            'client_username': str(portfolio.entity.id),
             'host': host,
             'port': port,
-            'client_keys': [Starter._private_key(privkeys)],
+            'client_keys': [Starter._private_key(portfolio.privkeys)],
             'known_hosts': Starter.__known_host(host_keys),
             'client_factory': SSHClient
         }
@@ -139,10 +136,9 @@ class Starter:
 
     @classmethod
     def clients_server(
-            self, entity, privkeys, host, port=5, ioc=None, loop=None):
+            self, portfolio, host, port=5, ioc=None, loop=None):
         """Start server for incoming client/portal communications."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
+        Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host, str)
         Util.is_type(port, int)
         Util.is_type(ioc, Container)
@@ -152,28 +148,31 @@ class Starter:
             'server_factory': lambda: ClientsServer(ioc),
             'host': host,
             'port': port,
-            'server_host_keys': [Starter._private_key(privkeys)],
+            'server_host_keys': [Starter._private_key(portfolio.privkeys)],
             'loop': loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
         return Starter.__start_server(params)
 
-    def clients_client(self, entity, privkeys, host_keys, host, port=5):
+    def clients_client(self, portfolio, host, port=5):
         """Start client for outgoing client/portal communications."""
-        Util.is_type(entity, Entity)
-        Util.is_type(privkeys, PrivateKeys)
-        Util.is_type(host_keys, Keys)
-        Util.is_type(host, str)
+        Util.is_type(portfolio, PrivatePortfolio)
+        Util.is_type(host, Portfolio)
         Util.is_type(port, int)
 
+        if host.network.hosts[0].hostname:
+            location = host.network.hosts[0].hostname
+        else:
+            location = str(host.network.hosts[0].ip)
+
         params = {
-            'username': str(entity.id),
-            'client_username': str(entity.id),
-            'host': host,
+            'username': str(portfolio.entity.id),
+            'client_username': str(portfolio.entity.id),
+            'host': location,
             'port': port,
-            'client_keys': [Starter._private_key(privkeys)],
-            'known_hosts': Starter.__known_host(host_keys),
+            'client_keys': [Starter._private_key(portfolio.privkeys)],
+            'known_hosts': Starter.__known_host(host.keys),
             'client_factory': SSHClient
         }
         params = {**params, **Starter.ALGS}
@@ -261,7 +260,7 @@ class Starter:
         def callback(h, a, p):
             return (
                 [NaClKey(key=NaClPublicKey.construct(
-                    host_keys.verify))], [], [])
+                    key.verify)) for key in host_keys], [], [])
         return callback
 
     @staticmethod

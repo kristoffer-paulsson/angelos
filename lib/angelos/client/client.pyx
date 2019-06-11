@@ -18,6 +18,8 @@ from kivy.uix.screenmanager import ScreenManager
 from kivymd.theming import ThemeManager
 
 from ..ioc import Container, ContainerAware, Config, Handle
+from ..worker import Worker
+from ..starter import Starter
 from ..utils import Util, Event
 from ..const import Const
 from ..archive.helper import Glue
@@ -69,13 +71,6 @@ class Configuration(Config, Container):
         }
 
 
-"""
-class MainInterface(ScreenManager):
-    def __init__(self):
-        ScreenManager.__init__(self)
-"""
-
-
 class LogoMessenger(ContainerAware, App):
     theme_cls = ThemeManager()
 
@@ -83,9 +78,11 @@ class LogoMessenger(ContainerAware, App):
         """Initialize app logger."""
         ContainerAware.__init__(self, Configuration())
         App.__init__(self)
+        self._worker = Worker('client.secondary', self.ioc)
         self.theme_cls.primary_palette = 'Green'
 
     def build(self):
+        """"""
         self.title = 'Logo'
         widget = ScreenManager(id='main_mngr')
         widget.add_widget(StartScreen(name='splash'))
@@ -123,6 +120,12 @@ class LogoMessenger(ContainerAware, App):
 
         screen = self.root.get_screen(old)
         self.root.remove_widget(screen)
+
+    async def __replicate_mailbox(self):
+        Starter.clients_client(self.ioc.facade.portfolio)
+
+    def check_mail(self):
+        self._worker.run_coroutine(self.__replicate_mailbox())
 
 
 def start():

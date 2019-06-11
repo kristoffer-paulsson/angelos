@@ -15,7 +15,7 @@ import collections
 import json
 
 from ..utils import Event
-from ..ioc import Container, ContainerAware, Config, Handle
+from ..ioc import Container, ContainerAware, Config, Handle, StaticHandle
 from ..starter import Starter
 from ..worker import Worker
 
@@ -55,9 +55,9 @@ class Configuration(Config, Container):
             'state': lambda self: StateMachine(self.config['state']),
             'log': lambda self: LogHandler(self.config['logger']),
             'session': lambda self: SessionManager(),
-            'facade': lambda self: Handle(Facade),
-            'boot': lambda self: Handle(asyncio.base_events.Server),
-            'admin': lambda self: Handle(asyncio.base_events.Server),
+            'facade': lambda self: StaticHandle(Facade),
+            'boot': lambda self: StaticHandle(asyncio.base_events.Server),
+            'admin': lambda self: StaticHandle(asyncio.base_events.Server),
             'clients': lambda self: Handle(asyncio.base_events.Server),
             'nodes': lambda self: Handle(asyncio.base_events.Server),
             'hosts': lambda self: Handle(asyncio.base_events.Server),
@@ -185,70 +185,77 @@ class Server(ContainerAware):
                     await self.ioc.boot.start_serving()
 
     async def clients_server(self):
-        first = True
-        while not self.ioc.quit.is_set():
-            if self.ioc.state.position('clients'):
-                await self.ioc.state.off('clients')
-                server = self.ioc.clients
-                server.close()
-                await self.ioc.session.unreg_server('clients')
-                await server.wait_closed()
-            else:
-                await self.ioc.state.on('clients')
-                if first:
-                    self.ioc.clients = await Starter().clients_server(
-                        self.ioc.facade.entity, self.ioc.facade.__,
-                        self.ioc.entity.facade.privkeys,
-                        self._listen(), port=self.ioc.env['opts'].port,
-                        ioc=self.ioc, loop=self._worker.loop)
-                    self.ioc.session.reg_server('clients', self.ioc.clients)
-                    first = False
+        try:
+            while not self.ioc.quit.is_set():
+                if self.ioc.state.position('clients'):
+                    await self.ioc.state.off('clients')
+                    self._applog.info('Clients server turned OFF')
+                    server = self.ioc.clients
+                    server.close()
+                    await self.ioc.session.unreg_server('clients')
+                    await server.wait_closed()
                 else:
-                    await self.ioc.clients.start_serving()
+                    await self.ioc.state.on('clients')
+                    self._applog.info('Clients server turned ON')
+                    self.ioc.clients = await Starter().clients_server(
+                        self.ioc.facade.portfolio,
+                        self._listen(),
+                        port=self.ioc.config['ports']['clients'],
+                        ioc=self.ioc, loop=self._worker.loop)
+                    self.ioc.session.reg_server(
+                        'clients', self.ioc.clients)
+        except Exception as e:
+            self._applog.critical(
+                'Clients server encountered a critical error.')
+            self._applog.exception(e)
 
     async def hosts_server(self):
-        first = True
-        while not self.ioc.quit.is_set():
-            if self.ioc.state.position('hosts'):
-                await self.ioc.state.off('hosts')
-                server = self.ioc.hosts
-                server.close()
-                await self.ioc.session.unreg_server('hosts')
-                await server.wait_closed()
-            else:
-                await self.ioc.state.on('hosts')
-                if first:
+        try:
+            while not self.ioc.quit.is_set():
+                if self.ioc.state.position('hosts'):
+                    await self.ioc.state.off('hosts')
+                    self._applog.info('Hosts server turned OFF')
+                    server = self.ioc.hosts
+                    server.close()
+                    await self.ioc.session.unreg_server('hosts')
+                    await server.wait_closed()
+                else:
+                    await self.ioc.state.on('hosts')
+                    self._applog.info('Hosts server turned ON')
                     self.ioc.hosts = await Starter().hosts_server(
-                        self.ioc.facade.entity, self.ioc.facade.__,
-                        self.ioc.entity.facade.privkeys,
-                        self._listen(), port=self.ioc.env['opts'].port,
+                        self.ioc.facade.portfolio,
+                        self._listen(),
+                        port=self.ioc.config['ports']['hosts'],
                         ioc=self.ioc, loop=self._worker.loop)
                     self.ioc.session.reg_server('hosts', self.ioc.hosts)
-                    first = False
-                else:
-                    await self.ioc.hosts.start_serving()
+        except Exception as e:
+            self._applog.critical(
+                'Hosts server encountered a critical error.')
+            self._applog.exception(e)
 
     async def nodes_server(self):
-        first = True
-        while not self.ioc.quit.is_set():
-            if self.ioc.state.position('nodes'):
-                await self.ioc.state.off('nodes')
-                server = self.ioc.nodes
-                server.close()
-                await self.ioc.session.unreg_server('nodes')
-                await server.wait_closed()
-            else:
-                await self.ioc.state.on('nodes')
-                if first:
+        try:
+            while not self.ioc.quit.is_set():
+                if self.ioc.state.position('nodes'):
+                    self._applog.info('Nodes server turned OFF')
+                    await self.ioc.state.off('nodes')
+                    server = self.ioc.nodes
+                    server.close()
+                    await self.ioc.session.unreg_server('nodes')
+                    await server.wait_closed()
+                else:
+                    await self.ioc.state.on('nodes')
+                    self._applog.info('Nodes server turned ON')
                     self.ioc.nodes = await Starter().nodes_server(
-                        self.ioc.facade.entity, self.ioc.facade.__,
-                        self.ioc.entity.facade.privkeys,
-                        self._listen(), port=self.ioc.env['opts'].port,
+                        self.ioc.facade.portfolio,
+                        self._listen(),
+                        port=self.ioc.config['ports']['nodes'],
                         ioc=self.ioc, loop=self._worker.loop)
                     self.ioc.session.reg_server('nodes', self.ioc.nodes)
-                    first = False
-                else:
-                    await self.ioc.nodes.start_serving()
+        except Exception as e:
+            self._applog.critical(
+                'Nodes server encountered a critical error.')
+            self._applog.exception(e)
 
     async def boot_activator(self):
         await asyncio.sleep(1)
