@@ -1,163 +1,91 @@
 from kivy.app import App
-from kivy.uix.textinput import TextInput
+from kivy.animation import Animation
+from kivy.clock import Clock
+from kivy.metrics import dp
 from kivy.lang import Builder
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.properties import NumericProperty, ListProperty, BooleanProperty, ObjectProperty
-from kivy.uix.recycleview import RecycleView
-from kivy.uix.recyclegridlayout import RecycleGridLayout
-from kivy.uix.recycleview.views import RecycleDataViewBehavior
-from kivy.uix.label import Label
-from kivy.uix.recycleboxlayout import RecycleBoxLayout
-from kivy.uix.behaviors import FocusBehavior
-from kivy.uix.recycleview.layout import LayoutSelectionBehavior
-
-Builder.load_string('''
-<Body>:
-    canvas:
-        Color:
-            rgba:(1, 1, 1, 1)
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-
-<DropDownWidget>:
-    canvas:
-        Color:
-            rgba:(1, 1, 1, 1)
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-    orientation: 'vertical'
-    spacing: 2
-    txt_input: txt_input
-    rv: rv
-
-    MyTextInput:
-        id: txt_input
-        size_hint_y: None
-        height: 50
-    RV:
-        id: rv
-
-<MyTextInput>:
-    readonly: False
-    multiline: False
-
-<SelectableLabel>:
-    # Draw a background to indicate selection
-    color: 0,0,0,1
-    canvas.before:
-        Color:
-            rgba: (0, 0, 1, .5) if self.selected else (1, 1, 1, 1)
-        Rectangle:
-            pos: self.pos
-            size: self.size
-<RV>:
-    canvas:
-        Color:
-            rgba: 0,0,0,.2
-
-        Line:
-            rectangle: self.x +1 , self.y, self.width - 2, self.height -2
-
-    bar_width: 10
-    scroll_type:['bars']
-    viewclass: 'SelectableLabel'
-    SelectableRecycleBoxLayout:
-        default_size: None, dp(20)
-        default_size_hint: 1, None
-        size_hint_y: None
-        height: self.minimum_height
+from kivymd.snackbars import Snackbar
+from kivymd.theming import ThemeManager
+from kivymd.toast import toast
+KV = '''
+#:import Window kivy.core.window.Window
+#:import MDToolbar kivymd.toolbar.MDToolbar
+#:import MDRaisedButton kivymd.button.MDRaisedButton
+#:import MDSeparator kivymd.cards.MDSeparator
+#:import MDLabel kivymd.label.MDLabel
+Screen:
+    name: 'snackbar'
+    BoxLayout:
         orientation: 'vertical'
-        multiselect: False
-        ''')
-
-class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
-                                 RecycleBoxLayout):
-    ''' Adds selection and focus behaviour to the view. '''
-
-
-class SelectableLabel(RecycleDataViewBehavior, Label):
-    ''' Add selection support to the Label '''
-    index = None
-    selected = BooleanProperty(False)
-    selectable = BooleanProperty(True)
-
-    def refresh_view_attrs(self, rv, index, data):
-        ''' Catch and handle the view changes '''
-        self.index = index
-        return super(SelectableLabel, self).refresh_view_attrs(
-            rv, index, data)
-
-    def on_touch_down(self, touch):
-        ''' Add selection on touch down '''
-        if super(SelectableLabel, self).on_touch_down(touch):
-            return True
-        if self.collide_point(*touch.pos) and self.selectable:
-            return self.parent.select_with_touch(self.index, touch)
-
-    def apply_selection(self, rv, index, is_selected):
-        ''' Respond to the selection of items in the view. '''
-        self.selected = is_selected
-        if is_selected:
-            print("selection changed to {0}".format(rv.data[index]))
-
-class RV(RecycleView):
-    def __init__(self, **kwargs):
-        super(RV, self).__init__(**kwargs)
-
-class DropDownWidget(BoxLayout):
-    txt_input = ObjectProperty()
-    rv = ObjectProperty()
-
-class MyTextInput(TextInput):
-    txt_input = ObjectProperty()
-    flt_list = ObjectProperty()
-    word_list = ListProperty()
-    #this is the variable storing the number to which the look-up will start
-    starting_no = NumericProperty(3)
-    suggestion_text = ''
-
-    def __init__(self, **kwargs):
-        super(MyTextInput, self).__init__(**kwargs)
-
-    def on_text(self, instance, value):
-        #find all the occurrence of the word
-        self.parent.ids.rv.data = []
-        matches = [self.word_list[i] for i in range(len(self.word_list)) if self.word_list[i][:self.starting_no] == value[:self.starting_no]]
-        #display the data in the recycleview
-        display_data = []
-        for i in matches:
-            display_data.append({'text':i})
-        self.parent.ids.rv.data = display_data
-        #ensure the size is okay
-        if len(matches) <= 10:
-            self.parent.height = (50 + (len(matches)*20))
-        else:
-            self.parent.height = 240
-
-    def keyboard_on_key_down(self, window, keycode, text, modifiers):
-        if self.suggestion_text and keycode[1] == 'tab':
-            self.insert_text(self.suggestion_text + ' ')
-            return True
-        return super(MyTextInput, self).keyboard_on_key_down(window, keycode, text, modifiers)
-
-class Body(FloatLayout):
-    def __init__(self, **kwargs):
-        super(Body, self).__init__(**kwargs)
-        widget_1 = DropDownWidget(pos_hint = {'center_x':.5,'center_y':.5}, \
-                               size_hint = (None, None), size = (600, 60))
-        widget_1.ids.txt_input.word_list = ['how to use python', 'how to use kivy', 'how to ...']
-        widget_1.ids.txt_input.starting_no = 3
-        self.add_widget(widget_1)
-
-class MyApp(App):
-
+        spacing: dp(10)
+        MDToolbar:
+            title: 'Example Snackbar'
+            md_bg_color: app.theme_cls.primary_color
+            left_action_items: [['menu', lambda x: x]]
+            background_palette: 'Primary'
+        BoxLayout:
+            orientation: 'vertical'
+            spacing: dp(10)
+            padding: dp(10)
+            Widget:
+            MDRaisedButton:
+                text: "Create simple snackbar"
+                pos_hint: {'center_x': .5}
+                on_release: app.show_example_snackbar('simple')
+            MDRaisedButton:
+                text: "Create snackbar with button"
+                pos_hint: {'center_x': .5}
+                on_release: app.show_example_snackbar('button')
+            MDRaisedButton:
+                text: "Create snackbar with a lot of text"
+                pos_hint: {'center_x': .5}
+                on_release: app.show_example_snackbar('verylong')
+            MDSeparator:
+            MDLabel:
+                text: 'Click the MDFloatingActionButton to show the following example...'
+                halign: 'center'
+            Widget:
+    MDFloatingActionButton:
+        id: button
+        md_bg_color: app.theme_cls.primary_color
+        x: Window.width - self.width - dp(10)
+        y: dp(10)
+        on_release: app.show_example_snackbar('float')
+'''
+class ExampleSnackBar(App):
+    theme_cls = ThemeManager()
+    _interval = 0
+    my_snackbar = None
+    screen = None
     def build(self):
-        return Body()
-
-if __name__ == "__main__":
-    MyApp().run()
+        self.screen = Builder.load_string(KV)
+        return self.screen
+    def show_example_snackbar(self, snack_type):
+        def callback(instance):
+            toast(instance.text)
+        def wait_interval(interval):
+            self._interval += interval
+            if self._interval > self.my_snackbar.duration:
+                anim = Animation(y=dp(10), d=.2)
+                anim.start(self.screen.ids.button)
+                Clock.unschedule(wait_interval)
+                self._interval = 0
+                self.my_snackbar = None
+        if snack_type == 'simple':
+            Snackbar(text="This is a snackbar!").show()
+        elif snack_type == 'button':
+            Snackbar(text="This is a snackbar", button_text="with a button!",
+                     button_callback=callback).show()
+        elif snack_type == 'verylong':
+            Snackbar(text="This is a very very very very very very very "
+                          "long snackbar!").show()
+        elif snack_type == 'float':
+            if not self.my_snackbar:
+                self.my_snackbar = Snackbar(
+                    text="This is a snackbar!", button_text='Button',
+                    duration=3, button_callback=callback)
+                self.my_snackbar.show()
+                anim = Animation(y=dp(72), d=.2)
+                anim.bind(on_complete=lambda *args: Clock.schedule_interval(
+                    wait_interval, 0))
+                anim.start(self.screen.ids.button)
+ExampleSnackBar().run()

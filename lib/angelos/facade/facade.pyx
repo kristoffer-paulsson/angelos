@@ -269,6 +269,7 @@ class Facade:
         Import a foreign entity and its public keys. Enforces
         ImportEntityPolicy.
         """
+        raise DeprecationWarning()
         valid = True
         dir = None
         policy = ImportPolicy()
@@ -305,6 +306,7 @@ class Facade:
         Imports new public keys for already imported foreign entity. Enforces
         ImportUpdatePolicy.
         """
+        raise DeprecationWarning()
         entity = self.find_entity(newkeys.issuer)
         keylist = self.find_keys(newkeys.issuer)
 
@@ -334,6 +336,7 @@ class Facade:
         Imports an updated version for already imported foreign entity.
         Enforces ImportUpdatePolicy.
         """
+        raise DeprecationWarning()
         old_ent = self.find_entity(entity.id)
         keylist = self.find_keys(entity.id)
 
@@ -373,6 +376,7 @@ class Facade:
 
         Loads public keys belonging to issuing entity.
         """
+        raise DeprecationWarning()
         doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
         return Glue.doc_check(doclist, Keys, expiry_check)
 
@@ -382,6 +386,7 @@ class Facade:
 
         Loads the entity document based on the issuers ID.
         """
+        raise DeprecationWarning()
         doclist = Glue.run_async(self._vault.issuer(issuer, '/entities/*', 1))
         entitylist = Glue.doc_check(
             doclist, (Person, Ministry, Church), expiry_check)
@@ -450,6 +455,8 @@ class ServerFacadeMixin(TypeFacadeMixin):
 
     async def load_client_auth(self, username):
         """Load documents required for Clients server authentication."""
+        raise DeprecationWarning()
+
         issuer = uuid.UUID(username)
         doclist = Glue.run_async(
             self._vault.issuer(issuer, '/keys/', 3),
@@ -467,6 +474,8 @@ class ServerFacadeMixin(TypeFacadeMixin):
 
     async def load_host_auth(self, username):
         """Load documents required for Hosts server authentication."""
+        raise DeprecationWarning()
+
         issuer = uuid.UUID(username)
         doclist = Glue.run_async(
             self._vault.issuer(issuer, '/networks/', 1),
@@ -486,6 +495,8 @@ class ServerFacadeMixin(TypeFacadeMixin):
 
     async def load_node_auth(self, username):
         """Load documents required for Nodes server authentication."""
+        raise DeprecationWarning()
+
         issuer = uuid.UUID(username)
         doclist = Glue.run_async(
             self._vault.issuer(

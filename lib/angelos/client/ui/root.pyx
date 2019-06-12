@@ -14,20 +14,9 @@ from kivy.uix.screenmanager import Screen
 
 from .common import BasePanelScreen
 from .messages import MessagesScreen
+from .contacts import ContactsScreen
 from .portfolios import PortfoliosScreen
-
-
-Builder.load_string("""
-<ContactsScreen@BasePanelScreen>:
-    name: 'contacts'
-    title: 'Contacts'
-    on_pre_enter: self.load()
-    on_leave: self.unload()
-""")  # noqa E501
-
-
-class ContactsScreen(BasePanelScreen):
-    pass
+from .profile import ProfileScreen
 
 
 Builder.load_string("""
@@ -53,19 +42,6 @@ Builder.load_string("""
 
 
 class NetworksScreen(BasePanelScreen):
-    pass
-
-
-Builder.load_string("""
-<ProfileScreen@BasePanelScreen>:
-    name: 'profile'
-    title: 'Profile'
-    on_pre_enter: self.load()
-    on_leave: self.unload()
-""")  # noqa E501
-
-
-class ProfileScreen(BasePanelScreen):
     pass
 
 

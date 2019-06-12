@@ -7,13 +7,12 @@ This file is distributed under the terms of the MIT license.
 
 
 Import and export commands."""
-import base64
-import re
 
 import yaml
 
 from .cmd import Command, Option
-from ..policy import PGroup, PortfolioPolicy
+from ..policy import PGroup
+from ..operation.export import ExportImportOperation
 
 
 class ImportCommand(Command):
@@ -31,7 +30,7 @@ class ImportCommand(Command):
 
     async def _command(self, opts):
         data = await self._io.multiline('Import portfolio')
-        portfolio = self.importer(data)
+        portfolio = ExportImportOperation.text_imp(data)
 
         if not portfolio:
             self._io << '\nInvalid data entered\n\n'
@@ -47,13 +46,6 @@ class ImportCommand(Command):
             'Confirm that you want to import this portfolio')
         if imp:
             await self.__facade.import_portfolio(portfolio)
-
-    def importer(self, data):
-        match = re.findall(self.regex, data, re.MULTILINE)
-        if len(match) != 1:
-            return None
-        data = match[0]
-        return PortfolioPolicy.imports(base64.b64decode(data))
 
     @classmethod
     def factory(cls, **kwargs):
@@ -78,23 +70,7 @@ class ExportCommand(Command):
                 portfolio = await self.__facade.load_portfolio(
                     self.__facade.portfolio.entity.id,
                     PGroup.SHARE_MED_COMMUNITY)
-                self._io << ('\n' + self.exporter(
-                    'Identity', portfolio) + '\n')
-
-    def exporter(self, name, portfolio, meta=None):
-        output = self.headline(name, '(Start)')
-        data = base64.b64encode(
-            PortfolioPolicy.exports(portfolio)).decode('utf-8')
-        output += '\n' + '\n'.join(
-            [data[i:i+79] for i in range(0, len(data), 79)]) + '\n'
-        output += self.headline(name, '(End)')
-        return output
-
-    def headline(self, title, filler=''):
-        title = ' ' + title + ' ' + filler + ' '
-        line = '-' * 79
-        offset = int(79/2 - len(title)/2)
-        return line[:offset] + title + line[offset + len(title):]
+                self._io << ExportImportOperation.text_exp(portfolio)
 
     def _rules(self):
         return {
