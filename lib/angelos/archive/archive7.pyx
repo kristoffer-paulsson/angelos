@@ -534,12 +534,12 @@ class Archive7(ContainerAware):
         """Archive stats."""
         return copy.deepcopy(self.__header)
 
-    def info(self, path):
+    def info(self, filename):
         """Return file info."""
         with self.__lock:
             ops = self.ioc.operations
 
-            dirname, name = os.path.split(path)
+            dirname, name = os.path.split(filename)
             pid = ops.get_pid(dirname)
             entry, idx = ops.find_entry(name, pid)
 
@@ -718,6 +718,22 @@ class Archive7(ContainerAware):
         if dirname[-1] is '/':
             dirname = dirname[:-1]
         return dirname in self.ioc.hierarchy.paths.keys()
+
+    def isfile(self, filename):
+        """Check if a path is a known file."""
+        with self.__lock:
+            try:
+                ops = self.ioc.operations
+
+                dirname, name = os.path.split(filename)
+                pid = ops.get_pid(dirname)
+                entry, idx = ops.find_entry(name, pid)
+                if entry.type == Entry.TYPE_FILE:
+                    return True
+            except Exception:
+                pass
+
+        return False
 
     def mkdir(self, dirname, user=None, group=None, perms=None):
         """

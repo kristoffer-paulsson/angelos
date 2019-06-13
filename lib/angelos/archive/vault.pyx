@@ -12,7 +12,7 @@ import asyncio
 import uuid
 import logging
 import atexit
-from typing import Tuple
+from typing import Tuple, List
 
 import msgpack
 
@@ -156,7 +156,9 @@ class Vault:
 
         return (await self._proxy.call(callback, 0, 5))
 
-    async def search(self, issuer=None, path='/', limit=1):
+    async def search(
+            self, issuer: uuid.UUID=None,
+            path: str='/', limit: str=1) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
         def callback():
             if issuer:
@@ -357,3 +359,24 @@ class Vault:
                 success = False
                 logging.warning('Failed to save document: %s' % result)
         return success
+
+    async def save_settings(self, name: str, data: bytes) -> bool:
+        """Save or update a settings file."""
+        try:
+            filename = '/settings/' + name
+            if self._archive.isfile(filename):
+                self._archive.mkfile(filename, data)
+            else:
+                self._archive.save(filename, data)
+        except Exception as e:
+            logging.exception(e)
+            return False
+
+        return True
+
+    async def load_settings(self, name: str) -> bytes:
+        """Load a settings file."""
+        filename = '/settings/' + name
+        if self._archive.isfile(filename):
+            return self._archive.load(filename)
+        return b''

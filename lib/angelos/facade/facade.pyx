@@ -17,6 +17,7 @@ import asyncio
 from typing import Sequence, Set
 
 from .mail import MailAPI
+from .settings import SettingsAPI
 from ..const import Const
 
 from ..document import (
@@ -147,6 +148,7 @@ class Facade:
             self._vault.stats.owner,
             PGroup.SERVER if server else PGroup.CLIENT)
         self.__mail = MailAPI(self.__portfolio, self._vault)
+        self.__settings = SettingsAPI(self.__portfolio, self._vault)
 
     async def load_portfolio(
             self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
@@ -261,6 +263,11 @@ class Facade:
     def mail(self):
         """Mail interface getter."""
         return self.__mail
+
+    @property
+    def settings(self):
+        """Settings interface getter."""
+        return self.__settings
 
     def import_entity(self, entity, keys):
         """
