@@ -16,6 +16,7 @@ from .common import BasePanelScreen
 from .messages import MessagesScreen
 from .contacts import ContactsScreen
 from .portfolios import PortfoliosScreen
+from .networks import NetworksScreen
 from .profile import ProfileScreen
 
 
@@ -29,19 +30,6 @@ Builder.load_string("""
 
 
 class FilesScreen(BasePanelScreen):
-    pass
-
-
-Builder.load_string("""
-<NetworksScreen@BasePanelScreen>:
-    name: 'networks'
-    title: 'Networks'
-    on_pre_enter: self.load()
-    on_leave: self.unload()
-""")  # noqa E501
-
-
-class NetworksScreen(BasePanelScreen):
     pass
 
 

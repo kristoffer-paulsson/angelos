@@ -8,6 +8,7 @@ This file is distributed under the terms of the MIT license.
 
 """
 import base64
+import binascii
 
 import libnacl
 import plyer
@@ -37,7 +38,9 @@ class KeyLoader(Policy):
         key = base64.b64decode(plyer.keystore.get_key('Λόγῳ', 'conceal'))
         box = libnacl.secret.SecretBox(key)
         master = base64.b64decode(plyer.keystore.get_key('Λόγῳ', 'masterkey'))
-        return box.decrypt(master)
+        master_key = box.decrypt(master)
+        print(binascii.hexlify(master_key))
+        return master_key
 
     @staticmethod
     def redo():

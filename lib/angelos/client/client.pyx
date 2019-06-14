@@ -24,6 +24,7 @@ from ..utils import Util, Event
 from ..const import Const
 from ..archive.helper import Glue
 from ..policy.lock import KeyLoader
+from ..operation.indexer import Indexer
 
 # from .state import StateMachine
 from ..logger import LogHandler
@@ -126,6 +127,11 @@ class LogoMessenger(ContainerAware, App):
 
     def check_mail(self):
         self._worker.run_coroutine(self.__replicate_mailbox())
+
+    def index_networks(self):
+        Glue.run_async(Indexer(self.ioc.facade, self._worker).networks_index())
+        # self._worker.run_coroutine(
+        #    Indexer(self.ioc.facade, self._worker).networks_index())
 
 
 def start():

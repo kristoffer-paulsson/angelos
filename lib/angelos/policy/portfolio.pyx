@@ -112,6 +112,7 @@ PORTFOLIO_PATTERN = {
     PField.KEYS: '.key',
     PField.DOMAIN: '.dmn',
     PField.NODES: '.nod',
+    PField.NODE: '.nod',
     PField.NET: '.net',
     PField.ISSUER_VERIFIED: '.ver',
     PField.ISSUER_TRUSTED: '.rst',

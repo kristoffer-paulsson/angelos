@@ -158,7 +158,7 @@ class Vault:
 
     async def search(
             self, issuer: uuid.UUID=None,
-            path: str='/', limit: str=1) -> List[bytes]:
+            path: str='/', limit: int=1) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
         def callback():
             if issuer:
@@ -365,9 +365,9 @@ class Vault:
         try:
             filename = '/settings/' + name
             if self._archive.isfile(filename):
-                self._archive.mkfile(filename, data)
-            else:
                 self._archive.save(filename, data)
+            else:
+                self._archive.mkfile(filename, data)
         except Exception as e:
             logging.exception(e)
             return False
