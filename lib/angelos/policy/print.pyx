@@ -28,10 +28,11 @@ class PrintPolicy:
         elif entity.type == DocType.ENTITY_MINISTRY:
             return '{0}'.format(entity.ministry)
         elif entity.type == DocType.ENTITY_CHURCH:
-            name = 'Church of {0}'.format(entity.city)
+            name = 'City church of {0}'.format(entity.city)
             if entity.region:
                 name += ', {0}'.format(entity.region)
             if entity.country:
                 name += ', {0}'.format(entity.country)
+            return name
         else:
             return 'n/a'

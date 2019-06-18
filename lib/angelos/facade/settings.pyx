@@ -27,9 +27,10 @@ class SettingsAPI:
     async def networks(self) -> Set[Tuple[uuid.UUID, bool]]:
         """Load all available networks."""
         nets = set()
-        data = io.BytesIO(self.__vault.load_settings('networks.csv'))
+        data = io.StringIO(
+            (await self.__vault.load_settings('networks.csv')).decode())
 
         for row in csv.reader(data):
-            nets.add(row)
+            nets.add(tuple(row))
 
         return nets

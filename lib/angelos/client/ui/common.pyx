@@ -8,9 +8,19 @@ This file is distributed under the terms of the MIT license.
 
 """
 import logging
+from typing import Callable, Any, Iterable
+from functools import partial
 
 from kivy.lang import Builder
+from kivy.clock import Clock
+from kivy.uix.widget import Widget
 from kivy.uix.screenmanager import Screen
+from kivy.uix.scrollview import ScrollView
+
+from kivymd.label import MDLabel
+from kivymd.list import MDList, BaseListItem
+
+from ...policy import PrivatePortfolio
 
 
 Builder.load_string("""
@@ -30,7 +40,9 @@ Builder.load_string("""
             left_action_items:
                 [['menu', lambda x: root.parent.parent.parent.toggle_nav_drawer()]]
             right_action_items: root.right_action_items
-        Widget:
+        BoxLayout:
+            id: panel
+            orientation: 'vertical'
 """)  # noqa E501
 
 
@@ -44,3 +56,42 @@ class BasePanelScreen(Screen):
 
     def unload(self):
         logging.error('\'unload\' not implemented')
+
+    def list_loader(
+            self, itemlist: Iterable, widget: Widget,
+            item_loader: Callable[[PrivatePortfolio, Any], BaseListItem]):
+        """Will generate a list with items loaded from storage."""
+        sv = ScrollView()
+        mdl = MDList()
+        sv.add_widget(mdl)
+        widget.add_widget(sv)
+
+        Clock.schedule_once(
+            partial(self.load_list_item, itemlist, mdl, item_loader))
+        return mdl
+
+    def load_list_item(
+            self, itemlist: Iterable, mdl: MDList,
+            item_loader: Callable[[PrivatePortfolio, Any], BaseListItem], dt):
+        """Load one item to put in list from storage."""
+        listitem = itemlist.pop()
+        item = item_loader(self.app.ioc.facade.portfolio, listitem)
+        if item:
+            mdl.add_widget(item)
+
+        if itemlist:
+            Clock.schedule_once(
+                partial(self.load_list_item, itemlist, mdl, item_loader))
+
+
+Builder.load_string("""
+<EmptyList>:
+    text: ''
+    markup: True
+    halign: 'center'
+    valign: 'middle'
+""")  # noqa E501
+
+
+class EmptyList(MDLabel):
+    pass

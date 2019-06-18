@@ -16,6 +16,7 @@ from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from .accept import ImportPolicy, ImportUpdatePolicy
 from .domain import NodePolicy, DomainPolicy, NetworkPolicy
 from .verify import StatementPolicy
+from .lock import KeyLoader
 from .message import (
     MessagePolicy, EnvelopePolicy, MimeTypes, ReportType, MailBuilder,
     ShareBuilder, ReportBuilder)
@@ -36,6 +37,7 @@ __all__ = [
     'DOCUMENT_PATH',
 
     'EntityData',
+    'KeyLoader',
 
     'PersonData',
     'MinistryData',

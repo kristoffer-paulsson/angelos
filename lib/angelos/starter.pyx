@@ -155,16 +155,15 @@ class Starter:
 
         return Starter.__start_server(params)
 
-    def clients_client(self, portfolio, host, port=5):
+    def clients_client(
+            self, portfolio: PrivatePortfolio, host: Portfolio, port: int=5):
         """Start client for outgoing client/portal communications."""
-        Util.is_type(portfolio, PrivatePortfolio)
-        Util.is_type(host, Portfolio)
-        Util.is_type(port, int)
-
-        if host.network.hosts[0].hostname:
-            location = host.network.hosts[0].hostname
+        if host.network.hosts[0].ip:
+            location = str(host.network.hosts[0].ip[0])
         else:
-            location = str(host.network.hosts[0].ip)
+            location = str(host.network.hosts[0].hostname[0])
+
+        print(location, port)
 
         params = {
             'username': str(portfolio.entity.id),

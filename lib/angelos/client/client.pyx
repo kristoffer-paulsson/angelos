@@ -11,11 +11,14 @@ Module docstring.
 import os
 import collections
 import json
+import uuid
+from typing import Callable, Awaitable
 
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager
 from kivymd.theming import ThemeManager
+from kivymd.snackbars import Snackbar
 
 from ..ioc import Container, ContainerAware, Config, Handle
 from ..worker import Worker
@@ -23,7 +26,7 @@ from ..starter import Starter
 from ..utils import Util, Event
 from ..const import Const
 from ..archive.helper import Glue
-from ..policy.lock import KeyLoader
+from ..policy import KeyLoader, Portfolio, PGroup
 from ..operation.indexer import Indexer
 
 # from .state import StateMachine
@@ -122,16 +125,40 @@ class LogoMessenger(ContainerAware, App):
         screen = self.root.get_screen(old)
         self.root.remove_widget(screen)
 
-    async def __replicate_mailbox(self):
-        Starter.clients_client(self.ioc.facade.portfolio)
+    async def __open_connection(self, host: Portfolio):
+        return await Starter().clients_client(self.ioc.facade.portfolio, host)
 
     def check_mail(self):
-        self._worker.run_coroutine(self.__replicate_mailbox())
+        self._worker.run_coroutine(self.__open_connection())
 
     def index_networks(self):
+        """Start network indexing background task."""
         Glue.run_async(Indexer(self.ioc.facade, self._worker).networks_index())
-        # self._worker.run_coroutine(
-        #    Indexer(self.ioc.facade, self._worker).networks_index())
+
+    def __connection_future(self, future: Awaitable) -> None:
+        if future.cancelled():
+            Snackbar(text='Connection cancelled.').show()
+        elif future.done():
+            e = future.exception()
+            if e:
+                Snackbar(text='Connection failed. {0}'.format(e)).show()
+            else:
+                Snackbar(text='Success connecting to network.').show()
+
+    def connect_network(
+            self, network_id: uuid.UUID,
+            callback: Callable[[Awaitable], None]=None) -> Awaitable:
+        """Open connection to a network."""
+        host = Glue.run_async(
+            self.ioc.facade.load_portfolio(
+                network_id, PGroup.SHARE_MIN_COMMUNITY))
+
+        future = self._worker.run_coroutine(self.__open_connection(host))
+        if callback:
+            future.add_done_callback(callback)
+        future.add_done_callback(self.__connection_future)
+
+        return future
 
 
 def start():
