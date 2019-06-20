@@ -126,7 +126,8 @@ class LogoMessenger(ContainerAware, App):
         self.root.remove_widget(screen)
 
     async def __open_connection(self, host: Portfolio):
-        return await Starter().clients_client(self.ioc.facade.portfolio, host)
+        return await Starter().clients_client(
+            self.ioc.facade.portfolio, host, ioc=self.ioc)
 
     def check_mail(self):
         self._worker.run_coroutine(self.__open_connection())

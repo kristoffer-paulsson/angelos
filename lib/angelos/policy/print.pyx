@@ -19,6 +19,10 @@ class PrintPolicy:
     def title(portfolio: Portfolio) -> str:
         """Format title and name based on entity type."""
         entity = portfolio.entity
+        return PrintPolicy.entity_title(entity)
+
+    @staticmethod
+    def entity_title(entity) -> str:
         if entity.type == DocType.ENTITY_PERSON:
             initials = ''
             for name in entity.names[1:]:
@@ -34,5 +38,5 @@ class PrintPolicy:
             if entity.country:
                 name += ', {0}'.format(entity.country)
             return name
-        else:
-            return 'n/a'
+
+        return 'n/a'

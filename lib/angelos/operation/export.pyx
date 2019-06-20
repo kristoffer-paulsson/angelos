@@ -23,6 +23,7 @@ class ExportImportOperation(Operation):
     @staticmethod
     def text_imp(data: str) -> Portfolio:
         """Import portfolio in text file format."""
+        print(data)
         match = re.findall(REGEX, data, re.MULTILINE)
         if len(match) != 1:
             return None

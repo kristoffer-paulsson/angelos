@@ -14,7 +14,7 @@ import uuid
 import logging
 import asyncio
 
-from typing import Sequence, Set
+from typing import Sequence, Set, List, Tuple
 
 from .mail import MailAPI
 from .settings import SettingsAPI
@@ -253,6 +253,14 @@ class Facade:
 
         result = await asyncio.gather(*ops, return_exceptions=True)
         return rejected, result
+
+    async def list_portfolios(
+            self, query: str='*') -> List[Tuple[bytes, Exception]]:
+        """List all portfolio entities."""
+        doclist = await self._vault.search(
+            path='/portfolios/{0}.ent'.format(query), limit=100)
+        result = Glue.doc_validate_report(doclist, (Person, Ministry, Church))
+        return result
 
     @property
     def portfolio(self):

@@ -67,7 +67,8 @@ class NetworkListItem(OneLineAvatarIconListItem):
             future = app.connect_network(self.network_id)
             Clock.schedule_once(later, 5)
         except Exception as e:
-            print('Hello', e)
+            logging.info('Failed to connect')
+            logging.exception(e)
 
 
 class NetworksScreen(BasePanelScreen):

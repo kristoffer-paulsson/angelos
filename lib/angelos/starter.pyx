@@ -156,14 +156,15 @@ class Starter:
         return Starter.__start_server(params)
 
     def clients_client(
-            self, portfolio: PrivatePortfolio, host: Portfolio, port: int=5):
+            self, portfolio: PrivatePortfolio, host: Portfolio,
+            port: int=5, ioc: Container=None):
         """Start client for outgoing client/portal communications."""
         if host.network.hosts[0].ip:
             location = str(host.network.hosts[0].ip[0])
         else:
             location = str(host.network.hosts[0].hostname[0])
 
-        print(location, port)
+        location = 'localhost'
 
         params = {
             'username': str(portfolio.entity.id),
@@ -172,7 +173,7 @@ class Starter:
             'port': port,
             'client_keys': [Starter._private_key(portfolio.privkeys)],
             'known_hosts': Starter.__known_host(host.keys),
-            'client_factory': SSHClient
+            'client_factory': lambda: SSHClient(ioc)
         }
         params = {**params, **Starter.ALGS}
 

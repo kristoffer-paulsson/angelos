@@ -19,7 +19,7 @@ from .ssh import SSHServer, SessionHandle
 from ..server.cmd import Terminal
 from ..server.commands import (
     EnvCommand, QuitCommand, SetupCommand, StartupCommand, ProcessCommand)
-from ..server.impexp import ImportCommand, ExportCommand
+from ..server.impexp import ImportCommand, ExportCommand, PortfolioCommand
 
 
 class ConsoleServerProcess(asyncssh.SSHServerProcess):
@@ -105,7 +105,8 @@ class AdminServer(SSHServer):
     """SSH Server for the admin console."""
 
     cmds = [
-        EnvCommand, QuitCommand, ImportCommand, ExportCommand, ProcessCommand]
+        EnvCommand, QuitCommand, ImportCommand,
+        ExportCommand, ProcessCommand, PortfolioCommand]
 
     def begin_auth(self, username):
         """Auth not required."""

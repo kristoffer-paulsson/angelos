@@ -47,7 +47,7 @@ HIERARCHY = (
     '/messages/sent',
     '/messages/spam',
     '/messages/trash',
-    # Networks, for other hostts that are strusted
+    # Networks, for other hosts that are trusted
     '/networks'
     # Preferences by the owning entity.
     '/settings',

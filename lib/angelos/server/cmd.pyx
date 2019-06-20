@@ -358,7 +358,7 @@ class Option:
 
         # Test if there is a default and none given
         if self.default is not None and len(opt) is 0:
-            return self.default
+            return (self.name, self.default)
 
         value = None
         if self.type is Option.TYPE_BOOL:

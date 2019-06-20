@@ -166,7 +166,7 @@ class PortfolioImporter(BaseDialog):
 
     def parse(self):
         try:
-            portfolio = ExportImportOperation.file_imp(self.data)
+            portfolio = ExportImportOperation.text_imp(self.ids['data'].text)
 
             pw = PortfolioView()
             pw.load(self._app, portfolio)
