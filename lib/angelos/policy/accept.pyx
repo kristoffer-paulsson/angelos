@@ -8,6 +8,7 @@ This file is distributed under the terms of the MIT license.
 
 Module docstring."""
 import datetime
+import copy
 import logging
 
 from typing import Set
@@ -93,7 +94,6 @@ class ImportPolicy(Policy):
 
     def node_document(self, node: Node) -> Document:
         """Validate document issued by internal portfolio."""
-        Util.is_type(node, Node)
         if node is None:
             return node
 
@@ -192,31 +192,35 @@ class ImportPolicy(Policy):
 
 class ImportUpdatePolicy(Policy):
     """Policy for accepting updateable documents."""
-    def __init__(self, entity, keys):
-        Util.is_type(entity, Entity)
-        Util.is_type(keys, Keys)
+    def __init__(self, portfolio: Portfolio):
+        self._portfolio = portfolio
+        self.exception
 
-        self.__entity = entity
-        self.__keys = keys
-        self._exception = None
-
-    def keys(self, newkeys):
+    def keys(self, newkeys: Keys):
         """Validate newky generated keys."""
-        Util.is_type(newkeys, Keys)
-        self._exception = None
+        self.exception = None
         valid = True
+
         try:
-            valid = False if not newkeys.validate() else valid
+            if newkeys.issuer != self._portfolio.entity.id:
+                valid = False
             if datetime.date.today() > newkeys.expires:
                 valid = False
-        except Exception as e:
-            self._exception = e
-            valid = False
+            valid = False if not newkeys.validate() else valid
 
-        valid = False if not Crypto.verify(
-            newkeys, self.__entity, self.__keys) else valid
-        valid = False if not Crypto.verify(
-            newkeys, self.__entity, newkeys) else valid
+            # Validate new key with old keys
+            valid = False if not Crypto.verify(
+                newkeys, self._portfolio) else valid
+
+            # Validate new key with itself
+            portfolio = copy.deepcopy(self._portfolio)
+            portfolio.keys = set(newkeys)
+            valid = False if not Crypto.verify(
+                newkeys, portfolio) else valid
+
+        except Exception as e:
+            self.exception = e
+            valid = False
 
         return valid
 
@@ -226,11 +230,11 @@ class ImportUpdatePolicy(Policy):
         valid = False if datetime.date.today() > entity.expires else valid
         valid = False if not entity.validate() else valid
         valid = False if not Crypto.verify(
-            entity, self.__entity, self.__keys) else valid
+            entity, self._portfolio) else valid
 
         diff = []
         new_exp = entity.export()
-        old_exp = self.__entity.export()
+        old_exp = self._portfolio.entity.export()
 
         for item in new_exp.keys():
             if new_exp[item] != old_exp[item]:
@@ -241,10 +245,9 @@ class ImportUpdatePolicy(Policy):
 
         return valid
 
-    def entity(self, entity):
+    def entity(self, entity: Entity):
         """Validate updated entity."""
-        Util.is_type(entity, type(self.__entity))
-        Util.is_type(entity, (Person, Ministry, Church))
+        self.exception = None
 
         if isinstance(entity, Person):
             fields = PersonPolicy.FIELDS
@@ -253,11 +256,10 @@ class ImportUpdatePolicy(Policy):
         elif isinstance(entity, Church):
             fields = ChurchPolicy.FIELDS
 
-        self._exception = None
         try:
             valid = self.__dict_cmp(entity, fields)
         except Exception as e:
-            self._exception = e
+            self.exception = e
             valid = False
 
         return valid

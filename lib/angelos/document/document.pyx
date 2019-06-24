@@ -49,6 +49,12 @@ class UpdatedMixin(metaclass=DocumentMeta):
             pass
         return True
 
+    def renew(self):
+        today = datetime.date.today()
+        self.updated = today
+        self.expires = today + datetime.timedelta(13*365/12)
+        self.signature = None
+
 
 class Document(IssueMixin, BaseDocument):
     id = UuidField(init=uuid.uuid4)
@@ -58,15 +64,12 @@ class Document(IssueMixin, BaseDocument):
     type = TypeField(value=0)
 
     def _validate(self):
-        try:
-            if not bool(self.updated):
-                if self.expires - self.created > datetime.timedelta(13*365/12):
-                    raise Util.exception(
-                        Error.DOCUMENT_SHORT_EXPIREY,
-                        {'expected': datetime.timedelta(13*365/12),
-                         'current': self.expires - self.created})
-        except AttributeError:
-            pass
+        sdate = self.updated if hasattr(self, 'updated') else self.created
+        if self.expires - sdate > datetime.timedelta(13*365/12):
+            raise Util.exception(
+                Error.DOCUMENT_SHORT_EXPIREY,
+                {'expected': datetime.timedelta(13*365/12),
+                 'current': self.expires - self.created})
         return True
 
     def _check_type(self, _type):
@@ -79,6 +82,14 @@ class Document(IssueMixin, BaseDocument):
     def _check_validate(self, _list):
         for cls in _list:
             cls._validate(self)
+
+    def expires_soon(self):
+        month = self.expires - datetime.timedelta(days=365/12)
+        today = datetime.today()
+        if today >= month and today <= self.expires:
+            return True
+        else:
+            return False
 
 
 class DocType(enum.IntEnum):

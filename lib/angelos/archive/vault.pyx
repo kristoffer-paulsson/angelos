@@ -328,7 +328,7 @@ class Vault:
             name='{dir}/*'.format(dirname), owner=portfolio.entity.id)
 
         ops = []
-        save = portfolio._save | portfolio.issuer._save | portfolio.owner._save
+        save, _ = portfolio.to_sets()
 
         for doc in save:
             filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)

@@ -319,7 +319,7 @@ class EnvelopePolicy(Policy):
         if not envelope.validate():
             return None
 
-        if envelope.owner.int != recipient.entity.id.int:
+        if envelope.owner != recipient.entity.id:
             return None
 
         EnvelopePolicy._add_header(recipient, envelope, Header.Op.RECEIVE)

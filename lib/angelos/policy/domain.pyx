@@ -71,8 +71,17 @@ class NodePolicy(Policy):
     def generate(self, **kwargs):
         raise NotImplementedError()
 
-    def update(self, **kwargs):
-        raise NotImplementedError()
+    def update(self, portfolio: PrivatePortfolioABC, node: Node) -> bool:
+        if node in portfolio.nodes:
+            portfolio.nodes.remove(node)
+
+        node.renew()
+
+        node = Crypto.sign(node, portfolio)
+        node.validate()
+        portfolio.nodes.add(node)
+
+        return True
 
 
 class DomainPolicy(Policy):
@@ -93,8 +102,17 @@ class DomainPolicy(Policy):
 
         return True
 
-    def update(self, domain):
-        raise NotImplementedError()
+    def update(self, portfolio: PrivatePortfolioABC, domain: Domain) -> bool:
+        if portfolio.domain:
+            portfolio.domain = None
+
+        domain.renew()
+
+        domain = Crypto.sign(domain, portfolio)
+        domain.validate()
+        portfolio.domain = domain
+
+        return True
 
 
 class NetworkPolicy(Policy):
@@ -125,5 +143,26 @@ class NetworkPolicy(Policy):
 
         return True
 
-    def update(self, domain):
-        raise NotImplementedError()
+    def update(self, portfolio: PrivatePortfolioABC, network: Network) -> bool:
+        if network in portfolio.network:
+            portfolio.network = None
+
+        if not portfolio.nodes:
+            raise ValueError('At least one node necessary to renew network')
+
+        hosts = []
+        for node in portfolio.nodes:
+            hosts.append(Host(nd={
+                'node': node.id,
+                'ip': node.location.ip,
+                'hostname': node.location.hostname
+            }))
+
+        network.hosts = hosts
+        network.renew()
+
+        network = Crypto.sign(network, portfolio)
+        network.validate()
+        portfolio.network = network
+
+        return True

@@ -155,9 +155,119 @@ class Facade:
         """Load a portfolio belonging to id according to configuration."""
         return await self._vault.load_portfolio(id, conf)
 
-    def update_portfolio(self, portfolio: Portfolio) -> bool:
+    async def update_portfolio(self, portfolio: Portfolio) -> (
+            bool, Set[Document], Set[Document]):
         """Update a portfolio by comparison."""
-        raise NotImplementedError()
+        old = await self._vault.load_portfolio(id, PGroup.ALL)
+
+        issuer, owner = portfolio.to_sets()
+        new_set = issuer | owner
+
+        issuer, owner = old.to_sets()
+        old_set = issuer | owner
+
+        newdoc = set()
+        upddoc = set()
+        for ndoc in new_set:  # Find documents that are new or changed.
+            newone = True
+            updone = False
+            for odoc in old_set:
+                if ndoc.id == odoc.id:
+                    newone = False
+                    if ndoc.expires != odoc.expires:
+                        updone = True
+            if newone:
+                newdoc.add(ndoc)
+            elif updone:
+                upddoc.add(ndoc)
+
+        new = Portfolio()
+        new.from_sets(newdoc | upddoc, newdoc | upddoc)
+        rejected = set()
+
+        # Validating any new keys
+        imp_policy = ImportPolicy(old)
+        upd_policy = ImportUpdatePolicy(old)
+        if new.keys and old.keys:
+            for key in new.keys:
+                reject = set()
+                if not upd_policy.keys(key):
+                    rejected.add(key)
+            new.keys -= reject
+            old.keys += new.keys  # Adding new keys to old portfolio,
+            # this way the old portfolio can verify documents signed with
+            # new keys.
+            rejected |= reject
+
+        # Validating any new entity
+        if new.entity and old.entity:
+            if not upd_policy.entity(new.entity):
+                new.entity = None
+
+        # Adding old entity and keys if none.
+        if not new.entity:
+            new.entity = old.entity
+        if not new.keys:
+            new.keys = old.keys
+
+        if new.profile:
+            if not imp_policy.issued_document(new.profile):
+                rejected.add(new.profile)
+                new.profile = None
+        if new.network:
+            if not imp_policy.issued_document(new.network):
+                rejected.add(new.network)
+                new.network = None
+
+        if new.issuer.verified:
+            for verified in new.issuer.verified:
+                rejected = set()
+                if not imp_policy.issued_document(verified):
+                    reject.add(verified)
+            new.issuer.verified -= reject
+            rejected |= reject
+        if new.issuer.trusted:
+            for trusted in new.issuer.trusted:
+                reject = set()
+                if not imp_policy.issued_document(trusted):
+                    rejected.add(trusted)
+            new.issuer.trusted -= reject
+            rejected |= reject
+        if new.issuer.revoked:
+            for revoked in new.issuer.revoked:
+                reject = set()
+                if not imp_policy.issued_document(revoked):
+                    rejected.add(revoked)
+            new.issuer.revoked -= reject
+            rejected |= reject
+
+        removed = (
+            portfolio.owner.revoked | portfolio.owner.trusted |
+            portfolio.owner.verified)
+
+        # Really remove files that can't be verified
+        portfolio.owner.revoked = set()
+        portfolio.owner.trusted = set()
+        portfolio.owner.verified = set()
+
+        if hasattr(new, 'privkeys'):
+            if new.privkeys:
+                if not imp_policy.issued_document(new.privkeys):
+                    new.privkeys = None
+        if hasattr(new, 'domain'):
+            if new.domain:
+                if not imp_policy.issued_document(new.domain):
+                    new.domain = None
+        if hasattr(new, 'nodes'):
+            if new.nodes:
+                for node in new.nodes:
+                    reject = set()
+                    if not imp_policy.node_document(node):
+                        reject.add(node)
+                new.nodes -= reject
+                rejected |= reject
+
+        return await self._vault.save_portfolio(new), rejected, removed
 
     async def import_portfolio(
             self, portfolio: Portfolio) -> (
@@ -276,137 +386,6 @@ class Facade:
     def settings(self):
         """Settings interface getter."""
         return self.__settings
-
-    def import_entity(self, entity, keys):
-        """
-        Import an entity.
-
-        Import a foreign entity and its public keys. Enforces
-        ImportEntityPolicy.
-        """
-        raise DeprecationWarning()
-        valid = True
-        dir = None
-        policy = ImportPolicy()
-        if isinstance(entity, Person):
-            valid = policy.person(entity, keys)
-            dir = '/entities/persons'
-        elif isinstance(entity, Ministry):
-            valid = policy.ministry(entity, keys)
-            dir = '/entities/ministries'
-        elif isinstance(entity, Church):
-            valid = policy.church(entity, keys)
-            dir = '/entities/churches'
-        else:
-            logging.warning('Invalid entity type')
-            raise TypeError('Invalid entity type')
-
-        if not valid:
-            logging.info('Entity or Keys are invalid')
-            raise RuntimeError('Entity or Keys are invalid')
-        else:
-            Glue.run_async(
-                self._vault.save(os.path.join(
-                    dir, str(entity.id) + '.pickle'), entity),
-                self._vault.save(os.path.join(
-                    '/keys', str(keys.id) + '.pickle'), keys)
-            )
-
-            return True
-
-    def update_keys(self, newkeys):
-        """
-        Import new public keys.
-
-        Imports new public keys for already imported foreign entity. Enforces
-        ImportUpdatePolicy.
-        """
-        raise DeprecationWarning()
-        entity = self.find_entity(newkeys.issuer)
-        keylist = self.find_keys(newkeys.issuer)
-
-        valid = False
-        for keys in keylist:
-            policy = ImportUpdatePolicy(entity, keys)
-            if policy.keys(newkeys):
-                valid = True
-                break
-
-        if valid:
-            result = asyncio.get_event_loop().run_until_complete(
-                self._vault.save(os.path.join(
-                    '/keys', str(newkeys.id) + '.pickle'), newkeys))
-            if isinstance(result, Exception):
-                raise result
-            logging.info('New keys imported')
-            return True
-        else:
-            logging.error('New keys invalid')
-            return False
-
-    def update_entity(self, entity):
-        """
-        Import updated entity document.
-
-        Imports an updated version for already imported foreign entity.
-        Enforces ImportUpdatePolicy.
-        """
-        raise DeprecationWarning()
-        old_ent = self.find_entity(entity.id)
-        keylist = self.find_keys(entity.id)
-
-        dir = None
-        if isinstance(entity, Person):
-            dir = '/entities/persons'
-        elif isinstance(entity, Ministry):
-            dir = '/entities/ministries'
-        elif isinstance(entity, Church):
-            dir = '/entities/churches'
-        else:
-            logging.warning('Invalid entity type')
-            raise TypeError('Invalid entity type')
-
-        valid = False
-        for keys in keylist:
-            policy = ImportUpdatePolicy(old_ent, keys)
-            if policy.entity(entity):
-                valid = True
-                break
-
-        if valid:
-            result = asyncio.get_event_loop().run_until_complete(
-                self._vault.update(os.path.join(
-                    dir, str(entity.id) + '.pickle'), entity))
-            if isinstance(result, Exception):
-                raise result
-            logging.info('updated entity imported')
-            return True
-        else:
-            logging.error('Updated entity invalid')
-            return False
-
-    def find_keys(self, issuer, expiry_check=True):
-        """
-        Load public keys.
-
-        Loads public keys belonging to issuing entity.
-        """
-        raise DeprecationWarning()
-        doclist = Glue.run_async(self._vault.issuer(issuer, '/keys/', 10))
-        return Glue.doc_check(doclist, Keys, expiry_check)
-
-    def find_entity(self, issuer, expiry_check=True):
-        """
-        Load foreign entity document.
-
-        Loads the entity document based on the issuers ID.
-        """
-        raise DeprecationWarning()
-        doclist = Glue.run_async(self._vault.issuer(issuer, '/entities/*', 1))
-        entitylist = Glue.doc_check(
-            doclist, (Person, Ministry, Church), expiry_check)
-
-        return entitylist[0] if len(entitylist) else None
 
 
 class EntityFacadeMixin:

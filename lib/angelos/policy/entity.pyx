@@ -25,7 +25,7 @@ class BaseEntityPolicy(Policy):
         self._box = None
 
     @staticmethod
-    def _generate(klass, entity_data: EntityData) -> (PrivatePortfolio):
+    def _generate(klass, entity_data: EntityData) -> PrivatePortfolio:
         box = libnacl.dual.DualSecret()
 
         entity = klass(nd=entity_data._asdict())

@@ -17,7 +17,7 @@ import msgpack
 from ._types import PortfolioABC, PrivatePortfolioABC
 from ..document import (
     DocType, Document, Entity, Profile, PrivateKeys, Keys, Domain, Node,
-    Network, Statement, Verified, Trusted, Revoked, Person, Ministry, Church,
+    Network, Verified, Trusted, Revoked, Person, Ministry, Church,
     PersonProfile, MinistryProfile, ChurchProfile, Envelope, Note, Instant,
     Mail, Share, Report, StoredLetter)
 
@@ -197,23 +197,17 @@ class Statements:
 
     Portfolio of Statement documents.
     """
-    __slots__ = ('_save', 'verified', 'trusted', 'revoked')
+    __slots__ = ('verified', 'trusted', 'revoked')
 
-    _save: Set[Statement]
     verified: Set[Verified]
     trusted: Set[Trusted]
     revoked: Set[Revoked]
 
     def __init__(self, *args):
         """Init statement with empty values."""
-        self._save = set()
         self.verified = set()
         self.trusted = set()
         self.revoked = set()
-
-    def reset(self):
-        """Reset save value."""
-        self._save = set()
 
 
 @dataclass
@@ -226,10 +220,9 @@ class Portfolio(PortfolioABC):
     and operations that are related.
     """
     __slots__ = (
-        '_save', 'entity', 'profile', 'keys', 'domain', 'nodes', 'network',
+        'entity', 'profile', 'keys', 'domain', 'nodes', 'network',
         'issuer', 'owner')
 
-    _save: Set[Document]
     entity: Entity
     profile: Profile
     keys: Set[Keys]
@@ -239,17 +232,12 @@ class Portfolio(PortfolioABC):
 
     def __init__(self):
         """Init portfolio with empty values."""
-        self._save = set()
         self.entity = None
         self.profile = None
         self.keys = set()
         self.network = None
         self.issuer = Statements()
         self.owner = Statements()
-
-    def reset(self):
-        """Reset save flag."""
-        self._save = set()
 
     def _disassemble(self) -> dict:
         """Disassemble portfolio into dictionary."""
