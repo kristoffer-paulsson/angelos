@@ -107,21 +107,21 @@ class PortfolioCommand(Command):
             if trusted.expires_soon():
                 t_renewable = True
 
-        s1 = '1.  Create verified statement.'
-        s2 = '2.  Renew verified statement.'
-        s3 = '3.  Revoke verified statement'
-        s4 = '4.  Create trusted statement',
-        s5 = '5.  Renew trusted statement'
-        s6 = '6.  Revoke trusted statement'
+        s1 = 'Create verified statement.'
+        s2 = 'Renew verified statement.'
+        s3 = 'Revoke verified statement'
+        s4 = 'Create trusted statement'
+        s5 = 'Renew trusted statement'
+        s6 = 'Revoke trusted statement'
 
         do = await self._io.menu('Portfolio statement management', [
             self._io.dim(s1) if verified else s1,
             s2 if v_renewable else self._io.dim(s2),
             s3 if verified else self._io.dim(s3),
-            self._io.dim(s4) if verified else s4,
+            self._io.dim(s4) if trusted else s4,
             s5 if t_renewable else self._io.dim(s5),
-            s6 if verified else self._io.dim(s6),
-            '7.  Continue',
+            s6 if trusted else self._io.dim(s6),
+            'Continue',
         ])
 
         statement = None
@@ -146,7 +146,7 @@ class PortfolioCommand(Command):
 
         if statement:
             await self.__facade.docs_to_portfolios(set([statement]))
-            self._io << 'Saved statement changes to portfolio.'
+            self._io << '\nSaved statement changes to portfolio.\n'
 
     async def __list(self, search='*'):
         self._io << '\n'
@@ -213,7 +213,7 @@ class PortfolioCommand(Command):
                 'group',
                 abbr='g',
                 type=Option.TYPE_CHOICES,
-                choices=['veriify', 'min', 'med', 'max', 'all'],
+                choices=['verify', 'min', 'med', 'max', 'all'],
                 default='med',
                 help='Load portfolio group'),
             Option(

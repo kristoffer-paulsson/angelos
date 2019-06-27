@@ -212,13 +212,13 @@ class Vault:
         return success
 
     async def load_portfolio(
-            self, id: uuid.UUID, config: Tuple[str]) -> Portfolio:
+            self, eid: uuid.UUID, config: Tuple[str]) -> Portfolio:
         """Load portfolio from uuid."""
-        dirname = '/portfolios/{0}'.format(id)
+        dirname = '/portfolios/{0}'.format(eid)
         if not self._archive.isdir(dirname):
-            raise OSError('Portfolio doesn\'t exists: %s' % id)
+            raise OSError('Portfolio doesn\'t exists: %s' % eid)
 
-        result = self._archive.glob(name='{0}/*'.format(dirname), owner=id)
+        result = self._archive.glob(name='{0}/*'.format(dirname), owner=eid)
 
         files = set()
         for field in config:
@@ -245,7 +245,7 @@ class Vault:
 
             document = PortfolioPolicy.deserialize(data)
 
-            if document.issuer.int != id.int:
+            if document.issuer != eid:
                 owner.add(document)
             else:
                 issuer.add(document)
@@ -263,7 +263,8 @@ class Vault:
         """Reload portfolio."""
         dirname = '/portfolios/{0}'.format(portfolio.entity.id)
         if not self._archive.isdir(dirname):
-            raise OSError('Portfolio doesn\'t exists: %s' % id)
+            raise OSError(
+                'Portfolio doesn\'t exists: %s' % portfolio.entity.id)
 
         result = self._archive.glob(
             name='{dir}/*'.format(dirname), owner=portfolio.entity.id)
@@ -309,7 +310,7 @@ class Vault:
 
             document = PortfolioPolicy.deserialize(data)
 
-            if document.issuer.int != id.int:
+            if document.issuer != portfolio.entity.id:
                 owner.add(document)
             else:
                 issuer.add(document)
@@ -322,10 +323,11 @@ class Vault:
         """Save a changed portfolio."""
         dirname = '/portfolios/{0}'.format(portfolio.entity.id)
         if not self._archive.isdir(dirname):
-            raise OSError('Portfolio doesn\'t exists: %s' % id)
+            raise OSError(
+                'Portfolio doesn\'t exists: %s' % portfolio.entity.id)
 
         files = self._archive.glob(
-            name='{dir}/*'.format(dirname), owner=portfolio.entity.id)
+            name='{dir}/*'.format(dir=dirname), owner=portfolio.entity.id)
 
         ops = []
         save, _ = portfolio.to_sets()
@@ -348,10 +350,6 @@ class Vault:
 
         results = await asyncio.shield(
             asyncio.gather(*ops, return_exceptions=True))
-
-        portfolio.reset()
-        portfolio.issuer.reset()
-        portfolio.owner.reset()
 
         success = True
         for result in results:

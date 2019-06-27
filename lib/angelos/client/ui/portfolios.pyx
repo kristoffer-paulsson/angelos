@@ -143,8 +143,13 @@ class PortfolioView(BaseDialog):
 
     def save(self):
         try:
-            result, rejected, removed = Glue.run_async(
-                self._app.ioc.facade.import_portfolio(self._portfolio))
+            try:
+                result, rejected, removed = Glue.run_async(
+                    self._app.ioc.facade.import_portfolio(self._portfolio))
+            except OSError as e:
+                result, rejected, removed = Glue.run_async(
+                    self._app.ioc.facade.update_portfolio(self._portfolio))
+
             self.dismiss()
             if result and not rejected and not removed:
                 Snackbar(text="Success importing portfolio.").show()

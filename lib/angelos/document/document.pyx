@@ -64,7 +64,8 @@ class Document(IssueMixin, BaseDocument):
     type = TypeField(value=0)
 
     def _validate(self):
-        sdate = self.updated if hasattr(self, 'updated') else self.created
+        sdate = self.updated if getattr(
+            self, 'updated', None) else self.created
         if self.expires - sdate > datetime.timedelta(13*365/12):
             raise Util.exception(
                 Error.DOCUMENT_SHORT_EXPIREY,
@@ -85,7 +86,7 @@ class Document(IssueMixin, BaseDocument):
 
     def expires_soon(self):
         month = self.expires - datetime.timedelta(days=365/12)
-        today = datetime.today()
+        today = datetime.date.today()
         if today >= month and today <= self.expires:
             return True
         else:

@@ -33,4 +33,4 @@ class ClientsServer(SSHServer):
     def session_requested(self):
         logging.debug('Session requested')
         # return AdminServerProcess(self.terminal, self.ioc.session)
-        return False
+        return True

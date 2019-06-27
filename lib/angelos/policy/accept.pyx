@@ -194,11 +194,9 @@ class ImportUpdatePolicy(Policy):
     """Policy for accepting updateable documents."""
     def __init__(self, portfolio: Portfolio):
         self._portfolio = portfolio
-        self.exception
 
     def keys(self, newkeys: Keys):
         """Validate newky generated keys."""
-        self.exception = None
         valid = True
 
         try:
@@ -219,7 +217,7 @@ class ImportUpdatePolicy(Policy):
                 newkeys, portfolio) else valid
 
         except Exception as e:
-            self.exception = e
+            logging.info('%s' % str(e))
             valid = False
 
         return valid
@@ -247,8 +245,6 @@ class ImportUpdatePolicy(Policy):
 
     def entity(self, entity: Entity):
         """Validate updated entity."""
-        self.exception = None
-
         if isinstance(entity, Person):
             fields = PersonPolicy.FIELDS
         elif isinstance(entity, Ministry):
@@ -259,7 +255,7 @@ class ImportUpdatePolicy(Policy):
         try:
             valid = self.__dict_cmp(entity, fields)
         except Exception as e:
-            self.exception = e
+            logging.info('%s' % str(e))
             valid = False
 
         return valid

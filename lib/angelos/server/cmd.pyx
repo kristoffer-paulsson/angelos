@@ -194,7 +194,7 @@ class ConsoleIO:
     def format(cls, text,
                b=False, d=False, i=False, u=False, bl=False, nv=False):
         """Format terminal text in several ways."""
-        codes = ';'.join(filter([
+        codes = ';'.join(filter(None, [
             '1' if b else None,
             '2' if d else None,
             '3' if i else None,
@@ -282,7 +282,7 @@ class Option:
         # Test if one option is given
         if len(opt) is 1:
             # Test if value is given
-            if bool(opt[0]) is True:
+            if bool(opt[0]):
                 raise Util.exception(
                     Error.CMD_OPT_ILLEGAL_VALUE,
                     {'opt': self.name, 'value': opt[0]})
@@ -357,7 +357,7 @@ class Option:
                 {'opt': self.name, 'tot_num': len(opt)})
 
         # Test if there is a default and none given
-        if self.default is not None and len(opt) is 0:
+        if self.default and len(opt) == 0:
             return (self.name, self.default)
 
         value = None

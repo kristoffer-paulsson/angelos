@@ -151,14 +151,14 @@ class Facade:
         self.__settings = SettingsAPI(self.__portfolio, self._vault)
 
     async def load_portfolio(
-            self, id: uuid.UUID, conf: Sequence[str]) -> Portfolio:
+            self, eid: uuid.UUID, conf: Sequence[str]) -> Portfolio:
         """Load a portfolio belonging to id according to configuration."""
-        return await self._vault.load_portfolio(id, conf)
+        return await self._vault.load_portfolio(eid, conf)
 
     async def update_portfolio(self, portfolio: Portfolio) -> (
             bool, Set[Document], Set[Document]):
         """Update a portfolio by comparison."""
-        old = await self._vault.load_portfolio(id, PGroup.ALL)
+        old = await self._vault.load_portfolio(portfolio.entity.id, PGroup.ALL)
 
         issuer, owner = portfolio.to_sets()
         new_set = issuer | owner

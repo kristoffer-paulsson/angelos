@@ -51,7 +51,7 @@ class Indexer(Operation):
         portfolio = await self.__facade.load_portfolio(
             self.__facade.portfolio.entity.id, PGroup.ALL)
         datalist = await self.__facade._vault.search(
-            path='/portfolios/*/*.net')
+            path='/portfolios/*/*.net', limit=200)
         network_list = set()
 
         async def validate_trust(data: bytes):
@@ -62,37 +62,44 @@ class Indexer(Operation):
             valid_trusted = False
             valid_trusting = False
 
-            for trusted in (
+            trusted_docs = (
                     portfolio.owner.trusted |
                     network_portfolio.issuer.trusted |
                     portfolio.issuer.trusted |
-                    network_portfolio.owner.trusted):
-                if (
-                    trusted.owner == portfolio.entity.id
-                        ) and trusted.issuer == network_portfolio.entity.id:
-                    try:
-                        valid = True
-                        valid = trusted.validate() if valid else valid
-                        valid = Crypto.verify(
-                            trusted, network_portfolio) if valid else valid
-                    except Exception:
-                        valid = False
+                    network_portfolio.owner.trusted)
 
-                    if valid:
-                        valid_trusted = True
-                if (
-                    trusted.issuer == portfolio.entity.id
-                        ) and trusted.owner == network_portfolio.entity.id:
-                    try:
-                        valid = True
-                        valid = trusted.validate() if valid else valid
-                        valid = Crypto.verify(
-                            trusted, portfolio) if valid else valid
-                    except Exception:
-                        valid = False
+            if len(trusted_docs) == 0:
+                network_list.add(
+                    (network.issuer, False))
+            else:
+                for trusted in trusted_docs:
+                    if (
+                            trusted.owner == portfolio.entity.id
+                            ) and (
+                            trusted.issuer == network_portfolio.entity.id):
+                        try:
+                            valid = True
+                            valid = trusted.validate() if valid else valid
+                            valid = Crypto.verify(
+                                trusted, network_portfolio) if valid else valid
+                        except Exception:
+                            valid = False
 
-                    if valid:
-                        valid_trusting = True
+                        if valid:
+                            valid_trusted = True
+                    if (
+                        trusted.issuer == portfolio.entity.id
+                            ) and trusted.owner == network_portfolio.entity.id:
+                        try:
+                            valid = True
+                            valid = trusted.validate() if valid else valid
+                            valid = Crypto.verify(
+                                trusted, portfolio) if valid else valid
+                        except Exception:
+                            valid = False
+
+                        if valid:
+                            valid_trusting = True
 
                 network_list.add(
                     (network.issuer, valid_trusted and valid_trusting))

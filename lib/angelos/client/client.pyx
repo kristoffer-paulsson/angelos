@@ -9,6 +9,7 @@ This file is distributed under the terms of the MIT license.
 Module docstring.
 """
 import os
+# import binascii
 import collections
 import json
 import uuid
@@ -97,8 +98,10 @@ class LogoMessenger(ContainerAware, App):
         vault_file = Util.path(self.user_data_dir, Const.CNL_VAULT)
 
         if os.path.isfile(vault_file):
+            masterkey = KeyLoader.get()
+            # print(binascii.hexlify(masterkey))
             facade = Glue.run_async(
-                Facade.open(self.user_data_dir, KeyLoader.get()))
+                Facade.open(self.user_data_dir, masterkey))
             self.ioc.facade = facade
             self.switch('splash', UserScreen(name='user'))
         else:
