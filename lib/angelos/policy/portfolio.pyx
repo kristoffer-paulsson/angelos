@@ -58,6 +58,10 @@ class PGroup:
     SERVER = (
         PField.ENTITY, PField.PRIVKEYS, PField.KEYS, PField.DOMAIN,
         PField.NODES, PField.NET)
+    # Necessary set for server authentication
+    CLIENT_AUTH = (
+        PField.ENTITY, PField.KEYS, PField.NET, PField.OWNER_VERIFIED,
+        PField.OWNER_TRUSTED)
     # Documents issued by issuer
     ISSUER = (
         PField.ISSUER_VERIFIED, PField.ISSUER_TRUSTED, PField.ISSUER_REVOKED)

@@ -33,6 +33,7 @@ from ..operation.indexer import Indexer
 # from .state import StateMachine
 from ..logger import LogHandler
 from ..ssh.ssh import SessionManager
+from ..ssh.client import ClientsClient
 from ..facade.facade import Facade
 from ..automatic import Automatic
 
@@ -67,7 +68,7 @@ class Configuration(Config, Container):
                 CONFIG_IMMUTABLE,
                 self.__load('config.json'),
                 CONFIG_DEFAULT),
-            # 'state': lambda self: StateMachine(self.config['state']),
+            'client': lambda self: Handle(ClientsClient),
             'log': lambda self: LogHandler(self.config['logger']),
             'session': lambda self: SessionManager(),
             'facade': lambda self: Handle(Facade),

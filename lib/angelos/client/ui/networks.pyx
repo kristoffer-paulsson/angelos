@@ -56,8 +56,17 @@ class NetworkListItem(OneLineAvatarIconListItem):
         """"""
         def later(dt):
             try:
+                error = False
                 result = future.result()
-                print(type(result), result)
+
+                if result is not tuple:
+                    error = True
+                if len(result) != 2:
+                    error = True
+                if error:
+                    raise ValueError('Unkown error with connection')
+
+                self.ioc.client = result[1]
             except Exception as e:
                 logging.info('Failed to connect')
                 logging.exception(e)

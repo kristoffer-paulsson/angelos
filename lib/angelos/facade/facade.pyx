@@ -447,25 +447,6 @@ class ServerFacadeMixin(TypeFacadeMixin):
         """Post init async work."""
         pass
 
-    async def load_client_auth(self, username):
-        """Load documents required for Clients server authentication."""
-        raise DeprecationWarning()
-
-        issuer = uuid.UUID(username)
-        doclist = Glue.run_async(
-            self._vault.issuer(issuer, '/keys/', 3),
-            self._vault.issuer(issuer, '/entities/*', 1),
-            self._vault.issuer(issuer, '/issued/trusted', 1)
-        )
-
-        authlist = (
-            Glue.doc_check(doclist[0], Keys, True),
-            Glue.doc_check(doclist[1], (Person, Ministry, Church), True),
-            Glue.doc_check(doclist[2], Trusted, True)
-        )
-
-        return authlist if len(authlist) else None
-
     async def load_host_auth(self, username):
         """Load documents required for Hosts server authentication."""
         raise DeprecationWarning()

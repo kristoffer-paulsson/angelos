@@ -19,7 +19,7 @@ from .policy import PrivatePortfolio, Portfolio
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.console import BootServer, AdminServer
-from .ssh.client import ClientsServer
+from .ssh.client import ClientsServer, ClientsClient
 from .server.rsa import SERVER_RSA_PRIVATE
 
 
@@ -173,7 +173,7 @@ class Starter:
             'port': port,
             'client_keys': [Starter._private_key(portfolio.privkeys)],
             'known_hosts': Starter.__known_host(host.keys),
-            'client_factory': lambda: SSHClient(ioc)
+            'client_factory': lambda: ClientsClient(ioc)
         }
         params = {**params, **Starter.ALGS}
 
