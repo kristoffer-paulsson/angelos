@@ -21,6 +21,7 @@ from ..policy import (
     PortfolioPolicy)
 from .archive7 import Archive7, Entry
 from .helper import Glue, Globber, AsyncProxy
+from .archive import BaseArchive
 
 
 HIERARCHY = (
@@ -57,7 +58,7 @@ HIERARCHY = (
 )
 
 
-class Vault:
+class Vault(BaseArchive):
     """
     Vault interface.
 
