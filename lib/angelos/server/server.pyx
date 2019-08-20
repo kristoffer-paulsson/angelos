@@ -24,6 +24,7 @@ from ..logger import LogHandler
 from ..ssh.ssh import SessionManager
 from ..facade.facade import Facade
 from ..automatic import Automatic
+from ..prefs import Preferences
 from .parser import Parser
 
 from .vars import (
@@ -62,6 +63,7 @@ class Configuration(Config, Container):
             'nodes': lambda self: Handle(asyncio.base_events.Server),
             'hosts': lambda self: Handle(asyncio.base_events.Server),
             'opts': lambda self: Parser(),
+            'prefs': lambda self: Preferences(self.facade),
             'auto': lambda self: Automatic('angelos', self.opts),
             'quit': lambda self: Event(),
         }

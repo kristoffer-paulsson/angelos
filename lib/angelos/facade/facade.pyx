@@ -23,6 +23,7 @@ from ..const import Const
 from ..document import (
     Document, Person, Ministry, Church, Keys, Node, Network, Trusted, Verified,
     Revoked)
+from ..archive.archive7 import Archive7
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 from ..policy import (
@@ -31,6 +32,7 @@ from ..policy import (
 
 from ..operation.setup import (
     SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation)
+from ..data.vars import PREFERENCES_INI
 
 
 class Facade:
@@ -101,6 +103,8 @@ class Facade:
             os.path.join(home_dir, Const.CNL_VAULT), secret, portfolio,
             _type=cls.INFO[0], role=role, use=Const.A_USE_VAULT)
 
+        await vault.save_settings('preferences.ini', PREFERENCES_INI)
+
         await vault.new_portfolio(portfolio)
 
         facade = cls(home_dir, secret, vault)
@@ -135,6 +139,13 @@ class Facade:
 
         await facade._post_init()
         return facade
+
+    def archive(self, archive: str) -> Archive7:
+        """Return available archive based on CNL constant."""
+        if archive == Const.CNL_VAULT:
+            return self._vault.archive
+        else:
+            return None
 
     async def _post_init(self):
         """Load private portfolio for facade."""

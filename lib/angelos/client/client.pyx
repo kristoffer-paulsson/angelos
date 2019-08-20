@@ -36,6 +36,7 @@ from ..ssh.ssh import SessionManager
 from ..ssh.client import ClientsClient
 from ..facade.facade import Facade
 from ..automatic import Automatic
+from ..prefs import Preferences
 
 from .ui.root import UserScreen
 from .ui.wizard import (
@@ -73,6 +74,7 @@ class Configuration(Config, Container):
             'session': lambda self: SessionManager(),
             'facade': lambda self: Handle(Facade),
             'auto': lambda self: Automatic('Logo'),
+            'prefs': lambda self: Preferences(self.facade),
             'quit': lambda self: Event(),
         }
 
@@ -100,13 +102,14 @@ class LogoMessenger(ContainerAware, App):
 
         if os.path.isfile(vault_file):
             masterkey = KeyLoader.get()
-            # print(binascii.hexlify(masterkey))
             facade = Glue.run_async(
                 Facade.open(self.user_data_dir, masterkey))
             self.ioc.facade = facade
             self.switch('splash', UserScreen(name='user'))
+            Glue.run_async(self.ioc.prefs.load())
         else:
             self.switch('splash', SetupScreen(name='setup'))
+            Glue.run_async(self.ioc.prefs.load())
 
     def goto_person_setup(self):
         self.switch('setup', PersonSetupGuide(name='setup_guide'))
@@ -134,13 +137,22 @@ class LogoMessenger(ContainerAware, App):
             self.ioc.facade.portfolio, host, ioc=self.ioc)
 
     def check_mail(self):
-        self._worker.run_coroutine(self.__open_connection())
+        """Connect to server and start mail replication."""
+        network_id = uuid.UUID(self.ioc.prefs.network)
+        self.connect_network(network_id, self.__start_replication_mail)
+
+    def __start_replication_mail(self, future: Awaitable) -> None:
+        """Start replication preset for mail sync."""
+        if future.done() and not future.exception():
+            _, client = future.result()
+            self._worker.run_coroutine(client.mail())
 
     def index_networks(self):
         """Start network indexing background task."""
         Glue.run_async(Indexer(self.ioc.facade, self._worker).networks_index())
 
-    def __connection_future(self, future: Awaitable) -> None:
+    def __connection_snackbar(self, future: Awaitable) -> None:
+        """Will show appropriate snackbar based on connection status."""
         if future.cancelled():
             Snackbar(text='Connection cancelled.').show()
         elif future.done():
@@ -161,7 +173,7 @@ class LogoMessenger(ContainerAware, App):
         future = self._worker.run_coroutine(self.__open_connection(host))
         if callback:
             future.add_done_callback(callback)
-        future.add_done_callback(self.__connection_future)
+        future.add_done_callback(self.__connection_snackbar)
 
         return future
 

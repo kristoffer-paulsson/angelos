@@ -95,3 +95,13 @@ Builder.load_string("""
 
 class EmptyList(MDLabel):
     pass
+
+
+class AppGetter:
+    def get_app(self):
+        instance = self
+
+        while hasattr(instance, 'parent') and not hasattr(instance, 'app'):
+            instance = instance.parent
+
+        return instance.app

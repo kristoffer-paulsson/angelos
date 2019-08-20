@@ -12,17 +12,49 @@ import uuid
 import asyncio
 
 from ..policy import StatementPolicy, PGroup
-from ..operation.replication import ReplicatorServerHandler, ReplicatorServer
+from ..operation.replication import (
+    ReplicatorServerHandler, ReplicatorServer, ReplicatorClientHandler,
+    ReplicatorClient)
 from .ssh import SSHServer, SSHClient
 from .nacl import NaClKey
 
 from asyncssh import (
-    SSHStreamSession, SSHServerSession, SSHReader, SSHWriter, BreakReceived,
-    SignalReceived)
+    SSHServerSession, SSHReader, SSHWriter, BreakReceived,
+    SignalReceived, SSHClientSession)
+from asyncssh.stream import SSHStreamSession
 
 
 class ClientsClient(SSHClient):
-    pass
+    async def mail(self):
+        """Start mail replication operation."""
+        try:
+            writer, reader, _ = await self._connection.open_session(
+                subsystem='replicator', encoding=None)
+            repclient = ReplicatorClient(self.ioc)
+            session = ClientReplicatorSession()
+            handler = session.start_replicator_client(
+                repclient, reader, writer)
+
+            await handler
+            # if asyncio.iscoroutine(handler):
+            #    self._connection.create_task(handler, stderr.logger)
+        except Exception as e:
+            logging.exception('Client mail repliction faulire')
+            raise e
+
+
+class ClientReplicatorSession(SSHStreamSession, SSHClientSession):
+    """SSH server stream session handler."""
+
+    @asyncio.coroutine
+    async def start_replicator_client(
+            self, replicator_client, reader, writer):
+        """Return a handler for an SFTP server session"""
+        replicator_client.channel = self._chan
+        handler = ReplicatorClientHandler(
+            replicator_client, reader, writer)
+        handler.logger.info('Starting Replicator client')
+        return (await handler.start())
 
 
 class ClientsServer(SSHServer):
@@ -61,7 +93,8 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
     """SSH server stream session handler"""
 
     def __init__(self, allow_replicator):
-        super().__init__()
+        SSHStreamSession.__init__(self)
+        SSHServerSession.__init__(self)
 
         self._allow_replicator = allow_replicator
 
@@ -78,20 +111,21 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
 
     def session_started(self):
         """Start a session for this newly opened server channel"""
-        stdin = SSHReader(self, self._chan)
-        stdout = SSHWriter(self, self._chan)
+        reader = SSHReader(self, self._chan)
+        writer = SSHWriter(self, self._chan)
 
         if self._chan.get_subsystem() == 'replicator':
             self._chan.set_encoding(None)
             self._encoding = None
 
             handler = self.__run_replicator_server(
-                ReplicatorServer(self._conn), stdin, stdout)
+                ReplicatorServer(self._conn), reader, writer)
+
         else:
             handler = None
 
         if asyncio.iscoroutine(handler):
-            self._conn.create_task(handler, stdin.logger)
+            self._conn.create_task(handler, reader.logger)
 
     def break_received(self, msec):
         """Handle an incoming break on the channel"""
@@ -105,8 +139,8 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
         self._unblock_read(None)
 
     @asyncio.coroutine
-    async def __run_replicator_server(replicator_server, reader, writer):
+    async def __run_replicator_server(self, replicator_server, reader, writer):
         """Return a handler for an SFTP server session"""
+        replicator_server.channel = self._chan
         handler = ReplicatorServerHandler(replicator_server, reader, writer)
-        handler.logger.info('Starting Replicator server')
         return (await handler.run())

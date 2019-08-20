@@ -38,6 +38,7 @@ class SSHServer(ContainerAware, asyncssh.SSHServer):
             logging.info('Connection closed')
         else:
             logging.error('Connection closed unexpectedly: %s' % str(exc))
+            logging.exception(exc, exc_info=True)
 
     def debug_msg_received(self, msg, lang, always_display):
         logging.error('Error: %s' % str(msg))
@@ -95,6 +96,7 @@ class SSHClient(ContainerAware, asyncssh.SSHClient):
             logging.info('Connection closed')
         else:
             logging.error('Connection closed unexpectedly: %s' % str(exc))
+            logging.exception(exc, exc_info=True)
 
     def debug_msg_received(self, msg, lang, always_display):
         logging.error('Error: %s' % str(msg))

@@ -21,7 +21,7 @@ from kivymd.list import (
 from kivymd.button import MDIconButton
 
 from ...archive.helper import Glue
-from .common import BasePanelScreen, EmptyList
+from .common import BasePanelScreen, EmptyList, AppGetter
 
 from ...policy import PrivatePortfolio, PGroup, PrintPolicy
 
@@ -43,13 +43,16 @@ class DummyPhoto(ILeftBody, AsyncImage):
         pass
 
 
-class RightIconButton(IRightBodyTouch, MDIconButton):
+class RightIconButton(IRightBodyTouch, MDIconButton, AppGetter):
     def on_release(self):
         """Make current network prefered."""
-        # network_id = self.parent.parent.network_id
+        app = self.get_app()
+        network_id = self.parent.parent.network_id
+        app.ioc.prefs.network = str(network_id)
+        Glue.run_async(app.ioc.prefs.save())
 
 
-class NetworkListItem(OneLineAvatarIconListItem):
+class NetworkListItem(OneLineAvatarIconListItem, AppGetter):
     network_id = ObjectProperty()
 
     def on_release(self):
@@ -59,20 +62,21 @@ class NetworkListItem(OneLineAvatarIconListItem):
                 error = False
                 result = future.result()
 
-                if result is not tuple:
+                if not isinstance(result, tuple):
                     error = True
                 if len(result) != 2:
                     error = True
                 if error:
                     raise ValueError('Unkown error with connection')
 
-                self.ioc.client = result[1]
+                app = self.get_app()
+                app.ioc.client = result[1]
             except Exception as e:
                 logging.info('Failed to connect')
                 logging.exception(e)
 
         try:
-            app = self.parent.parent.parent.parent.parent.app
+            app = self.get_app()
             future = app.connect_network(self.network_id)
             Clock.schedule_once(later, 5)
         except Exception as e:
