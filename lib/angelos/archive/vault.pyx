@@ -11,7 +11,6 @@ Vault.
 import asyncio
 import uuid
 import logging
-import atexit
 from typing import Tuple, List
 
 import msgpack
@@ -19,43 +18,9 @@ import msgpack
 from ..policy import (
     Portfolio, PrivatePortfolio, PField, DOCUMENT_PATH, PORTFOLIO_PATTERN,
     PortfolioPolicy)
-from .archive7 import Archive7, Entry
-from .helper import Glue, Globber, AsyncProxy
+from .archive7 import Entry
+from .helper import Glue, Globber
 from .archive import BaseArchive
-
-
-HIERARCHY = (
-    '/',
-    '/cache',
-    '/cache/msg',
-    # Contact profiles and links based on directory.
-    '/contacts',
-    '/contacts/favorites',
-    '/contacts/friend',
-    '/contacts/all',
-    '/contacts/blocked',
-    # Issued statements by the vaults entity
-    '/issued',
-    '/issued/verified',
-    '/issued/trusted',
-    '/issued/revoked',
-    # Messages, ingoing and outgoung correspondence
-    '/messages',
-    '/messages/inbox',
-    '/messages/read',
-    '/messages/drafts',
-    '/messages/outbox',
-    '/messages/sent',
-    '/messages/spam',
-    '/messages/trash',
-    # Networks, for other hosts that are trusted
-    '/networks'
-    # Preferences by the owning entity.
-    '/settings',
-    '/settings/nodes',
-
-    '/portfolios'
-)
 
 
 class Vault(BaseArchive):
@@ -66,52 +31,41 @@ class Vault(BaseArchive):
     the private entity data.
     """
 
+    HIERARCHY = (
+        '/',
+        '/cache',
+        '/cache/msg',
+        # Contact profiles and links based on directory.
+        '/contacts',
+        '/contacts/favorites',
+        '/contacts/friend',
+        '/contacts/all',
+        '/contacts/blocked',
+        # Issued statements by the vaults entity
+        '/issued',
+        '/issued/verified',
+        '/issued/trusted',
+        '/issued/revoked',
+        # Messages, ingoing and outgoung correspondence
+        '/messages',
+        '/messages/inbox',
+        '/messages/read',
+        '/messages/drafts',
+        '/messages/outbox',
+        '/messages/sent',
+        '/messages/spam',
+        '/messages/trash',
+        # Networks, for other hosts that are trusted
+        '/networks'
+        # Preferences by the owning entity.
+        '/settings',
+        '/settings/nodes',
+
+        '/portfolios'
+    )
+
     NODES = '/settings/nodes'
     INBOX = '/messages/inbox/'
-
-    def __init__(self, filename, secret):
-        """Initialize the Vault."""
-        self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
-        atexit.register(self._archive.close)
-        self.__stats = self._archive.stats()
-        self._closed = False
-        self._proxy = AsyncProxy(200)
-
-    @property
-    def stats(self):
-        """Stats of underlying archive."""
-        return self.__stats
-
-    @property
-    def closed(self):
-        """Indicate if vault is closed."""
-        return self._closed
-
-    def close(self):
-        """Close the Vault."""
-        if not self._closed:
-            self._proxy.quit()
-            atexit.unregister(self._archive.close)
-            self._archive.close()
-            self._closed = True
-
-    @staticmethod
-    def setup(filename, secret, portfolio: PrivatePortfolio,
-              _type=None, role=None, use=None):
-        """Create and setup the whole Vault according to policys."""
-
-        arch = Archive7.setup(
-            filename, secret, owner=portfolio.entity.id,
-            node=next(iter(portfolio.nodes)).id,
-            domain=portfolio.domain.id, title='Vault',
-            _type=_type, role=role, use=use)
-
-        for i in HIERARCHY:
-            arch.mkdir(i)
-
-        arch.close()
-
-        return Vault(filename, secret)
 
     async def save(self, filename, document):
         """Save a document at a certian location."""

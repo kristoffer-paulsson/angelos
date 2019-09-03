@@ -110,9 +110,7 @@ class Glue:
 
 class Globber:
     @staticmethod
-    def full(archive, filename='*', cmp_uuid=False):
-        Util.is_type(archive, Archive7)
-
+    def full(archive: Archive7, filename: str='*', cmp_uuid: bool=False):
         with archive.lock:
             sq = Archive7.Query(pattern=filename)
             sq.type(b'f')
@@ -134,11 +132,36 @@ class Globber:
         return files
 
     @staticmethod
-    def owner(archive, owner, path='/'):
-        Util.is_type(archive, Archive7)
-        Util.is_type(path, str)
-        Util.is_type(owner, (str, uuid.UUID))
+    def syncro(
+            archive: Archive7,
+            path: str='/', owner: uuid.UUID=None,
+            modified: datetime.datetime=None, cmp_uuid: bool=False):
+        with archive.lock:
+            sq = Archive7.Query(pattern=path)
+            if owner:
+                sq.owner(owner)
+            if modified:
+                sq.modified(modified)
+            sq.type(b'f')
+            idxs = archive.ioc.entries.search(sq)
+            ids = archive.ioc.hierarchy.ids
 
+            files = {}
+            for i in idxs:
+                idx, entry = i
+                if entry.parent.int == 0:
+                    name = '/'+str(entry.name, 'utf-8')
+                else:
+                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                if cmp_uuid:
+                    files[entry.id] = (name, entry.modified, entry.deleted)
+                else:
+                    files[name] = (entry.id, entry.modified, entry.deleted)
+
+        return files
+
+    @staticmethod
+    def owner(archive: Archive7, owner: uuid.UUID, path: str='/'):
         with archive.lock:
             sq = Archive7.Query(path).owner(owner).type(b'f')
             idxs = archive.ioc.entries.search(sq)
@@ -156,9 +179,7 @@ class Globber:
         return files
 
     @staticmethod
-    def path(archive, path='*'):
-        Util.is_type(archive, Archive7)
-
+    def path(archive: Archive7, path: str ='*'):
         with archive.lock:
             sq = Archive7.Query(path).type(b'f')
             idxs = archive.ioc.entries.search(sq)

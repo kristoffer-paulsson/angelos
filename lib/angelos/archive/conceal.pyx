@@ -32,6 +32,7 @@ class ConcealIO(io.RawIOBase):
         Util.is_type(file, (str, bytes, io.IOBase))
         Util.is_type(mode, (str, bytes))
         Util.is_type(secret, (str, bytes))
+        print('ConcealIO:', file)
 
         if isinstance(file, io.IOBase):
             if file.mode not in ['rb', 'rb+', 'wb']:

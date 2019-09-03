@@ -13,6 +13,7 @@ import asyncio
 import time
 import datetime
 import binascii
+import logging
 
 import libnacl
 
@@ -461,6 +462,7 @@ class StartupCommand(Command):
             raise Util.exception(Error.CMD_SHELL_EXIT)
 
         except (ValueError, binascii.Error) as e:
+            logging.exception('Error: %s' % e)
             self._io << '\nError: %s\n\n' % e
 
     async def _switch(self):

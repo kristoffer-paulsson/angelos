@@ -12,9 +12,9 @@ import uuid
 import asyncio
 
 from ..policy import StatementPolicy, PGroup
-from ..operation.replication import (
+from ..replication import (
     ReplicatorServerHandler, ReplicatorServer, ReplicatorClientHandler,
-    ReplicatorClient)
+    ReplicatorClient, MailPreset)
 from .ssh import SSHServer, SSHClient
 from .nacl import NaClKey
 
@@ -30,10 +30,11 @@ class ClientsClient(SSHClient):
         try:
             writer, reader, _ = await self._connection.open_session(
                 subsystem='replicator', encoding=None)
-            repclient = ReplicatorClient(self.ioc)
+            preset = MailPreset(self.ioc.facade.portfolio.entity.id)
+            repclient = ReplicatorClient(self.ioc, preset)
             session = ClientReplicatorSession()
             handler = session.start_replicator_client(
-                repclient, reader, writer)
+                repclient, reader, writer, 'mail')
 
             await handler
             # if asyncio.iscoroutine(handler):
@@ -48,7 +49,7 @@ class ClientReplicatorSession(SSHStreamSession, SSHClientSession):
 
     @asyncio.coroutine
     async def start_replicator_client(
-            self, replicator_client, reader, writer):
+            self, replicator_client, reader, writer, preset='custom'):
         """Return a handler for an SFTP server session"""
         replicator_client.channel = self._chan
         handler = ReplicatorClientHandler(

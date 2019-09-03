@@ -236,6 +236,7 @@ class ConsoleIO:
 
     def exception(self, e):
         """Print exception error message to console."""
+        logging.exception('Error: %s' % e)
         self._stdout.write('\nError: %s\n\n' % e)
 
 
@@ -747,7 +748,6 @@ class Terminal(Shell):
                         self._io << ('%s \n' % e)
                     except Exception as e:
                         self._io << ('%s: %s \n' % (type(e), e))
-                        logging.exception(e)
 
                     self._io << self._config['prompt']
 

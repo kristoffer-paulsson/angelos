@@ -21,10 +21,10 @@ from .settings import SettingsAPI
 from ..const import Const
 
 from ..document import (
-    Document, Person, Ministry, Church, Keys, Node, Network, Trusted, Verified,
-    Revoked)
+    Document, Person, Ministry, Church, Trusted, Verified, Revoked)
 from ..archive.archive7 import Archive7
 from ..archive.vault import Vault
+from ..archive.mail import Mail
 from ..archive.helper import Glue
 from ..policy import (
     PrivatePortfolio, Portfolio, ImportUpdatePolicy, ImportPolicy,
@@ -95,6 +95,11 @@ class Facade:
 
             if server:
                 NetworkPolicy.generate(portfolio)
+                # Setting up server specific archives
+                Mail.setup(
+                    os.path.join(home_dir, Const.CNL_MAIL),
+                    secret, portfolio, _type=cls.INFO[0],
+                    role=Const.A_ROLE_PRIMARY, use=Const.A_USE_MAIL)
 
         if not cls.PREFS[1].import_ext(portfolio, role_str, server):
             raise ValueError('Failed importing portfolio to new facade')
@@ -138,6 +143,12 @@ class Facade:
             raise RuntimeError('Unkown archive type: %s' % str(_type))
 
         await facade._post_init()
+
+        Mail.setup(
+            os.path.join(home_dir, Const.CNL_MAIL),
+            secret, facade.portfolio, _type=facade.INFO[0],
+            role=Const.A_ROLE_PRIMARY, use=Const.A_USE_MAIL)
+
         return facade
 
     def archive(self, archive: str) -> Archive7:
@@ -454,42 +465,12 @@ class ServerFacadeMixin(TypeFacadeMixin):
     def __init__(self):
         TypeFacadeMixin.__init__(self)
 
+        self._mail = Mail(
+            os.path.join(self._path, Const.CNL_MAIL), self._secret)
+
     async def _post_init(self):
         """Post init async work."""
         pass
-
-    async def load_host_auth(self, username):
-        """Load documents required for Hosts server authentication."""
-        raise DeprecationWarning()
-
-        issuer = uuid.UUID(username)
-        doclist = Glue.run_async(
-            self._vault.issuer(issuer, '/networks/', 1),
-            self._vault.issuer(issuer, '/keys/', 2),
-            self._vault.issuer(issuer, '/entities/*', 1),
-            self._vault.issuer(issuer, '/issued/trusted', 1)
-        )
-
-        authlist = (
-            Glue.doc_check(doclist[1], Keys, True),
-            Glue.doc_check(doclist[2], (Person, Ministry, Church), True),
-            Glue.doc_check(doclist[3], Trusted, True),
-            Glue.doc_check(doclist[0], Network, True),
-        )
-
-        return authlist if len(authlist) else None
-
-    async def load_node_auth(self, username):
-        """Load documents required for Nodes server authentication."""
-        raise DeprecationWarning()
-
-        issuer = uuid.UUID(username)
-        doclist = Glue.run_async(
-            self._vault.issuer(
-                issuer, '/settings/nodes' + str(issuer)+'.pickle', 1))
-
-        authlist = (Glue.doc_check(doclist[0], Node, True))
-        return authlist if len(authlist) else None
 
 
 class ClientFacadeMixin(TypeFacadeMixin):

@@ -181,3 +181,12 @@ class MailAPI:
             path=MailAPI.DRAFT + '/*', limit=100)
         result = Glue.doc_validate_report(doclist, Mail, False)
         return result
+
+    async def import_envelope(self, envelope: Envelope):
+        """Imports an envelope to inbox."""
+        result = await self.__vault.save(
+            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+                dir=MailAPI.INBOX, file=envelope.id), envelope)
+        if isinstance(result, Exception):
+            raise result
+        return True
