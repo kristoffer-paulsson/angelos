@@ -360,7 +360,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
             self._action = Actions.NO_ACTION
 
-    async def download(self, fileid: uuid.UUID, path: str):
+    async def download(self, fileid: uuid.UUID, path: str) -> bool:
         self.send_packet(
             Packets.RPL_DOWNLOAD, None, String(fileid.bytes), String(path))
 
@@ -397,9 +397,10 @@ class ReplicatorClientHandler(ReplicatorHandler):
             return
 
         # Verify checksum and write to archive7
+        self.client.file_meta(fileid)
         return True
 
-    async def upload(self, fileid: uuid.UUID, path: str):
+    async def upload(self, fileid: uuid.UUID, path: str) -> bool:
         # Load file from archive7
         data = b''
         pieces = ''
@@ -437,7 +438,13 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 raise Error(reason='Received wrong piece of data', code=1)
 
         self.send_packet(Packets.RPL_DONE, None)
+        self.client.file_meta(fileid)
 
+        return True
+
+    async def delete(self, fileid: uuid.UUID, path: str) -> bool:
+        # Delete file from Archive7
+        self.client.file_meta(fileid)
         return True
 
     def _process_version(self, pkttype: int, pktid: int, packet: SSHPacket):

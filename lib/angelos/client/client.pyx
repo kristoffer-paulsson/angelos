@@ -109,7 +109,6 @@ class LogoMessenger(ContainerAware, App):
             Glue.run_async(self.ioc.prefs.load())
         else:
             self.switch('splash', SetupScreen(name='setup'))
-            Glue.run_async(self.ioc.prefs.load())
 
     def goto_person_setup(self):
         self.switch('setup', PersonSetupGuide(name='setup_guide'))

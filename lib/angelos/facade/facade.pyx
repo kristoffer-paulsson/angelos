@@ -99,7 +99,7 @@ class Facade:
                 Mail.setup(
                     os.path.join(home_dir, Const.CNL_MAIL),
                     secret, portfolio, _type=cls.INFO[0],
-                    role=Const.A_ROLE_PRIMARY, use=Const.A_USE_MAIL)
+                    role=Const.A_ROLE_PRIMARY, use=Const.A_USE_MAIL).close()
 
         if not cls.PREFS[1].import_ext(portfolio, role_str, server):
             raise ValueError('Failed importing portfolio to new facade')
@@ -143,19 +143,20 @@ class Facade:
             raise RuntimeError('Unkown archive type: %s' % str(_type))
 
         await facade._post_init()
-
-        Mail.setup(
-            os.path.join(home_dir, Const.CNL_MAIL),
-            secret, facade.portfolio, _type=facade.INFO[0],
-            role=Const.A_ROLE_PRIMARY, use=Const.A_USE_MAIL)
-
         return facade
 
     def archive(self, archive: str) -> Archive7:
         """Return available archive based on CNL constant."""
-        if archive == Const.CNL_VAULT:
-            return self._vault.archive
-        else:
+        try:
+            if archive == Const.CNL_VAULT:
+                return self._vault
+            elif archive == Const.CNL_MAIL:
+                return self._mail
+            else:
+                return None
+        except AttributeError:
+            logging.exception(
+                'Archive attribute %s not implemented.' % archive)
             return None
 
     async def _post_init(self):

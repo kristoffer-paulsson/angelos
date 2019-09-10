@@ -747,6 +747,7 @@ class Terminal(Shell):
                     except CmdShellException as e:
                         self._io << ('%s \n' % e)
                     except Exception as e:
+                        logging.exception(e, exc_info=True)
                         self._io << ('%s: %s \n' % (type(e), e))
 
                     self._io << self._config['prompt']

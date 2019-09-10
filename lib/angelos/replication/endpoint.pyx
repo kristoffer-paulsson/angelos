@@ -22,11 +22,13 @@ class ReplicatorClient(ContainerAware):
     def __init__(self, ioc, preset, modified=None):
         ContainerAware.__init__(self, ioc)
         self._preset = preset
-        self._archive = self.ioc.facade.archive(self._preset.client['ARCHIVE'])
+        self._archive = self.ioc.facade.archive(
+            self._preset.client['ARCHIVE']).archive
         self._modified = modified if modified else datetime.datetime(1, 1, 1)
         self._path = self._preset.client['PATH']
         self._owner = uuid.UUID(int=0)
         self._list = None
+        self._processed = set()
 
     @property
     def preset(self):
@@ -48,11 +50,24 @@ class ReplicatorClient(ContainerAware):
 
     def file_meta(self, fileid: uuid.UUID=uuid.UUID(int=0)):
         """Get meta information of file according to fileid."""
+        if fileid in self._processed:
+            raise Exception('Illegal to process same file twice')
         if fileid not in self._list:
             return (None, None, None, None)
         else:
             meta = self._list[fileid]
             return (fileid) + meta
+
+    def pull_meta(self):
+        """Pop meta information off """
+        fileid = self._list.keys().pop()
+        meta = self._list[fileid]
+        del self._list[fileid]
+        return (fileid) + meta
+
+    def mark_processed(self, fileid):
+        self._processed.add(fileid)
+        self.mark_processed(fileid)
 
     def __enter__(self):
         return self

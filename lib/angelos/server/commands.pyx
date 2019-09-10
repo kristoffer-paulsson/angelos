@@ -144,74 +144,79 @@ documents and connect to the nodes on the current domain network.
 
     async def _command(self, opts):
         """Do entity setup."""
-        if isinstance(self._ioc.facade, Facade):
-            self._io << '\nServer already running.\n\n'
-            return
+        try:
+            if isinstance(self._ioc.facade, Facade):
+                self._io << '\nServer already running.\n\n'
+                return
 
-        vault_file = Util.path(self._ioc.env['dir'].root, Const.CNL_VAULT)
-        if os.path.isfile(vault_file):
-            self._io << '\n\nServer already setup.\n\n'
-            return
+            vault_file = Util.path(self._ioc.env['dir'].root, Const.CNL_VAULT)
+            if os.path.isfile(vault_file):
+                self._io << '\n\nServer already setup.\n\n'
+                return
 
-        self._io << self.msg_start
-        do = await self._io.menu('Select an entry', [
-            'Create new entity',
-            'Import existing entity'
-        ], True)
-
-        if do == 0:
-            # Collect information for the data entity
-            subdo, entity_data = await self.do_new()
-            # Select server role
-            r = await self._io.menu('What role should the server have?', [
-                'Primary server',
-                'Backup server'
+            self._io << self.msg_start
+            do = await self._io.menu('Select an entry', [
+                'Create new entity',
+                'Import existing entity'
             ], True)
 
-            if r == 0:
-                role = Const.A_ROLE_PRIMARY
-            elif r == 1:
-                role = Const.A_ROLE_BACKUP
+            if do == 0:
+                # Collect information for the data entity
+                subdo, entity_data = await self.do_new()
+                # Select server role
+                r = await self._io.menu('What role should the server have?', [
+                    'Primary server',
+                    'Backup server'
+                ], True)
 
-            # Generate master key
-            secret = libnacl.secret.SecretBox().sk
+                if r == 0:
+                    role = Const.A_ROLE_PRIMARY
+                elif r == 1:
+                    role = Const.A_ROLE_BACKUP
+
+                # Generate master key
+                secret = libnacl.secret.SecretBox().sk
+                self._io << (
+                    'This is the Master key for this entity.\n' +
+                    'Make a backup, don\'t loose it!\n\n' +
+                    binascii.hexlify(secret).decode() + '\n\n'
+                )
+                await self._io.presskey()
+                # Verify master key
+                key = await self._io.prompt(
+                    'Enter the master key as verification!')
+
+                if secret != binascii.unhexlify(key.encode()):
+                    raise RuntimeError('Master key mismatch')
+
+                os.makedirs(self._root, exist_ok=True)
+                if subdo == 0:
+                    facade = await PersonServerFacade.setup(
+                        self._root, secret, role, entity_data)
+                elif subdo == 1:
+                    facade = await MinistryServerFacade.setup(
+                        self._root, secret, role, entity_data)
+                elif subdo == 2:
+                    facade = await ChurchServerFacade.setup(
+                        self._root, secret, role, entity_data)
+
+                self._ioc.facade = facade
+
+            elif do == 1:
+                raise NotImplementedError('Import to be implemented')
+                # docs = await self.do_import()
+
             self._io << (
-                'This is the Master key for this entity.\n' +
-                'Make a backup, don\'t loose it!\n\n' +
-                binascii.hexlify(secret).decode() + '\n\n'
+                'You just de-encrypted and loaded the Facade. Next step in\n' +
+                'boot sequence is to start the ' +
+                'services and the Admin console.\n' +
+                'Meanwhile you will be logged out from the Boot console.\n'
             )
             await self._io.presskey()
-            # Verify master key
-            key = await self._io.prompt(
-                'Enter the master key as verification!')
+            asyncio.ensure_future(self._switch())
+        except Exception as e:
+            logging.exception('Error: %s' % e)
 
-            if secret != binascii.unhexlify(key.encode()):
-                raise RuntimeError('Master key mismatch')
-
-            os.makedirs(self._root, exist_ok=True)
-            if subdo == 0:
-                facade = await PersonServerFacade.setup(
-                    self._root, secret, role, entity_data)
-            elif subdo == 1:
-                facade = await MinistryServerFacade.setup(
-                    self._root, secret, role, entity_data)
-            elif subdo == 2:
-                facade = await ChurchServerFacade.setup(
-                    self._root, secret, role, entity_data)
-
-            self._ioc.facade = facade
-
-        elif do == 1:
-            raise NotImplementedError('Import to be implemented')
-            # docs = await self.do_import()
-
-        self._io << (
-            'You just de-encrypted and loaded the Facade. Next step in\n' +
-            'boot sequence is to start the services and the Admin console.\n' +
-            'Meanwhile you will be logged out from the Boot console.\n'
-        )
-        await self._io.presskey()
-        asyncio.ensure_future(self._switch())
         raise Util.exception(Error.CMD_SHELL_EXIT)
 
     async def do_new(self):
