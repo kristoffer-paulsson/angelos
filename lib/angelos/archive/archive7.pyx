@@ -1608,7 +1608,7 @@ class Archive7(ContainerAware):
                 self.__owner = (ints, operand)
             return self
 
-        def created(self, created, operand='>'):
+        def created(self, created, operand='<'):
             """Search with creation date."""
             Util.is_type(created, (int, str, datetime.datetime))
             if operand not in ['=', '>', '<']:
@@ -1621,7 +1621,7 @@ class Archive7(ContainerAware):
             self.__created = (created, operand)
             return self
 
-        def modified(self, modified, operand='>'):
+        def modified(self, modified, operand='<'):
             """Search with modified date."""
             Util.is_type(modified, (int, str, datetime.datetime))
             if operand not in ['=', '>', '<']:

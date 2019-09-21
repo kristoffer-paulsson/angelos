@@ -18,6 +18,7 @@ from typing import Sequence, Set, List, Tuple
 
 from .mail import MailAPI
 from .settings import SettingsAPI
+from .replication import ReplicationAPI
 from ..const import Const
 
 from ..document import (
@@ -172,6 +173,7 @@ class Facade:
             PGroup.SERVER if server else PGroup.CLIENT)
         self.__mail = MailAPI(self.__portfolio, self._vault)
         self.__settings = SettingsAPI(self.__portfolio, self._vault)
+        self.__replication = ReplicationAPI(self)
 
     async def load_portfolio(
             self, eid: uuid.UUID, conf: Sequence[str]) -> Portfolio:
@@ -409,6 +411,11 @@ class Facade:
     def settings(self):
         """Settings interface getter."""
         return self.__settings
+
+    @property
+    def replication(self):
+        """Replication interface getter."""
+        return self.__replication
 
 
 class EntityFacadeMixin:

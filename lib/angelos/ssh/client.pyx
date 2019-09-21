@@ -14,7 +14,7 @@ import asyncio
 from ..policy import StatementPolicy, PGroup
 from ..replication import (
     ReplicatorServerHandler, ReplicatorServer, ReplicatorClientHandler,
-    ReplicatorClient, MailPreset)
+    ReplicatorClient, Preset)
 from .ssh import SSHServer, SSHClient
 from .nacl import NaClKey
 
@@ -30,7 +30,9 @@ class ClientsClient(SSHClient):
         try:
             writer, reader, _ = await self._connection.open_session(
                 subsystem='replicator', encoding=None)
-            preset = MailPreset(self.ioc.facade.portfolio.entity.id)
+            preset = self.ioc.facade.replication.create_preset(
+                Preset.T_MAIL, Preset.CLIENT,
+                self.ioc.facade.portfolio.entity.id)
             repclient = ReplicatorClient(self.ioc, preset)
             session = ClientReplicatorSession()
             handler = session.start_replicator_client(
@@ -61,19 +63,23 @@ class ClientReplicatorSession(SSHStreamSession, SSHClientSession):
 class ClientsServer(SSHServer):
     """SSH Server for the clients."""
 
+    def __init__(self, ioc):
+        SSHServer.__init__(self, ioc)
+        self._portfolio = None
+
     @asyncio.coroutine
     async def begin_auth(self, username):
         logging.info('Begin authentication for: %s' % username)
 
         try:
             issuer = uuid.UUID(username)
-            portfolio = await self.ioc.facade.load_portfolio(
+            self._portfolio = await self.ioc.facade.load_portfolio(
                 issuer, PGroup.CLIENT_AUTH)
 
             if StatementPolicy.validate_trusted(
-                    self.ioc.facade.portfolio, portfolio):
+                    self.ioc.facade.portfolio, self._portfolio):
                 self._client_keys = [
-                    NaClKey.factory(key) for key in portfolio.keys]
+                    NaClKey.factory(key) for key in self._portfolio.keys]
         except OSError as e:
             logging.error('User not found: %s' % username)
             self._client_keys = []
@@ -87,17 +93,19 @@ class ClientsServer(SSHServer):
 
     def session_requested(self):
         logging.debug('Session requested')
-        return ServerReplicatorSession(True)
+        return ServerReplicatorSession(True, self.ioc, self._portfolio)
 
 
 class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
     """SSH server stream session handler"""
 
-    def __init__(self, allow_replicator):
+    def __init__(self, allow_replicator, ioc, portfolio):
         SSHStreamSession.__init__(self)
         SSHServerSession.__init__(self)
 
         self._allow_replicator = allow_replicator
+        self._ioc = ioc
+        self._portfolio = portfolio
 
     def pty_requested(self, term_type, term_size, term_modes):
         """Deny pseudo-tty."""
@@ -120,8 +128,8 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
             self._encoding = None
 
             handler = self.__run_replicator_server(
-                ReplicatorServer(self._conn), reader, writer)
-
+                ReplicatorServer(
+                    self._ioc, self._conn, self._portfolio), reader, writer)
         else:
             handler = None
 

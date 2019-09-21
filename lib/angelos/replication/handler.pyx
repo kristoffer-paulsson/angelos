@@ -20,6 +20,7 @@ from asyncssh import Error
 from asyncssh.packet import (
     SSHPacketHandler, PacketDecodeError, SSHPacket, Byte, UInt32, String,
     Boolean)
+from .preset import Preset
 
 
 VERSION = 1
@@ -172,6 +173,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 self._process_version(pkttype, None, packet)
 
                 # Wait for RPL_CONFIRM
+                print('wait CONFIRM')
                 packet = await self.recv_packet()
                 pkttype = packet.get_byte()
 
@@ -181,7 +183,8 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
                 # Start syncro loop
                 # Make client index/load file-list
-                self.client.prepare_index_list()
+                self.client.ioc.facade.replication.load_files_list(
+                    self.client.preset)
                 await self.pull()
                 await self.push()
 
@@ -206,8 +209,10 @@ class ReplicatorClientHandler(ReplicatorHandler):
         run = True
 
         while run:
+            print('send REQUEST pull')
             self.send_packet(Packets.RPL_REQUEST, None, String('pull'))
 
+            print('wait RESPONSE / DONE')
             packet = await self.recv_packet()
             pkttype = packet.get_byte()
 
@@ -219,9 +224,16 @@ class ReplicatorClientHandler(ReplicatorHandler):
             s_fileid, s_path, s_modified, s_deleted = self._process_response(
                 pkttype, None, packet)
 
+            print(s_fileid, s_path, s_modified, s_deleted)
+
+            s_full_path = self.client.preset.to_absolute(s_path)
+
             # Load file metadata
-            (c_fileid, c_path, c_deleted, c_modified
-             ) = self.client.file_meta(s_fileid)
+            (c_fileid, c_path, c_modified, c_deleted
+             ) = self.client.preset.pull_file_meta()
+            self.client.preset.file_processed(s_fileid)
+
+            c_rel_path = self.client.preset.to_relative(c_path)
 
             # Calculate what action to take based on client and server
             # file circumstances.
@@ -252,9 +264,10 @@ class ReplicatorClientHandler(ReplicatorHandler):
             else:
                 self._action = Actions.NO_ACTION
 
+            print('send SYNC')
             self.send_packet(
                 Packets.RPL_SYNC, None, String(self._action),
-                String(c_fileid.bytes), String(c_path),
+                String(c_fileid.bytes), String(c_rel_path),
                 String(c_modified.isoformat()), Boolean(c_deleted))
 
             packet = await self.recv_packet()
@@ -267,13 +280,13 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 continue
 
             if self._action == Actions.CLI_CREATE:
-                self.download(s_fileid, s_path)
+                await self.download(s_fileid, s_full_path)
             elif self._action == Actions.CLI_UPDATE:
-                self.download(s_fileid, s_path)
+                await self.download(s_fileid, s_full_path)
             elif self._action == Actions.SER_UPDATE:
-                self.upload(s_fileid, s_path)
+                await self.upload(s_fileid, s_full_path)
             elif self._action == Actions.CLI_DELETE:
-                self.delete(s_fileid)
+                await self.delete(s_fileid)
             else:
                 pass
 
@@ -290,6 +303,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             c_modified = ''
             c_deleted = ''
 
+            print('send REQUEST push')
             self.send_packet(
                 Packets.RPL_REQUEST, None, String('push'),
                 String(c_fileid.bytes), String(c_path),
@@ -347,14 +361,13 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 continue
 
             if self._action == Actions.SER_CREATE:
-                self.upload()
+                await self.upload()
             elif self._action == Actions.SER_UPDATE:
-                self.upload()
+                await self.upload()
             elif self._action == Actions.CLI_UPDATE:
-                self.download()
+                await self.download()
             elif self._action == Actions.CLI_DELETE:
-                # Delete file from local archive7.
-                pass
+                await self.delete(s_fileid)
             else:
                 pass
 
@@ -462,20 +475,23 @@ class ReplicatorClientHandler(ReplicatorHandler):
             raise Error(reason='Unsupported version: %d' % version, code=1)
 
         packet.check_end()
+        preset = self.client.preset
 
-        if self.client.preset.PRESET != 'custom':
+        if preset.preset != 'custom':
+            print('send OPERATION:', preset.preset)
             self.send_packet(
                 Packets.RPL_OPERATION, None, UInt32(VERSION),
-                String(self.client.modified.isoformat()),
-                String(self.client.preset.PRESET))
+                String(preset.modified.isoformat()),
+                String(preset.preset))
         else:
+            print('send OPERATION custom')
             self.send_packet(
                 Packets.RPL_OPERATION, None, UInt32(VERSION),
-                String(self.client.modified.isoformat()),
-                String(self.client.preset.PRESET),
-                String(self.client.preset.client['ARCHIVE']),
-                String(self.client.preset.client['PATH']),
-                String(self.client.preset.client['OWNER'].bytes))
+                String(preset.modified.isoformat()),
+                String(preset.preset),
+                String(preset.archive),
+                String(preset.path),
+                String(preset.owner.bytes))
 
     def _process_confirm(
             self, pkttype: int, pktid: int, packet: SSHPacket) -> bool:
@@ -500,7 +516,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             raise Error(reason='Expected response message', code=1)
 
         fileid = uuid.UUID(bytes=packet.get_string())
-        path = packet.get_string()
+        path = packet.get_string().decode()
         modified = datetime.datetime.fromisoformat(
             packet.get_string().decode())
         deleted = packet.get_boolean()
@@ -607,7 +623,6 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def run(self):
         """Replication server handler entry-point."""
-
         try:
             self._server.logger.info('Starting Replicator server')
             try:
@@ -635,12 +650,15 @@ class ReplicatorServerHandler(ReplicatorHandler):
                     raise Error(reason='Incompatible protocol version', code=1)
 
                 # Loop for receiving pull/push
+                self._server.ioc.facade.replication.load_files_list(
+                    self._preset)
                 run = True
                 while run:
                     packet = await self.recv_packet()
                     pkttype = packet.get_byte()
 
                     if pkttype == Packets.RPL_REQUEST:
+                        print('wait REQUEST')
                         await self._process_request(pkttype, None, packet)
                     elif pkttype == Packets.RPL_CLOSE:
                         run = False
@@ -677,17 +695,21 @@ class ReplicatorServerHandler(ReplicatorHandler):
             raise Error(reason='Expected operation message', code=1)
 
         version = packet.get_uint32()
-        self._modified = datetime.datetime.fromisoformat(
+        modified = datetime.datetime.fromisoformat(
             packet.get_string().decode())
-        self._preset = packet.get_string().decode()
+        preset_type = packet.get_string().decode()
 
-        if self._preset == 'custom':
-            self._archive = packet.get_string().decode()
-            self._path = packet.get_string().decode()
-            self._owner = uuid.UUID(bytes=packet.get_string())
+        if preset_type == 'custom':
+            archive = packet.get_string().decode()
+            path = packet.get_string().decode()
+            owner = uuid.UUID(bytes=packet.get_string())
+            self._preset = self._server.ioc.facade.replication.create_preset(
+                preset_type, Preset.SERVER, self._server.portfolio.entity.id,
+                modified=modified, archive=archive, path=path, owner=owner)
         else:
-            # Implement presets
-            pass
+            self._preset = self._server.ioc.facade.replication.create_preset(
+                preset_type, Preset.SERVER, self._server.portfolio.entity.id,
+                modified=modified)
 
         packet.check_end()
         return version
@@ -702,8 +724,10 @@ class ReplicatorServerHandler(ReplicatorHandler):
         _type = packet.get_string().decode()
 
         if _type == 'pull':
+            print('perform PULL')
             await self.pulled()
         elif _type == 'push':
+            print('perform PUSH')
             c_fileid = uuid.UUID(bytes=packet.get_string())
             c_path = packet.get_string().decode()
             c_modified = datetime.datetime.fromisoformat(
@@ -744,7 +768,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             raise Error(reason='Expected download message', code=1)
 
         fileid = uuid.UUID(bytes=packet.get_string())
-        path = packet.get_string()
+        path = packet.get_string().decode()
         packet.check_end()
 
         return fileid, path
@@ -782,7 +806,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             raise Error(reason='Expected upload message', code=1)
 
         fileid = uuid.UUID(bytes=packet.get_string())
-        path = packet.get_string()
+        path = packet.get_string().decode()
         packet.check_end()
 
         return fileid, path
@@ -823,15 +847,16 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def pulled(self):
         # Load a file from archive7 to be pulled
-        s_fileid = ''
-        s_path = ''
-        s_modified = ''
-        s_deleted = ''
+        (s_fileid, s_path, s_modified, s_deleted
+         ) = self._preset.pull_file_meta()
+        self._preset.file_processed(s_fileid)
+
+        s_rel_path = self._preset.to_relative(s_path)
 
         if s_fileid:
             self.send_packet(
                 Packets.RPL_RESPONSE, None, String(s_fileid.bytes),
-                String(s_path), String(s_modified.isoformat()),
+                String(s_rel_path), String(s_modified.isoformat()),
                 Boolean(s_deleted))
         else:
             self.send_packet(Packets.RPL_DONE, None)
@@ -842,6 +867,8 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
         action, c_fileid, c_path, c_modified, c_deleted = self._process_sync(
             pkttype, None, packet)
+
+        c_full_path = self._preset.to_absolute(c_path)
 
         # Calculate what action to take based on client and server
         # file circumstances.
@@ -879,14 +906,13 @@ class ReplicatorServerHandler(ReplicatorHandler):
             return
 
         if self._action == Actions.SER_CREATE:
-            self.uploading(c_fileid, c_path)
+            await self.uploading(c_fileid, c_full_path)
         elif self._action == Actions.SER_UPDATE:
-            self.uploading(c_fileid, c_path)
+            await self.uploading(c_fileid, c_full_path)
         elif self._action == Actions.CLI_UPDATE:
-            self.downloading(s_fileid, s_path)
+            await self.downloading(s_fileid, c_full_path)
         elif self._action == Actions.SER_DELETE:
-            # Delete file from local archive7.
-            pass
+            await self.delete(s_fileid)
         else:
             pass
 
@@ -946,14 +972,13 @@ class ReplicatorServerHandler(ReplicatorHandler):
             return
 
         if self._action == Actions.SER_CREATE:
-            self.uploading(c_fileid, c_path)
+            await self.uploading(c_fileid, c_path)
         elif self._action == Actions.SER_UPDATE:
-            self.uploading(c_fileid, c_path)
+            await self.uploading(c_fileid, c_path)
         elif self._action == Actions.CLI_UPDATE:
-            self.downloading(s_fileid, s_path)
+            await self.downloading(s_fileid, s_path)
         elif self._action == Actions.SER_DELETE:
-            # Delete file from local archive7.
-            pass
+            await self.delete(s_fileid)
         else:
             pass
 

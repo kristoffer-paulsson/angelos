@@ -137,7 +137,9 @@ class Globber:
             path: str='/', owner: uuid.UUID=None,
             modified: datetime.datetime=None, cmp_uuid: bool=False):
         with archive.lock:
-            sq = Archive7.Query(pattern=path)
+            pid = archive.ioc.operations.get_pid(path)
+            sq = Archive7.Query()
+            sq.parent(pid)
             if owner:
                 sq.owner(owner)
             if modified:

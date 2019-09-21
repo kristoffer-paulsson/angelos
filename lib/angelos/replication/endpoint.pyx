@@ -22,10 +22,9 @@ class ReplicatorClient(ContainerAware):
     def __init__(self, ioc, preset, modified=None):
         ContainerAware.__init__(self, ioc)
         self._preset = preset
-        self._archive = self.ioc.facade.archive(
-            self._preset.client['ARCHIVE']).archive
+        self._archive = self.ioc.facade.archive(self._preset.archive)
         self._modified = modified if modified else datetime.datetime(1, 1, 1)
-        self._path = self._preset.client['PATH']
+        self._path = self._preset.path
         self._owner = uuid.UUID(int=0)
         self._list = None
         self._processed = set()
@@ -38,16 +37,6 @@ class ReplicatorClient(ContainerAware):
     def modified(self):
         return self._modified
 
-    def prepare_index_list(self):
-        """Index and load the list of files to be replicated.
-
-        self._list[name] = (entry.id, entry.deleted, entry.modified)
-        """
-        self._list = Globber.syncro(
-            self._archive, self._path,
-            self._owner if self._owner.int else None,
-            self._modified, True)
-
     def file_meta(self, fileid: uuid.UUID=uuid.UUID(int=0)):
         """Get meta information of file according to fileid."""
         if fileid in self._processed:
@@ -57,13 +46,6 @@ class ReplicatorClient(ContainerAware):
         else:
             meta = self._list[fileid]
             return (fileid) + meta
-
-    def pull_meta(self):
-        """Pop meta information off """
-        fileid = self._list.keys().pop()
-        meta = self._list[fileid]
-        del self._list[fileid]
-        return (fileid) + meta
 
     def mark_processed(self, fileid):
         self._processed.add(fileid)
@@ -83,16 +65,22 @@ class ReplicatorClient(ContainerAware):
         await self.wait_closed()
 
 
-class ReplicatorServer:
+class ReplicatorServer(ContainerAware):
     """Replicator server."""
 
-    def __init__(self, conn):
+    def __init__(self, ioc, conn, portfolio):
+        ContainerAware.__init__(self, ioc)
         self._conn = conn
+        self._portfolio = portfolio
+
+    @property
+    def portfolio(self):
+        """The portfolio associated with this Replicator server session"""
+        return self._portfolio
 
     @property
     def channel(self):
         """The channel associated with this Replicator server session"""
-
         return self._chan
 
     @channel.setter
@@ -103,7 +91,6 @@ class ReplicatorServer:
     @property
     def connection(self):
         """The channel associated with this SFTP server session"""
-
         return self._chan.get_connection()
 
     @property

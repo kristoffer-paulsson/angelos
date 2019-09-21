@@ -12,7 +12,7 @@ Implementation of the replocator logic and protocol.
 """
 from .endpoint import ReplicatorClient, ReplicatorServer
 from .handler import ReplicatorClientHandler, ReplicatorServerHandler
-from .preset import MailPreset
+from .preset import Preset
 
 
 __all__ = [
@@ -22,5 +22,5 @@ __all__ = [
     'ReplicatorClientHandler',
     'ReplicatorServerHandler',
 
-    'MailPreset'
+    'Preset'
 ]
