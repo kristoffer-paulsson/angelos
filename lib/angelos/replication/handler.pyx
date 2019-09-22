@@ -146,11 +146,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
         self._packet_handler[Packets.RPL_DONE] = self._process_done
 
         self._preset = None
-        self._modified = datetime.datetime(1, 1, 1)
-        self._archive = None
-        self._path = None
-        self._owner = None
-        self._action = Actions.NO_ACTION
+        self._filesync = None
 
     @property
     def client(self):
@@ -221,54 +217,51 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 run = False
                 break
 
-            s_fileid, s_path, s_modified, s_deleted = self._process_response(
-                pkttype, None, packet)
+            s_fileinfo = self._process_response(pkttype, None, packet)
 
-            print(s_fileid, s_path, s_modified, s_deleted)
-
-            s_full_path = self.client.preset.to_absolute(s_path)
+            s_full_path = self.client.preset.to_absolute(s_fileinfo.path)
 
             # Load file metadata
-            (c_fileid, c_path, c_modified, c_deleted
-             ) = self.client.preset.pull_file_meta()
-            self.client.preset.file_processed(s_fileid)
+            c_fileinfo = self.client.preset.pull_file_meta()
+            self.client.preset.file_processed(c_fileinfo.fileid)
 
-            c_rel_path = self.client.preset.to_relative(c_path)
+            c_rel_path = self.client.preset.to_relative(c_fileinfo.path)
 
             # Calculate what action to take based on client and server
             # file circumstances.
-            if not c_fileid:
-                if s_deleted:
-                    self._action = Actions.NO_ACTION
+            if not c_fileinfo.fileid:
+                if s_fileinfo.deleted:
+                    s_fileinfo.action = Actions.NO_ACTION
                 else:
-                    self._action = Actions.CLI_CREATE
-            elif c_fileid and c_deleted:
-                if s_deleted:
-                    self._action = Actions.NO_ACTION
+                    s_fileinfo.action = Actions.CLI_CREATE
+            elif c_fileinfo.fileid and c_fileinfo.deleted:
+                if s_fileinfo.deleted:
+                    s_fileinfo.action = Actions.NO_ACTION
                 else:
-                    if c_modified > s_modified:
-                        self._action = Actions.SER_DELETE
+                    if c_fileinfo.modified > c_fileinfo.modified:
+                        s_fileinfo.action = Actions.SER_DELETE
                     else:
-                        self._action = Actions.CLI_UPDATE
-            elif c_fileid and not c_deleted:
-                if s_deleted:
-                    if c_modified > s_modified:
-                        self._action = Actions.SER_UPDATE
+                        s_fileinfo.action = Actions.CLI_UPDATE
+            elif c_fileinfo.fileid and not c_fileinfo.deleted:
+                if s_fileinfo.deleted:
+                    if c_fileinfo.modified > s_fileinfo.modified:
+                        s_fileinfo.action = Actions.SER_UPDATE
                     else:
-                        self._action = Actions.CLI_DELETE
+                        s_fileinfo.action = Actions.CLI_DELETE
                 else:
-                    if c_modified > s_modified:
-                        self._action = Actions.SER_UPDATE
+                    if c_fileinfo.modified > s_fileinfo.modified:
+                        s_fileinfo.action = Actions.SER_UPDATE
                     else:
-                        self._action = Actions.CLI_UPDATE
+                        s_fileinfo.action = Actions.CLI_UPDATE
             else:
-                self._action = Actions.NO_ACTION
+                s_fileinfo.action = Actions.NO_ACTION
 
             print('send SYNC')
             self.send_packet(
-                Packets.RPL_SYNC, None, String(self._action),
-                String(c_fileid.bytes), String(c_rel_path),
-                String(c_modified.isoformat()), Boolean(c_deleted))
+                Packets.RPL_SYNC, None, String(s_fileinfo.action),
+                String(c_fileinfo.fileid.bytes), String(c_rel_path),
+                String(c_fileinfo.modified.isoformat()),
+                Boolean(c_fileinfo.deleted))
 
             packet = await self.recv_packet()
             pkttype = packet.get_byte()
@@ -276,21 +269,23 @@ class ReplicatorClientHandler(ReplicatorHandler):
             if not self._process_confirm(pkttype, None, packet):
                 # raise Error(
                 #   reason='File sync action not confirmed by server.', code=1)
-                self._action = Actions.NO_ACTION
+                self._fileinfo = None
                 continue
+            else:
+                self._fileinfo = s_fileinfo
 
-            if self._action == Actions.CLI_CREATE:
-                await self.download(s_fileid, s_full_path)
-            elif self._action == Actions.CLI_UPDATE:
-                await self.download(s_fileid, s_full_path)
-            elif self._action == Actions.SER_UPDATE:
-                await self.upload(s_fileid, s_full_path)
-            elif self._action == Actions.CLI_DELETE:
-                await self.delete(s_fileid)
+            if self._fileinfo.action == Actions.CLI_CREATE:
+                await self.download()
+            elif self._fileinfo.action == Actions.CLI_UPDATE:
+                await self.download()
+            elif self._fileinfo.action == Actions.SER_UPDATE:
+                await self.upload()
+            elif self._fileinfo.action == Actions.CLI_DELETE:
+                await self.delete()
             else:
                 pass
 
-            self._action = Actions.NO_ACTION
+            self._fileinfo = Actions.NO_ACTION
 
     async def push(self):
         """Synchronize using push to the server."""
@@ -373,9 +368,10 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
             self._action = Actions.NO_ACTION
 
-    async def download(self, fileid: uuid.UUID, path: str) -> bool:
+    async def download(self) -> bool:
         self.send_packet(
-            Packets.RPL_DOWNLOAD, None, String(fileid.bytes), String(path))
+            Packets.RPL_DOWNLOAD, None,
+            String(self._fileinfo.fileid.bytes), String(self._fileinfo.path))
 
         packet = await self.recv_packet()
         pkttype = packet.get_byte()
@@ -389,11 +385,9 @@ class ReplicatorClientHandler(ReplicatorHandler):
         pkttype = packet.get_byte()
 
         data = b''
-        (pieces, size, digest, filename, created, modified, owner,
-            fileid, user, group, perms) = self._process_chunk(
-                pkttype, None, packet)
+        self._process_chunk(pkttype, None, packet)
 
-        for piece in range(pieces):
+        for piece in range(self._fileinfo.pieces):
             self.send_packet(
                 Packets.RPL_GET, None, String('data'), UInt32(piece))
             packet = await self.recv_packet()
@@ -401,20 +395,24 @@ class ReplicatorClientHandler(ReplicatorHandler):
             rpiece, data = self._process_chunk(pkttype, None, packet)
             if rpiece != piece:
                 raise Error(reason='Received wrong piece of data', code=1)
-            data += data
+            self._fileinfo.data += data
 
-        if len(data) == size and hashlib.sha1(data).digest() == digest:
+        data = self._fileinfo.data
+        if len(data) == self._fileinfo.size and hashlib.sha1(
+                data).digest() == self._fileinfo.digest:
             self.send_packet(Packets.RPL_DONE, None)
         else:
             self.send_packet(Packets.RPL_ABORT, None)
-            return
+            return False
 
-        # Verify checksum and write to archive7
-        self.client.file_meta(fileid)
+        self.client.ioc.facade.replication.save_file(
+            self._preset, self._fileinfo)
         return True
 
-    async def upload(self, fileid: uuid.UUID, path: str) -> bool:
+    async def upload(self) -> bool:
         # Load file from archive7
+        self.client.ioc.facade.replication.load_file(
+            self._preset, self._fileinfo)
         data = b''
         pieces = ''
         size = ''
@@ -508,21 +506,22 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
     def _process_response(
             self, pkttype: int, pktid: int, packet: SSHPacket
-            ) -> (uuid.UUID, str, datetime.datetime, bool):
+            ) -> FileSyncInfo:
         """Process response from request and return file information."""
         self.log_received_packet(pkttype, pktid, packet)
 
         if pkttype != Packets.RPL_RESPONSE:
             raise Error(reason='Expected response message', code=1)
 
-        fileid = uuid.UUID(bytes=packet.get_string())
-        path = packet.get_string().decode()
-        modified = datetime.datetime.fromisoformat(
+        fileinfo = FileSyncInfo()
+        fileinfo.fileid = uuid.UUID(bytes=packet.get_string())
+        fileinfo.path = packet.get_string().decode()
+        fileinfo.modified = datetime.datetime.fromisoformat(
             packet.get_string().decode())
-        deleted = packet.get_boolean()
+        fileinfo.deleted = packet.get_boolean()
         packet.check_end()
 
-        return fileid, path, modified, deleted
+        return fileinfo
 
     def _process_chunk(self, pkttype: int, pktid: int, packet: SSHPacket):
         self.log_received_packet(pkttype, pktid, packet)
@@ -530,27 +529,25 @@ class ReplicatorClientHandler(ReplicatorHandler):
         if pkttype != Packets.RPL_CHUNK:
             raise Error(reason='Expected data/meta chunk message', code=1)
 
-        meta = packet.get_string()
+        meta = packet.get_string().decode()
         if meta == 'meta':
-            pieces = packet.get_uint32()
-            size = packet.get_uint32()
-            digest = packet.get_string()
+            self._fileinfo.pieces = packet.get_uint32()
+            self._fileinfo.size = packet.get_uint32()
+            self._fileinfo.digest = packet.get_string()
 
-            filename = packet.get_string()
-            created = datetime.datetime.fromisoformat(
+            self._fileinfo.filename = packet.get_string().decode()
+            self._fileinfo.created = datetime.datetime.fromisoformat(
                 packet.get_string().decode())
-            modified = datetime.datetime.fromisoformat(
+            self._fileinfo.modified = datetime.datetime.fromisoformat(
                 packet.get_string().decode())
-            owner = uuid.UUID(bytes=packet.get_string())
-            fileid = uuid.UUID(bytes=packet.get_string())
-            user = packet.get_string()
-            group = packet.get_string()
-            perms = int.from_bytes(packet.get_bytes(2), 'big')
+            self._fileinfo.owner = uuid.UUID(bytes=packet.get_string())
+            self._fileinfo.fileid = uuid.UUID(bytes=packet.get_string())
+            self._fileinfo.user = packet.get_string()
+            self._fileinfo.group = packet.get_string()
+            self._fileinfo.perms = int.from_bytes(packet.get_bytes(2), 'big')
 
             packet.check_end()
-            return (
-                pieces, size, digest, filename, created, modified, owner,
-                fileid, user, group, perms)
+            return self._fileinfo
         else:
             piece = packet.get_uint32()
             data = packet.get_string()
@@ -564,7 +561,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
         if pkttype != Packets.RPL_RECEIVED:
             raise Error(reason='Expected received message', code=1)
 
-        meta = packet.get_string()
+        meta = packet.get_string().decode()
         if meta == 'meta':
             packet.check_end()
             return True
@@ -779,8 +776,9 @@ class ReplicatorServerHandler(ReplicatorHandler):
         if pkttype != Packets.RPL_GET:
             raise Error(reason='Expected get message', code=1)
 
-        _type = packet.get_string()
+        _type = packet.get_string().decode()
         piece = packet.get_uint32()
+
         if _type == 'meta':
             # Get meta from loaded file
             pieces = ''
@@ -797,6 +795,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             self.send_packet(
                 Packets.RPL_CHUNK, None, UInt32(piece), String(data))
         else:
+            print(_type)
             raise Error(reason='Illegal get type.', code=1)
 
     def _process_upload(self, pkttype, pktid, packet):
@@ -817,7 +816,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
         if pkttype != Packets.RPL_PUT:
             raise Error(reason='Expected put message', code=1)
 
-        _type = packet.get_string()
+        _type = packet.get_string().decode()
         piece = packet.get_uint32()
         if _type == 'meta':
             # Get meta from loaded file
@@ -985,16 +984,18 @@ class ReplicatorServerHandler(ReplicatorHandler):
         self._action = Actions.NO_ACTION
 
     async def downloading(self, fileid: uuid.UUID, path: str):
+        print('wait DOWNLOAD')
         packet = await self.recv_packet()
         pkttype = packet.get_byte()
 
         fileid, path = self._process_download(pkttype, None, packet)
 
         # Check whether file exists and is OK
-
+        print('send CONFIRM DOWNLOAD')
         self.send_packet(
             Packets.RPL_CONFIRM, None, Boolean(True))
 
+        print('wait GET')
         packet = await self.recv_packet()
         pkttype = packet.get_byte()
 

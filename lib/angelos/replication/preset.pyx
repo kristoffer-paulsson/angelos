@@ -18,6 +18,25 @@ from ..const import Const
 from ..facade.mail import MailAPI
 
 
+class FileSyncInfo:
+    def __init__(self):
+        self.action = ''
+        self.fileid = uuid.UUID(int=0)
+        self.path = ''
+        self.deleted = None
+        self.pieces = 0
+        self.size = 0
+        self.digest = b''
+        self.filename = ''
+        self.created = datetime.datetime(1, 1, 1)
+        self.modified = datetime.datetime(1, 1, 1)
+        self.owner = uuid.UUID(int=0)
+        self.user = b''
+        self.group = b''
+        self.perms = 0x0
+        self.data = b''
+
+
 class Preset:
     """Preset operation.
 
@@ -80,16 +99,22 @@ class Preset:
         """Already replicated files ID:s."""
         return self._processed
 
-    def pull_file_meta(self) -> Tuple[str, uuid.UUID, datetime.datetime, bool]:
+    def pull_file_meta(self) -> FileSyncInfo:
         """Pop meta information off."""
         keys = list(self.files.keys())
         if keys:
             fileid = keys.pop()
         else:
-            return (None, None, None, None)
+            return FileSyncInfo()
         meta = self.files[fileid]
         del self.files[fileid]
-        return (fileid, ) + meta
+
+        fileinfo = FileSyncInfo()
+        fileinfo.fileid = fileid
+        fileinfo.path = meta[0]
+        fileinfo.modified = meta[1]
+        fileinfo.deleted = meta[2]
+        return fileinfo
 
     def file_processed(self, fileid: uuid.UUID):
         self.processed.add(fileid)
