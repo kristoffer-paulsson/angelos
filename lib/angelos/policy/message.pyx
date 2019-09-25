@@ -31,7 +31,7 @@ REPORT_TEXT = {
         'A message which content is defaming or slanderous towards someone.',
     'Offensive': 'A message which content is detestable or repulsive.',
     'Hateful': 'A message that is malicious or insulting and spreads hate.',
-    'Incitement': 'Incitement to mischief and spread hate or commit crimes.',
+    'Sedition': 'Sedition to mischief and spread hate or commit crimes.',
     'Harassment': 'A message is considered to be harassment or stalking.',
     'Menace':
         'A message is intimidating and menacing or contains direct threats.',
@@ -84,7 +84,7 @@ class ReportType(enum.Enum):
     DEFAMATION = 'Defamation'
     OFFENSIVE = 'Offensive'
     HATEFUL = 'Hateful'
-    INCITEMENT = 'Incitement'
+    SEDITION = 'Sedition'
     HARASSMENT = 'Harassment'
     MENACE = 'Menace'
     BLACKMAIL = 'Blackmail'
