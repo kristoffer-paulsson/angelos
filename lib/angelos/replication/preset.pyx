@@ -12,7 +12,6 @@ for several purposes.
 import uuid
 import datetime
 import pathlib
-from typing import Tuple
 
 from ..const import Const
 from ..facade.mail import MailAPI
@@ -20,7 +19,6 @@ from ..facade.mail import MailAPI
 
 class FileSyncInfo:
     def __init__(self):
-        self.action = ''
         self.fileid = uuid.UUID(int=0)
         self.path = ''
         self.deleted = None
@@ -111,6 +109,22 @@ class Preset:
 
         fileinfo = FileSyncInfo()
         fileinfo.fileid = fileid
+        fileinfo.path = meta[0]
+        fileinfo.modified = meta[1]
+        fileinfo.deleted = meta[2]
+        return fileinfo
+
+    def get_file_meta(self, keys: uuid.UUID) -> FileSyncInfo:
+        """Pop meta information off."""
+        if keys in list(self.files.keys()):
+            meta = self.files[keys]
+        else:
+            return FileSyncInfo()
+
+        del self.files[keys]
+
+        fileinfo = FileSyncInfo()
+        fileinfo.fileid = keys
         fileinfo.path = meta[0]
         fileinfo.modified = meta[1]
         fileinfo.deleted = meta[2]
