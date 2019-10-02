@@ -20,10 +20,9 @@ class StatementPolicy(Policy):
     def verified(issuer: PrivatePortfolio, owner: Portfolio) -> Verified:
         """Issue a verified statement."""
 
-        verified = Verified(nd={
-            'issuer': issuer.entity.id,
-            'owner': owner.entity.id
-        })
+        verified = Verified(
+            nd={"issuer": issuer.entity.id, "owner": owner.entity.id}
+        )
 
         verified = Crypto.sign(verified, issuer)
         verified.validate()
@@ -37,10 +36,9 @@ class StatementPolicy(Policy):
     def trusted(issuer: PrivatePortfolio, owner: Portfolio) -> Trusted:
         """Issue a trusted statement."""
 
-        trusted = Trusted(nd={
-            'issuer': issuer.entity.id,
-            'owner': owner.entity.id
-        })
+        trusted = Trusted(
+            nd={"issuer": issuer.entity.id, "owner": owner.entity.id}
+        )
 
         trusted = Crypto.sign(trusted, issuer)
         trusted.validate()
@@ -57,10 +55,9 @@ class StatementPolicy(Policy):
         if isinstance(statement, Revoked):
             return False
 
-        revoked = Revoked(nd={
-            'issuer': issuer.entity.id,
-            'issuance': statement.id
-        })
+        revoked = Revoked(
+            nd={"issuer": issuer.entity.id, "issuance": statement.id}
+        )
 
         revoked = Crypto.sign(revoked, issuer)
         revoked.validate()
@@ -70,20 +67,18 @@ class StatementPolicy(Policy):
 
     @staticmethod
     def validate_verified(
-            issuer: PrivatePortfolio, owner: Portfolio) -> Verified:
+        issuer: PrivatePortfolio, owner: Portfolio
+    ) -> Verified:
         """Validate that the owners verification is valid. Return document"""
         valid_verified = None
-        for verified in (
-                issuer.issuer.verified |
-                owner.owner.verified):
+        for verified in issuer.issuer.verified | owner.owner.verified:
             if (
                 verified.owner == owner.entity.id
-                    ) and verified.issuer == issuer.entity.id:
+            ) and verified.issuer == issuer.entity.id:
                 try:
                     valid = True
                     valid = verified.validate() if valid else valid
-                    valid = Crypto.verify(
-                        verified, issuer) if valid else valid
+                    valid = Crypto.verify(verified, issuer) if valid else valid
                 except Exception:
                     valid = False
                 if valid:
@@ -93,20 +88,18 @@ class StatementPolicy(Policy):
 
     @staticmethod
     def validate_trusted(
-            issuer: PrivatePortfolio, owner: Portfolio) -> Trusted:
+        issuer: PrivatePortfolio, owner: Portfolio
+    ) -> Trusted:
         """Validate that the owners trustedness is valid. Return document."""
         valid_trusted = None
-        for trusted in (
-                issuer.issuer.trusted |
-                owner.owner.trusted):
+        for trusted in issuer.issuer.trusted | owner.owner.trusted:
             if (
                 trusted.owner == owner.entity.id
-                    ) and trusted.issuer == issuer.entity.id:
+            ) and trusted.issuer == issuer.entity.id:
                 try:
                     valid = True
                     valid = trusted.validate() if valid else valid
-                    valid = Crypto.verify(
-                        trusted, issuer) if valid else valid
+                    valid = Crypto.verify(trusted, issuer) if valid else valid
                 except Exception:
                     valid = False
                 if valid:

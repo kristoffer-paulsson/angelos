@@ -30,39 +30,42 @@ server.
 
     def __init__(self, io, ioc):
         """Initialize the command. Takes a list of Command classes."""
-        Command.__init__(self, 'dummy', io)
+        Command.__init__(self, "dummy", io)
         self._ioc = ioc
 
     async def _command(self, opts):
         """Do entity setup."""
-        if opts['mail']:
-            eid = uuid.UUID('urn:uuid:' + str(opts['mail']))
+        if opts["mail"]:
+            eid = uuid.UUID("urn:uuid:" + str(opts["mail"]))
             entity = await self._ioc.facade.load_portfolio(
-                eid, PGroup.VERIFIER)
+                eid, PGroup.VERIFIER
+            )
             mail = self._ioc.facade.archive(Const.CNL_MAIL)
             if not mail:
-                self._io << 'No transit mailbox found. Fail!'
+                self._io << "No transit mailbox found. Fail!"
                 return
 
             for i in range(5):
                 msg = EnvelopePolicy.wrap(
-                    self._ioc.facade.portfolio, entity, MessagePolicy.mail(
-                        self._ioc.facade.portfolio, entity).message(
-                            generate_filename(postfix='.'),
-                            generate_data().decode()).done())
+                    self._ioc.facade.portfolio,
+                    entity,
+                    MessagePolicy.mail(self._ioc.facade.portfolio, entity)
+                    .message(
+                        generate_filename(postfix="."),
+                        generate_data().decode(),
+                    )
+                    .done(),
+                )
 
                 filename = str(msg.id) + DOCUMENT_PATTERN[DocType.COM_ENVELOPE]
-                self._io << ('Generating random mail (%s) to %s\n' % (
-                    filename, str(eid)))
-                await mail.save('/' + filename, msg)
+                self._io << (
+                    "Generating random mail (%s) to %s\n"
+                    % (filename, str(eid))
+                )
+                await mail.save("/" + filename, msg)
 
     def _rules(self):
-        return {
-            'exclusive': [
-                'mail'],
-            'option': [
-                'mail'],
-        }
+        return {"exclusive": ["mail"], "option": ["mail"]}
 
     def _options(self):
         """
@@ -72,13 +75,14 @@ server.
         """
         return [
             Option(
-                'mail',
-                abbr='m',
+                "mail",
+                abbr="m",
                 type=Option.TYPE_VALUE,
-                help='Send messages to a user'),
-            ]
+                help="Send messages to a user",
+            )
+        ]
 
     @classmethod
     def factory(cls, **kwargs):
         """Create command with env from IoC."""
-        return cls(kwargs['io'], kwargs['ioc'])
+        return cls(kwargs["io"], kwargs["ioc"])

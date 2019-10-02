@@ -24,15 +24,27 @@ class Parser:
         """Argument parser configuration."""
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            '-l', '--listen',  choices=Const.OPT_LISTEN,
-            dest='listen', default='localhost',
-            help='listen to a network interface. (localhost)')
+            "-l",
+            "--listen",
+            choices=Const.OPT_LISTEN,
+            dest="listen",
+            default="localhost",
+            help="listen to a network interface. (localhost)",
+        )
         parser.add_argument(
-            '-p', '--port',
-            dest='port', default=22, type=int,
-            help='listen to a network port. (22)')
+            "-p",
+            "--port",
+            dest="port",
+            default=22,
+            type=int,
+            help="listen to a network port. (22)",
+        )
         parser.add_argument(
-            '-d', '--daemon',  choices=['start', 'stop', 'resume', 'suspend'],
-            dest='daemon', default=None,
-            help='run server as a daemon.')
+            "-d",
+            "--daemon",
+            choices=["start", "stop", "resume", "suspend"],
+            dest="daemon",
+            default=None,
+            help="run server as a daemon.",
+        )
         return parser

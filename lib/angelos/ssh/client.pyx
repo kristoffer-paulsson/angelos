@@ -13,14 +13,23 @@ import asyncio
 
 from ..policy import StatementPolicy, PGroup
 from ..replication import (
-    ReplicatorServerHandler, ReplicatorServer, ReplicatorClientHandler,
-    ReplicatorClient, Preset)
+    ReplicatorServerHandler,
+    ReplicatorServer,
+    ReplicatorClientHandler,
+    ReplicatorClient,
+    Preset,
+)
 from .ssh import SSHServer, SSHClient
 from .nacl import NaClKey
 
 from asyncssh import (
-    SSHServerSession, SSHReader, SSHWriter, BreakReceived,
-    SignalReceived, SSHClientSession)
+    SSHServerSession,
+    SSHReader,
+    SSHWriter,
+    BreakReceived,
+    SignalReceived,
+    SSHClientSession,
+)
 from asyncssh.stream import SSHStreamSession
 
 
@@ -29,20 +38,24 @@ class ClientsClient(SSHClient):
         """Start mail replication operation."""
         try:
             writer, reader, _ = await self._connection.open_session(
-                subsystem='replicator', encoding=None)
+                subsystem="replicator", encoding=None
+            )
             preset = self.ioc.facade.replication.create_preset(
-                Preset.T_MAIL, Preset.CLIENT,
-                self.ioc.facade.portfolio.entity.id)
+                Preset.T_MAIL,
+                Preset.CLIENT,
+                self.ioc.facade.portfolio.entity.id,
+            )
             repclient = ReplicatorClient(self.ioc, preset)
             session = ClientReplicatorSession()
             handler = session.start_replicator_client(
-                repclient, reader, writer, 'mail')
+                repclient, reader, writer, "mail"
+            )
 
             await handler
             # if asyncio.iscoroutine(handler):
             #    self._connection.create_task(handler, stderr.logger)
         except Exception as e:
-            logging.exception('Client mail repliction faulire')
+            logging.exception("Client mail repliction faulire")
             raise e
 
 
@@ -51,13 +64,13 @@ class ClientReplicatorSession(SSHStreamSession, SSHClientSession):
 
     @asyncio.coroutine
     async def start_replicator_client(
-            self, replicator_client, reader, writer, preset='custom'):
+        self, replicator_client, reader, writer, preset="custom"
+    ):
         """Return a handler for an SFTP server session"""
         replicator_client.channel = self._chan
-        handler = ReplicatorClientHandler(
-            replicator_client, reader, writer)
-        handler.logger.info('Starting Replicator client')
-        return (await handler.start())
+        handler = ReplicatorClientHandler(replicator_client, reader, writer)
+        handler.logger.info("Starting Replicator client")
+        return await handler.start()
 
 
 class ClientsServer(SSHServer):
@@ -69,30 +82,33 @@ class ClientsServer(SSHServer):
 
     @asyncio.coroutine
     async def begin_auth(self, username):
-        logging.info('Begin authentication for: %s' % username)
+        logging.info("Begin authentication for: %s" % username)
 
         try:
             issuer = uuid.UUID(username)
             self._portfolio = await self.ioc.facade.load_portfolio(
-                issuer, PGroup.CLIENT_AUTH)
+                issuer, PGroup.CLIENT_AUTH
+            )
 
             if StatementPolicy.validate_trusted(
-                    self.ioc.facade.portfolio, self._portfolio):
+                self.ioc.facade.portfolio, self._portfolio
+            ):
                 self._client_keys = [
-                    NaClKey.factory(key) for key in self._portfolio.keys]
+                    NaClKey.factory(key) for key in self._portfolio.keys
+                ]
         except OSError as e:
-            logging.error('User not found: %s' % username)
+            logging.error("User not found: %s" % username)
             self._client_keys = []
 
         return True
 
     def validate_public_key(self, username, key):
-        logging.info('Authentication for a user')
-        logging.debug('%s' % username)
+        logging.info("Authentication for a user")
+        logging.debug("%s" % username)
         return key in self._client_keys
 
     def session_requested(self):
-        logging.debug('Session requested')
+        logging.debug("Session requested")
         return ServerReplicatorSession(True, self.ioc, self._portfolio)
 
 
@@ -113,7 +129,7 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
 
     def subsystem_requested(self, subsystem):
         """Return whether starting a subsystem can be requested"""
-        if subsystem == 'replicator':
+        if subsystem == "replicator":
             return bool(self._allow_replicator)
 
         return False
@@ -123,13 +139,15 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
         reader = SSHReader(self, self._chan)
         writer = SSHWriter(self, self._chan)
 
-        if self._chan.get_subsystem() == 'replicator':
+        if self._chan.get_subsystem() == "replicator":
             self._chan.set_encoding(None)
             self._encoding = None
 
             handler = self.__run_replicator_server(
-                ReplicatorServer(
-                    self._ioc, self._conn, self._portfolio), reader, writer)
+                ReplicatorServer(self._ioc, self._conn, self._portfolio),
+                reader,
+                writer,
+            )
         else:
             handler = None
 
@@ -152,4 +170,4 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
         """Return a handler for an SFTP server session"""
         replicator_server.channel = self._chan
         handler = ReplicatorServerHandler(replicator_server, reader, writer)
-        return (await handler.run())
+        return await handler.run()

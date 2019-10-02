@@ -27,7 +27,8 @@ class Container:
         if name not in self.__instances:
             if name not in self.__config:
                 raise Util.exception(
-                    Error.IOC_NOT_CONFIGURED, {'service': name})
+                    Error.IOC_NOT_CONFIGURED, {"service": name}
+                )
             elif callable(self.__config[name]):
                 try:
                     self.__instances[name] = self.__config[name](self)
@@ -36,7 +37,8 @@ class Container:
                     raise e
             else:
                 raise Util.exception(
-                    Error.IOC_LAMBDA_EXPECTED, {'service': name})
+                    Error.IOC_LAMBDA_EXPECTED, {"service": name}
+                )
         return self.__instances[name]
 
 
@@ -86,7 +88,7 @@ class Handle:
 
     def __delete__(self, instance):
         """Handle can not be deleted. It is immutable."""
-        raise ValueError('Can not delete handle for %s' % self.__name)
+        raise ValueError("Can not delete handle for %s" % self.__name)
 
     def __set_name__(self, owner, name):
         """Set the attribute name."""
@@ -94,14 +96,15 @@ class Handle:
 
 
 class StaticHandle(Handle):
-
     def __set__(self, instance, value):
         """
         Set the handle instance.
 
         Handle is immutable and can only be set once.
         """
-        if self.__value: raise ValueError(  # noqa E701
-            'Handle already set for %s' % self.__name)
+        if self.__value:
+            raise ValueError(  # noqa E701
+                "Handle already set for %s" % self.__name
+            )
         Util.is_type(value, self.__type)
         self.__value = value

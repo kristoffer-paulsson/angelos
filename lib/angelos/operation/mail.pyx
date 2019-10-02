@@ -17,7 +17,6 @@ from ..document import Message
 
 
 class MailOperation(Operation):
-
     @staticmethod
     async def open_envelope(facade: Facade, envelope_id: uuid.UUID) -> Message:
         """Open an envelope and verify its content according to policies."""

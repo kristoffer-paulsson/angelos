@@ -27,6 +27,7 @@ class PrivatePortfolioABC(metaclass=abc.ABCMeta):
 @dataclass
 class PersonData(BaseDataClass):
     """Initial data for Person document."""
+
     given_name: str
     family_name: str
     names: List[str]
@@ -35,32 +36,34 @@ class PersonData(BaseDataClass):
 
     def _asdict(self) -> dict:
         return {
-            'given_name': self.given_name,
-            'family_name': self.family_name,
-            'names': self.names,
-            'sex': self.sex,
-            'born': self.born
+            "given_name": self.given_name,
+            "family_name": self.family_name,
+            "names": self.names,
+            "sex": self.sex,
+            "born": self.born,
         }
 
 
 @dataclass
 class MinistryData(BaseDataClass):
     """Initial data for Ministry document."""
+
     ministry: str
     vision: str
     founded: datetime.date
 
     def _asdict(self) -> dict:
         return {
-            'ministry': self.ministry,
-            'vision': self.vision,
-            'founded': self.founded
+            "ministry": self.ministry,
+            "vision": self.vision,
+            "founded": self.founded,
         }
 
 
 @dataclass
 class ChurchData(BaseDataClass):
     """Initial data for Church document."""
+
     city: str
     region: str
     country: str
@@ -68,10 +71,10 @@ class ChurchData(BaseDataClass):
 
     def _asdict(self) -> dict:
         return {
-            'city': self.city,
-            'region': self.region,
-            'country': self.country,
-            'founded': self.founded
+            "city": self.city,
+            "region": self.region,
+            "country": self.country,
+            "founded": self.founded,
         }
 
 

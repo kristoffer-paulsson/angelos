@@ -11,14 +11,13 @@ Entity mixin for shared fields.
 from ..utils import Util
 from ..error import Error
 
-from .model import (
-    DocumentMeta, ChoiceField, DateField, StringField)
+from .model import DocumentMeta, ChoiceField, DateField, StringField
 
 
 class PersonMixin(metaclass=DocumentMeta):
     """Mixin for person specific fields."""
 
-    sex = ChoiceField(choices=['man', 'woman', 'undefined'])
+    sex = ChoiceField(choices=["man", "woman", "undefined"])
     born = DateField()
     names = StringField(multiple=True)
     family_name = StringField()
@@ -29,8 +28,8 @@ class PersonMixin(metaclass=DocumentMeta):
         if self.given_name not in self.names:
             raise Util.exception(
                 Error.DOCUMENT_PERSON_NAMES,
-                {'name': self.given_name,
-                 'not_in': self.names})
+                {"name": self.given_name, "not_in": self.names},
+            )
         return True
 
 

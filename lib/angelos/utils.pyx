@@ -21,6 +21,7 @@ from .error import ERROR_INFO
 
 class Event(asyncio.Event):
     """A threadsafe asynchronous event class."""
+
     def set(self):
         self._loop.call_soon_threadsafe(super().set)
 
@@ -29,7 +30,7 @@ class Util:
     """@todo."""
 
     __app_path = os.path.dirname(os.path.abspath(sys.argv[0]))
-    __usr_path = os.path.expanduser('~')
+    __usr_path = os.path.expanduser("~")
     __exe_path = os.path.abspath(os.getcwd())
 
     @staticmethod
@@ -66,8 +67,10 @@ class Util:
         """
         if not isinstance(instance, types):
             raise TypeError(
-                'Instance expected type {0}, but got: {1}'.format(
-                    str(types), str(instance)))
+                "Instance expected type {0}, but got: {1}".format(
+                    str(types), str(instance)
+                )
+            )
 
     @staticmethod
     def is_class(instance, types):
@@ -83,8 +86,10 @@ class Util:
         """
         if not issubclass(instance, types):
             raise TypeError(
-                'Subclass expected type {0}, but got: {1}'.format(
-                    str(types), str(instance)))
+                "Subclass expected type {0}, but got: {1}".format(
+                    str(types), str(instance)
+                )
+            )
 
     @staticmethod
     def is_path(instance):
@@ -99,8 +104,8 @@ class Util:
         """
         if not isinstance(instance, os.PathLike):
             raise TypeError(
-                'Path like object expected, but got: {0}'.format(
-                    str(instance)))
+                "Path like object expected, but got: {0}".format(str(instance))
+            )
 
     @staticmethod
     def exception(error_code, debug_info={}):
@@ -111,19 +116,20 @@ class Util:
         debug = []
         if debug_info:
             for k in debug_info:
-                debug.append('{k}: {i}'.format(k=k, i=debug_info[k]))
-                debug_text = ': [{data}]'.format(data=', '.join(debug))
+                debug.append("{k}: {i}".format(k=k, i=debug_info[k]))
+                debug_text = ": [{data}]".format(data=", ".join(debug))
         else:
-            debug_text = '.'
+            debug_text = "."
         return ERROR_INFO[error_code][0](
-            '{msg}{debug}'.format(
-                msg=ERROR_INFO[error_code][1], debug=debug_text))
+            "{msg}{debug}".format(
+                msg=ERROR_INFO[error_code][1], debug=debug_text
+            )
+        )
 
     @staticmethod
-    def format_exception(exception_type,
-                         instance,
-                         message='Formated exception',
-                         debug_info={}):
+    def format_exception(
+        exception_type, instance, message="Formated exception", debug_info={}
+    ):
         """
         format_exception is a helper function. It will populate and format an
         exception so that it is understandable and include good debug data.
@@ -153,13 +159,14 @@ class Util:
 
         debug = []
         for k in debug_info:
-            debug.append('{0}: {1}'.format(k, debug_info[k]))
+            debug.append("{0}: {1}".format(k, debug_info[k]))
         if isinstance(instance, object):
             name = instance.__class__.__name__
         else:
             name = instance
         exc = exception_type(
-            '{0}, "{1}" - debug: {2}'.format(name, message, ', '.join(debug)))
+            '{0}, "{1}" - debug: {2}'.format(name, message, ", ".join(debug))
+        )
         return exc
 
     @staticmethod
@@ -184,12 +191,12 @@ class Util:
         Util.is_type(data, (dict, type(None)))
 
         if not data:
-            return '{0}.'.format(event_str)
+            return "{0}.".format(event_str)
         else:
             info = []
             for k in data:
-                info.append('{0}: {1}'.format(k, data[k]))
-            return '{0}. Info: ({1})'.format(event_str, ', '.join(info))
+                info.append("{0}: {1}".format(k, data[k]))
+            return "{0}. Info: ({1})".format(event_str, ", ".join(info))
 
     @staticmethod
     def format_error(caught_exception, event_str):
@@ -212,10 +219,8 @@ class Util:
         Util.is_type(caught_exception, Exception)
         Util.is_type(event_str, str)
 
-        return '{0}, Class: {1}:{2}'.format(
-            event_str,
-            str(type(caught_exception)),
-            caught_exception
+        return "{0}, Class: {1}:{2}".format(
+            event_str, str(type(caught_exception)), caught_exception
         )
 
     @staticmethod
@@ -231,32 +236,33 @@ class Util:
         c_instance = klass()
         """
         Util.is_type(path, str)
-        pkg = path.rsplit('.', 1)
+        pkg = path.rsplit(".", 1)
         return getattr(importlib.import_module(pkg[0]), pkg[1])
 
     @staticmethod
     def class_pkg(klass):
         """Docstring"""
-        return '{0}.{1}'.format(
-            klass.__class__.__module__,
-            klass.__class__.__name__)
+        return "{0}.{1}".format(
+            klass.__class__.__module__, klass.__class__.__name__
+        )
 
     @staticmethod
     def hours(seconds):
         """Docstring"""
-        if seconds > 24*3600:
-            return '{:>7.2}d'.format(float(seconds/(24*3600)))
+        if seconds > 24 * 3600:
+            return "{:>7.2}d".format(float(seconds / (24 * 3600)))
         else:
             seconds = int(seconds)
             hour = int(seconds / 3600)
             mins = int(seconds / 60)
-            secs = seconds - hour*3600 - mins*60
-            return '{:}:{:02}:{:02}'.format(hour, mins, secs)
+            secs = seconds - hour * 3600 - mins * 60
+            return "{:}:{:02}:{:02}".format(hour, mins, secs)
 
 
 class FactoryInterface:
     """Docstring"""
+
     @classmethod
     def factory(cls, **kwargs):
         """Docstring"""
-        return cls(kwargs['io'])
+        return cls(kwargs["io"])

@@ -13,6 +13,7 @@ class ArithmeticCoderBase(object):
     """
     # Provides the state and behaviors that arithmetic coding encoders and decoders share.
     """  # noqa E501
+
     def __init__(self, numbits):
         """
         # Constructs an arithmetic coder, which initializes the code range.
@@ -72,8 +73,11 @@ class ArithmeticCoderBase(object):
         # State check
         low = self.low
         high = self.high
-        if low >= high or (low & self.state_mask) != low or (
-                high & self.state_mask) != high:
+        if (
+            low >= high
+            or (low & self.state_mask) != low
+            or (high & self.state_mask) != high
+        ):
             raise AssertionError("Low or high out of range")
         range = high - low + 1
         if not (self.minimum_range <= range <= self.full_range):
@@ -97,7 +101,7 @@ class ArithmeticCoderBase(object):
         # While low and high have the same top bit value, shift them out
         while ((self.low ^ self.high) & self.half_range) == 0:
             self.shift()
-            self.low = ((self.low << 1) & self.state_mask)
+            self.low = (self.low << 1) & self.state_mask
             self.high = ((self.high << 1) & self.state_mask) | 1
         # Now low's top bit must be 0 and high's top bit must be 1
 
@@ -105,8 +109,9 @@ class ArithmeticCoderBase(object):
         while (self.low & ~self.high & self.quarter_range) != 0:
             self.underflow()
             self.low = (self.low << 1) ^ self.half_range
-            self.high = ((
-                self.high ^ self.half_range) << 1) | self.half_range | 1
+            self.high = (
+                ((self.high ^ self.half_range) << 1) | self.half_range | 1
+            )
 
     def shift(self):
         """
@@ -125,6 +130,7 @@ class ArithmeticEncoder(ArithmeticCoderBase):
     """
     # Encodes symbols and writes to an arithmetic-coded bit stream.
     """
+
     def __init__(self, numbits, bitout):
         """
         # Constructs an arithmetic coding encoder based on the given bit output stream.
@@ -169,6 +175,7 @@ class ArithmeticDecoder(ArithmeticCoderBase):
     """
     # Reads from an arithmetic-coded bit stream and decodes symbols.
     """
+
     def __init__(self, numbits, bitin):
         """
         # Constructs an arithmetic coding decoder based on the
@@ -212,9 +219,11 @@ class ArithmeticDecoder(ArithmeticCoderBase):
         assert start + 1 == end
 
         symbol = start
-        assert freqs.get_low(
-            symbol) * range // total <= offset < freqs.get_high(
-                symbol) * range // total
+        assert (
+            freqs.get_low(symbol) * range // total
+            <= offset
+            < freqs.get_high(symbol) * range // total
+        )
         self.update(freqs, symbol)
         if not (self.low <= self.code <= self.high):
             raise AssertionError("Code out of range")
@@ -224,8 +233,11 @@ class ArithmeticDecoder(ArithmeticCoderBase):
         self.code = ((self.code << 1) & self.state_mask) | self.read_code_bit()
 
     def underflow(self):
-        self.code = (self.code & self.half_range) | (
-            (self.code << 1) & (self.state_mask >> 1)) | self.read_code_bit()
+        self.code = (
+            (self.code & self.half_range)
+            | ((self.code << 1) & (self.state_mask >> 1))
+            | self.read_code_bit()
+        )
 
     def read_code_bit(self):
         """
@@ -305,7 +317,9 @@ class FlatFrequencyTable(FrequencyTable):
         """
         if numsyms < 1:
             raise ValueError("Number of symbols must be positive")
-        self.numsymbols = numsyms  # Total number of symbols, which is at least 1  # noqa E501
+        self.numsymbols = (
+            numsyms
+        )  # Total number of symbols, which is at least 1  # noqa E501
 
     def get_symbol_limit(self):
         """
@@ -538,7 +552,9 @@ class CheckedFrequencyTable(FrequencyTable):
             low = self.freqtable.get_low(symbol)
             high = self.freqtable.get_high(symbol)
             if not (0 <= low <= high <= self.freqtable.get_total()):
-                raise AssertionError("Symbol low cumulative frequency out of range")  # noqa E501
+                raise AssertionError(
+                    "Symbol low cumulative frequency out of range"
+                )  # noqa E501
             return low
         else:
             self.freqtable.get_low(symbol)
@@ -549,7 +565,9 @@ class CheckedFrequencyTable(FrequencyTable):
             low = self.freqtable.get_low(symbol)
             high = self.freqtable.get_high(symbol)
             if not (0 <= low <= high <= self.freqtable.get_total()):
-                raise AssertionError("Symbol high cumulative frequency out of range")  # noqa E501
+                raise AssertionError(
+                    "Symbol high cumulative frequency out of range"
+                )  # noqa E501
             return high
         else:
             self.freqtable.get_high(symbol)

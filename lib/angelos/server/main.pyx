@@ -26,6 +26,7 @@ class Application:
     def run(self):
         """Start and run application."""
         from .server import Server
+
         Server().run()
 
 
@@ -36,8 +37,14 @@ class Daemonizer:
     Usage: daemonize a subclassed Application class
     """
 
-    def __init__(self, app, pidfile,
-                 stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(
+        self,
+        app,
+        pidfile,
+        stdin="/dev/null",
+        stdout="/dev/null",
+        stderr="/dev/null",
+    ):
         """Initialize the daemonizer."""
         self.__app = app
         self.__stdin = stdin
@@ -53,12 +60,12 @@ class Daemonizer:
                 sys.exit(0)
         except OSError as e:
             sys.stderr.write(
-                'fork #1 failed: {:d} ({:})\n'.format(e.errno, e.strerror)
+                "fork #1 failed: {:d} ({:})\n".format(e.errno, e.strerror)
             )
             sys.exit(1)
 
         # decouple from parent environment
-        os.chdir('/')
+        os.chdir("/")
         os.setsid()
         os.umask(0)
 
@@ -70,7 +77,7 @@ class Daemonizer:
                 sys.exit(0)
         except OSError as e:
             sys.stderr.write(
-                'fork #2 failed: {:d} ({:})\n'.format(e.errno, e.strerror)
+                "fork #2 failed: {:d} ({:})\n".format(e.errno, e.strerror)
             )
             sys.exit(1)
 
@@ -78,18 +85,18 @@ class Daemonizer:
         sys.stdout.flush()
         sys.stderr.flush()
 
-        with open(self.__stdin, 'r') as si:
+        with open(self.__stdin, "r") as si:
             os.dup2(si.fileno(), sys.stdin.fileno())
-        with open(self.__stdout, 'a+') as so:
+        with open(self.__stdout, "a+") as so:
             os.dup2(so.fileno(), sys.stdout.fileno())
-        with open(self.__stderr, 'wb+', 0) as se:
+        with open(self.__stderr, "wb+", 0) as se:
             os.dup2(se.fileno(), sys.stderr.fileno())
 
         # write pidfile
         atexit.register(self.__delpid)
         pid = str(os.getpid())
-        with open(self.__pidfile, 'w+') as pidf:
-            pidf.write('{:}\n'.format(pid))
+        with open(self.__pidfile, "w+") as pidf:
+            pidf.write("{:}\n".format(pid))
 
     def __delpid(self):
         os.remove(self.__pidfile)
@@ -98,7 +105,7 @@ class Daemonizer:
         """Start the daemon."""
         # Check for a pidfile to see if the daemon already __runs
         try:
-            with open(self.__pidfile, 'r') as pf:
+            with open(self.__pidfile, "r") as pf:
                 pid = int(pf.read().strip())
                 pf.close()
         except IOError:
@@ -118,7 +125,7 @@ class Daemonizer:
         """Stop the daemon."""
         # Get the pid from the pidfile
         try:
-            with open(self.__pidfile, 'r') as pf:
+            with open(self.__pidfile, "r") as pf:
                 pid = int(pf.read().strip())
                 pf.close()
         except IOError:
@@ -133,7 +140,7 @@ class Daemonizer:
         try:
             while True:
                 os.kill(pid, signal.SIGTERM)
-                time.sleep(.1)
+                time.sleep(0.1)
         except OSError as err:
             err = str(err)
             if err.find("No such process") > 0:
@@ -154,11 +161,9 @@ def start():
     app = Application()
     parser = Parser()
 
-    if parser.args.daemon == 'start':
-        Daemonizer(
-            app, '/tmp/angelos.pid').start()
-    elif parser.args.daemon == 'stop':
-        Daemonizer(
-            app, '/tmp/angelos.pid').stop()
+    if parser.args.daemon == "start":
+        Daemonizer(app, "/tmp/angelos.pid").start()
+    elif parser.args.daemon == "stop":
+        Daemonizer(app, "/tmp/angelos.pid").stop()
     else:
         app.run()

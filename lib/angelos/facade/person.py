@@ -44,17 +44,17 @@ class PersonFacade(BaseFacade):
         if secret:
             box = libnacl.secret.SecretBox(
                 libnacl.encode.hex_decode(
-                    plyer.keystore.get_key('Λόγῳ', 'conceal')))
+                    plyer.keystore.get_key("Λόγῳ", "conceal")
+                )
+            )
             self.__secret = box.decrypt(base64.b64decode(secret))
 
-    class Entity(collections.namedtuple('Entity', [
-        'given_name',
-        'names',
-        'family_name',
-        'born',
-        'gender',
-        'type'
-    ])):
+    class Entity(
+        collections.namedtuple(
+            "Entity",
+            ["given_name", "names", "family_name", "born", "gender", "type"],
+        )
+    ):
         __slots__ = ()
 
     @property
@@ -65,15 +65,12 @@ class PersonFacade(BaseFacade):
     def id(self):
         return self.__facade.id
 
-    class Address(collections.namedtuple('Address', [
-        'street',
-        'number',
-        'address2',
-        'zip',
-        'city',
-        'state',
-        'country'
-    ])):
+    class Address(
+        collections.namedtuple(
+            "Address",
+            ["street", "number", "address2", "zip", "city", "state", "country"],
+        )
+    ):
         __slots__ = ()
 
     @property
@@ -112,10 +109,7 @@ class PersonFacade(BaseFacade):
         Util.is_type(phone, (str, type(None)))
         self.__facade.phone = phone
 
-    class Social(collections.namedtuple('Social', [
-        'token',
-        'media',
-    ])):
+    class Social(collections.namedtuple("Social", ["token", "media"])):
         __slots__ = ()
 
     @property
@@ -132,13 +126,13 @@ class PersonFacade(BaseFacade):
         except KeyError:
             pass
 
-    class Contacts(collections.namedtuple('Address', [
-        'favorites',
-        'friends',
-        'family',
-        'blocked',
-        'all',
-    ], defaults=([], [], [], [], []))):
+    class Contacts(
+        collections.namedtuple(
+            "Address",
+            ["favorites", "friends", "family", "blocked", "all"],
+            defaults=([], [], [], [], []),
+        )
+    ):
         __slots__ = ()
 
     @property
@@ -170,8 +164,8 @@ class PersonFacade(BaseFacade):
 
         # Creating and signing the identitys public keys
         keys = Keys()
-        keys.public = self.__keys.hex_pk().decode('utf-8')
-        keys.verify = self.__keys.hex_vk().decode('utf-8')
+        keys.public = self.__keys.hex_pk().decode("utf-8")
+        keys.verify = self.__keys.hex_vk().decode("utf-8")
         keys = self.__issue(entity.id, keys)
 
         # Createing and signing the network document
@@ -183,7 +177,7 @@ class PersonFacade(BaseFacade):
         node = Node()
         node.owner = entity.id
         node.network = network.id
-        node.role = 'client'
+        node.role = "client"
         node.device = platform.platform()
         node.serial = plyer.uniqueid.id
         node = self.__issue(entity.id, node)
@@ -193,18 +187,26 @@ class PersonFacade(BaseFacade):
 
         # Setting up the concealed archives.
         box = libnacl.secret.SecretBox()
-        skey = str(box.hex_sk(), 'utf_8')
-        plyer.keystore.set_key('Λόγῳ', 'conceal', skey)
+        skey = str(box.hex_sk(), "utf_8")
+        plyer.keystore.set_key("Λόγῳ", "conceal", skey)
 
         self.__secret = libnacl.secret.SecretBox().sk
-        with open(self.__path + '/default.yml', 'w') as config:
-            config.write(yaml.dump({
-                'configured': True, 'key': base64.b64encode(
-                    box.encrypt(self.__secret))},
-                default_flow_style=False, allow_unicode=True,
-                explicit_start=True, explicit_end=True))
+        with open(self.__path + "/default.yml", "w") as config:
+            config.write(
+                yaml.dump(
+                    {
+                        "configured": True,
+                        "key": base64.b64encode(box.encrypt(self.__secret)),
+                    },
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    explicit_start=True,
+                    explicit_end=True,
+                )
+            )
         self.__entity = EntityArchive.setup(
-            self.__path, self.__secret, entity, network)
+            self.__path, self.__secret, entity, network
+        )
 
         # Importing the new identity
         self.import_new_person(entity, keys)
@@ -213,84 +215,89 @@ class PersonFacade(BaseFacade):
 
         # Configuring the facade and saving settings
         data = entity.export_str()
-        self.__configure({
-            'id': str(entity.id),
-            'entity': {
-                'given_name': data['given_name'],
-                'names': data['names'],
-                'family_name': data['family_name'],
-                'born': data['born'],
-                'gender': data['gender'],
-                'type': 'person'
-            },
-            'keys': {
-                'secret': self.__keys.hex_sk().decode('utf-8'),
-                'seed': self.__keys.hex_seed().decode('utf-8'),
+        self.__configure(
+            {
+                "id": str(entity.id),
+                "entity": {
+                    "given_name": data["given_name"],
+                    "names": data["names"],
+                    "family_name": data["family_name"],
+                    "born": data["born"],
+                    "gender": data["gender"],
+                    "type": "person",
+                },
+                "keys": {
+                    "secret": self.__keys.hex_sk().decode("utf-8"),
+                    "seed": self.__keys.hex_seed().decode("utf-8"),
+                },
             }
-        })
+        )
         self.__save_identity()
 
     def __configure(self, data):
         Util.is_type(data, dict)
 
         try:
-            address = self.Address(**data['address'])
+            address = self.Address(**data["address"])
         except (KeyError, TypeError):
             address = None
 
         try:
-            email = data['email']
+            email = data["email"]
         except (KeyError, TypeError):
             email = None
 
         try:
-            mobile = data['mobile']
+            mobile = data["mobile"]
         except (KeyError, TypeError):
             mobile = None
 
         try:
-            phone = data['phone']
+            phone = data["phone"]
         except (KeyError, TypeError):
             phone = None
 
         try:
             social = {}
-            for media in data['social']:
-                social[data['social'][media]['media'].lower()] = self.Social(
-                    data['social'][media]['token'],
-                    data['social'][media]['media'])
+            for media in data["social"]:
+                social[data["social"][media]["media"].lower()] = self.Social(
+                    data["social"][media]["token"],
+                    data["social"][media]["media"],
+                )
         except (KeyError, TypeError):
             social = {}
 
         try:
-            contacts = self.Contacts(**data['contacts'])
+            contacts = self.Contacts(**data["contacts"])
         except (KeyError):
             contacts = self.Contacts()
 
         try:
-            picture = data['picture']
+            picture = data["picture"]
         except (KeyError, TypeError):
             picture = None
 
         self.__facade = self.Facade(
-            id=str(uuid.UUID(data['id'])),
-            entity=self.Entity(**data['entity']),
+            id=str(uuid.UUID(data["id"])),
+            entity=self.Entity(**data["entity"]),
             address=address,
             email=email,
             mobile=mobile,
             phone=phone,
             social=social,
             contacts=contacts,
-            picture=picture)
+            picture=picture,
+        )
 
         self.__keys = libnacl.dual.DualSecret(
-            libnacl.encode.hex_decode(data['keys']['secret']),
-            libnacl.encode.hex_decode(data['keys']['seed']))
+            libnacl.encode.hex_decode(data["keys"]["secret"]),
+            libnacl.encode.hex_decode(data["keys"]["seed"]),
+        )
 
         self.__configured = True
 
     def __load_identity(self):
-        return self.__entity.read('/identity.pickle')
+        return self.__entity.read("/identity.pickle")
 
     def __save_identity(self):
         if bool(self.__facade.address):
@@ -306,29 +313,29 @@ class PersonFacade(BaseFacade):
             social = {}
 
         data = {
-            'id': str(uuid.UUID(self.__facade.id)),
-            'entity': self.__facade.entity._asdict(),
-            'address': address,
-            'email': self.__facade.email,
-            'mobile': self.__facade.mobile,
-            'phone': self.__facade.phone,
-            'social': social,
-            'contacts': self.__facade.contacts._asdict(),
-            'picture':  self.__facade.picture,
-            'keys': {
-                'secret': self.__keys.hex_sk().decode('utf-8'),
-                'seed': self.__keys.hex_seed().decode('utf-8'),
-            }
+            "id": str(uuid.UUID(self.__facade.id)),
+            "entity": self.__facade.entity._asdict(),
+            "address": address,
+            "email": self.__facade.email,
+            "mobile": self.__facade.mobile,
+            "phone": self.__facade.phone,
+            "social": social,
+            "contacts": self.__facade.contacts._asdict(),
+            "picture": self.__facade.picture,
+            "keys": {
+                "secret": self.__keys.hex_sk().decode("utf-8"),
+                "seed": self.__keys.hex_seed().decode("utf-8"),
+            },
         }
 
         pckl = pickle.dumps(data, pickle.DEFAULT_PROTOCOL)
         try:
-            self.__entity.archive.info('/identity.pickle')
-            self.__entity.archive.save('/identity.pickle', data=pckl)
+            self.__entity.archive.info("/identity.pickle")
+            self.__entity.archive.save("/identity.pickle", data=pckl)
         except ArchiveInvalidFile as e:
             self.__entity.archive.mkfile(
-                '/identity.pickle', data=pckl,
-                owner=uuid.UUID(self.__facade.id))
+                "/identity.pickle", data=pckl, owner=uuid.UUID(self.__facade.id)
+            )
 
     def __issue(self, id, document):
         Util.is_type(id, uuid.UUID)
@@ -336,8 +343,11 @@ class PersonFacade(BaseFacade):
         Util.is_type(document, IssueMixin)
 
         document.sign(
-            id, self.__keys.signature(
-                bytes(str(id) + document.data_msg(), 'utf-8')))
+            id,
+            self.__keys.signature(
+                bytes(str(id) + document.data_msg(), "utf-8")
+            ),
+        )
         return document
 
     def __verify(self, document, keys):
@@ -357,12 +367,13 @@ class PersonFacade(BaseFacade):
         if isinstance(document.signature, list):
             verified = False
             for signature in document.signature:
-                signature = bytes(
-                    base64.standard_b64decode(signature))
+                signature = bytes(base64.standard_b64decode(signature))
                 try:
-                    verificator.verify(signature +
-                                       bytes(document.issuer, 'utf-8') +
-                                       bytes(document.data_msg(), 'utf-8'))
+                    verificator.verify(
+                        signature
+                        + bytes(document.issuer, "utf-8")
+                        + bytes(document.data_msg(), "utf-8")
+                    )
                     verified = True
                 except ValueError:
                     pass
@@ -370,9 +381,10 @@ class PersonFacade(BaseFacade):
         else:
             try:
                 verificator.verify(
-                    bytes(base64.standard_b64decode(document.signature)) +
-                    bytes(str(document.issuer), 'utf-8') +
-                    bytes(document.data_msg(), 'utf-8'))
+                    bytes(base64.standard_b64decode(document.signature))
+                    + bytes(str(document.issuer), "utf-8")
+                    + bytes(document.data_msg(), "utf-8")
+                )
             except ValueError:
                 return False
             return True
@@ -416,12 +428,12 @@ class PersonFacade(BaseFacade):
             raise Exception()
 
         # Importing the identitys public keys
-        self.__entity.create(
-            '/keys/'+str(keys.id)+'.pickle', keys)
+        self.__entity.create("/keys/" + str(keys.id) + ".pickle", keys)
 
         # Importing the owners identity
         self.__entity.create(
-            '/entities/persons/'+str(entity.id)+'.pickle', entity)
+            "/entities/persons/" + str(entity.id) + ".pickle", entity
+        )
 
     def set_network(self, network, keys):
         Util.is_type(network, Network)
@@ -448,8 +460,7 @@ class PersonFacade(BaseFacade):
             raise Exception()
 
         # Importing the identitys public keys
-        self.__entity.create(
-            '/settings/network.pickle', network)
+        self.__entity.create("/settings/network.pickle", network)
 
     def import_new_node(self, node, network, keys):
         Util.is_type(node, Node)
@@ -492,31 +503,43 @@ class PersonFacade(BaseFacade):
 
         # Importing the identitys public keys
         self.__entity.create(
-            '/settings/nodes/'+str(node.id)+'.pickle', node)
+            "/settings/nodes/" + str(node.id) + ".pickle", node
+        )
 
     def find_person(self, issuer):
-        res = self.__entity.search('/entities/persons', uuid.UUID(issuer))
-        output = ''
+        res = self.__entity.search("/entities/persons", uuid.UUID(issuer))
+        output = ""
         for doc in res:
             output += yaml.dump(
                 Person(doc, False).export_conf(),
-                default_flow_style=False, allow_unicode=True,
-                explicit_start=True, explicit_end=True)
+                default_flow_style=False,
+                allow_unicode=True,
+                explicit_start=True,
+                explicit_end=True,
+            )
         return output
 
     def find_keys(self, issuer):
-        res = self.__entity.search('/keys', uuid.UUID(issuer))
-        output = ''
+        res = self.__entity.search("/keys", uuid.UUID(issuer))
+        output = ""
         for doc in res:
             output += yaml.dump(
                 Keys(doc, False).export_conf(),
-                default_flow_style=False, allow_unicode=True,
-                explicit_start=True, explicit_end=True)
+                default_flow_style=False,
+                allow_unicode=True,
+                explicit_start=True,
+                explicit_end=True,
+            )
         return output
 
     def export_yaml(self, data={}):
-        return yaml.dump(data, default_flow_style=False, allow_unicode=True,
-                         explicit_start=True, explicit_end=True)
+        return yaml.dump(
+            data,
+            default_flow_style=False,
+            allow_unicode=True,
+            explicit_start=True,
+            explicit_end=True,
+        )
 
     def _finalize(self):
         if self.__entity:

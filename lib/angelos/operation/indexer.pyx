@@ -42,46 +42,51 @@ class Indexer(Operation):
         """
         global _networks_run
         if _networks_run:
-            logging.info('Networks indexing already running.')
+            logging.info("Networks indexing already running.")
             return
         else:
             _networks_run = True
 
-        logging.info('Start indexing networks')
+        logging.info("Start indexing networks")
         portfolio = await self.__facade.load_portfolio(
-            self.__facade.portfolio.entity.id, PGroup.ALL)
+            self.__facade.portfolio.entity.id, PGroup.ALL
+        )
         datalist = await self.__facade._vault.search(
-            path='/portfolios/*/*.net', limit=200)
+            path="/portfolios/*/*.net", limit=200
+        )
         network_list = set()
 
         async def validate_trust(data: bytes):
             network = PortfolioPolicy.deserialize(data)
             network_portfolio = await self.__facade.load_portfolio(
-                network.issuer, PGroup.ALL)
+                network.issuer, PGroup.ALL
+            )
 
             valid_trusted = False
             valid_trusting = False
 
             trusted_docs = (
-                    portfolio.owner.trusted |
-                    network_portfolio.issuer.trusted |
-                    portfolio.issuer.trusted |
-                    network_portfolio.owner.trusted)
+                portfolio.owner.trusted
+                | network_portfolio.issuer.trusted
+                | portfolio.issuer.trusted
+                | network_portfolio.owner.trusted
+            )
 
             if len(trusted_docs) == 0:
-                network_list.add(
-                    (network.issuer, False))
+                network_list.add((network.issuer, False))
             else:
                 for trusted in trusted_docs:
-                    if (
-                            trusted.owner == portfolio.entity.id
-                            ) and (
-                            trusted.issuer == network_portfolio.entity.id):
+                    if (trusted.owner == portfolio.entity.id) and (
+                        trusted.issuer == network_portfolio.entity.id
+                    ):
                         try:
                             valid = True
                             valid = trusted.validate() if valid else valid
-                            valid = Crypto.verify(
-                                trusted, network_portfolio) if valid else valid
+                            valid = (
+                                Crypto.verify(trusted, network_portfolio)
+                                if valid
+                                else valid
+                            )
                         except Exception:
                             valid = False
 
@@ -89,12 +94,15 @@ class Indexer(Operation):
                             valid_trusted = True
                     if (
                         trusted.issuer == portfolio.entity.id
-                            ) and trusted.owner == network_portfolio.entity.id:
+                    ) and trusted.owner == network_portfolio.entity.id:
                         try:
                             valid = True
                             valid = trusted.validate() if valid else valid
-                            valid = Crypto.verify(
-                                trusted, portfolio) if valid else valid
+                            valid = (
+                                Crypto.verify(trusted, portfolio)
+                                if valid
+                                else valid
+                            )
                         except Exception:
                             valid = False
 
@@ -102,7 +110,8 @@ class Indexer(Operation):
                             valid_trusting = True
 
                 network_list.add(
-                    (network.issuer, valid_trusted and valid_trusting))
+                    (network.issuer, valid_trusted and valid_trusting)
+                )
 
         for data in datalist:
             await validate_trust(data)
@@ -112,6 +121,7 @@ class Indexer(Operation):
         writer.writerows(network_list)
 
         await self.__facade._vault.save_settings(
-            'networks.csv', csvdata.getvalue().encode())
-        logging.info('Done indexing networks')
+            "networks.csv", csvdata.getvalue().encode()
+        )
+        logging.info("Done indexing networks")
         _networks_run = False

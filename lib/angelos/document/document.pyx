@@ -15,8 +15,13 @@ import enum
 from ..utils import Util
 from ..error import Error
 from .model import (
-    DocumentMeta, BaseDocument, UuidField, DateField, TypeField,
-    SignatureField)
+    DocumentMeta,
+    BaseDocument,
+    UuidField,
+    DateField,
+    TypeField,
+    SignatureField,
+)
 
 
 class IssueMixin(metaclass=DocumentMeta):
@@ -40,11 +45,16 @@ class UpdatedMixin(metaclass=DocumentMeta):
     def _validate(self):
         try:
             if bool(self.updated):
-                if self.expires - self.updated > datetime.timedelta(13*365/12):
+                if self.expires - self.updated > datetime.timedelta(
+                    13 * 365 / 12
+                ):
                     raise Util.exception(
                         Error.DOCUMENT_SHORT_EXPIREY,
-                        {'expected': datetime.timedelta(13*365/12),
-                         'current': self.expires - self.updated})
+                        {
+                            "expected": datetime.timedelta(13 * 365 / 12),
+                            "current": self.expires - self.updated,
+                        },
+                    )
         except AttributeError:
             pass
         return True
@@ -52,40 +62,47 @@ class UpdatedMixin(metaclass=DocumentMeta):
     def renew(self):
         today = datetime.date.today()
         self.updated = today
-        self.expires = today + datetime.timedelta(13*365/12)
+        self.expires = today + datetime.timedelta(13 * 365 / 12)
         self.signature = None
 
 
 class Document(IssueMixin, BaseDocument):
     id = UuidField(init=uuid.uuid4)
     created = DateField(init=datetime.date.today)
-    expires = DateField(init=lambda: (
-        datetime.date.today() + datetime.timedelta(13*365/12)))
+    expires = DateField(
+        init=lambda: (
+            datetime.date.today() + datetime.timedelta(13 * 365 / 12)
+        )
+    )
     type = TypeField(value=0)
 
     def _validate(self):
-        sdate = self.updated if getattr(
-            self, 'updated', None) else self.created
-        if self.expires - sdate > datetime.timedelta(13*365/12):
+        sdate = (
+            self.updated if getattr(self, "updated", None) else self.created
+        )
+        if self.expires - sdate > datetime.timedelta(13 * 365 / 12):
             raise Util.exception(
                 Error.DOCUMENT_SHORT_EXPIREY,
-                {'expected': datetime.timedelta(13*365/12),
-                 'current': self.expires - self.created})
+                {
+                    "expected": datetime.timedelta(13 * 365 / 12),
+                    "current": self.expires - self.created,
+                },
+            )
         return True
 
     def _check_type(self, _type):
         if not self.type == _type:
             raise Util.exception(
                 Error.DOCUMENT_INVALID_TYPE,
-                {'expected': _type,
-                 'current': self.type})
+                {"expected": _type, "current": self.type},
+            )
 
     def _check_validate(self, _list):
         for cls in _list:
             cls._validate(self)
 
     def expires_soon(self):
-        month = self.expires - datetime.timedelta(days=365/12)
+        month = self.expires - datetime.timedelta(days=365 / 12)
         today = datetime.date.today()
         if today >= month and today <= self.expires:
             return True

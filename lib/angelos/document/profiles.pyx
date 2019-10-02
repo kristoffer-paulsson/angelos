@@ -9,8 +9,15 @@ This file is distributed under the terms of the MIT license.
 Module docstring.
 """
 from .model import (
-    BaseDocument, StringField, DateField, ChoiceField, EmailField, BinaryField,
-    DocumentField, TypeField)
+    BaseDocument,
+    StringField,
+    DateField,
+    ChoiceField,
+    EmailField,
+    BinaryField,
+    DocumentField,
+    TypeField,
+)
 from .document import DocType, Document, UpdatedMixin, IssueMixin
 from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
@@ -50,7 +57,7 @@ class Profile(Document, UpdatedMixin):
 
 class PersonProfile(Profile, PersonMixin):
     type = TypeField(value=DocType.PROF_PERSON)
-    gender = ChoiceField(required=False, choices=['man', 'woman', 'undefined'])
+    gender = ChoiceField(required=False, choices=["man", "woman", "undefined"])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
@@ -59,8 +66,15 @@ class PersonProfile(Profile, PersonMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Profile, UpdatedMixin,
-                    PersonProfile, PersonMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Profile,
+            UpdatedMixin,
+            PersonProfile,
+            PersonMixin,
+        ]
         self._check_validate(validate)
         return True
 
@@ -73,8 +87,15 @@ class MinistryProfile(Profile, MinistryMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Profile, UpdatedMixin,
-                    MinistryProfile, MinistryMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Profile,
+            UpdatedMixin,
+            MinistryProfile,
+            MinistryMixin,
+        ]
         self._check_validate(validate)
         return True
 
@@ -87,7 +108,14 @@ class ChurchProfile(Profile, ChurchMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Profile, UpdatedMixin,
-                    ChurchProfile, ChurchMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Profile,
+            UpdatedMixin,
+            ChurchProfile,
+            ChurchMixin,
+        ]
         self._check_validate(validate)
         return True

@@ -43,22 +43,20 @@ class Field:
         """Validate according to basic field functionality."""
         if self.required and not bool(value):
             logging.debug('Field with "required" not set. (%s)' % value)
-            raise Util.exception(Error.FIELD_NOT_SET, {'field': name})
+            raise Util.exception(Error.FIELD_NOT_SET, {"field": name})
 
         if not self.multiple and isinstance(value, list):
             logging.debug('Field not "multiple" but list. (%s)' % value)
-            raise Util.exception(Error.FIELD_NOT_MULTIPLE, {
-                'type': type(self),
-                'value': value,
-                'field': name
-            })
+            raise Util.exception(
+                Error.FIELD_NOT_MULTIPLE,
+                {"type": type(self), "value": value, "field": name},
+            )
         if self.multiple and not isinstance(value, (list, type(None))):
             logging.debug('Field "multiple" but not list. (%s)' % value)
-            raise Util.exception(Error.FIELD_IS_MULTIPLE, {
-                'type': type(self),
-                'value': value,
-                'field': name
-            })
+            raise Util.exception(
+                Error.FIELD_IS_MULTIPLE,
+                {"type": type(self), "value": value, "field": name},
+            )
         return True
 
     def from_bytes(self, v):
@@ -85,12 +83,12 @@ def conv_dont(f, v):
 
 def conv_str(f, v):
     """Str convertion activator."""
-    return f.str(v) if v else ''
+    return f.str(v) if v else ""
 
 
 def conv_bytes(f, v):
     """Bytes convertion activator."""
-    return f.bytes(v) if v else b''
+    return f.bytes(v) if v else b""
 
 
 def conv_yaml(f, v):
@@ -109,8 +107,8 @@ class DocumentMeta(type):
         """Create new class."""
         fields = {}
         for base in bases:
-            if '_fields' in base.__dict__:
-                fields = {**fields, **base.__dict__['_fields']}
+            if "_fields" in base.__dict__:
+                fields = {**fields, **base.__dict__["_fields"]}
 
         for fname, field in namespace.items():
             if isinstance(field, Field):
@@ -121,7 +119,7 @@ class DocumentMeta(type):
             if fname in ns:
                 del ns[fname]
 
-        ns['_fields'] = fields
+        ns["_fields"] = fields
         return super().__new__(self, name, bases, ns)
 
 
@@ -139,8 +137,13 @@ class BaseDocument(metaclass=DocumentMeta):
         Receives a dictionary of values and populates the fields.
         """
         for name, field in self._fields.items():
-            object.__setattr__(self, name, field.init() if (
-                bool(field.init) and not bool(field.value)) else field.value)
+            object.__setattr__(
+                self,
+                name,
+                field.init()
+                if (bool(field.init) and not bool(field.value))
+                else field.value,
+            )
 
         for key, value in nd.items():
             try:
@@ -161,7 +164,8 @@ class BaseDocument(metaclass=DocumentMeta):
                     object.__setattr__(self, key, value)
                 else:
                     raise AttributeError(
-                        'Invalid value "%s" for field "%s"'.format(value, key))
+                        'Invalid value "%s" for field "%s"'.format(value, key)
+                    )
             except ModelException:
                 pass
         else:
@@ -171,11 +175,11 @@ class BaseDocument(metaclass=DocumentMeta):
     def build(cls, data):
         """Build document from dictionary, takes dict or list of dicts."""
         doc = {}
-        logging.debug('Exporting document %s' % type(cls))
+        logging.debug("Exporting document %s" % type(cls))
 
         for name, field in cls._fields.items():
             value = data[name]
-            logging.debug('%s, %s, %s' % (type(field), name, value))
+            logging.debug("%s, %s, %s" % (type(field), name, value))
 
             if not field.multiple:
                 doc[name] = field.from_bytes(value)
@@ -218,22 +222,28 @@ class BaseDocument(metaclass=DocumentMeta):
         Fields can be converted during export into String or Bytes.
         """
         nd = {}
-        logging.debug('Exporting document %s' % type(self))
+        logging.debug("Exporting document %s" % type(self))
 
         for name, field in self._fields.items():
             value = getattr(self, name)
-            logging.debug('%s, %s, %s' % (type(field), name, value))
+            logging.debug("%s, %s, %s" % (type(field), name, value))
 
             if not field.multiple:
-                nd[name] = c(field, value) if not isinstance(
-                    value, BaseDocument) else value.export(c)
+                nd[name] = (
+                    c(field, value)
+                    if not isinstance(value, BaseDocument)
+                    else value.export(c)
+                )
             elif isinstance(value, type(None)):
                 nd[name] = []
             else:
                 item_list = []
                 for item in value:
-                    item_list.append(c(field, item) if not isinstance(
-                        item, BaseDocument) else item.export(c))
+                    item_list.append(
+                        c(field, item)
+                        if not isinstance(item, BaseDocument)
+                        else item.export(c)
+                    )
                 nd[name] = item_list
         return nd
 
@@ -264,8 +274,9 @@ class BaseDocument(metaclass=DocumentMeta):
 class DocumentField(Field):
     """Field that holds one or several Documents as field."""
 
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, t=None):
+    def __init__(
+        self, value=None, required=True, multiple=False, init=None, t=None
+    ):
         Field.__init__(self, value, required, multiple, init)
         """Set a type to be accepted in particular"""
         self.type = t
@@ -281,12 +292,15 @@ class DocumentField(Field):
             if isinstance(v, (BaseDocument, self.type)):
                 v._validate()
             elif not isinstance(v, type(None)):
-                logging.debug('Field is not BaseDocument but %s' % type(v))
+                logging.debug("Field is not BaseDocument but %s" % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': type(BaseDocument),
-                     'current': type(v),
-                     'field': name})
+                    {
+                        "expected": type(BaseDocument),
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
 
         return True
 
@@ -304,11 +318,15 @@ class UuidField(Field):
 
         for v in value:
             if not isinstance(v, (uuid.UUID, type(None))):
-                logging.debug('Field is not UUID but %s' % type(v))
+                logging.debug("Field is not UUID but %s" % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'uuid.UUID',
-                     'current': type(v), 'field': name})
+                    {
+                        "expected": "uuid.UUID",
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
         return True
 
     def from_bytes(self, value):
@@ -336,13 +354,18 @@ class IPField(Field):
             value = [value]
 
         for v in value:
-            if not isinstance(v, (
-                    ipaddress.IPv4Address, ipaddress.IPv6Address, type(None))):
-                logging.debug('Field is not IPaddress but %s' % type(v))
+            if not isinstance(
+                v, (ipaddress.IPv4Address, ipaddress.IPv6Address, type(None))
+            ):
+                logging.debug("Field is not IPaddress but %s" % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'ipaddress.IPv[4|6]Address',
-                     'current': type(v), 'field': name})
+                    {
+                        "expected": "ipaddress.IPv[4|6]Address",
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
         return True
 
     def from_bytes(self, value):
@@ -355,7 +378,8 @@ class IPField(Field):
             return ipaddress.IPv6Address(value)
         else:
             raise TypeError(
-                'Not bytes of length 4 or 8. %s %s' % (length, value))
+                "Not bytes of length 4 or 8. %s %s" % (length, value)
+            )
 
     def str(self, value):
         """Str converter."""
@@ -364,11 +388,11 @@ class IPField(Field):
     def bytes(self, value):
         """Bytes converter."""
         if isinstance(value, ipaddress.IPv4Address):
-            return int(value).to_bytes(4, byteorder='big')
+            return int(value).to_bytes(4, byteorder="big")
         if isinstance(value, ipaddress.IPv6Address):
-            return int(value).to_bytes(8, byteorder='big')
+            return int(value).to_bytes(8, byteorder="big")
         else:
-            raise TypeError('Arbitrary size: %s' % len(value))
+            raise TypeError("Arbitrary size: %s" % len(value))
 
     def yaml(self, value):
         """YAML converter."""
@@ -385,11 +409,15 @@ class DateField(Field):
 
         for v in value:
             if not isinstance(v, (datetime.date, type(None))):
-                logging.debug('Field is not datetime.date but %s' % type(v))
+                logging.debug("Field is not datetime.date but %s" % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'datetime.date',
-                     'current': type(v), 'field': name})
+                    {
+                        "expected": "datetime.date",
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
         return True
 
     def from_bytes(self, value):
@@ -414,16 +442,21 @@ class DateTimeField(Field):
 
         for v in value:
             if not isinstance(v, (datetime.datetime, type(None))):
-                logging.debug('Field is not datetime.date but %s' % type(v))
+                logging.debug("Field is not datetime.date but %s" % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'datetime.date',
-                     'current': type(v), 'field': name})
+                    {
+                        "expected": "datetime.date",
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
         return True
 
     def from_bytes(self, value):
-        return datetime.datetime.fromisoformat(
-            value.decode()) if value else None
+        return (
+            datetime.datetime.fromisoformat(value.decode()) if value else None
+        )
 
     def str(self, value):
         """Str converter."""
@@ -448,11 +481,12 @@ class StringField(Field):
                 logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'str', 'current': type(v), 'field': name})
+                    {"expected": "str", "current": type(v), "field": name},
+                )
         return True
 
     def from_bytes(self, value):
-        return str(value, 'utf-8') if value else None
+        return str(value, "utf-8") if value else None
 
     def str(self, value):
         """Str converter."""
@@ -476,11 +510,12 @@ class TypeField(Field):
                 logging.debug('Field is not "int" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'int', 'current': type(v), 'field': name})
+                    {"expected": "int", "current": type(v), "field": name},
+                )
         return True
 
     def from_bytes(self, value):
-        return int.from_bytes(value, byteorder='big') if value else None
+        return int.from_bytes(value, byteorder="big") if value else None
 
     def str(self, value):
         """Str converter."""
@@ -488,7 +523,7 @@ class TypeField(Field):
 
     def bytes(self, value):
         """Bytes converter."""
-        return int(value).to_bytes(4, byteorder='big')
+        return int(value).to_bytes(4, byteorder="big")
 
     def yaml(self, value):
         """YAML converter."""
@@ -496,8 +531,9 @@ class TypeField(Field):
 
 
 class BinaryField(Field):
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, limit=1024):
+    def __init__(
+        self, value=None, required=True, multiple=False, init=None, limit=1024
+    ):
         Field.__init__(self, value, required, multiple, init)
         self.limit = limit
 
@@ -516,14 +552,17 @@ class BinaryField(Field):
                 logging.debug('Field is not "bytes" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'bytes', 'current': type(v), 'field': name})
+                    {"expected": "bytes", "current": type(v), "field": name},
+                )
 
             if not isinstance(v, type(None)) and len(v) > self.limit:
-                logging.debug('Field beyond limit %s but %s' % (
-                    self.limit, len(v)))
+                logging.debug(
+                    "Field beyond limit %s but %s" % (self.limit, len(v))
+                )
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
-                    {'limit': self.limit, 'size': len(v), 'field': name})
+                    {"limit": self.limit, "size": len(v), "field": name},
+                )
         return True
 
     def from_bytes(self, value):
@@ -531,7 +570,7 @@ class BinaryField(Field):
 
     def str(self, value):
         """Str converter."""
-        return base64.standard_b64encode(value).decode('utf-8')
+        return base64.standard_b64encode(value).decode("utf-8")
 
     def bytes(self, value):
         """Bytes converter."""
@@ -539,12 +578,13 @@ class BinaryField(Field):
 
     def yaml(self, value):
         """YAML converter."""
-        return base64.standard_b64encode(value).decode('utf-8')
+        return base64.standard_b64encode(value).decode("utf-8")
 
 
 class SignatureField(BinaryField):
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, limit=1024):
+    def __init__(
+        self, value=None, required=True, multiple=False, init=None, limit=1024
+    ):
         Field.__init__(self, value, required, multiple, init)
         self.limit = limit
         self.redo = False
@@ -562,20 +602,24 @@ class SignatureField(BinaryField):
                 logging.debug('Field is not "bytes" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'bytes', 'current': type(v), 'field': name})
+                    {"expected": "bytes", "current": type(v), "field": name},
+                )
 
             if not isinstance(v, type(None)) and len(v) > self.limit:
-                logging.debug('Field beyond limit %s but %s' % (
-                    self.size, len(v)))
+                logging.debug(
+                    "Field beyond limit %s but %s" % (self.size, len(v))
+                )
                 raise Util.exception(
                     Error.FIELD_BEYOND_LIMIT,
-                    {'limit': self.limit, 'size': len(v), 'field': name})
+                    {"limit": self.limit, "size": len(v), "field": name},
+                )
         return True
 
 
 class ChoiceField(Field):
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, choices=[]):
+    def __init__(
+        self, value=None, required=True, multiple=False, init=None, choices=[]
+    ):
         Field.__init__(self, value, required, multiple, init)
         if not all(isinstance(n, str) for n in choices):
             raise TypeError()
@@ -590,10 +634,11 @@ class ChoiceField(Field):
 
         for v in value:
             if not isinstance(v, type(None)) and v not in self.choices:
-                logging.debug('Field is not valid choice but %s' % type(v))
+                logging.debug("Field is not valid choice but %s" % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_CHOICE,
-                    {'expected': self.choices, 'current': v})
+                    {"expected": self.choices, "current": v},
+                )
         return True
 
     def from_bytes(self, value):
@@ -609,10 +654,13 @@ class ChoiceField(Field):
 
 
 class EmailField(Field):
-    EMAIL_REGEX = '^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$'  # noqa E501
+    EMAIL_REGEX = (
+        "^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$"
+    )  # noqa E501
 
-    def __init__(self, value=None, required=True,
-                 multiple=False, init=None, choices=[]):
+    def __init__(
+        self, value=None, required=True, multiple=False, init=None, choices=[]
+    ):
         Field.__init__(self, value, required, multiple, init)
         self.choices = choices
 
@@ -628,13 +676,16 @@ class EmailField(Field):
                 logging.debug('Field is not "str" but %s' % type(v))
                 raise Util.exception(
                     Error.FIELD_INVALID_TYPE,
-                    {'expected': 'str', 'current': type(v), 'field': name})
+                    {"expected": "str", "current": type(v), "field": name},
+                )
 
             if not isinstance(v, type(None)) and not bool(
-                    re.match(EmailField.EMAIL_REGEX, v)):
-                logging.debug('Field is not valid email but %s' % type(v))
+                re.match(EmailField.EMAIL_REGEX, v)
+            ):
+                logging.debug("Field is not valid email but %s" % type(v))
                 raise Util.exception(
-                    Error.FIELD_INVALID_EMAIL, {'email': v, 'field': name})
+                    Error.FIELD_INVALID_EMAIL, {"email": v, "field": name}
+                )
         return True
 
     def from_bytes(self, value):

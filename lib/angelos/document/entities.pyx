@@ -58,8 +58,15 @@ class Person(Entity, PersonMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Entity, UpdatedMixin,
-                    Person, PersonMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Entity,
+            UpdatedMixin,
+            Person,
+            PersonMixin,
+        ]
         self._check_validate(validate)
         return True
 
@@ -72,8 +79,15 @@ class Ministry(Entity, MinistryMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument,  Document, IssueMixin, Entity, UpdatedMixin,
-                    Ministry, MinistryMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Entity,
+            UpdatedMixin,
+            Ministry,
+            MinistryMixin,
+        ]
         self._check_validate(validate)
         return True
 
@@ -86,7 +100,14 @@ class Church(Entity, ChurchMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Entity, UpdatedMixin,
-                    Church, ChurchMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Entity,
+            UpdatedMixin,
+            Church,
+            ChurchMixin,
+        ]
         self._check_validate(validate)
         return True

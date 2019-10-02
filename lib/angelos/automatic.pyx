@@ -31,11 +31,11 @@ class Dir(BaseAuto):
     def __init__(self, app_name):
         app = Util.app_dir()
 
-        if '/usr/local/bin' in app:
+        if "/usr/local/bin" in app:
             self.stem = os.path.dirname(os.path.dirname(os.path.dirname(app)))
-        if '/usr/bin' in app:
+        if "/usr/bin" in app:
             self.stem = os.path.dirname(os.path.dirname(app))
-        elif '/bin' in app:
+        elif "/bin" in app:
             self.stem = os.path.dirname(app)
 
         # Binary install directory
@@ -43,17 +43,23 @@ class Dir(BaseAuto):
         # Current users directory
         self.home = Util.usr_dir()
         # Server root directory
-        self.root = os.path.join(self.stem, 'var/lib/' + app_name)
+        self.root = os.path.join(self.stem, "var/lib/" + app_name)
         # Logging directory
-        self.log = os.path.join(self.stem, 'var/log/' + app_name)
+        self.log = os.path.join(self.stem, "var/log/" + app_name)
         # Current working directory
         self.current = Util.exe_dir()
 
 
 class Sys(BaseAuto):
     def __init__(self):
-        (self.system, self.node, self.release, self.version,
-            self.machine, self.processor) = platform.uname()
+        (
+            self.system,
+            self.node,
+            self.release,
+            self.version,
+            self.machine,
+            self.processor,
+        ) = platform.uname()
         self.java = platform.java_ver()[0]
         self.win = platform.win32_ver()[0]
         self.mac = platform.mac_ver()[0]

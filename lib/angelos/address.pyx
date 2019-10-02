@@ -10,30 +10,29 @@ Address fields internationalization.
 """
 
 FORMAT = (  # Format
-    f'Address formatting string',
+    f"Address formatting string",
     (  # Row
         (  # Field
-            '<field> (str)',
-            '<fieldname> (str)',
-            '<prefix> (str/None)',
-            '<postfix> (str/None)',
-            '<modifier> (func)',
-            '<width_in_0.x> (float)'
+            "<field> (str)",
+            "<fieldname> (str)",
+            "<prefix> (str/None)",
+            "<postfix> (str/None)",
+            "<modifier> (func)",
+            "<width_in_0.x> (float)",
         ),
     ),
 )
 
 SE = (  # Format
-    "{'c/o '+co'//N' if co else ''}{'Box '+pobox+'//N' if pobox else street+' '+number+'//N'}{zip if zip else ''} {city if city else ''}{'//N'+country if country else ''}"  # noqa 501
-    (  # Row
+    "{'c/o '+co'//N' if co else ''}{'Box '+pobox+'//N' if pobox else street+' '+number+'//N'}{zip if zip else ''} {city if city else ''}{'//N'+country if country else ''}"(  # noqa 501  # Row
         (  # Field
-            '<field> (str)',
-            '<fieldname> (str)',
-            '<prefix> (str/None)',
-            '<postfix> (str/None)',
-            '<modifier> (func)',
-            '<width_in_0.x> (float)'
-        ),
+            "<field> (str)",
+            "<fieldname> (str)",
+            "<prefix> (str/None)",
+            "<postfix> (str/None)",
+            "<modifier> (func)",
+            "<width_in_0.x> (float)",
+        )
     ),
 )
 

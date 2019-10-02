@@ -50,69 +50,69 @@ class Const:
 
     """
 
-    A_TYPE_PERSON_CLIENT = ord(b'p')
-    A_TYPE_PERSON_SERVER = ord(b'P')
-    A_TYPE_MINISTRY_CLIENT = ord(b'm')
-    A_TYPE_MINISTRY_SERVER = ord(b'M')
-    A_TYPE_CHURCH_CLIENT = ord(b'c')
-    A_TYPE_CHURCH_SERVER = ord(b'C')
+    A_TYPE_PERSON_CLIENT = ord(b"p")
+    A_TYPE_PERSON_SERVER = ord(b"P")
+    A_TYPE_MINISTRY_CLIENT = ord(b"m")
+    A_TYPE_MINISTRY_SERVER = ord(b"M")
+    A_TYPE_CHURCH_CLIENT = ord(b"c")
+    A_TYPE_CHURCH_SERVER = ord(b"C")
 
-    A_TYPE_BEARER = ord(b'b')
-    A_TYPE_SEED = ord(b's')
-    A_TYPE_ARCHIVE = ord(b'a')
+    A_TYPE_BEARER = ord(b"b")
+    A_TYPE_SEED = ord(b"s")
+    A_TYPE_ARCHIVE = ord(b"a")
 
-    A_ROLE_PRIMARY = ord(b'p')
-    A_ROLE_BACKUP = ord(b'b')
+    A_ROLE_PRIMARY = ord(b"p")
+    A_ROLE_BACKUP = ord(b"b")
 
-    A_USE_VAULT = ord(b'v')
-    A_USE_HOME = ord(b'h')
-    A_USE_MAIL = ord(b'm')
-    A_USE_POOL = ord(b'p')
-    A_USE_FTP = ord(b'f')
-    A_USE_ROUTING = ord(b'r')
+    A_USE_VAULT = ord(b"v")
+    A_USE_HOME = ord(b"h")
+    A_USE_MAIL = ord(b"m")
+    A_USE_POOL = ord(b"p")
+    A_USE_FTP = ord(b"f")
+    A_USE_ROUTING = ord(b"r")
 
-    CNL_VAULT = 'vault.ar7.cnl'
-    CNL_HOME = 'home.ar7.cnl'
-    CNL_MAIL = 'mail.ar7.cnl'
-    CNL_POOL = 'pool.ar7.cnl'
-    CNL_FTP = 'ftp.ar7.cnl'
-    CNL_ROUTING = 'routing.ar7.cnl'
+    CNL_VAULT = "vault.ar7.cnl"
+    CNL_HOME = "home.ar7.cnl"
+    CNL_MAIL = "mail.ar7.cnl"
+    CNL_POOL = "pool.ar7.cnl"
+    CNL_FTP = "ftp.ar7.cnl"
+    CNL_ROUTING = "routing.ar7.cnl"
 
-    LOG_ERR = 'err'
-    LOG_APP = 'app'
-    LOG_BIZ = 'biz'
+    LOG_ERR = "err"
+    LOG_APP = "app"
+    LOG_BIZ = "biz"
 
-    OPT_LISTEN = ['localhost', 'loopback', 'hostname', 'domain', 'ip', 'any']
+    OPT_LISTEN = ["localhost", "loopback", "hostname", "domain", "ip", "any"]
 
     LOOP_SLEEP = 0.05
 
-    W_SUPERV_NAME = 'Supervisor'  # Server Supervisor worker
-    W_ADMIN_NAME = 'AdminServer'  # Server Admin worker
-    G_CORE_NAME = 'Core'
-    W_CLIENT_NAME = 'Client'  # Client main worker
-    W_BACKEND_NAME = 'Backend'  # Client backend worker
+    W_SUPERV_NAME = "Supervisor"  # Server Supervisor worker
+    W_ADMIN_NAME = "AdminServer"  # Server Admin worker
+    G_CORE_NAME = "Core"
+    W_CLIENT_NAME = "Client"  # Client main worker
+    W_BACKEND_NAME = "Backend"  # Client backend worker
 
     # Runtime nodes
-    R_MODE_DEV = 'dev'
-    R_MODE_PRODUCTION = 'prod'
+    R_MODE_DEV = "dev"
+    R_MODE_PRODUCTION = "prod"
 
-    R_TYPE_SERVER = 'server'
-    R_TYPE_CLIENT = 'client'
+    R_TYPE_SERVER = "server"
+    R_TYPE_CLIENT = "client"
 
-    R_ROLE_NORMAL = 'normal'
-    R_ROLE_BACKUP = 'backup'
+    R_ROLE_NORMAL = "normal"
+    R_ROLE_BACKUP = "backup"
 
-    R_PLATFORM_NIX = 'nix'
-    R_PLATFORM_WIN = 'win'
-    R_PLATFORM_MACOS = 'osx'
-    R_PLATFORM_ANDROID = 'android'
-    R_PLATFORM_IOS = 'ios'
+    R_PLATFORM_NIX = "nix"
+    R_PLATFORM_WIN = "win"
+    R_PLATFORM_MACOS = "osx"
+    R_PLATFORM_ANDROID = "android"
+    R_PLATFORM_IOS = "ios"
 
-    I_SPLASH = 'splash'
-    I_DEFAULT = 'default'
-    I_SETUP = 'setup'
-    I_SPINNER = 'spinner'
-    I_FLASH = 'flash'
+    I_SPLASH = "splash"
+    I_DEFAULT = "default"
+    I_SETUP = "setup"
+    I_SPINNER = "spinner"
+    I_FLASH = "flash"
 
     ARCH_BLK_1 = 227
     ARCH_BLK_2 = 454

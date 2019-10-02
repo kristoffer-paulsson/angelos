@@ -17,7 +17,7 @@ class NodesServer(SSHServer):
     """SSH Server for the nodes."""
 
     def begin_auth(self, username):
-        logging.info('Begin authentication for: %s' % username)
+        logging.info("Begin authentication for: %s" % username)
 
         auth = self.ioc.load_node_auth(username)
         if auth[0]:
@@ -26,11 +26,11 @@ class NodesServer(SSHServer):
         return True
 
     def validate_public_key(self, username, key):
-        logging.info('Authentication for a user')
-        logging.debug('%s' % username)
+        logging.info("Authentication for a user")
+        logging.debug("%s" % username)
         return key in self._client_keys
 
     def session_requested(self):
-        logging.debug('Session requested')
+        logging.debug("Session requested")
         # return AdminServerProcess(self.terminal, self.ioc.session)
         return False

@@ -12,11 +12,18 @@ Dummy data generation utilities.
 import random
 
 from .support import (
-    random_church_entity_data, random_person_entity_data, generate_filename,
-    generate_data)
+    random_church_entity_data,
+    random_person_entity_data,
+    generate_filename,
+    generate_data,
+)
 from ..operation.setup import SetupChurchOperation
 from ..policy import (
-    NetworkPolicy, StatementPolicy, MessagePolicy, EnvelopePolicy)
+    NetworkPolicy,
+    StatementPolicy,
+    MessagePolicy,
+    EnvelopePolicy,
+)
 from ..operation.setup import SetupPersonOperation
 
 
@@ -34,7 +41,8 @@ class DummyPolicy:
         sets = []
         for church_data in churches:
             cur_set = SetupChurchOperation.create_new(
-                church_data, 'server', True)
+                church_data, "server", True
+            )
             net = NetworkPolicy(cur_set[0], cur_set[1], cur_set[2])
             net.generate(cur_set[3], cur_set[4])
             cur_set += net.network
@@ -52,7 +60,8 @@ class DummyPolicy:
 
         # Generate a church
         church = SetupChurchOperation.create(
-            random_church_entity_data(1)[0], 'server', True)
+            random_church_entity_data(1)[0], "server", True
+        )
         NetworkPolicy.generate(church)
 
         mail = set()
@@ -60,15 +69,22 @@ class DummyPolicy:
             StatementPolicy.verified(church, person)
             StatementPolicy.trusted(church, person)
             StatementPolicy.trusted(person, church)
-            mail.add(EnvelopePolicy.wrap(
-                person, facade.portfolio, MessagePolicy.mail(
-                    person, facade.portfolio).message(
-                        generate_filename(postfix='.'),
-                        generate_data().decode()).done()))
+            mail.add(
+                EnvelopePolicy.wrap(
+                    person,
+                    facade.portfolio,
+                    MessagePolicy.mail(person, facade.portfolio)
+                    .message(
+                        generate_filename(postfix="."),
+                        generate_data().decode(),
+                    )
+                    .done(),
+                )
+            )
 
         for triad in range(67):
-            offset = triad*3
-            triple = persons[offset:offset+3]
+            offset = triad * 3
+            triple = persons[offset : offset + 3]
 
             StatementPolicy.trusted(triple[0], triple[1])
             StatementPolicy.trusted(triple[0], triple[2])

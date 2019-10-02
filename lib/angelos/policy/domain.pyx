@@ -24,43 +24,50 @@ from ..automatic import Net
 class NodePolicy(Policy):
     """Generate node documents."""
 
-    ROLE = ('client', 'server', 'backup')
+    ROLE = ("client", "server", "backup")
 
     @staticmethod
     def current(
-            portfolio: PrivatePortfolioABC,
-            role: str='client', server: bool=False):
+        portfolio: PrivatePortfolioABC,
+        role: str = "client",
+        server: bool = False,
+    ):
         """Generate node document from the current node."""
 
         if isinstance(role, int):
             if role == Const.A_ROLE_PRIMARY:
-                role = 'server'
+                role = "server"
             elif role == Const.A_ROLE_BACKUP:
-                role = 'backup'
+                role = "backup"
 
         if role not in NodePolicy.ROLE:
-            raise ValueError('Unsupported node role')
+            raise ValueError("Unsupported node role")
 
         if portfolio.domain.issuer != portfolio.entity.issuer:
             raise RuntimeError(
-                'The domain must have same issuer as issuing entity.')
+                "The domain must have same issuer as issuing entity."
+            )
 
         location = None
         if server:
             net = Net()
-            location = Location(nd={
-                'hostname': [net.domain],
-                'ip': [ipaddress.ip_address(net.ip)]
-            })
+            location = Location(
+                nd={
+                    "hostname": [net.domain],
+                    "ip": [ipaddress.ip_address(net.ip)],
+                }
+            )
 
-        node = Node(nd={
-            'domain': portfolio.domain.id,
-            'role': role,
-            'device': platform.platform(),
-            'serial': plyer.uniqueid.id.decode('utf-8'),
-            'issuer': portfolio.entity.id,
-            'location': location
-        })
+        node = Node(
+            nd={
+                "domain": portfolio.domain.id,
+                "role": role,
+                "device": platform.platform(),
+                "serial": plyer.uniqueid.id.decode("utf-8"),
+                "issuer": portfolio.entity.id,
+                "location": location,
+            }
+        )
 
         node = Crypto.sign(node, portfolio)
         node.validate()
@@ -85,16 +92,13 @@ class NodePolicy(Policy):
 
 
 class DomainPolicy(Policy):
-
     @staticmethod
     def generate(portfolio: PrivatePortfolioABC):
         """Generate domain document from currently running node."""
         if portfolio.domain:
             return False
 
-        domain = Domain(nd={
-            'issuer': portfolio.entity.id
-        })
+        domain = Domain(nd={"issuer": portfolio.entity.id})
 
         domain = Crypto.sign(domain, portfolio)
         domain.validate()
@@ -116,26 +120,31 @@ class DomainPolicy(Policy):
 
 
 class NetworkPolicy(Policy):
-
     @staticmethod
     def generate(portfolio: PrivatePortfolioABC):
         """Generate network document from currently running node."""
         if not portfolio.nodes:
-            raise ValueError('At least one node necessary to generate network')
+            raise ValueError("At least one node necessary to generate network")
 
         hosts = []
         for node in portfolio.nodes:
-            hosts.append(Host(nd={
-                'node': node.id,
-                'ip': node.location.ip,
-                'hostname': node.location.hostname
-            }))
+            hosts.append(
+                Host(
+                    nd={
+                        "node": node.id,
+                        "ip": node.location.ip,
+                        "hostname": node.location.hostname,
+                    }
+                )
+            )
 
-        network = Network(nd={
-            'domain': portfolio.domain.id,
-            'hosts': hosts,
-            'issuer': portfolio.entity.id,
-        })
+        network = Network(
+            nd={
+                "domain": portfolio.domain.id,
+                "hosts": hosts,
+                "issuer": portfolio.entity.id,
+            }
+        )
 
         network = Crypto.sign(network, portfolio)
         network.validate()
@@ -148,15 +157,19 @@ class NetworkPolicy(Policy):
             portfolio.network = None
 
         if not portfolio.nodes:
-            raise ValueError('At least one node necessary to renew network')
+            raise ValueError("At least one node necessary to renew network")
 
         hosts = []
         for node in portfolio.nodes:
-            hosts.append(Host(nd={
-                'node': node.id,
-                'ip': node.location.ip,
-                'hostname': node.location.hostname
-            }))
+            hosts.append(
+                Host(
+                    nd={
+                        "node": node.id,
+                        "ip": node.location.ip,
+                        "hostname": node.location.hostname,
+                    }
+                )
+            )
 
         network.hosts = hosts
         network.renew()

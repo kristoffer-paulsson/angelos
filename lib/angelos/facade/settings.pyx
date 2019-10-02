@@ -26,28 +26,26 @@ class SettingsAPI:
         self.__vault = vault
 
     async def __load(self, name: str) -> io.StringIO:
-        return io.StringIO(
-            (await self.__vault.load_settings(name)).decode())
+        return io.StringIO((await self.__vault.load_settings(name)).decode())
 
     async def __save(self, name: str, text: io.StringIO):
-        return await self.__vault.save_settings(
-            name, text.getvalue().encode())
+        return await self.__vault.save_settings(name, text.getvalue().encode())
 
     async def preferences(self) -> ConfigParser:
         """Load all available networks."""
         parser = ConfigParser(interpolation=ExtendedInterpolation())
-        parser.read_file(await self.__load('preferences.ini'))
+        parser.read_file(await self.__load("preferences.ini"))
         return parser
 
     async def save_prefs(self, parser: ConfigParser) -> bool:
         """Load all available networks."""
         text = io.StringIO()
         parser.write(text)
-        return await self.__save('preferences.ini', text)
+        return await self.__save("preferences.ini", text)
 
     async def networks(self) -> Set[Tuple[uuid.UUID, bool]]:
         """Load all available networks."""
         nets = set()
-        for row in csv.reader(await self.__load('networks.csv')):
+        for row in csv.reader(await self.__load("networks.csv")):
             nets.add(tuple(row))
         return nets

@@ -16,11 +16,9 @@ from .preset import Preset
 
 
 __all__ = [
-    'ReplicatorClient',
-    'ReplicatorServer',
-
-    'ReplicatorClientHandler',
-    'ReplicatorServerHandler',
-
-    'Preset'
+    "ReplicatorClient",
+    "ReplicatorServer",
+    "ReplicatorClientHandler",
+    "ReplicatorServerHandler",
+    "Preset",
 ]

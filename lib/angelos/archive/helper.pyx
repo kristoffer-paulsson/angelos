@@ -28,12 +28,14 @@ class Glue:
 
         try:
             updated = datetime.datetime.combine(
-                document.updated, datetime.datetime.min.time())
+                document.updated, datetime.datetime.min.time()
+            )
         except (AttributeError, TypeError):
             updated = None
 
         created = datetime.datetime.combine(
-            document.created, datetime.datetime.min.time())
+            document.created, datetime.datetime.min.time()
+        )
 
         return created, updated, owner
 
@@ -90,8 +92,7 @@ class Glue:
     @staticmethod
     def run_async(*aws, raise_exc=True):
         loop = asyncio.get_event_loop()
-        gathering = asyncio.gather(
-            *aws, loop=loop, return_exceptions=True)
+        gathering = asyncio.gather(*aws, loop=loop, return_exceptions=True)
         loop.run_until_complete(gathering)
 
         result_list = gathering.result()
@@ -99,7 +100,7 @@ class Glue:
         for result in result_list:
             if isinstance(result, Exception):
                 exc = result if not exc else exc
-                logging.error('Operation failed: %s' % result)
+                logging.error("Operation failed: %s" % result)
         if exc:
             raise exc
         if len(result_list) > 1:
@@ -110,10 +111,10 @@ class Glue:
 
 class Globber:
     @staticmethod
-    def full(archive: Archive7, filename: str='*', cmp_uuid: bool=False):
+    def full(archive: Archive7, filename: str = "*", cmp_uuid: bool = False):
         with archive.lock:
             sq = Archive7.Query(pattern=filename)
-            sq.type(b'f')
+            sq.type(b"f")
             idxs = archive.ioc.entries.search(sq)
             ids = archive.ioc.hierarchy.ids
 
@@ -121,9 +122,9 @@ class Globber:
             for i in idxs:
                 idx, entry = i
                 if entry.parent.int == 0:
-                    name = '/'+str(entry.name, 'utf-8')
+                    name = "/" + str(entry.name, "utf-8")
                 else:
-                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
                 if cmp_uuid:
                     files[entry.id] = (name, entry.deleted, entry.modified)
                 else:
@@ -133,9 +134,12 @@ class Globber:
 
     @staticmethod
     def syncro(
-            archive: Archive7,
-            path: str='/', owner: uuid.UUID=None,
-            modified: datetime.datetime=None, cmp_uuid: bool=False):
+        archive: Archive7,
+        path: str = "/",
+        owner: uuid.UUID = None,
+        modified: datetime.datetime = None,
+        cmp_uuid: bool = False,
+    ):
         with archive.lock:
             pid = archive.ioc.operations.get_pid(path)
             sq = Archive7.Query()
@@ -144,7 +148,7 @@ class Globber:
                 sq.owner(owner)
             if modified:
                 sq.modified(modified)
-            sq.type(b'f')
+            sq.type(b"f")
             idxs = archive.ioc.entries.search(sq)
             ids = archive.ioc.hierarchy.ids
 
@@ -152,9 +156,9 @@ class Globber:
             for i in idxs:
                 idx, entry = i
                 if entry.parent.int == 0:
-                    name = '/'+str(entry.name, 'utf-8')
+                    name = "/" + str(entry.name, "utf-8")
                 else:
-                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
                 if cmp_uuid:
                     files[entry.id] = (name, entry.modified, entry.deleted)
                 else:
@@ -163,9 +167,9 @@ class Globber:
         return files
 
     @staticmethod
-    def owner(archive: Archive7, owner: uuid.UUID, path: str='/'):
+    def owner(archive: Archive7, owner: uuid.UUID, path: str = "/"):
         with archive.lock:
-            sq = Archive7.Query(path).owner(owner).type(b'f')
+            sq = Archive7.Query(path).owner(owner).type(b"f")
             idxs = archive.ioc.entries.search(sq)
             ids = archive.ioc.hierarchy.ids
 
@@ -173,17 +177,17 @@ class Globber:
             for i in idxs:
                 idx, entry = i
                 if entry.parent.int == 0:
-                    name = '/'+str(entry.name, 'utf-8')
+                    name = "/" + str(entry.name, "utf-8")
                 else:
-                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
                 files.append((name, entry.id, entry.created))
 
         return files
 
     @staticmethod
-    def path(archive: Archive7, path: str ='*'):
+    def path(archive: Archive7, path: str = "*"):
         with archive.lock:
-            sq = Archive7.Query(path).type(b'f')
+            sq = Archive7.Query(path).type(b"f")
             idxs = archive.ioc.entries.search(sq)
             ids = archive.ioc.hierarchy.ids
 
@@ -191,9 +195,9 @@ class Globber:
             for i in idxs:
                 idx, entry = i
                 if entry.parent.int == 0:
-                    name = '/'+str(entry.name, 'utf-8')
+                    name = "/" + str(entry.name, "utf-8")
                 else:
-                    name = ids[entry.parent]+'/'+str(entry.name, 'utf-8')
+                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
                 files.append((name, entry.id, entry.created))
 
         return files
@@ -205,9 +209,9 @@ class Proxy:
 
     def call(self, callback, priority=1024, timeout=10, **kwargs):
         if not callable(callback):
-            raise TypeError('Not a callable. Type: %s' % type(callback))
+            raise TypeError("Not a callable. Type: %s" % type(callback))
         if self._quit:
-            raise RuntimeError('Proxy has quit, no more calls')
+            raise RuntimeError("Proxy has quit, no more calls")
 
     def run(self):
         pass
@@ -232,16 +236,17 @@ class Proxy:
 class NullProxy(Proxy):
     def call(self, callback, priority=1024, timeout=10, **kwargs):
         if not callable(callback):
-            raise TypeError('Not a callable. Type: %s' % type(callback))
+            raise TypeError("Not a callable. Type: %s" % type(callback))
         if self._quit:
-            raise RuntimeError('Proxy has quit, no more calls')
+            raise RuntimeError("Proxy has quit, no more calls")
         try:
             result = callback(**kwargs)
             logging.info('Proxy execution: "%s"' % str(callback.__name__))
             return result
         except Exception as e:
             logging.error(
-                'Proxy execution failed: "%s"' % str(callback.__name__))
+                'Proxy execution failed: "%s"' % str(callback.__name__)
+            )
             return e
 
 
@@ -252,9 +257,9 @@ class ThreadProxy(Proxy):
 
     def call(self, callback, priority=1024, timeout=10, **kwargs):
         if not callable(callback):
-            raise TypeError('Not a callable. Type: %s' % type(callback))
+            raise TypeError("Not a callable. Type: %s" % type(callback))
         if self._quit:
-            raise RuntimeError('Proxy has quit, no more calls')
+            raise RuntimeError("Proxy has quit, no more calls")
 
         task = Proxy.Task(priority, callback, kwargs)
         self.__queue.put(task)
@@ -266,12 +271,14 @@ class ThreadProxy(Proxy):
             try:
                 result = task.callable(**task.params)
                 logging.info(
-                    'Proxy execution: "%s"' % str(task.callable.__name__))
+                    'Proxy execution: "%s"' % str(task.callable.__name__)
+                )
                 task.result = result  # if result else None
             except Exception as e:
                 logging.error(
-                    'Proxy execution failed: "%s"' % str(
-                        task.callable.__name__))
+                    'Proxy execution failed: "%s"'
+                    % str(task.callable.__name__)
+                )
                 task.result = e
             self.__queue.task_done()
 
@@ -284,9 +291,9 @@ class AsyncProxy(Proxy):
 
     async def call(self, callback, priority=1024, timeout=10, **kwargs):
         if not callable(callback):
-            raise TypeError('Not a callable. Type: %s' % type(callback))
+            raise TypeError("Not a callable. Type: %s" % type(callback))
         if self._quit:
-            raise RuntimeError('Proxy has quit, no more calls')
+            raise RuntimeError("Proxy has quit, no more calls")
 
         try:
             task = Proxy.Task(priority, callback, kwargs)
@@ -315,5 +322,6 @@ class AsyncProxy(Proxy):
             task.result = result  # if result else None
         except Exception as e:
             logging.error(
-                'Proxy execution failed: "%s"' % str(task.callable.__name__))
+                'Proxy execution failed: "%s"' % str(task.callable.__name__)
+            )
             task.result = e

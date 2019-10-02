@@ -23,8 +23,8 @@ class Replicator:
         Util.is_type(master, Archive7)
         Util.is_type(slave, Archive7)
 
-        m_list = Globber.full(master, '*')
-        s_list = Globber.full(slave, '*')
+        m_list = Globber.full(master, "*")
+        s_list = Globber.full(slave, "*")
 
         m_idxs = set(m_list.keys())
         s_idxs = set(s_list.keys())
@@ -38,49 +38,56 @@ class Replicator:
 
         for i in m_unique:
             if not m_list[i][1]:
-                push.append((i, b'c'))
+                push.append((i, b"c"))
 
         for i in s_unique:
             if not s_list[i][1]:
-                pull.append((i, b'c'))
+                pull.append((i, b"c"))
 
         for i in common:
             if m_list[i][2] > s_list[i][2]:
                 if m_list[i][1]:
-                    push.append((i, b'd'))
+                    push.append((i, b"d"))
                 else:
-                    push.append((i, b'u'))
+                    push.append((i, b"u"))
             elif m_list[i][2] < s_list[i][2]:
                 if s_list[i][1]:
-                    pull.append((i, b'd'))
+                    pull.append((i, b"d"))
                 else:
-                    pull.append((i, b'u'))
+                    pull.append((i, b"u"))
 
         return push, pull
 
     @classmethod
     def _copy(cls, frm, to, p_list, modify=False):
         for idx, op in p_list:
-            if op == b'd':
+            if op == b"d":
                 to.remove(idx)
-            elif op == b'u':
+            elif op == b"u":
                 data = frm.load(idx)
                 if not modify:
                     e = frm.info(idx)
                     to.save(idx, data, modified=e.modified)
                 else:
                     to.save(idx, data)
-            elif op == b'c':
+            elif op == b"c":
                 e = frm.info(idx)
                 data = frm.load(idx)
                 to.mkfile(
-                    idx, data, created=e.created, owner=e.owner,
-                    id=e.id, modified=(
-                        e.modified if not modify else datetime.datetime.now()))
+                    idx,
+                    data,
+                    created=e.created,
+                    owner=e.owner,
+                    id=e.id,
+                    modified=(
+                        e.modified if not modify else datetime.datetime.now()
+                    ),
+                )
             else:
-                logging.error('Unkown synchronization operation: %s' % str(op))
+                logging.error("Unkown synchronization operation: %s" % str(op))
                 raise RuntimeError(
-                    'Unkown synchronization operation: %s' % str(op))
+                    "Unkown synchronization operation: %s" % str(op)
+                )
 
     @classmethod
     def push(cls, master, slave, p_list):

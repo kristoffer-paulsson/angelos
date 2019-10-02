@@ -17,7 +17,12 @@ from .crypto import Crypto
 from ..document import Entity, PrivateKeys, Keys, Person, Ministry, Church
 from .portfolio import PrivatePortfolio
 from ._types import (
-    EntityData, PersonData, MinistryData, ChurchData, PrivatePortfolioABC)
+    EntityData,
+    PersonData,
+    MinistryData,
+    ChurchData,
+    PrivatePortfolioABC,
+)
 
 
 class BaseEntityPolicy(Policy):
@@ -31,23 +36,22 @@ class BaseEntityPolicy(Policy):
         entity = klass(nd=entity_data._asdict())
         entity.issuer = entity.id
         entity.signature = box.signature(
-            entity.issuer.bytes + Crypto._document_data(entity))
+            entity.issuer.bytes + Crypto._document_data(entity)
+        )
 
-        privkeys = PrivateKeys(nd={
-            'issuer': entity.id,
-            'secret': box.sk,
-            'seed': box.seed
-        })
+        privkeys = PrivateKeys(
+            nd={"issuer": entity.id, "secret": box.sk, "seed": box.seed}
+        )
         privkeys.signature = box.signature(
-            privkeys.issuer.bytes + Crypto._document_data(privkeys))
+            privkeys.issuer.bytes + Crypto._document_data(privkeys)
+        )
 
-        keys = Keys(nd={
-            'issuer': entity.id,
-            'public': box.pk,
-            'verify': box.vk
-        })
-        keys.signature = [box.signature(
-                keys.issuer.bytes + Crypto._document_data(keys))]
+        keys = Keys(
+            nd={"issuer": entity.id, "public": box.pk, "verify": box.vk}
+        )
+        keys.signature = [
+            box.signature(keys.issuer.bytes + Crypto._document_data(keys))
+        ]
 
         entity.validate()
         privkeys.validate()
@@ -67,8 +71,8 @@ class BaseEntityPolicy(Policy):
         today = datetime.date.today()
         # entity = copy.deepcopy(entity)
         entity.updated = today
-        entity.expires = today + datetime.timedelta(13*365/12)
-        entity._fields['signature'].redo = True
+        entity.expires = today + datetime.timedelta(13 * 365 / 12)
+        entity._fields["signature"].redo = True
         entity.signature = None
 
         entity = Crypto.sign(entity, portfolio)
@@ -99,26 +103,35 @@ class BaseEntityPolicy(Policy):
         """Issue a new pair of keys"""
         box = libnacl.dual.DualSecret()
 
-        new_pk = PrivateKeys(nd={
-            'issuer': portfolio.entity.id,
-            'secret': box.sk,
-            'seed': box.seed
-        })
+        new_pk = PrivateKeys(
+            nd={
+                "issuer": portfolio.entity.id,
+                "secret": box.sk,
+                "seed": box.seed,
+            }
+        )
         # Sign new private key with latest private key
         new_pk = Crypto.sign(new_pk, portfolio)
 
-        new_keys = Keys(nd={
-            'issuer': portfolio.entity.id,
-            'public': box.pk,
-            'verify': box.vk
-        })
+        new_keys = Keys(
+            nd={
+                "issuer": portfolio.entity.id,
+                "public": box.pk,
+                "verify": box.vk,
+            }
+        )
         # sign new public key with old and new private key, REWRITE
-        raise NotImplementedError('REWRITE the signing of new public keys')
+        raise NotImplementedError("REWRITE the signing of new public keys")
         new_keys = Crypto.sign(
-            new_keys, portfolio.entity, portfolio.privkeys,
-            portfolio.keys, multiple=True)
+            new_keys,
+            portfolio.entity,
+            portfolio.privkeys,
+            portfolio.keys,
+            multiple=True,
+        )
         new_keys = Crypto.sign(
-            new_keys, portfolio.entity, new_pk, new_keys, multiple=True)
+            new_keys, portfolio.entity, new_pk, new_keys, multiple=True
+        )
 
         new_pk.validate()
         new_keys.validate()
@@ -131,7 +144,8 @@ class BaseEntityPolicy(Policy):
 
 class PersonPolicy(BaseEntityPolicy):
     """Create and maintain Person entity document with keys."""
-    FIELDS = ('family_name', )
+
+    FIELDS = ("family_name",)
 
     @staticmethod
     def generate(person_data: PersonData) -> PrivatePortfolioABC:
@@ -140,12 +154,14 @@ class PersonPolicy(BaseEntityPolicy):
     @staticmethod
     def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
         return BaseEntityPolicy._change(
-            portfolio.entity, changed, PersonPolicy.FIELDS)
+            portfolio.entity, changed, PersonPolicy.FIELDS
+        )
 
 
 class MinistryPolicy(BaseEntityPolicy):
     """Create and maintain Ministry entity document with keys."""
-    FIELDS = ('vision', 'ministry')
+
+    FIELDS = ("vision", "ministry")
 
     @staticmethod
     def generate(ministry_data: MinistryData) -> PrivatePortfolioABC:
@@ -154,12 +170,14 @@ class MinistryPolicy(BaseEntityPolicy):
     @staticmethod
     def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
         return BaseEntityPolicy._change(
-            portfolio.entity, changed, MinistryPolicy.FIELDS)
+            portfolio.entity, changed, MinistryPolicy.FIELDS
+        )
 
 
 class ChurchPolicy(BaseEntityPolicy):
     """Create and maintain Church entity document with keys."""
-    FIELDS = ('state', 'nation')
+
+    FIELDS = ("state", "nation")
 
     @staticmethod
     def generate(church_data: ChurchData) -> PrivatePortfolioABC:
@@ -168,4 +186,5 @@ class ChurchPolicy(BaseEntityPolicy):
     @staticmethod
     def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
         return BaseEntityPolicy._change(
-            portfolio.entity, changed, ChurchPolicy.FIELDS)
+            portfolio.entity, changed, ChurchPolicy.FIELDS
+        )

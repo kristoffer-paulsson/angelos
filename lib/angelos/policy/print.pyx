@@ -24,19 +24,20 @@ class PrintPolicy:
     @staticmethod
     def entity_title(entity) -> str:
         if entity.type == DocType.ENTITY_PERSON:
-            initials = ''
+            initials = ""
             for name in entity.names[1:]:
-                initials += name[:1].upper()+'.'
-            return '{0} {1} {2}'.format(
-                entity.given_name, initials, entity.family_name)
+                initials += name[:1].upper() + "."
+            return "{0} {1} {2}".format(
+                entity.given_name, initials, entity.family_name
+            )
         elif entity.type == DocType.ENTITY_MINISTRY:
-            return '{0}'.format(entity.ministry)
+            return "{0}".format(entity.ministry)
         elif entity.type == DocType.ENTITY_CHURCH:
-            name = 'City church of {0}'.format(entity.city)
+            name = "City church of {0}".format(entity.city)
             if entity.region:
-                name += ', {0}'.format(entity.region)
+                name += ", {0}".format(entity.region)
             if entity.country:
-                name += ', {0}'.format(entity.country)
+                name += ", {0}".format(entity.country)
             return name
 
-        return 'n/a'
+        return "n/a"

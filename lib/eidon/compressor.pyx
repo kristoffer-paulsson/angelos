@@ -20,8 +20,13 @@
 import io
 
 from .arithmetic import (
-    BitOutputStream, BitInputStream, SimpleFrequencyTable,
-    ArithmeticEncoder, FlatFrequencyTable, ArithmeticDecoder)
+    BitOutputStream,
+    BitInputStream,
+    SimpleFrequencyTable,
+    ArithmeticEncoder,
+    FlatFrequencyTable,
+    ArithmeticDecoder,
+)
 
 
 class ArithmethicCompressor:

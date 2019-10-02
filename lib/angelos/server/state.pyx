@@ -13,10 +13,20 @@ from ..utils import Event
 from ..error import AngelosException
 
 
-class StateMachineError(AngelosException): pass  # noqa E701
-class StateMissconfiguredError(StateMachineError): pass  # noqa E701
-class StateBlockedError(StateMachineError): pass  # noqa E701
-class StateDependencyError(StateMachineError): pass  # noqa E701
+class StateMachineError(AngelosException):
+    pass  # noqa E701
+
+
+class StateMissconfiguredError(StateMachineError):
+    pass  # noqa E701
+
+
+class StateBlockedError(StateMachineError):
+    pass  # noqa E701
+
+
+class StateDependencyError(StateMachineError):
+    pass  # noqa E701
 
 
 class State:
@@ -35,26 +45,28 @@ class State:
     def __init__(self, name=None, blocking=[], depends=[], switches=[]):
         """Init the state"""
         if not (self.name or name):
-            raise StateMissconfiguredError('State name not set')
+            raise StateMissconfiguredError("State name not set")
         elif self.name and name:
-            raise StateMissconfiguredError('State name can not be set twice')
+            raise StateMissconfiguredError("State name can not be set twice")
         elif name and not self.name:
             self.name = name
 
         if self.blocking and blocking:
             raise StateMissconfiguredError(
-                'State blockers can not be set twice')
+                "State blockers can not be set twice"
+            )
         else:
             self.blocking = blocking
 
         if self.depends and depends:
             raise StateMissconfiguredError(
-                'State dependencies can not be set twice')
+                "State dependencies can not be set twice"
+            )
         else:
             self.depends = depends
 
         if self.switches and switches:
-            raise StateMissconfiguredError('State name can not be set twice')
+            raise StateMissconfiguredError("State name can not be set twice")
         elif switches and not self.switches:
             self.switches = switches
 
@@ -115,7 +127,7 @@ class StateMachine:
         return self.__get(state).state
 
     def __call__(self, state, turn=None):
-        if state == 'all' and turn is False:
+        if state == "all" and turn is False:
             for name in self.__states.keys():
                 self.__do_turn(self.__get(name), False)
             return True
@@ -133,7 +145,8 @@ class StateMachine:
     def __get(self, state):
         if state not in self.__states:
             raise StateMissconfiguredError(
-                'There is no state "%s" configured' % state)
+                'There is no state "%s" configured' % state
+            )
         return self.__states[state]
 
     def __do_turn(self, si, turn):
@@ -152,8 +165,10 @@ class StateMachine:
             if b.state:
                 blocking.append(b.name)
         if len(blocking):
-            raise StateBlockedError('State "%s" blocked by: "%s"' % (
-                si.name, '", "'.join(blocking)))
+            raise StateBlockedError(
+                'State "%s" blocked by: "%s"'
+                % (si.name, '", "'.join(blocking))
+            )
 
         missing = []
         for name in si.depends:
@@ -162,8 +177,9 @@ class StateMachine:
                 missing.append(d.name)
         if len(missing):
             raise StateDependencyError(
-                'Dependencies "%s" not fullfiled for state "%s"' % (
-                    '", "'.join(missing), si.name))
+                'Dependencies "%s" not fullfiled for state "%s"'
+                % ('", "'.join(missing), si.name)
+            )
 
     async def on(self, state):
         await self.__get(state).wait(True)

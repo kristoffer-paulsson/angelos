@@ -16,7 +16,7 @@ from asyncssh.public_key import register_public_key_alg
 
 from ..utils import Util
 
-_algorithm = b'angelos-tongues'
+_algorithm = b"angelos-tongues"
 
 
 class BaseKey:
@@ -99,7 +99,7 @@ class NaClKey(asyncssh.SSHKey):
     def sign_der(self, data, sig_algorithm):
         """Abstract method to compute a DER-encoded signature."""
         if not self._key.key:
-            raise ValueError('Private key needed for signing')
+            raise ValueError("Private key needed for signing")
 
         return self._key.sign(data)
 
@@ -127,14 +127,16 @@ class NaClKey(asyncssh.SSHKey):
     def decode_ssh_public(cls, packet):
         """Decode public SSH key."""
         public_value = base64.b64decode(
-            packet.get_bytes(packet._len - packet._idx))
+            packet.get_bytes(packet._len - packet._idx)
+        )
         return (public_value,)
 
     @classmethod
     def decode_ssh_private(cls, packet):
         """Decode private SSH key."""
         private_value = base64.b64decode(
-            packet.get_bytes(packet._len - packet._idx))
+            packet.get_bytes(packet._len - packet._idx)
+        )
         return (private_value,)
 
     @classmethod
@@ -149,8 +151,10 @@ class NaClKey(asyncssh.SSHKey):
 
     def __eq__(self, other):
         """Compare class with another object."""
-        return (isinstance(other, type(self)) and
-                self._key.value == other._key.value)
+        return (
+            isinstance(other, type(self))
+            and self._key.value == other._key.value
+        )
 
     def __hash__(self):
         """Generate a hash for this class."""
@@ -170,4 +174,7 @@ register_public_key_alg(_algorithm, NaClKey, (_algorithm,))
 def make_known_hosts(verify):
     """Produce a known hosts generator."""
     return lambda h, a, p: (
-        [NaClKey(key=NaClPublicKey.construct(verify=verify))], [], [])
+        [NaClKey(key=NaClPublicKey.construct(verify=verify))],
+        [],
+        [],
+    )

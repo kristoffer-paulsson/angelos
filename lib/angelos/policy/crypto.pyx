@@ -22,9 +22,9 @@ class Crypto:
     """Conceal/unveil policy."""
 
     @staticmethod
-    def _document_data(document: Document, exclude: list=[]) -> bytes:
+    def _document_data(document: Document, exclude: list = []) -> bytes:
         new_dict = {}
-        exclude += ['issuer', 'signature']
+        exclude += ["issuer", "signature"]
 
         for k, v in document.export_bytes().items():
             if k not in exclude:
@@ -72,13 +72,16 @@ class Crypto:
         if document is UpdatedMixin:
             if document.updated:
                 return keys.created <= document.updated and (
-                    keys.expires >= document.updated)
+                    keys.expires >= document.updated
+                )
             else:
                 return keys.created <= document.created and (
-                    keys.expires >= document.created)
+                    keys.expires >= document.created
+                )
         else:
             return keys.created <= document.created and (
-                keys.expires >= document.created)
+                keys.expires >= document.created
+            )
 
     @staticmethod
     def _latestkeys(keys: Set[Keys]) -> Keys:
@@ -87,96 +90,106 @@ class Crypto:
 
     @staticmethod
     def conceal(
-            data: bytes, sender: PrivatePortfolio,
-            receiver: Portfolio) -> bytes:
+        data: bytes, sender: PrivatePortfolio, receiver: Portfolio
+    ) -> bytes:
         """Conceal data."""
         keys = Crypto._latestkeys(receiver.keys)
 
         if not (sender.privkeys.issuer == sender.entity.id):
             raise RuntimeError(
-                'PrivateKeys "issuer" and sender "id" doesn\'t match')
+                'PrivateKeys "issuer" and sender "id" doesn\'t match'
+            )
 
         if not (keys.issuer == receiver.entity.id):
             raise RuntimeError(
-                'Keys "issuer" and receiver "id" doesn\'t match')
+                'Keys "issuer" and receiver "id" doesn\'t match'
+            )
 
         today = datetime.date.today()
 
         if today > sender.entity.expires:
-            raise RuntimeError('The sending entity has expired')
+            raise RuntimeError("The sending entity has expired")
 
         if today > sender.privkeys.expires:
-            raise RuntimeError('The concealing keys has expired')
+            raise RuntimeError("The concealing keys has expired")
 
         if today > receiver.entity.expires:
-            raise RuntimeError('The receiving entity has expired')
+            raise RuntimeError("The receiving entity has expired")
 
         if today > keys.expires:
-            raise RuntimeError('The receiving keys has expired')
+            raise RuntimeError("The receiving keys has expired")
 
-        return libnacl.public.Box(
-            sender.privkeys.secret, keys.public).encrypt(data)
+        return libnacl.public.Box(sender.privkeys.secret, keys.public).encrypt(
+            data
+        )
 
     @staticmethod
     def unveil(
-            data: bytes, receiver: PrivatePortfolio,
-            sender: Portfolio) -> bytes:
+        data: bytes, receiver: PrivatePortfolio, sender: Portfolio
+    ) -> bytes:
         """Unveil data."""
         keys = Crypto._latestkeys(sender.keys)
 
         if not (receiver.privkeys.issuer == receiver.entity.id):
             raise RuntimeError(
-                'PrivateKeys "issuer" and receiver "id" doesn\'t match')
+                'PrivateKeys "issuer" and receiver "id" doesn\'t match'
+            )
 
         if not (keys.issuer == sender.entity.id):
-            raise RuntimeError(
-                'Keys "issuer" and sender "id" doesn\'t match')
+            raise RuntimeError('Keys "issuer" and sender "id" doesn\'t match')
 
         today = datetime.date.today()
 
         if today > receiver.entity.expires:
-            raise RuntimeError('The receiving entity has expired')
+            raise RuntimeError("The receiving entity has expired")
 
         if today > receiver.privkeys.expires:
-            raise RuntimeError('The receiving keys has expired')
+            raise RuntimeError("The receiving keys has expired")
 
         if today > sender.entity.expires:
-            raise RuntimeError('The sending entity has expired')
+            raise RuntimeError("The sending entity has expired")
 
         if today > keys.expires:
-            raise RuntimeError('The concealing keys has expired')
+            raise RuntimeError("The concealing keys has expired")
 
         return libnacl.public.Box(
-            receiver.privkeys.secret, keys.public).decrypt(data)
+            receiver.privkeys.secret, keys.public
+        ).decrypt(data)
 
     @staticmethod
     def sign(
-            document: Document, signer: PrivatePortfolio,
-            exclude=[], multiple=False) -> Document:
+        document: Document,
+        signer: PrivatePortfolio,
+        exclude=[],
+        multiple=False,
+    ) -> Document:
         """Main document signing algorithm."""
         keys = Crypto._latestkeys(signer.keys)
 
         if not (document.issuer == keys.issuer == signer.entity.id):
             raise RuntimeError(
-                'Document/Keys "issuer" or Entity "id" doesn\'t match')
+                'Document/Keys "issuer" or Entity "id" doesn\'t match'
+            )
 
         today = datetime.date.today()
 
         if today > signer.entity.expires:
-            raise RuntimeError('The signing entity has expired')
+            raise RuntimeError("The signing entity has expired")
 
         if today > keys.expires:
-            raise RuntimeError('The verifying keys has expired')
+            raise RuntimeError("The verifying keys has expired")
 
         if not multiple and document.signature:
-            raise RuntimeError('Document already signed')
+            raise RuntimeError("Document already signed")
 
-        if multiple and not document._fields['signature'].multiple:
+        if multiple and not document._fields["signature"].multiple:
             raise RuntimeError(
-                'This document doesn\'t support multiple signatures')
+                "This document doesn't support multiple signatures"
+            )
 
         data = bytes(signer.entity.id.bytes) + Crypto._document_data(
-            document, exclude)
+            document, exclude
+        )
         signature = libnacl.sign.Signer(signer.privkeys.seed).signature(data)
 
         if multiple:
@@ -186,7 +199,7 @@ class Crypto:
                 document.signature.append(signature)
         else:
             document.signature = signature
-        document._fields['signature'].redo = False
+        document._fields["signature"].redo = False
 
         return document
 
@@ -195,15 +208,18 @@ class Crypto:
         """Main document verifying algorithm."""
 
         for keys in sorted(
-                signer.keys, key=lambda doc: doc.created, reverse=True):
+            signer.keys, key=lambda doc: doc.created, reverse=True
+        ):
             if not Crypto._overlap(document, keys):
                 continue
 
             if not (document.issuer == keys.issuer == signer.entity.id):
                 raise RuntimeError(
-                    'Document/Keys issuer or Entity id doesn\'t match')
+                    "Document/Keys issuer or Entity id doesn't match"
+                )
             data = bytes(document.issuer.bytes) + Crypto._document_data(
-                document, exclude)
+                document, exclude
+            )
             verifier = libnacl.sign.Verifier(keys.verify.hex())
 
             if isinstance(document.signature, list):
@@ -224,32 +240,36 @@ class Crypto:
 
     @staticmethod
     def sign_header(
-            envelope: Envelope, header: Header,
-            signer: PrivatePortfolio) -> Header:
+        envelope: Envelope, header: Header, signer: PrivatePortfolio
+    ) -> Header:
         """Sign envelope header"""
         keys = Crypto._latestkeys(signer.keys)
 
         if not (header.issuer == keys.issuer == signer.entity.id):
             raise RuntimeError(
-                'Header/Keys "issuer" or Entity "id" doesn\'t match')
+                'Header/Keys "issuer" or Entity "id" doesn\'t match'
+            )
 
         today = datetime.date.today()
         if today > signer.entity.expires:
-            raise RuntimeError('The signing entity has expired')
+            raise RuntimeError("The signing entity has expired")
 
         if today > keys.expires:
-            raise RuntimeError('The verifying keys has expired')
+            raise RuntimeError("The verifying keys has expired")
 
         if header.signature:
-            raise RuntimeError('Document already signed')
+            raise RuntimeError("Document already signed")
 
         if len(envelope.header):
             old_signature = envelope.header[-1].signature
         else:
             old_signature = envelope.signature
 
-        data = old_signature + bytes(
-            signer.entity.id.bytes) + Crypto._document_data(header)
+        data = (
+            old_signature
+            + bytes(signer.entity.id.bytes)
+            + Crypto._document_data(header)
+        )
         signature = libnacl.sign.Signer(signer.privkeys.seed).signature(data)
 
         header.signature = signature
@@ -257,24 +277,29 @@ class Crypto:
 
     @staticmethod
     def verify_header(
-            envelope: Envelope, header_no: int,
-            signer: Portfolio) -> bool:
+        envelope: Envelope, header_no: int, signer: Portfolio
+    ) -> bool:
         """Verify envelope header."""
-        header = envelope.header[header_no-1]
+        header = envelope.header[header_no - 1]
 
         if header_no - 2 > 0:
-            old_signature = envelope.header[header_no-1]
+            old_signature = envelope.header[header_no - 1]
         else:
             old_signature = envelope.signature
 
-        data = old_signature + bytes(
-                    signer.entity.id.bytes) + Crypto._document_data(header)
+        data = (
+            old_signature
+            + bytes(signer.entity.id.bytes)
+            + Crypto._document_data(header)
+        )
 
         for keys in sorted(
-                signer.keys, key=lambda doc: doc.created, reverse=True):
+            signer.keys, key=lambda doc: doc.created, reverse=True
+        ):
             if not (header.issuer == keys.issuer == signer.entity.id):
                 raise RuntimeError(
-                    'Header/Keys issuer or Entity id doesn\'t match')
+                    "Header/Keys issuer or Entity id doesn't match"
+                )
 
             verifier = libnacl.sign.Verifier(keys.verify.hex())
 

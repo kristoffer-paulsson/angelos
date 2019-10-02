@@ -9,8 +9,15 @@ This file is distributed under the terms of the MIT license.
 Module docstring.
 """
 from .model import (
-    BaseDocument, StringField, DateField, BinaryField, DocumentField,
-    UuidField, TypeField, DateTimeField)
+    BaseDocument,
+    StringField,
+    DateField,
+    BinaryField,
+    DocumentField,
+    UuidField,
+    TypeField,
+    DateTimeField,
+)
 from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
@@ -35,8 +42,14 @@ class Note(Message):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
-                    Note]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Message,
+            OwnerMixin,
+            Note,
+        ]
         self._check_validate(validate)
         return True
 
@@ -51,8 +64,14 @@ class Instant(Message):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
-                    Instant]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Message,
+            OwnerMixin,
+            Instant,
+        ]
         self._check_validate(validate)
         return True
 
@@ -67,8 +86,14 @@ class Mail(Message):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
-                    Mail]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Message,
+            OwnerMixin,
+            Mail,
+        ]
         self._check_validate(validate)
         return True
 
@@ -81,8 +106,15 @@ class Share(Mail):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
-                    Mail, Share]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Message,
+            OwnerMixin,
+            Mail,
+            Share,
+        ]
         self._check_validate(validate)
         return True
 
@@ -95,7 +127,14 @@ class Report(Mail):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Message, OwnerMixin,
-                    Mail, Share]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Message,
+            OwnerMixin,
+            Mail,
+            Share,
+        ]
         self._check_validate(validate)
         return True

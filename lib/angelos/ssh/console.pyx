@@ -18,7 +18,12 @@ from ..const import Const
 from .ssh import SSHServer, SessionHandle
 from ..server.cmd import Terminal
 from ..server.commands import (
-    EnvCommand, QuitCommand, SetupCommand, StartupCommand, ProcessCommand)
+    EnvCommand,
+    QuitCommand,
+    SetupCommand,
+    StartupCommand,
+    ProcessCommand,
+)
 from ..server.impexp import ImportCommand, ExportCommand, PortfolioCommand
 from ..dummy.command import DummyCommand
 
@@ -32,7 +37,8 @@ class ConsoleServerProcess(asyncssh.SSHServerProcess):
         self._uuid = uuid.uuid4()
 
         self._session_manager.add_session(
-            name, SessionHandle(self._uuid, self))
+            name, SessionHandle(self._uuid, self)
+        )
 
     def close(self, sessmgr=False):
         result = super().close()
@@ -43,12 +49,12 @@ class ConsoleServerProcess(asyncssh.SSHServerProcess):
 
 class BootServerProcess(ConsoleServerProcess):
     def __init__(self, process_factory, sess_mgr):
-        ConsoleServerProcess.__init__(self, process_factory, sess_mgr, 'boot')
+        ConsoleServerProcess.__init__(self, process_factory, sess_mgr, "boot")
 
 
 class AdminServerProcess(ConsoleServerProcess):
     def __init__(self, process_factory, sess_mgr):
-        ConsoleServerProcess.__init__(self, process_factory, sess_mgr, 'admin')
+        ConsoleServerProcess.__init__(self, process_factory, sess_mgr, "admin")
 
 
 class BootServer(SSHServer):
@@ -58,17 +64,17 @@ class BootServer(SSHServer):
         """Initialize BootServer."""
         SSHServer.__init__(self, ioc)
 
-        vault_file = Util.path(self.ioc.env['dir'].root, Const.CNL_VAULT)
+        vault_file = Util.path(self.ioc.env["dir"].root, Const.CNL_VAULT)
         if os.path.isfile(vault_file):
-            self._applog.info(
-                'Vault archive found. Initialize startup mode.')
+            self._applog.info("Vault archive found. Initialize startup mode.")
         else:
             self._applog.info(
-                'Vault archive NOT found. Initialize setup mode.')
+                "Vault archive NOT found. Initialize setup mode."
+            )
 
     def begin_auth(self, username):
         """Auth not required."""
-        logging.info('Begin authentication for: %s' % username)
+        logging.info("Begin authentication for: %s" % username)
         return False
 
     def password_auth_supported(self):
@@ -81,7 +87,7 @@ class BootServer(SSHServer):
 
     def session_requested(self):
         """Start terminal session. Denying SFTP and SCP."""
-        logging.debug('Session requested')
+        logging.debug("Session requested")
         return BootServerProcess(self.terminal, self.ioc.session)
 
     async def terminal(self, process):
@@ -90,28 +96,38 @@ class BootServer(SSHServer):
 
         The terminal will be equipped for setup or startup.
         """
-        vault_file = Util.path(self.ioc.env['dir'].root, Const.CNL_VAULT)
+        vault_file = Util.path(self.ioc.env["dir"].root, Const.CNL_VAULT)
 
         if os.path.isfile(vault_file):
-            return (await Terminal(
+            return await Terminal(
                 commands=[StartupCommand, QuitCommand],
-                ioc=self.ioc, process=process).run())
+                ioc=self.ioc,
+                process=process,
+            ).run()
         else:
-            return (await Terminal(
+            return await Terminal(
                 commands=[SetupCommand, QuitCommand],
-                ioc=self.ioc, process=process).run())
+                ioc=self.ioc,
+                process=process,
+            ).run()
 
 
 class AdminServer(SSHServer):
     """SSH Server for the admin console."""
 
     cmds = [
-        EnvCommand, QuitCommand, ImportCommand,
-        ExportCommand, ProcessCommand, PortfolioCommand, DummyCommand]
+        EnvCommand,
+        QuitCommand,
+        ImportCommand,
+        ExportCommand,
+        ProcessCommand,
+        PortfolioCommand,
+        DummyCommand,
+    ]
 
     def begin_auth(self, username):
         """Auth not required."""
-        logging.info('Begin authentication for: %s' % username)
+        logging.info("Begin authentication for: %s" % username)
         return False
 
     def password_auth_supported(self):
@@ -124,7 +140,7 @@ class AdminServer(SSHServer):
 
     def session_requested(self):
         """Start terminal session. Denying SFTP and SCP."""
-        logging.debug('Session requested')
+        logging.debug("Session requested")
         return AdminServerProcess(self.terminal, self.ioc.session)
 
     async def terminal(self, process):
@@ -133,6 +149,6 @@ class AdminServer(SSHServer):
 
         The terminal will be equipped for setup or startup.
         """
-        return (await Terminal(
-            commands=AdminServer.cmds,
-            ioc=self.ioc, process=process).run())
+        return await Terminal(
+            commands=AdminServer.cmds, ioc=self.ioc, process=process
+        ).run()

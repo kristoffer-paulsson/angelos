@@ -9,8 +9,14 @@ This file is distributed under the terms of the MIT license.
 Module docstring.
 """
 from .model import (
-    BaseDocument, StringField, IPField, UuidField, DocumentField, TypeField,
-    ChoiceField)
+    BaseDocument,
+    StringField,
+    IPField,
+    UuidField,
+    DocumentField,
+    TypeField,
+    ChoiceField,
+)
 from .document import DocType, Document, UpdatedMixin, IssueMixin
 
 
@@ -41,7 +47,7 @@ class Domain(Document, UpdatedMixin):
 class Node(Document, UpdatedMixin):
     type = TypeField(value=DocType.NET_NODE)
     domain = UuidField()
-    role = ChoiceField(choices=['client', 'server', 'backup'])
+    role = ChoiceField(choices=["client", "server", "backup"])
     device = StringField()
     serial = StringField()
     location = DocumentField(required=False, t=Location)

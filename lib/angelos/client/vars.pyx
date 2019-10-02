@@ -17,108 +17,83 @@ particular are used to configure services available from the IoC container.
 from ..const import Const
 
 """Environment default values."""
-ENV_DEFAULT = {
-    'name': 'Logo'
-}
+ENV_DEFAULT = {"name": "Logo"}
 
 """Environment immutable values."""
-ENV_IMMUTABLE = {
-
-}
+ENV_IMMUTABLE = {}
 
 """Configuration default values"""
-CONFIG_DEFAULT = {
-
-}
+CONFIG_DEFAULT = {}
 
 """Configuration immutable values"""
 CONFIG_IMMUTABLE = {
-    'state': [{
-            'name': 'running'
-        }, {
-            'name': 'boot',
-            'blocking': ('serving', ),
-            'depends': ('running', )
-        }, {
-            'name': 'serving',
-            'depends': ('running', ),
-            'switches': ('boot', )
-        }, {
-            'name': 'nodes',
-            'depends': ('serving', )
-        }, {
-            'name': 'hosts',
-            'depends': ('serving', )
-        }, {
-            'name': 'clients',
-            'depends': ('serving', )
-        }
+    "state": [
+        {"name": "running"},
+        {"name": "boot", "blocking": ("serving",), "depends": ("running",)},
+        {"name": "serving", "depends": ("running",), "switches": ("boot",)},
+        {"name": "nodes", "depends": ("serving",)},
+        {"name": "hosts", "depends": ("serving",)},
+        {"name": "clients", "depends": ("serving",)},
     ],
-    'logger': {
-        'version': 1,
-        'formatters': {
-            'default': {
-                'format': '%(asctime)s %(name)s:%(levelname)s %(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
+    "logger": {
+        "version": 1,
+        "formatters": {
+            "default": {
+                "format": "%(asctime)s %(name)s:%(levelname)s %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
             },
-            'console': {
-                'format': '%(levelname)s %(message)s',
-            }
+            "console": {"format": "%(levelname)s %(message)s"},
         },
-        'filters': {
-            'default': {
-                'name': ''
-            }
-        },
-        'handlers': {
-            'default': {
-                'class': 'logging.FileHandler',
-                'filename': 'angelos.log',
-                'mode': 'a+',
-                'level': 'INFO',
-                'formatter': 'default',
-                'filters': []
+        "filters": {"default": {"name": ""}},
+        "handlers": {
+            "default": {
+                "class": "logging.FileHandler",
+                "filename": "angelos.log",
+                "mode": "a+",
+                "level": "INFO",
+                "formatter": "default",
+                "filters": [],
             },
-            'console': {
-                'class': 'logging.StreamHandler',
-                'stream': 'ext://sys.stdout',
-                'level': 'ERROR',
-                'formatter': 'console',
-                'filters': []
+            "console": {
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+                "level": "ERROR",
+                "formatter": "console",
+                "filters": [],
             },
         },
-        'loggers': {
+        "loggers": {
             Const.LOG_ERR: {  # LOG_ERR is used to log system errors
-                'level': 'INFO',
+                "level": "INFO",
                 # 'propagate': None,
-                'filters': [],
-                'handlers': ['default'],
+                "filters": [],
+                "handlers": ["default"],
             },
             Const.LOG_APP: {  # LOG_APP is used to log system events
-                'level': 'INFO',
+                "level": "INFO",
                 # 'propagate': None,
-                'filters': [],
-                'handlers': ['default'],
+                "filters": [],
+                "handlers": ["default"],
             },
             Const.LOG_BIZ: {  # LOG_BIZ is used to log business events
-                'level': 'INFO',
+                "level": "INFO",
                 # 'propagate': None,
-                'filters': [],
-                'handlers': ['default'],
+                "filters": [],
+                "handlers": ["default"],
             },
-            'asyncio': {  # 'asyncio' is used to log business events
-                'level': 'WARNING',
+            "asyncio": {  # 'asyncio' is used to log business events
+                "level": "WARNING",
                 # 'propagate': None,
-                'filters': [],
-                'handlers': ['default'],
-            }
+                "filters": [],
+                "handlers": ["default"],
+            },
         },
-        'root': {
-            'level': 'INFO',
-            'filters': [],
-            'handlers': ['console', 'default'],
+        "root": {
+            "level": "INFO",
+            "filters": [],
+            "handlers": ["console", "default"],
         },
         # 'incrementel': False,
-        'disable_existing_loggings': True
-    }
+        "disable_existing_loggings": True,
+    },
 }

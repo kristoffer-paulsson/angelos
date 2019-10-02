@@ -27,8 +27,7 @@ from ..automatic import Automatic
 from ..prefs import Preferences
 from .parser import Parser
 
-from .vars import (
-    ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE)
+from .vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
 
 
 class Configuration(Config, Container):
@@ -44,28 +43,28 @@ class Configuration(Config, Container):
 
     def __config(self):
         return {
-            'env': lambda self: collections.ChainMap(
+            "env": lambda self: collections.ChainMap(
                 ENV_IMMUTABLE,
                 vars(self.auto),
-                self.__load('env.json'),
-                ENV_DEFAULT),
-            'config': lambda self: collections.ChainMap(
-                CONFIG_IMMUTABLE,
-                self.__load('config.json'),
-                CONFIG_DEFAULT),
-            'state': lambda self: StateMachine(self.config['state']),
-            'log': lambda self: LogHandler(self.config['logger']),
-            'session': lambda self: SessionManager(),
-            'facade': lambda self: StaticHandle(Facade),
-            'boot': lambda self: StaticHandle(asyncio.base_events.Server),
-            'admin': lambda self: StaticHandle(asyncio.base_events.Server),
-            'clients': lambda self: Handle(asyncio.base_events.Server),
-            'nodes': lambda self: Handle(asyncio.base_events.Server),
-            'hosts': lambda self: Handle(asyncio.base_events.Server),
-            'opts': lambda self: Parser(),
-            'prefs': lambda self: Preferences(self.facade),
-            'auto': lambda self: Automatic('angelos', self.opts),
-            'quit': lambda self: Event(),
+                self.__load("env.json"),
+                ENV_DEFAULT,
+            ),
+            "config": lambda self: collections.ChainMap(
+                CONFIG_IMMUTABLE, self.__load("config.json"), CONFIG_DEFAULT
+            ),
+            "state": lambda self: StateMachine(self.config["state"]),
+            "log": lambda self: LogHandler(self.config["logger"]),
+            "session": lambda self: SessionManager(),
+            "facade": lambda self: StaticHandle(Facade),
+            "boot": lambda self: StaticHandle(asyncio.base_events.Server),
+            "admin": lambda self: StaticHandle(asyncio.base_events.Server),
+            "clients": lambda self: Handle(asyncio.base_events.Server),
+            "nodes": lambda self: Handle(asyncio.base_events.Server),
+            "hosts": lambda self: Handle(asyncio.base_events.Server),
+            "opts": lambda self: Parser(),
+            "prefs": lambda self: Preferences(self.facade),
+            "auto": lambda self: Automatic("angelos", self.opts),
+            "quit": lambda self: Event(),
         }
 
 
@@ -75,18 +74,20 @@ class Server(ContainerAware):
     def __init__(self):
         """Initialize app logger."""
         ContainerAware.__init__(self, Configuration())
-        self._worker = Worker('server.main', self.ioc, executor=0, new=False)
+        self._worker = Worker("server.main", self.ioc, executor=0, new=False)
         self._applog = self.ioc.log.app
 
     def _initialize(self):
-        self.ioc.state('running', True)
+        self.ioc.state("running", True)
         loop = self._worker.loop
 
         loop.add_signal_handler(
-            signal.SIGINT, functools.partial(self.quiter, signal.SIGINT))
+            signal.SIGINT, functools.partial(self.quiter, signal.SIGINT)
+        )
 
         loop.add_signal_handler(
-            signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM))
+            signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM)
+        )
 
         self._worker.run_coroutine(self.boot_server())
         self._worker.run_coroutine(self.admin_server())
@@ -95,26 +96,26 @@ class Server(ContainerAware):
         self._worker.run_coroutine(self.nodes_server())
         self._worker.run_coroutine(self.boot_activator())
 
-        self._applog.info('Starting boot server.')
+        self._applog.info("Starting boot server.")
 
     def _finalize(self):
-        self._applog.info('Shutting down server.')
-        self._applog.info('Server quitting.')
+        self._applog.info("Shutting down server.")
+        self._applog.info("Server quitting.")
 
     def _listen(self):
-        la = self.ioc.env['opts'].listen
-        if la == 'localhost':
-            listen = 'localhost'
-        elif la == 'loopback':
-            listen = '127.0.0.1'
-        elif la == 'hostname':
-            listen = self.ioc.env['net'].hostname
-        elif la == 'domain':
-            listen = self.ioc.env['net'].domain
-        elif la == 'ip':
-            listen = self.ioc.env['net'].ip
-        elif la == 'any':
-            listen = ''
+        la = self.ioc.env["opts"].listen
+        if la == "localhost":
+            listen = "localhost"
+        elif la == "loopback":
+            listen = "127.0.0.1"
+        elif la == "hostname":
+            listen = self.ioc.env["net"].hostname
+        elif la == "domain":
+            listen = self.ioc.env["net"].domain
+        elif la == "ip":
+            listen = self.ioc.env["net"].ip
+        elif la == "any":
+            listen = ""
         else:
             listen = la
         return listen
@@ -131,7 +132,7 @@ class Server(ContainerAware):
 
     def run(self):
         """Run the server applications main loop."""
-        self._applog.info('-------- STARTING SERVER --------')
+        self._applog.info("-------- STARTING SERVER --------")
 
         self._initialize()
         try:
@@ -140,28 +141,32 @@ class Server(ContainerAware):
             pass
         except Exception as e:
             self._applog.critical(
-                'Server crashed due to unhandled exception: %s' % e)
+                "Server crashed due to unhandled exception: %s" % e
+            )
             self._applog.exception(e)
         self._finalize()
 
-        self._applog.info('-------- EXITING SERVER --------')
+        self._applog.info("-------- EXITING SERVER --------")
 
     async def admin_server(self):
         first = True
         while not self.ioc.quit.is_set():
-            if self.ioc.state.position('serving'):
-                await self.ioc.state.off('serving')
+            if self.ioc.state.position("serving"):
+                await self.ioc.state.off("serving")
                 server = self.ioc.admin
                 server.close()
-                await self.ioc.session.unreg_server('admin')
+                await self.ioc.session.unreg_server("admin")
                 await server.wait_closed()
             else:
-                await self.ioc.state.on('serving')
+                await self.ioc.state.on("serving")
                 if first:
                     self.ioc.admin = await Starter().admin_server(
-                        self._listen(), port=self.ioc.env['opts'].port,
-                        ioc=self.ioc, loop=self._worker.loop)
-                    self.ioc.session.reg_server('admin', self.ioc.admin)
+                        self._listen(),
+                        port=self.ioc.env["opts"].port,
+                        ioc=self.ioc,
+                        loop=self._worker.loop,
+                    )
+                    self.ioc.session.reg_server("admin", self.ioc.admin)
                     first = False
                 else:
                     await self.ioc.admin.start_serving()
@@ -169,19 +174,22 @@ class Server(ContainerAware):
     async def boot_server(self):
         first = True
         while not self.ioc.quit.is_set():
-            if self.ioc.state.position('boot'):
-                await self.ioc.state.off('boot')
+            if self.ioc.state.position("boot"):
+                await self.ioc.state.off("boot")
                 server = self.ioc.boot
                 server.close()
-                await self.ioc.session.unreg_server('boot')
+                await self.ioc.session.unreg_server("boot")
                 await server.wait_closed()
             else:
-                await self.ioc.state.on('boot')
+                await self.ioc.state.on("boot")
                 if first:
                     self.ioc.boot = await Starter().boot_server(
-                        self._listen(), port=self.ioc.env['opts'].port,
-                        ioc=self.ioc, loop=self._worker.loop)
-                    self.ioc.session.reg_server('boot', self.ioc.boot)
+                        self._listen(),
+                        port=self.ioc.env["opts"].port,
+                        ioc=self.ioc,
+                        loop=self._worker.loop,
+                    )
+                    self.ioc.session.reg_server("boot", self.ioc.boot)
                     first = False
                 else:
                     await self.ioc.boot.start_serving()
@@ -189,76 +197,80 @@ class Server(ContainerAware):
     async def clients_server(self):
         try:
             while not self.ioc.quit.is_set():
-                if self.ioc.state.position('clients'):
-                    await self.ioc.state.off('clients')
-                    self._applog.info('Clients server turned OFF')
+                if self.ioc.state.position("clients"):
+                    await self.ioc.state.off("clients")
+                    self._applog.info("Clients server turned OFF")
                     server = self.ioc.clients
                     server.close()
-                    await self.ioc.session.unreg_server('clients')
+                    await self.ioc.session.unreg_server("clients")
                     await server.wait_closed()
                 else:
-                    await self.ioc.state.on('clients')
-                    self._applog.info('Clients server turned ON')
+                    await self.ioc.state.on("clients")
+                    self._applog.info("Clients server turned ON")
                     self.ioc.clients = await Starter().clients_server(
                         self.ioc.facade.portfolio,
                         self._listen(),
-                        port=self.ioc.config['ports']['clients'],
-                        ioc=self.ioc, loop=self._worker.loop)
-                    self.ioc.session.reg_server(
-                        'clients', self.ioc.clients)
+                        port=self.ioc.config["ports"]["clients"],
+                        ioc=self.ioc,
+                        loop=self._worker.loop,
+                    )
+                    self.ioc.session.reg_server("clients", self.ioc.clients)
         except Exception as e:
             self._applog.critical(
-                'Clients server encountered a critical error.')
+                "Clients server encountered a critical error."
+            )
             self._applog.exception(e)
 
     async def hosts_server(self):
         try:
             while not self.ioc.quit.is_set():
-                if self.ioc.state.position('hosts'):
-                    await self.ioc.state.off('hosts')
-                    self._applog.info('Hosts server turned OFF')
+                if self.ioc.state.position("hosts"):
+                    await self.ioc.state.off("hosts")
+                    self._applog.info("Hosts server turned OFF")
                     server = self.ioc.hosts
                     server.close()
-                    await self.ioc.session.unreg_server('hosts')
+                    await self.ioc.session.unreg_server("hosts")
                     await server.wait_closed()
                 else:
-                    await self.ioc.state.on('hosts')
-                    self._applog.info('Hosts server turned ON')
+                    await self.ioc.state.on("hosts")
+                    self._applog.info("Hosts server turned ON")
                     self.ioc.hosts = await Starter().hosts_server(
                         self.ioc.facade.portfolio,
                         self._listen(),
-                        port=self.ioc.config['ports']['hosts'],
-                        ioc=self.ioc, loop=self._worker.loop)
-                    self.ioc.session.reg_server('hosts', self.ioc.hosts)
+                        port=self.ioc.config["ports"]["hosts"],
+                        ioc=self.ioc,
+                        loop=self._worker.loop,
+                    )
+                    self.ioc.session.reg_server("hosts", self.ioc.hosts)
         except Exception as e:
-            self._applog.critical(
-                'Hosts server encountered a critical error.')
+            self._applog.critical("Hosts server encountered a critical error.")
             self._applog.exception(e)
 
     async def nodes_server(self):
         try:
             while not self.ioc.quit.is_set():
-                if self.ioc.state.position('nodes'):
-                    self._applog.info('Nodes server turned OFF')
-                    await self.ioc.state.off('nodes')
+                if self.ioc.state.position("nodes"):
+                    self._applog.info("Nodes server turned OFF")
+                    await self.ioc.state.off("nodes")
                     server = self.ioc.nodes
                     server.close()
-                    await self.ioc.session.unreg_server('nodes')
+                    await self.ioc.session.unreg_server("nodes")
                     await server.wait_closed()
                 else:
-                    await self.ioc.state.on('nodes')
-                    self._applog.info('Nodes server turned ON')
+                    await self.ioc.state.on("nodes")
+                    self._applog.info("Nodes server turned ON")
                     self.ioc.nodes = await Starter().nodes_server(
                         self.ioc.facade.portfolio,
                         self._listen(),
-                        port=self.ioc.config['ports']['nodes'],
-                        ioc=self.ioc, loop=self._worker.loop)
-                    self.ioc.session.reg_server('nodes', self.ioc.nodes)
+                        port=self.ioc.config["ports"]["nodes"],
+                        ioc=self.ioc,
+                        loop=self._worker.loop,
+                    )
+                    self.ioc.session.reg_server("nodes", self.ioc.nodes)
         except Exception as e:
-            self._applog.critical(
-                'Nodes server encountered a critical error.')
+            self._applog.critical("Nodes server encountered a critical error.")
             self._applog.exception(e)
 
     async def boot_activator(self):
         await asyncio.sleep(1)
-        self.ioc.state('boot', True)
+        self.ioc.state("boot", True)

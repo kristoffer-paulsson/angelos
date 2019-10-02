@@ -23,42 +23,43 @@ from ..error import Error
 class ConcealIO(io.RawIOBase):
     """ConcealIO is a FileIO-compliant and transparent encryption layer."""
 
-    TOT_SIZE = 512*33
-    CBLK_SIZE = 512*32 + 40
-    ABLK_SIZE = 512*32
+    TOT_SIZE = 512 * 33
+    CBLK_SIZE = 512 * 32 + 40
+    ABLK_SIZE = 512 * 32
 
-    def __init__(self, file, mode='rb', secret=None):
+    def __init__(self, file, mode="rb", secret=None):
         """Init with file object, mode and symmetric encryption key."""
         Util.is_type(file, (str, bytes, io.IOBase))
         Util.is_type(mode, (str, bytes))
         Util.is_type(secret, (str, bytes))
 
         if isinstance(file, io.IOBase):
-            if file.mode not in ['rb', 'rb+', 'wb']:
-                raise Util.exception(Error.CONCEAL_UNKOWN_MODE, {'mode', mode})
+            if file.mode not in ["rb", "rb+", "wb"]:
+                raise Util.exception(Error.CONCEAL_UNKOWN_MODE, {"mode", mode})
             self._name = file.name
             self._mode = file.mode
             self._fd = file
             self._fdclose = False
         else:
-            if mode not in ['rb', 'rb+', 'wb']:
-                raise Util.exception(Error.CONCEAL_UNKOWN_MODE, {'mode', mode})
+            if mode not in ["rb", "rb+", "wb"]:
+                raise Util.exception(Error.CONCEAL_UNKOWN_MODE, {"mode", mode})
             self._name = file
             self._mode = mode
             self._fd = open(file, mode)
             self._fdclose = True
 
-        self._readable = True if mode in ['rb', 'rb+'] else False
-        self._writable = True if mode in ['wb', 'rb+'] else False
-        self._seekable = True if mode in ['rb', 'rb+', 'wb'] else False
+        self._readable = True if mode in ["rb", "rb+"] else False
+        self._writable = True if mode in ["wb", "rb+"] else False
+        self._seekable = True if mode in ["rb", "rb+", "wb"] else False
 
         self._closed = False
 
         fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
         self._box = libnacl.secret.SecretBox(secret)
-        self._count = int(os.fstat(
-            self._fd.fileno()).st_size / ConcealIO.TOT_SIZE)
+        self._count = int(
+            os.fstat(self._fd.fileno()).st_size / ConcealIO.TOT_SIZE
+        )
         self._end = 0 if self._count == 0 else self.__length()
         self._size = self._count * ConcealIO.ABLK_SIZE
         self._index = 0
@@ -80,10 +81,11 @@ class ConcealIO(io.RawIOBase):
 
         if offset is None:
             data = self._box.decrypt(self._fd.read(48))
-            offset = struct.unpack('!Q', data)[0]
-        elif self._mode in ['rb+', 'wb']:
-            data = bytearray(self._box.encrypt(
-                struct.pack('!Q', offset)) + os.urandom(424))
+            offset = struct.unpack("!Q", data)[0]
+        elif self._mode in ["rb+", "wb"]:
+            data = bytearray(
+                self._box.encrypt(struct.pack("!Q", offset)) + os.urandom(424)
+            )
             self._fd.write(data)
 
         self._fd.seek(realpos)
@@ -95,17 +97,17 @@ class ConcealIO(io.RawIOBase):
         res = self._fd.seek(pos)
 
         if pos != res:
-            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
-                'position': pos, 'result': res})
+            raise Util.exception(
+                Error.CONCEAL_POSITION_ERROR, {"position": pos, "result": res}
+            )
 
-        self._buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b'\x00')
+        self._buffer = bytearray().ljust(ConcealIO.ABLK_SIZE, b"\x00")
 
         if blk == 0:
-            filler = b''
+            filler = b""
         else:
             filler = os.urandom(472)
-        block = bytearray(
-            self._box.encrypt(self._buffer) + filler)
+        block = bytearray(self._box.encrypt(self._buffer) + filler)
         self._fd.write(block)
 
         self._count += 1
@@ -115,17 +117,19 @@ class ConcealIO(io.RawIOBase):
 
     def _load(self, blk):
         if not self._count > blk:
-            raise IndexError('Block out of range.')
+            raise IndexError("Block out of range.")
 
         pos = blk * ConcealIO.TOT_SIZE
         res = self._fd.seek(pos)
 
         if pos != res:
-            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
-                'position': pos, 'result': res})
+            raise Util.exception(
+                Error.CONCEAL_POSITION_ERROR, {"position": pos, "result": res}
+            )
 
-        self._buffer = bytearray(self._box.decrypt(
-            self._fd.read(ConcealIO.CBLK_SIZE)))
+        self._buffer = bytearray(
+            self._box.decrypt(self._fd.read(ConcealIO.CBLK_SIZE))
+        )
 
         self._index = blk
         self._changed = False
@@ -139,15 +143,15 @@ class ConcealIO(io.RawIOBase):
         res = self._fd.seek(pos)
 
         if pos != res:
-            raise Util.exception(Error.CONCEAL_POSITION_ERROR, {
-                'position': pos, 'result': res})
+            raise Util.exception(
+                Error.CONCEAL_POSITION_ERROR, {"position": pos, "result": res}
+            )
 
         if self._index == 0:
-            filler = b''
+            filler = b""
         else:
             filler = os.urandom(472)
-        block = bytearray(
-            self._box.encrypt(self._buffer) + filler)
+        block = bytearray(self._box.encrypt(self._buffer) + filler)
         self._fd.write(block)
 
         if self._index >= self._count:
@@ -224,7 +228,7 @@ class ConcealIO(io.RawIOBase):
         if not self.readable():
             raise OSError()
 
-        m = memoryview(b).cast('B')
+        m = memoryview(b).cast("B")
         size = min(len(m), self._end - self._position)
 
         data = bytearray()
@@ -232,10 +236,9 @@ class ConcealIO(io.RawIOBase):
         self._save()
 
         while size > cursor:
-            numcpy = min(
-                ConcealIO.ABLK_SIZE - self._offset, size - cursor)
+            numcpy = min(ConcealIO.ABLK_SIZE - self._offset, size - cursor)
 
-            data += self._buffer[self._offset:self._offset+numcpy]
+            data += self._buffer[self._offset : self._offset + numcpy]
             cursor += numcpy
             self._position += numcpy
             self._offset += numcpy
@@ -282,8 +285,9 @@ class ConcealIO(io.RawIOBase):
         elif whence == io.SEEK_END:
             cursor = max(min(self._end + offset, self._end), 0)
         else:
-            raise Util.exception(Error.CONCEAL_INVALID_SEEK, {
-                'whence': whence})
+            raise Util.exception(
+                Error.CONCEAL_INVALID_SEEK, {"whence": whence}
+            )
 
         blk = int(math.floor(cursor / self.ABLK_SIZE))
         if self._index != blk:
@@ -334,9 +338,9 @@ class ConcealIO(io.RawIOBase):
 
         self._changed = True
         space = ConcealIO.ABLK_SIZE - blk_cursor
-        self._buffer[self._offset:ConcealIO.ABLK_SIZE] = b'\x00' * space
+        self._buffer[self._offset : ConcealIO.ABLK_SIZE] = b"\x00" * space
         self._save()
-        self._count = self._index+1
+        self._count = self._index + 1
 
         self.__length(self._end)
         self._fd.truncate(self._count * ConcealIO.TOT_SIZE)
@@ -369,12 +373,11 @@ class ConcealIO(io.RawIOBase):
 
         while wrtlen > cursor:
             self._changed = True
-            numcpy = min(
-                ConcealIO.ABLK_SIZE - self._offset, wrtlen - cursor)
+            numcpy = min(ConcealIO.ABLK_SIZE - self._offset, wrtlen - cursor)
 
-            self._buffer[
-                self._offset:self._offset + numcpy] = b[
-                    cursor: cursor + numcpy]  # noqa E501
+            self._buffer[self._offset : self._offset + numcpy] = b[
+                cursor : cursor + numcpy
+            ]  # noqa E501
 
             cursor += numcpy
             self._offset += numcpy

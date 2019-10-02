@@ -15,8 +15,12 @@ import asyncssh
 
 from ..utils import Util, FactoryInterface
 from ..error import (
-    CmdShellException, CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit,
-    Error)
+    CmdShellException,
+    CmdShellEmpty,
+    CmdShellInvalidCommand,
+    CmdShellExit,
+    Error,
+)
 from ..ioc import ContainerAware
 
 
@@ -40,26 +44,26 @@ class ConsoleIO:
         self._stdout.write(other)
         return self
 
-    async def prompt(self, msg='', t=str):
+    async def prompt(self, msg="", t=str):
         """Prompt for user input."""
         while True:
-            self._stdout.write('%s: ' % msg)
+            self._stdout.write("%s: " % msg)
             input = await self._stdin.readline()
 
             try:
                 input = t(input.strip())
                 break
             except ValueError:
-                self._stdout.write('Invalid data entered.\n')
+                self._stdout.write("Invalid data entered.\n")
                 continue
 
         return input
 
-    async def multiline(self, msg='', t=str):
+    async def multiline(self, msg="", t=str):
         """Prompt for multiline user input."""
-        lines = ''
+        lines = ""
         while True:
-            self._stdout.write('%s:\n' % msg)
+            self._stdout.write("%s:\n" % msg)
 
             while True:
                 input = await self._stdin.readline()
@@ -71,18 +75,17 @@ class ConsoleIO:
                 input = t(lines.strip())
                 break
             except ValueError:
-                self._stdout.write('Invalid data entered.\n')
+                self._stdout.write("Invalid data entered.\n")
                 continue
 
         return lines
 
-    async def confirm(self, msg='', em=True):
+    async def confirm(self, msg="", em=True):
         """Ask for user choice."""
-        ans = ['Y', 'N'] if em else ['y', 'n']
+        ans = ["Y", "N"] if em else ["y", "n"]
         while True:
-            self._stdout.write('%s\n' % msg)
-            self._stdout.write(
-                'Press key: %s \n' % ' / '.join(['Yes', 'No']))
+            self._stdout.write("%s\n" % msg)
+            self._stdout.write("Press key: %s \n" % " / ".join(["Yes", "No"]))
             try:
                 self._stdin.channel.set_line_mode(False)
                 input = await self._stdin.read(1)
@@ -92,17 +95,17 @@ class ConsoleIO:
                 raise e
 
             if input == ans[0]:
-                self._stdout.write('Yes\n\n')
+                self._stdout.write("Yes\n\n")
                 return True
             elif input == ans[1]:
-                self._stdout.write('No\n\n')
+                self._stdout.write("No\n\n")
                 return False
 
         return None
 
-    async def presskey(self, msg='Press any key to continue...'):
+    async def presskey(self, msg="Press any key to continue..."):
         """Press a key to continue."""
-        self._stdout.write('%s\n' % msg)
+        self._stdout.write("%s\n" % msg)
 
         try:
             self._stdin.channel.set_line_mode(False)
@@ -115,7 +118,7 @@ class ConsoleIO:
 
         return True
 
-    async def choose(self, msg='', choices=[], em=False):
+    async def choose(self, msg="", choices=[], em=False):
         """Ask for user choice."""
         keylist = {}
         for item in choices:
@@ -126,8 +129,8 @@ class ConsoleIO:
             keylist[key] = item
 
         while True:
-            self._stdout.write('%s\n' % msg)
-            self._stdout.write('Choices: [ %s ]\n' % ' | '.join(choices))
+            self._stdout.write("%s\n" % msg)
+            self._stdout.write("Choices: [ %s ]\n" % " | ".join(choices))
             self._stdin.channel.set_line_mode(False)
             input = await self._stdin.read(1)
             self._stdin.channel.set_line_mode(True)
@@ -136,11 +139,11 @@ class ConsoleIO:
                 input = keylist[input]
                 break
             else:
-                self._stdout.write('Invalid choice.\n')
+                self._stdout.write("Invalid choice.\n")
 
         return input
 
-    async def menu(self, msg='', entries=[], confirm=False):
+    async def menu(self, msg="", entries=[], confirm=False):
         """Print menu with entries."""
         entries = entries[:12]
         cnt = 0
@@ -148,40 +151,41 @@ class ConsoleIO:
 
         for entry in entries:
             cnt += 1
-            lines.append(' {0:>2}. {1}'.format(cnt, entry))
+            lines.append(" {0:>2}. {1}".format(cnt, entry))
 
         while True:
-            self._stdout.write('{0}\n\n'.format(msg))
-            self._stdout.write('\n'.join(lines))
-            self._stdout.write('\n\nChoose: ')
+            self._stdout.write("{0}\n\n".format(msg))
+            self._stdout.write("\n".join(lines))
+            self._stdout.write("\n\nChoose: ")
             try:
                 input = int(await self._stdin.readline())
             except ValueError:
                 continue
 
             if not (1 <= input <= len(entries)):
-                self._stdout.write('Invalid choice.\n')
+                self._stdout.write("Invalid choice.\n")
                 continue
 
             if confirm:
                 if await self.confirm(
-                        'Is ({0}) your final choice?'.format(input), False):
+                    "Is ({0}) your final choice?".format(input), False
+                ):
                     break
             else:
                 break
 
         return input - 1
 
-    async def secret(self, msg='Enter password'):
+    async def secret(self, msg="Enter password"):
         """Print menu with entries."""
-        self._stdout.write('{0}: '.format(msg))
+        self._stdout.write("{0}: ".format(msg))
 
         self._process.channel.set_echo(False)
         try:
             while True:
                 input = await self._stdin.readline()
                 input = input.strip()
-                if input != '':
+                if input != "":
                     break
             self._process.channel.set_echo(True)
         except Exception as e:
@@ -191,18 +195,24 @@ class ConsoleIO:
         return input
 
     @classmethod
-    def format(cls, text,
-               b=False, d=False, i=False, u=False, bl=False, nv=False):
+    def format(
+        cls, text, b=False, d=False, i=False, u=False, bl=False, nv=False
+    ):
         """Format terminal text in several ways."""
-        codes = ';'.join(filter(None, [
-            '1' if b else None,
-            '2' if d else None,
-            '3' if i else None,
-            '4' if u else None,
-            '5' if bl else None,
-            '7' if nv else None
-        ]))
-        return '\033[{c}m{t}\033[0m'.format(c=codes if codes else '0', t=text)
+        codes = ";".join(
+            filter(
+                None,
+                [
+                    "1" if b else None,
+                    "2" if d else None,
+                    "3" if i else None,
+                    "4" if u else None,
+                    "5" if bl else None,
+                    "7" if nv else None,
+                ],
+            )
+        )
+        return "\033[{c}m{t}\033[0m".format(c=codes if codes else "0", t=text)
 
     @classmethod
     def bold(cls, text):
@@ -236,8 +246,8 @@ class ConsoleIO:
 
     def exception(self, e):
         """Print exception error message to console."""
-        logging.exception('Error: %s' % e)
-        self._stdout.write('\nError: %s\n\n' % e)
+        logging.exception("Error: %s" % e)
+        self._stdout.write("\nError: %s\n\n" % e)
 
 
 class Option:
@@ -247,13 +257,15 @@ class Option:
     TYPE_CHOICES = 2
     TYPE_VALUE = 3
 
-    def __init__(self,
-                 name,
-                 abbr=None,
-                 type=TYPE_VALUE,
-                 choices=[],
-                 default=None,
-                 help=''):
+    def __init__(
+        self,
+        name,
+        abbr=None,
+        type=TYPE_VALUE,
+        choices=[],
+        default=None,
+        help="",
+    ):
         """
         Initialize an Option that belonging to a Command.
 
@@ -286,7 +298,8 @@ class Option:
             if bool(opt[0]):
                 raise Util.exception(
                     Error.CMD_OPT_ILLEGAL_VALUE,
-                    {'opt': self.name, 'value': opt[0]})
+                    {"opt": self.name, "value": opt[0]},
+                )
             # Test if only presence is given but no value
             elif bool(opt[0]) is False:
                 return True
@@ -297,7 +310,8 @@ class Option:
 
         raise Util.exception(
             Error.CMD_UNKOWN_ERROR,
-            {'opt': self.name, 'value': opt[0], 'type': self.type})
+            {"opt": self.name, "value": opt[0], "type": self.type},
+        )
 
     def _enum(self, opt):
         # Test if one option is given
@@ -306,14 +320,16 @@ class Option:
             if opt[0] not in self.choices:
                 raise Util.exception(
                     Error.CMD_OPT_ILLEGAL_CHOICE,
-                    {'opt': self.name, 'choice': opt[0]})
+                    {"opt": self.name, "choice": opt[0]},
+                )
             # Test if value is given
             if bool(opt[0]) is True:
                 return opt[0]
             else:
                 raise Util.exception(
                     Error.CMD_OPT_CHOICE_OMITTED,
-                    {'opt': self.name, 'choice': None})
+                    {"opt": self.name, "choice": None},
+                )
 
         # Test if presence is missing
         if len(opt) is 0:
@@ -321,7 +337,8 @@ class Option:
 
         raise Util.exception(
             Error.CMD_UNKOWN_ERROR,
-            {'opt': self.name, 'value': opt[0], 'type': self.type})
+            {"opt": self.name, "value": opt[0], "type": self.type},
+        )
 
     def _value(self, opt):
         # Test if one option is given
@@ -332,7 +349,8 @@ class Option:
             else:
                 raise Util.exception(
                     Error.CMD_OPT_VALUE_OMITTED,
-                    {'opt': self.name, 'value': None})
+                    {"opt": self.name, "value": None},
+                )
 
         # Test if presence is missing
         if len(opt) is 0:
@@ -340,14 +358,15 @@ class Option:
 
         raise Util.exception(
             Error.CMD_UNKOWN_ERROR,
-            {'opt': self.name, 'value': opt[0], 'type': self.type})
+            {"opt": self.name, "value": opt[0], "type": self.type},
+        )
 
     def evaluate(self, opts):
         """Evaluate options."""
         opt = []
         rm = None
         for r in opts:
-            if r[0] == str('--'+self.name) or r[0] == ('-'+str(self.abbr)):
+            if r[0] == str("--" + self.name) or r[0] == ("-" + str(self.abbr)):
                 opt.append(r[1])
                 rm = r
 
@@ -355,7 +374,8 @@ class Option:
         if len(opt) > 1:
             raise Util.exception(
                 Error.CMD_OPT_MULTIPLE_VALUES,
-                {'opt': self.name, 'tot_num': len(opt)})
+                {"opt": self.name, "tot_num": len(opt)},
+            )
 
         # Test if there is a default and none given
         if self.default and len(opt) == 0:
@@ -371,7 +391,8 @@ class Option:
         else:
             raise Util.exception(
                 Error.CMD_OPT_TYPE_INVALID,
-                {'opt': self.name, 'type': self.type})
+                {"opt": self.name, "type": self.type},
+            )
 
         try:
             opts.remove(rm)
@@ -385,10 +406,10 @@ class Command(FactoryInterface):
     """Representation of one executable command."""
 
     """A abbreviated description of the command for the list section"""
-    abbr = ''
+    abbr = ""
 
     """Long description explaining the command"""
-    description = ''
+    description = ""
 
     def __init__(self, cmd, io):
         """Initialize Command class."""
@@ -438,7 +459,7 @@ class Command(FactoryInterface):
 
     async def execute(self, opts):
         """Execute a command with current options."""
-        if opts == [('--help', '')] or opts == [('-h', '')]:
+        if opts == [("--help", "")] or opts == [("-h", "")]:
             self._help()
         else:
             opts = self._evaluate(opts)
@@ -449,30 +470,35 @@ class Command(FactoryInterface):
         intersection = key_set.intersection(set(exclusive))
         if len(intersection) > 1:
             raise Util.exception(
-                Error.CMD_OPT_MUT_EXCL, {
-                    'exclusive': exclusive, 'collision': intersection})
+                Error.CMD_OPT_MUT_EXCL,
+                {"exclusive": exclusive, "collision": intersection},
+            )
 
     def _rule_option(self, option, opt_keys):
         key_set = set(opt_keys)
         if len(set(option).intersection(key_set)) < 1:
             raise Util.exception(
-                Error.CMD_OPT_DEM_ANY, {'one_of_them': option})
+                Error.CMD_OPT_DEM_ANY, {"one_of_them": option}
+            )
 
     def _rule_depends(self, depends, opt_keys):
         key_set = set(opt_keys)
         represented = set(depends).intersection(key_set)
         if len(represented) < len(depends):
             raise Util.exception(
-                Error.CMD_OPT_DEM_ALL, {
-                    'all_of_them': depends,
-                    'missing': set(depends) - represented})
+                Error.CMD_OPT_DEM_ALL,
+                {
+                    "all_of_them": depends,
+                    "missing": set(depends) - represented,
+                },
+            )
 
     def _rule_combo(self, opt, combo, opt_keys):
         key_set = set(opt_keys)
         if len(set(combo).intersection(key_set)) > 0:
             raise Util.exception(
-                Error.CMD_OPT_COMBINE, {
-                    'option': opt, 'combination': combo})
+                Error.CMD_OPT_COMBINE, {"option": opt, "combination": combo}
+            )
 
     def _evaluate(self, opts):
         options = {}
@@ -486,18 +512,17 @@ class Command(FactoryInterface):
                 opt_keys.append(k)
 
         if opts:
-            raise Util.exception(
-                Error.CMD_OPT_UNKNOWN, {'unkown': opts})
+            raise Util.exception(Error.CMD_OPT_UNKNOWN, {"unkown": opts})
 
-        if 'exclusive' in rules.keys():
-            for t in rules['exclusive']:
+        if "exclusive" in rules.keys():
+            for t in rules["exclusive"]:
                 self._rule_exclusive(t, opt_keys)
 
-        if 'option' in rules.keys():
-            self._rule_option(rules['option'], opt_keys)
+        if "option" in rules.keys():
+            self._rule_option(rules["option"], opt_keys)
 
-        if 'depends' in rules.keys():
-            self._rule_depends(rules['depends'], opt_keys)
+        if "depends" in rules.keys():
+            self._rule_depends(rules["depends"], opt_keys)
 
         for opt in opt_keys:
             if opt in rules.keys():
@@ -526,30 +551,36 @@ class Command(FactoryInterface):
         """
         rows = []
 
-        opts = self.__opts + [Option(
-            'help',
-            abbr='h',
-            type=Option.TYPE_BOOL,
-            help='Print the command help section')]
+        opts = self.__opts + [
+            Option(
+                "help",
+                abbr="h",
+                type=Option.TYPE_BOOL,
+                help="Print the command help section",
+            )
+        ]
 
         # Loop through option cols and create rows
         for opt in opts:
             if opt.type == Option.TYPE_VALUE:
                 expr = opt.name.upper()
             elif opt.type == Option.TYPE_CHOICES:
-                expr = '(' + '|'.join(opt.choices) + ')'
+                expr = "(" + "|".join(opt.choices) + ")"
             else:
-                expr = ''
+                expr = ""
             if not isinstance(opt.abbr, str):
-                flag = '--' + opt.name
+                flag = "--" + opt.name
             else:
-                flag = '--' + opt.name + '/-' + opt.abbr
-            rows.append((
-                opt.name,
-                flag,
-                expr,
-                '' if bool(opt.default) is False else str(opt.default),
-                opt.help))
+                flag = "--" + opt.name + "/-" + opt.abbr
+            rows.append(
+                (
+                    opt.name,
+                    flag,
+                    expr,
+                    "" if bool(opt.default) is False else str(opt.default),
+                    opt.help,
+                )
+            )
 
         # Calculate the max width of each column
         width = [0, 0, 0, 0, 0]
@@ -561,16 +592,15 @@ class Command(FactoryInterface):
                     chars = roww
             width[col] = chars
 
-        r_b = ''
+        r_b = ""
         for row in rows:
             for col in range(5):
-                r_b += row[col] + ' '*(
-                    width[col] - len(row[col]) + 2)
+                r_b += row[col] + " " * (width[col] - len(row[col]) + 2)
             r_b += Shell.EOL
 
-        b = Shell.EOL + self.description + Shell.EOL*2
-        b += '<' + self.command + '> supports the options below' + Shell.EOL
-        b += '-'*79 + Shell.EOL
+        b = Shell.EOL + self.description + Shell.EOL * 2
+        b += "<" + self.command + "> supports the options below" + Shell.EOL
+        b += "-" * 79 + Shell.EOL
         b += r_b + Shell.EOL
         self._io << b
 
@@ -586,10 +616,12 @@ class Command(FactoryInterface):
 class Shell(ContainerAware):
     """Shell that represents a PTY."""
 
-    cmd_regex = '^(\w+)'
-    opt_regex = '(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)' \
-                '(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?'
-    EOL = '\r\n'
+    cmd_regex = "^(\w+)"
+    opt_regex = (
+        "(?<=\s)((?:-\w(?!\w))|(?:--\w+))(?:(?:[ ]+|=)"
+        '(?:(?:"((?<=")\S+(?="))")|(?![\-|"])(:?\S+)))?'
+    )
+    EOL = "\r\n"
 
     def __init__(self, commands, ioc, process):
         """
@@ -616,7 +648,8 @@ class Shell(ContainerAware):
         if cmd.command in self.__cmds:
             raise Util.exception(
                 Error.CMD_SHELL_DUPLICATE,
-                {'package': Util.class_pkg(cmd), 'command': cmd.command})
+                {"package": Util.class_pkg(cmd), "command": cmd.command},
+            )
 
         self.__cmds[cmd.command] = cmd
 
@@ -627,13 +660,13 @@ class Shell(ContainerAware):
 
         cmd = re.findall(self.cmd_regex, line)
         if len(cmd) is not 1:
-            raise Util.exception(
-                Error.CMD_SHELL_CONFUSED, {'line': line})
+            raise Util.exception(Error.CMD_SHELL_CONFUSED, {"line": line})
         cmd = cmd[0]
 
         if cmd not in self.__cmds:
             raise Util.exception(
-                Error.CMD_SHELL_INVALID_COMMAND, {'command': cmd})
+                Error.CMD_SHELL_INVALID_COMMAND, {"command": cmd}
+            )
 
         opts = re.findall(self.opt_regex, line)
         opts = self._parse(opts)
@@ -641,50 +674,59 @@ class Shell(ContainerAware):
         try:
             await self.__cmds[cmd].execute(opts)
         except asyncssh.BreakReceived as e:
-            self._io << '\n\nAbort sequence received!\n%s\n\n' % e
+            self._io << "\n\nAbort sequence received!\n%s\n\n" % e
 
     def _parse(self, options):
         opts = []
         for opt in options:
             opts.append(
-                (opt[0], opt[1] if bool(opt[1]) is not False else opt[2]))
+                (opt[0], opt[1] if bool(opt[1]) is not False else opt[2])
+            )
         return opts
 
     class HelpCommand(Command):
         """Print help text about a command."""
 
-        abbr = 'Print available commands and how to use them.'
+        abbr = "Print available commands and how to use them."
         description = """Help will print all the available commands loaded in
 the console shell"""
 
         def __init__(self, io, cmds):
             """Initialize the command. Takes a list of Command classes."""
-            Command.__init__(self, 'help', io)
+            Command.__init__(self, "help", io)
             self.__cmds = cmds
 
         async def _command(self, opts):
             rows = []
             for cmd in self.__cmds:
-                rows.append('{n:<16}{d}'.format(
-                    n=self.__cmds[cmd].command, d=self.__cmds[cmd].abbr))
+                rows.append(
+                    "{n:<16}{d}".format(
+                        n=self.__cmds[cmd].command, d=self.__cmds[cmd].abbr
+                    )
+                )
 
             self._io << (
-                Shell.EOL +
-                'Available commands with description below.' + Shell.EOL +
-                '-'*79 + Shell.EOL +
-                Shell.EOL.join(rows) + Shell.EOL*2 +
-                'type <command> -h for detailed help.' + Shell.EOL*2)
+                Shell.EOL
+                + "Available commands with description below."
+                + Shell.EOL
+                + "-" * 79
+                + Shell.EOL
+                + Shell.EOL.join(rows)
+                + Shell.EOL * 2
+                + "type <command> -h for detailed help."
+                + Shell.EOL * 2
+            )
 
     class ExitCommand(Command):
         """Exit the shell."""
 
-        abbr = 'Exit the current terminal session.'
+        abbr = "Exit the current terminal session."
         description = """Exit will exit the console session and restore the
 screen"""
 
         def __init__(self, io):
             """Initialize the command."""
-            Command.__init__(self, 'exit', io)
+            Command.__init__(self, "exit", io)
 
         async def _command(self, opts):
             raise Util.exception(Error.CMD_SHELL_EXIT)
@@ -692,15 +734,15 @@ screen"""
     class ClearCommand(Command):
         """Clear the screen."""
 
-        abbr = 'Clear the terminal window.'
+        abbr = "Clear the terminal window."
         description = """Clear clears the console screen/window"""
 
         def __init__(self, io):
             """Initialize the command. Takes a list of Command classes."""
-            Command.__init__(self, 'clear', io)
+            Command.__init__(self, "clear", io)
 
         async def _command(self, opts):
-            self._io << '\033[H\033[J'
+            self._io << "\033[H\033[J"
 
 
 class Terminal(Shell):
@@ -711,7 +753,7 @@ class Terminal(Shell):
     def __init__(self, commands, ioc, process):
         """Initialize Terminal from SSHServerProcess."""
         Shell.__init__(self, commands, ioc, process)
-        self._config = self.ioc.config['terminal']
+        self._config = self.ioc.config["terminal"]
 
     async def run(self):
         """Looping the Shell interpreter."""
@@ -723,9 +765,13 @@ class Terminal(Shell):
             try:
 
                 self._io << (
-                    '\033[41m\033[H\033[J' + self._config['message'] +
-                    Shell.EOL + '='*79 + Shell.EOL)
-                self._io << self._config['prompt']
+                    "\033[41m\033[H\033[J"
+                    + self._config["message"]
+                    + Shell.EOL
+                    + "=" * 79
+                    + Shell.EOL
+                )
+                self._io << self._config["prompt"]
 
                 while not self._io._stdin.at_eof():
                     try:
@@ -735,8 +781,11 @@ class Terminal(Shell):
 
                     except CmdShellInvalidCommand as exc:
                         self._io << (
-                            str(exc) + Shell.EOL +
-                            'Try "help" or "<command> -h"' + Shell.EOL*2)
+                            str(exc)
+                            + Shell.EOL
+                            + 'Try "help" or "<command> -h"'
+                            + Shell.EOL * 2
+                        )
                     except CmdShellEmpty:
                         pass
                     except asyncssh.TerminalSizeChanged:
@@ -745,15 +794,15 @@ class Terminal(Shell):
                     except CmdShellExit:
                         break
                     except CmdShellException as e:
-                        self._io << ('%s \n' % e)
+                        self._io << ("%s \n" % e)
                     except Exception as e:
                         logging.exception(e, exc_info=True)
-                        self._io << ('%s: %s \n' % (type(e), e))
+                        self._io << ("%s: %s \n" % (type(e), e))
 
-                    self._io << self._config['prompt']
+                    self._io << self._config["prompt"]
 
             except asyncssh.BreakReceived:
                 pass
 
-            self._io << '\033[40m\033[H\033[J'
+            self._io << "\033[40m\033[H\033[J"
             self._process.close()

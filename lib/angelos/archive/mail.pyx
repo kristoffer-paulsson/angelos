@@ -27,39 +27,39 @@ class Mail(BaseArchive):
     within the community.
     """
 
-    HIERARCHY = (
-        '/',
-    )
+    HIERARCHY = ("/",)
 
     async def save(self, filename, document):
         """Save a document at a certian location."""
         created, updated, owner = Glue.doc_save(document)
 
-        return (
-            await self._proxy.call(
-                self._archive.mkfile, filename=filename,
-                data=PortfolioPolicy.serialize(document),
-                id=document.id, owner=owner, created=created, modified=updated,
-                compression=Entry.COMP_NONE)
-            )
+        return await self._proxy.call(
+            self._archive.mkfile,
+            filename=filename,
+            data=PortfolioPolicy.serialize(document),
+            id=document.id,
+            owner=owner,
+            created=created,
+            modified=updated,
+            compression=Entry.COMP_NONE,
+        )
 
     async def delete(self, filename):
         """Remove a document at a certian location."""
-        return (
-            await self._proxy.call(
-                self._archive.remove, filename=filename))
+        return await self._proxy.call(self._archive.remove, filename=filename)
 
     async def update(self, filename, document):
         """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
-        return (
-            await self._proxy.call(
-                self._archive.save, filename=filename,
-                data=PortfolioPolicy.serialize(document), modified=updated)
-            )
+        return await self._proxy.call(
+            self._archive.save,
+            filename=filename,
+            data=PortfolioPolicy.serialize(document),
+            modified=updated,
+        )
 
-    async def issuer(self, issuer, path='/', limit=1):
+    async def issuer(self, issuer, path="/", limit=1):
         """Search a folder for documents by issuer."""
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
@@ -73,12 +73,13 @@ class Mail(BaseArchive):
 
             return datalist
 
-        return (await self._proxy.call(callback, 0, 5))
+        return await self._proxy.call(callback, 0, 5)
 
     async def search(
-            self, issuer: uuid.UUID=None,
-            path: str='/', limit: int=1) -> List[bytes]:
+        self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
+    ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
+
         def callback():
             if issuer:
                 result = Globber.owner(self._archive, issuer, path)
@@ -93,4 +94,4 @@ class Mail(BaseArchive):
 
             return datalist
 
-        return (await self._proxy.call(callback, 0, 5))
+        return await self._proxy.call(callback, 0, 5)

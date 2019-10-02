@@ -20,38 +20,40 @@ from ..facade.mail import MailAPI
 class FileSyncInfo:
     def __init__(self):
         self.fileid = uuid.UUID(int=0)
-        self.path = ''
+        self.path = ""
         self.deleted = None
         self.pieces = 0
         self.size = 0
-        self.digest = b''
-        self.filename = ''
+        self.digest = b""
+        self.filename = ""
         self.created = datetime.datetime(1, 1, 1)
         self.modified = datetime.datetime(1, 1, 1)
         self.owner = uuid.UUID(int=0)
-        self.user = b''
-        self.group = b''
+        self.user = ""
+        self.group = ""
         self.perms = 0x0
-        self.data = b''
+        self.data = b""
 
 
 class Preset:
     """Preset operation.
 
     Holds the current status for an ongoing replication operation."""
+
     CLIENT = 0
     SERVER = 1
 
-    T_CUSTOM = 'custom'
-    T_MAIL = 'mail'
+    T_CUSTOM = "custom"
+    T_MAIL = "mail"
 
     def __init__(
-            self, archive: str,
-            preset: str='custom',
-            modified: datetime.datetime=None,
-            path: str='/',
-            owner: uuid.UUID=None
-            ):
+        self,
+        archive: str,
+        preset: str = "custom",
+        modified: datetime.datetime = None,
+        path: str = "/",
+        owner: uuid.UUID = None,
+    ):
         """Preset operation."""
         self._preset = preset
         self._modified = modified if modified else datetime.datetime(1, 1, 1)
@@ -147,10 +149,10 @@ class CustomPreset(Preset):
 
 
 class MailClientPreset(Preset):
-    def __init__(self, modified: datetime.datetime=None):
+    def __init__(self, modified: datetime.datetime = None):
         Preset.__init__(
-            self, Const.CNL_VAULT, Preset.T_MAIL,
-            modified, MailAPI.OUTBOX)
+            self, Const.CNL_VAULT, Preset.T_MAIL, modified, MailAPI.OUTBOX
+        )
 
     def to_absolute(self, path: str) -> str:
         """Convert relative path to absolute."""
@@ -159,6 +161,8 @@ class MailClientPreset(Preset):
 
 class MailServerPreset(Preset):
     def __init__(
-            self, modified: datetime.datetime=None, owner: uuid.UUID=None):
+        self, modified: datetime.datetime = None, owner: uuid.UUID = None
+    ):
         Preset.__init__(
-            self, Const.CNL_MAIL, Preset.T_MAIL, modified, '/', owner=owner)
+            self, Const.CNL_MAIL, Preset.T_MAIL, modified, "/", owner=owner
+        )

@@ -17,7 +17,7 @@ class HostsServer(SSHServer):
     """SSH Server for the hosts."""
 
     def begin_auth(self, username):
-        logging.info('Begin authentication for: %s' % username)
+        logging.info("Begin authentication for: %s" % username)
 
         auth = self.ioc.load_host_auth(username)
         if auth[0] and auth[1] and auth[2] and auth[3]:
@@ -26,11 +26,11 @@ class HostsServer(SSHServer):
         return True
 
     def validate_public_key(self, username, key):
-        logging.info('Authentication for a user')
-        logging.debug('%s' % username)
+        logging.info("Authentication for a user")
+        logging.debug("%s" % username)
         return key in self._client_keys
 
     def session_requested(self):
-        logging.debug('Session requested')
+        logging.debug("Session requested")
         # return AdminServerProcess(self.terminal, self.ioc.session)
         return False

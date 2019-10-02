@@ -19,8 +19,9 @@ from .envelope import Envelope
 class StoredLetter(Document):
     id = UuidField()
     type = TypeField(value=DocType.CACHED_MSG)
-    expires = DateField(init=lambda: (
-        datetime.date.today() + datetime.timedelta(3*365/12)))
+    expires = DateField(
+        init=lambda: (datetime.date.today() + datetime.timedelta(3 * 365 / 12))
+    )
     envelope = DocumentField(t=Envelope)
     message = DocumentField(t=Message)
 
@@ -28,7 +29,7 @@ class StoredLetter(Document):
         self._check_type(DocType.CACHED_MSG)
 
         if self.id.int != self.message.id.int:
-            raise ValueError('StoredLetter ID is not the same as Message ID.')
+            raise ValueError("StoredLetter ID is not the same as Message ID.")
         return True
 
     def validate(self):

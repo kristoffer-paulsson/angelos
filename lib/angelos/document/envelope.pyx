@@ -14,8 +14,16 @@ from ..utils import Util
 from ..error import Error
 
 from .model import (
-    BaseDocument, DateField, StringField, UuidField, DocumentField,
-    BinaryField, TypeField, SignatureField, DateTimeField)
+    BaseDocument,
+    DateField,
+    StringField,
+    UuidField,
+    DocumentField,
+    BinaryField,
+    TypeField,
+    SignatureField,
+    DateTimeField,
+)
 from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
@@ -26,15 +34,16 @@ class Header(BaseDocument):
     signature = SignatureField()
 
     class Op:
-        SEND = 'SEND'
-        ROUTE = 'RTE'
-        RECEIVE = 'RECV'
+        SEND = "SEND"
+        ROUTE = "RTE"
+        RECEIVE = "RECV"
 
 
 class Envelope(Document, OwnerMixin):
     type = TypeField(value=DocType.COM_ENVELOPE)
-    expires = DateField(init=lambda: (
-        datetime.date.today() + datetime.timedelta(31)))
+    expires = DateField(
+        init=lambda: (datetime.date.today() + datetime.timedelta(31))
+    )
     message = BinaryField(limit=131072)
     header = DocumentField(required=False, t=Header, multiple=True)
     posted = DateTimeField()
@@ -45,8 +54,11 @@ class Envelope(Document, OwnerMixin):
         if self.expires - self.created > datetime.timedelta(31):
             raise Util.exception(
                 Error.DOCUMENT_SHORT_EXPIREY,
-                {'expected': datetime.timedelta(31),
-                 'current': self.expires - self.created})
+                {
+                    "expected": datetime.timedelta(31),
+                    "current": self.expires - self.created,
+                },
+            )
 
         return True
 

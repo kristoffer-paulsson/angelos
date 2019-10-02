@@ -14,7 +14,7 @@ from ..policy import PortfolioPolicy, Portfolio
 from .operation import Operation
 
 
-REGEX = r'----[\n\r]([a-zA-Z0-9+/\n\r]+={0,3})[\n\r]----'
+REGEX = r"----[\n\r]([a-zA-Z0-9+/\n\r]+={0,3})[\n\r]----"
 
 
 class ExportImportOperation(Operation):
@@ -33,22 +33,29 @@ class ExportImportOperation(Operation):
     @staticmethod
     def text_exp(portfolio: Portfolio) -> str:
         """Export portfolio to text file format."""
-        return ('\n' + ExportImportOperation.exporter(
-            'Portfolio', portfolio) + '\n')
+        return (
+            "\n"
+            + ExportImportOperation.exporter("Portfolio", portfolio)
+            + "\n"
+        )
 
     @staticmethod
     def exporter(name: str, portfolio: Portfolio):
-        output = ExportImportOperation.headline(name, '(Start)')
-        data = base64.b64encode(
-            PortfolioPolicy.exports(portfolio)).decode('utf-8')
-        output += '\n' + '\n'.join(
-            [data[i:i+79] for i in range(0, len(data), 79)]) + '\n'
-        output += ExportImportOperation.headline(name, '(End)')
+        output = ExportImportOperation.headline(name, "(Start)")
+        data = base64.b64encode(PortfolioPolicy.exports(portfolio)).decode(
+            "utf-8"
+        )
+        output += (
+            "\n"
+            + "\n".join([data[i : i + 79] for i in range(0, len(data), 79)])
+            + "\n"
+        )
+        output += ExportImportOperation.headline(name, "(End)")
         return output
 
     @staticmethod
-    def headline(title: str, filler: str=''):
-        title = ' ' + title + ' ' + filler + ' '
-        line = '-' * 79
-        offset = int(79/2 - len(title)/2)
-        return line[:offset] + title + line[offset + len(title):]
+    def headline(title: str, filler: str = ""):
+        title = " " + title + " " + filler + " "
+        line = "-" * 79
+        offset = int(79 / 2 - len(title) / 2)
+        return line[:offset] + title + line[offset + len(title) :]

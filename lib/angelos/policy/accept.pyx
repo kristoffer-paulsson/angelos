@@ -15,11 +15,30 @@ from typing import Set
 
 from ..utils import Util
 from ..document import (
-    Entity, Person, Ministry, Church, Keys, Statement, Domain, Node, Network,
-    Envelope, Message, Document, PrivateKeys, Revoked, Trusted, Verified,
-    PersonProfile, MinistryProfile, ChurchProfile, Note, Instant, Mail)
-from .entity import (
-    PersonPolicy, MinistryPolicy, ChurchPolicy)
+    Entity,
+    Person,
+    Ministry,
+    Church,
+    Keys,
+    Statement,
+    Domain,
+    Node,
+    Network,
+    Envelope,
+    Message,
+    Document,
+    PrivateKeys,
+    Revoked,
+    Trusted,
+    Verified,
+    PersonProfile,
+    MinistryProfile,
+    ChurchProfile,
+    Note,
+    Instant,
+    Mail,
+)
+from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from .crypto import Crypto
 from .portfolio import Portfolio
 from .policy import Policy
@@ -27,6 +46,7 @@ from .policy import Policy
 
 class ImportPolicy(Policy):
     """Validate documents before import to facade."""
+
     def __init__(self, portfolio: Portfolio):
         self._portfolio = portfolio
 
@@ -46,7 +66,7 @@ class ImportPolicy(Policy):
             if datetime.date.today() > entity.expires:
                 valid = False
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         valid = False if not Crypto.verify(keys, self._portfolio) else valid
@@ -59,9 +79,21 @@ class ImportPolicy(Policy):
 
     def issued_document(self, document: Document) -> Document:
         """Validate document issued by internal portfolio."""
-        Util.is_type(document, (
-            Revoked, Trusted, Verified, PersonProfile, MinistryProfile,
-            ChurchProfile, Domain, Network, Keys, PrivateKeys))
+        Util.is_type(
+            document,
+            (
+                Revoked,
+                Trusted,
+                Verified,
+                PersonProfile,
+                MinistryProfile,
+                ChurchProfile,
+                Domain,
+                Network,
+                Keys,
+                PrivateKeys,
+            ),
+        )
         if document is None:
             return document
 
@@ -72,10 +104,13 @@ class ImportPolicy(Policy):
             if datetime.date.today() > document.expires:
                 valid = False
             valid = False if not document.validate() else valid
-            valid = False if not Crypto.verify(
-                document, self._portfolio) else valid
+            valid = (
+                False
+                if not Crypto.verify(document, self._portfolio)
+                else valid
+            )
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         if valid:
@@ -106,10 +141,11 @@ class ImportPolicy(Policy):
             if datetime.date.today() > node.expires:
                 valid = False
             valid = False if not node.validate() else valid
-            valid = False if not Crypto.verify(
-                node, self._portfolio) else valid
+            valid = (
+                False if not Crypto.verify(node, self._portfolio) else valid
+            )
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         if valid:
@@ -118,7 +154,8 @@ class ImportPolicy(Policy):
             return None
 
     def owned_document(
-            self, issuer: Portfolio, document: Statement) -> Statement:
+        self, issuer: Portfolio, document: Statement
+    ) -> Statement:
         """Validate document owned by internal portfolio."""
         Util.is_type(document, (Revoked, Trusted, Verified))
         if document is None:
@@ -133,10 +170,13 @@ class ImportPolicy(Policy):
             if datetime.date.today() > document.expires:
                 valid = False
             valid = False if not document.validate() else valid
-            valid = False if not Crypto.verify(
-                document, issuer.entity, issuer.keys) else valid
+            valid = (
+                False
+                if not Crypto.verify(document, issuer.entity, issuer.keys)
+                else valid
+            )
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         if valid:
@@ -156,10 +196,13 @@ class ImportPolicy(Policy):
             if datetime.date.today() > envelope.expires:
                 valid = False
             valid = False if not envelope.validate() else valid
-            valid = False if not Crypto.verify(
-                envelope, sender, exclude=['header']) else valid
+            valid = (
+                False
+                if not Crypto.verify(envelope, sender, exclude=["header"])
+                else valid
+            )
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         if valid:
@@ -181,7 +224,7 @@ class ImportPolicy(Policy):
             valid = False if not message.validate() else valid
             valid = False if not Crypto.verify(message, sender) else valid
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         if valid:
@@ -192,6 +235,7 @@ class ImportPolicy(Policy):
 
 class ImportUpdatePolicy(Policy):
     """Policy for accepting updateable documents."""
+
     def __init__(self, portfolio: Portfolio):
         self._portfolio = portfolio
 
@@ -207,17 +251,17 @@ class ImportUpdatePolicy(Policy):
             valid = False if not newkeys.validate() else valid
 
             # Validate new key with old keys
-            valid = False if not Crypto.verify(
-                newkeys, self._portfolio) else valid
+            valid = (
+                False if not Crypto.verify(newkeys, self._portfolio) else valid
+            )
 
             # Validate new key with itself
             portfolio = copy.deepcopy(self._portfolio)
             portfolio.keys = set(newkeys)
-            valid = False if not Crypto.verify(
-                newkeys, portfolio) else valid
+            valid = False if not Crypto.verify(newkeys, portfolio) else valid
 
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         return valid
@@ -227,8 +271,7 @@ class ImportUpdatePolicy(Policy):
 
         valid = False if datetime.date.today() > entity.expires else valid
         valid = False if not entity.validate() else valid
-        valid = False if not Crypto.verify(
-            entity, self._portfolio) else valid
+        valid = False if not Crypto.verify(entity, self._portfolio) else valid
 
         diff = []
         new_exp = entity.export()
@@ -238,7 +281,7 @@ class ImportUpdatePolicy(Policy):
             if new_exp[item] != old_exp[item]:
                 diff.append(item)
 
-        if len(set(diff) - set(fields + ['signature', 'updated'])):
+        if len(set(diff) - set(fields + ["signature", "updated"])):
             valid = False
 
         return valid
@@ -255,7 +298,7 @@ class ImportUpdatePolicy(Policy):
         try:
             valid = self.__dict_cmp(entity, fields)
         except Exception as e:
-            logging.info('%s' % str(e))
+            logging.info("%s" % str(e))
             valid = False
 
         return valid

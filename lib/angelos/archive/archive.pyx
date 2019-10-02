@@ -16,7 +16,6 @@ from ..policy import PrivatePortfolio
 
 
 class BaseArchive:
-
     def __init__(self, filename, secret):
         """Initialize the Mail."""
         self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
@@ -48,15 +47,28 @@ class BaseArchive:
             self._closed = True
 
     @classmethod
-    def setup(cls, filename, secret, portfolio: PrivatePortfolio,
-              _type=None, role=None, use=None):
+    def setup(
+        cls,
+        filename,
+        secret,
+        portfolio: PrivatePortfolio,
+        _type=None,
+        role=None,
+        use=None,
+    ):
         """Create and setup the whole Vault according to policys."""
 
         arch = Archive7.setup(
-            filename, secret, owner=portfolio.entity.id,
+            filename,
+            secret,
+            owner=portfolio.entity.id,
             node=next(iter(portfolio.nodes)).id,
-            domain=portfolio.domain.id, title=cls.__name__,
-            _type=_type, role=role, use=use)
+            domain=portfolio.domain.id,
+            title=cls.__name__,
+            _type=_type,
+            role=role,
+            use=use,
+        )
 
         for i in cls.HIERARCHY:
             arch.mkdir(i)

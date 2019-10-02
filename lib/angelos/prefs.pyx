@@ -24,9 +24,8 @@ class Preferences:
 
     @property
     def network(self):
-        return self._parser.get(
-            'Preferences', 'CurrentNetwork', fallback=None)
+        return self._parser.get("Preferences", "CurrentNetwork", fallback=None)
 
     @network.setter
     def network(self, value):
-        self._parser.set('Preferences', 'CurrentNetwork', value)
+        self._parser.set("Preferences", "CurrentNetwork", value)

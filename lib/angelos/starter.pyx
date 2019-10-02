@@ -27,28 +27,27 @@ class Starter:
     """This class contains the methods for starting SSH clients and servers."""
 
     ALGS = {
-        'kex_algs': ('diffie-hellman-group18-sha512', ),
-        'encryption_algs': ('chacha20-poly1305@openssh.com', ),
-        'mac_algs': ('hmac-sha2-512-etm@openssh.com', ),
-        'compression_algs': ('zlib', ),
-        'signature_algs': ('angelos-tongues', )
+        "kex_algs": ("diffie-hellman-group18-sha512",),
+        "encryption_algs": ("chacha20-poly1305@openssh.com",),
+        "mac_algs": ("hmac-sha2-512-etm@openssh.com",),
+        "compression_algs": ("zlib",),
+        "signature_algs": ("angelos-tongues",),
     }
 
     SARGS = {
-        'backlog': 200,
-        'x509_trusted_certs': [],
-        'x509_purposes': False,
-        'gss_host': False,
-        'allow_pty': False,
-        'x11_forwarding': False,
-        'agent_forwarding': False,
-        'sftp_factory': False,
-        'allow_scp': False,
+        "backlog": 200,
+        "x509_trusted_certs": [],
+        "x509_purposes": False,
+        "gss_host": False,
+        "allow_pty": False,
+        "x11_forwarding": False,
+        "agent_forwarding": False,
+        "sftp_factory": False,
+        "allow_scp": False,
     }
 
     @classmethod
-    def nodes_server(
-            self, portfolio, host, port=3, ioc=None, loop=None):
+    def nodes_server(self, portfolio, host, port=3, ioc=None, loop=None):
         """Start server for incoming node/domain communications."""
         Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host, str)
@@ -57,13 +56,13 @@ class Starter:
         Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': SSHServer,
-            'host': host,
-            'port': port,
-            'server_host_keys': [Starter._private_key(portfolio.privkeys)],
-            'process_factory': lambda: None,
-            'session_factory': lambda: None,
-            'loop': loop,
+            "server_factory": SSHServer,
+            "host": host,
+            "port": port,
+            "server_host_keys": [Starter._private_key(portfolio.privkeys)],
+            "process_factory": lambda: None,
+            "session_factory": lambda: None,
+            "loop": loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -78,21 +77,20 @@ class Starter:
         Util.is_type(port, int)
 
         params = {
-            'username': str(portfolio.entity.id),
-            'client_username': str(portfolio.entity.id),
-            'host': host,
-            'port': port,
-            'client_keys': [Starter._private_key(portfolio.privkeys)],
-            'known_hosts': Starter.__known_host(host_keys),
-            'client_factory': SSHClient
+            "username": str(portfolio.entity.id),
+            "client_username": str(portfolio.entity.id),
+            "host": host,
+            "port": port,
+            "client_keys": [Starter._private_key(portfolio.privkeys)],
+            "known_hosts": Starter.__known_host(host_keys),
+            "client_factory": SSHClient,
         }
         params = {**params, **self.ALGS}
 
         return Starter.__start_client(params)  # (conn, client)
 
     @classmethod
-    def hosts_server(
-            self, portfolio, host, port=4, ioc=None, loop=None):
+    def hosts_server(self, portfolio, host, port=4, ioc=None, loop=None):
         """Start server for incoming host/host communications."""
         Util.is_type(portfolio, PrivatePortfolio)
         Util.is_type(host, str)
@@ -101,13 +99,13 @@ class Starter:
         Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': SSHServer,
-            'host': host,
-            'port': port,
-            'server_host_keys': [Starter._private_key(portfolio.privkeys)],
-            'process_factory': lambda: None,
-            'session_factory': lambda: None,
-            'loop': loop,
+            "server_factory": SSHServer,
+            "host": host,
+            "port": port,
+            "server_host_keys": [Starter._private_key(portfolio.privkeys)],
+            "process_factory": lambda: None,
+            "session_factory": lambda: None,
+            "loop": loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -122,13 +120,13 @@ class Starter:
         Util.is_type(port, int)
 
         params = {
-            'username': str(portfolio.entity.id),
-            'client_username': str(portfolio.entity.id),
-            'host': host,
-            'port': port,
-            'client_keys': [Starter._private_key(portfolio.privkeys)],
-            'known_hosts': Starter.__known_host(host_keys),
-            'client_factory': SSHClient
+            "username": str(portfolio.entity.id),
+            "client_username": str(portfolio.entity.id),
+            "host": host,
+            "port": port,
+            "client_keys": [Starter._private_key(portfolio.privkeys)],
+            "known_hosts": Starter.__known_host(host_keys),
+            "client_factory": SSHClient,
         }
         params = {**params, **self.ALGS}
 
@@ -136,48 +134,56 @@ class Starter:
 
     @classmethod
     def clients_server(
-            self, portfolio: PrivatePortfolio, host: str, port: int=5,
-            ioc: Container=None, loop: asyncio.base_events.BaseEventLoop=None):
+        self,
+        portfolio: PrivatePortfolio,
+        host: str,
+        port: int = 5,
+        ioc: Container = None,
+        loop: asyncio.base_events.BaseEventLoop = None,
+    ):
         """Start server for incoming client/portal communications."""
 
         params = {
-            'server_factory': lambda: ClientsServer(ioc),
-            'host': host,
-            'port': port,
-            'server_host_keys': [Starter._private_key(portfolio.privkeys)],
-            'loop': loop,
+            "server_factory": lambda: ClientsServer(ioc),
+            "host": host,
+            "port": port,
+            "server_host_keys": [Starter._private_key(portfolio.privkeys)],
+            "loop": loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
         return Starter.__start_server(params)
 
     def clients_client(
-            self, portfolio: PrivatePortfolio, host: Portfolio,
-            port: int=5, ioc: Container=None):
+        self,
+        portfolio: PrivatePortfolio,
+        host: Portfolio,
+        port: int = 5,
+        ioc: Container = None,
+    ):
         """Start client for outgoing client/portal communications."""
         if host.network.hosts[0].ip:
             location = str(host.network.hosts[0].ip[0])
         else:
             location = str(host.network.hosts[0].hostname[0])
 
-        location = 'localhost'
+        location = "localhost"
 
         params = {
-            'username': str(portfolio.entity.id),
-            'client_username': str(portfolio.entity.id),
-            'host': location,
-            'port': port,
-            'client_keys': [Starter._private_key(portfolio.privkeys)],
-            'known_hosts': Starter.__known_host(host.keys),
-            'client_factory': lambda: ClientsClient(ioc)
+            "username": str(portfolio.entity.id),
+            "client_username": str(portfolio.entity.id),
+            "host": location,
+            "port": port,
+            "client_keys": [Starter._private_key(portfolio.privkeys)],
+            "known_hosts": Starter.__known_host(host.keys),
+            "client_factory": lambda: ClientsClient(ioc),
         }
         params = {**params, **Starter.ALGS}
 
         return Starter.__start_client(params)  # (conn, client)
 
-    def admin_server(
-            self, host, port=22, ioc=None, loop=None):
-            # self, entity, privkeys, host, port=22, ioc=None, loop=None):
+    def admin_server(self, host, port=22, ioc=None, loop=None):
+        # self, entity, privkeys, host, port=22, ioc=None, loop=None):
         """Start shell server for incoming admin communications."""
         """Util.is_type(entity, Entity)
         Util.is_type(privkeys, PrivateKeys)
@@ -205,15 +211,16 @@ class Starter:
         Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': lambda: AdminServer(ioc),
-            'host': host,
-            'port': port,
-            'loop': loop,
-            'server_host_keys': [
-                asyncssh.import_private_key(SERVER_RSA_PRIVATE)],
+            "server_factory": lambda: AdminServer(ioc),
+            "host": host,
+            "port": port,
+            "loop": loop,
+            "server_host_keys": [
+                asyncssh.import_private_key(SERVER_RSA_PRIVATE)
+            ],
         }
         params = {**params, **self.SARGS}
-        params['allow_pty'] = True
+        params["allow_pty"] = True
 
         return Starter.__start_server(params)
 
@@ -225,15 +232,16 @@ class Starter:
         Util.is_type(loop, asyncio.base_events.BaseEventLoop)
 
         params = {
-            'server_factory': lambda: BootServer(ioc),
-            'host': host,
-            'port': port,
-            'loop': loop,
-            'server_host_keys': [
-                asyncssh.import_private_key(SERVER_RSA_PRIVATE)],
+            "server_factory": lambda: BootServer(ioc),
+            "host": host,
+            "port": port,
+            "loop": loop,
+            "server_host_keys": [
+                asyncssh.import_private_key(SERVER_RSA_PRIVATE)
+            ],
         }
         params = {**params, **self.SARGS}
-        params['allow_pty'] = True
+        params["allow_pty"] = True
 
         return Starter.__start_server(params)
 
@@ -242,21 +250,27 @@ class Starter:
         try:
             return asyncssh.create_server(**params)
         except (OSError, asyncssh.Error) as exc:
-            logging.critical('Error starting server: %s' % str(exc))
+            logging.critical("Error starting server: %s" % str(exc))
 
     @staticmethod
     def __start_client(params):
         try:
             return asyncssh.create_connection(**params)
         except (OSError, asyncssh.Error) as exc:
-            logging.critical('SSH connection failed: %s' % str(exc))
+            logging.critical("SSH connection failed: %s" % str(exc))
 
     @staticmethod
     def __known_host(host_keys):
         def callback(h, a, p):
             return (
-                [NaClKey(key=NaClPublicKey.construct(
-                    key.verify)) for key in host_keys], [], [])
+                [
+                    NaClKey(key=NaClPublicKey.construct(key.verify))
+                    for key in host_keys
+                ],
+                [],
+                [],
+            )
+
         return callback
 
     @staticmethod

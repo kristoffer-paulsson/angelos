@@ -20,13 +20,20 @@ class EidonStream:
     quality = None
 
     def __init__(self, width, height, signal, quality, data):
-        if not isinstance(width, int): raise TypeError()  # noqa E701
-        if not 65535 >= width >= 0: raise ValueError()  # noqa E701
-        if not isinstance(height, int): raise TypeError()  # noqa E701
-        if not 65535 >= height >= 0: raise ValueError()  # noqa E701
-        if not isinstance(signal, int): raise TypeError()  # noqa E701
-        if not isinstance(quality, int): raise TypeError()  # noqa E701
-        if not isinstance(data, bytearray): raise TypeError()  # noqa E701
+        if not isinstance(width, int):
+            raise TypeError()  # noqa E701
+        if not 65535 >= width >= 0:
+            raise ValueError()  # noqa E701
+        if not isinstance(height, int):
+            raise TypeError()  # noqa E701
+        if not 65535 >= height >= 0:
+            raise ValueError()  # noqa E701
+        if not isinstance(signal, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(quality, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(data, bytearray):
+            raise TypeError()  # noqa E701
 
         self.width = width
         self.height = height
@@ -40,16 +47,17 @@ class EidonStream:
         self._counter = 0
 
     def pack(self, data):
-        if not isinstance(data, list): raise TypeError()  # noqa E701
+        if not isinstance(data, list):
+            raise TypeError()  # noqa E701
         offset = self._counter * self._quality
         for q in range(self._quality):
-            self.data[offset+q] = data[q]
+            self.data[offset + q] = data[q]
         self._counter += 1
 
     def unpack(self):
         offset = self._counter * self._quality
         self._counter += 1
-        return self.data[offset:offset+self._quality].tolist()
+        return self.data[offset : offset + self._quality].tolist()
 
     def size(self):
         return self._size
@@ -60,31 +68,42 @@ class EidonStream:
 
     @staticmethod
     def load(data):
-        tpl = struct.unpack(
-            Eidon.HEADER_FORMAT, data[:Eidon.HEADER_LENGTH])
-        if tpl[0] == Eidon.Format.RGB: klass = StreamRGB   # noqa E701
-        elif tpl[0] == Eidon.Format.YCBCR: klass = StreamYCBCR  # noqa E701
-        elif tpl[0] == Eidon.Format.INDEX: klass = StreamIndexed  # noqa E701
-        else: raise TypeError(tpl[0])  # noqa E701
+        tpl = struct.unpack(Eidon.HEADER_FORMAT, data[: Eidon.HEADER_LENGTH])
+        if tpl[0] == Eidon.Format.RGB:
+            klass = StreamRGB  # noqa E701
+        elif tpl[0] == Eidon.Format.YCBCR:
+            klass = StreamYCBCR  # noqa E701
+        elif tpl[0] == Eidon.Format.INDEX:
+            klass = StreamIndexed  # noqa E701
+        else:
+            raise TypeError(tpl[0])  # noqa E701
 
-        return klass(tpl[3], tpl[4], tpl[1], bytearray(
-            data[Eidon.HEADER_LENGTH:]))
+        return klass(
+            tpl[3], tpl[4], tpl[1], bytearray(data[Eidon.HEADER_LENGTH :])
+        )
 
     @staticmethod
     def dump(stream):
-        if isinstance(stream, StreamRGB): format = Eidon.Format.RGB  # noqa E701
-        elif isinstance(stream, StreamYCBCR): format = Eidon.Format.YCBCR  # noqa E701
-        elif isinstance(stream, StreamIndexed): format = Eidon.Format.INDEX  # noqa E701
-        else: raise TypeError()  # noqa E701
+        if isinstance(stream, StreamRGB):
+            format = Eidon.Format.RGB  # noqa E701
+        elif isinstance(stream, StreamYCBCR):
+            format = Eidon.Format.YCBCR  # noqa E701
+        elif isinstance(stream, StreamIndexed):
+            format = Eidon.Format.INDEX  # noqa E701
+        else:
+            raise TypeError()  # noqa E701
 
-        return bytearray(struct.pack(
-            Eidon.HEADER_FORMAT,
-            format,
-            stream.quality,
-            stream.signal,
-            stream.width,
-            stream.height,
-        ) + stream.data)
+        return bytearray(
+            struct.pack(
+                Eidon.HEADER_FORMAT,
+                format,
+                stream.quality,
+                stream.signal,
+                stream.width,
+                stream.height,
+            )
+            + stream.data
+        )
 
 
 class Stream8Bit(EidonStream):
@@ -92,12 +111,14 @@ class Stream8Bit(EidonStream):
         self._size = 1
         if not bool(data):
             data = bytearray(
-                b'\x00' *
-                int(math.floor(width / 8)) *
-                int(math.floor(height / 8)) *
-                Eidon.QUALITY[quality])
-        EidonStream.__init__(self, width, height,
-                             Eidon.Signal.COMPOSITE, quality, data)
+                b"\x00"
+                * int(math.floor(width / 8))
+                * int(math.floor(height / 8))
+                * Eidon.QUALITY[quality]
+            )
+        EidonStream.__init__(
+            self, width, height, Eidon.Signal.COMPOSITE, quality, data
+        )
 
 
 class StreamIndexed(Stream8Bit):
@@ -109,12 +130,15 @@ class Stream24Bit(EidonStream):
         self._size = 3
         if not bool(data):
             data = bytearray(
-                b'\x00' *
-                int(math.floor(width / 8)) *
-                int(math.floor(height / 8)) *
-                self._size * Eidon.QUALITY[quality])
-        EidonStream.__init__(self, width, height,
-                             Eidon.Signal.COMPONENT, quality, data)
+                b"\x00"
+                * int(math.floor(width / 8))
+                * int(math.floor(height / 8))
+                * self._size
+                * Eidon.QUALITY[quality]
+            )
+        EidonStream.__init__(
+            self, width, height, Eidon.Signal.COMPONENT, quality, data
+        )
 
 
 class StreamRGB(Stream24Bit):

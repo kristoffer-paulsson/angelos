@@ -29,51 +29,50 @@ class SSHServer(ContainerAware, asyncssh.SSHServer):
         self._applog = self.ioc.log.app
 
     def connection_made(self, conn):
-        logging.info('Connection made')
+        logging.info("Connection made")
         self._conn = conn
-        conn.send_auth_banner('auth banner')
+        conn.send_auth_banner("auth banner")
 
     def connection_lost(self, exc):
         if isinstance(exc, type(None)):
-            logging.info('Connection closed')
+            logging.info("Connection closed")
         else:
-            logging.error('Connection closed unexpectedly: %s' % str(exc))
+            logging.error("Connection closed unexpectedly: %s" % str(exc))
             logging.exception(exc, exc_info=True)
 
     def debug_msg_received(self, msg, lang, always_display):
-        logging.error('Error: %s' % str(msg))
+        logging.error("Error: %s" % str(msg))
 
     def begin_auth(self, username):
-        logging.info('Begin authentication for: %s' % username)
+        logging.info("Begin authentication for: %s" % username)
         # Load keys for username
         return True
 
     def auth_completed(self):
-        logging.info('Authentication completed')
+        logging.info("Authentication completed")
 
     def public_key_auth_supported(self):
         return True
 
     def validate_public_key(self, username, key):
-        logging.info('Authentication for a user')
-        logging.debug('%s' % username)
+        logging.info("Authentication for a user")
+        logging.debug("%s" % username)
         return False  # Security countermeasure
 
     def session_requested(self):
-        logging.debug('Session requested')
+        logging.debug("Session requested")
         return False
 
     def connection_requested(self, dest_host, dest_port, orig_host, orig_port):
-        logging.debug('Connection requested')
+        logging.debug("Connection requested")
         return False
 
     def server_requested(self, listen_host, listen_port):
-        logging.debug('Server requested')
+        logging.debug("Server requested")
         return False
 
 
 class SSHClient(ContainerAware, asyncssh.SSHClient):
-
     def __init__(self, ioc, keylist=(), delay=1):
         """Initialize Client."""
         self._connection = None
@@ -84,7 +83,7 @@ class SSHClient(ContainerAware, asyncssh.SSHClient):
         ContainerAware.__init__(self, ioc)
 
     def connection_made(self, conn):
-        logging.info('Connection made')
+        logging.info("Connection made")
         self._connection = conn
         # self._channel, self._session =
         #   await conn.create_session(SSHClientSession)
@@ -93,24 +92,24 @@ class SSHClient(ContainerAware, asyncssh.SSHClient):
 
     def connection_lost(self, exc):
         if isinstance(exc, type(None)):
-            logging.info('Connection closed')
+            logging.info("Connection closed")
         else:
-            logging.error('Connection closed unexpectedly: %s' % str(exc))
+            logging.error("Connection closed unexpectedly: %s" % str(exc))
             logging.exception(exc, exc_info=True)
 
     def debug_msg_received(self, msg, lang, always_display):
-        logging.error('Error: %s' % str(msg))
+        logging.error("Error: %s" % str(msg))
 
     def auth_banner_received(self, msg, lang):
-        logging.info('Banner: %s' % str(msg))
+        logging.info("Banner: %s" % str(msg))
 
     def auth_completed(self):
-        logging.info('Authentication completed')
+        logging.info("Authentication completed")
 
     def public_key_auth_requested(self):
         if self._delay:
             yield from asyncio.sleep(self._delay)
-        logging.info('Public key authentication requested')
+        logging.info("Public key authentication requested")
         return self._keylist.pop(0) if self._keylist else None
 
 
@@ -153,7 +152,7 @@ class SessionManager:
 
         if name in self.__servers.keys():
             # If server name not registered raise Error
-            raise RuntimeError('Can not register a server twice')
+            raise RuntimeError("Can not register a server twice")
 
         self.__servers[name] = (server, idle)  # Get server into registry
         self.__servsess[name] = set()  # Set server/session association
@@ -163,7 +162,8 @@ class SessionManager:
         if name not in self.__servers.keys():
             # If server name not registered raise Error
             raise RuntimeError(
-                'Can not register session on non-registered server')
+                "Can not register session on non-registered server"
+            )
 
         # server = self.__servers[name][0]  # Get server instance by name
         self.__servers.pop(name)  # Remove server instance from registry
@@ -179,11 +179,12 @@ class SessionManager:
         if name not in self.__servers.keys():
             # Server for session must exist
             raise RuntimeError(
-                'Can not register session on non-registered server')
+                "Can not register session on non-registered server"
+            )
 
         if handle.id in self.__sessions.keys():
             # Session can only be added once.
-            raise RuntimeError('Can not register session twice.')
+            raise RuntimeError("Can not register session twice.")
 
         self.__sessions[handle.id] = handle  # Register session in registry
         self.__servsess[name].add(handle)  # Associate session with server

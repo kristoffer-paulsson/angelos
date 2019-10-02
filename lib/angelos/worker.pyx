@@ -29,11 +29,12 @@ class Worker(ContainerAware):
         ContainerAware.__init__(self, ioc)
 
         if name in self.__workers.keys():
-            raise RuntimeError('Worker name is taken: %s' % name)
+            raise RuntimeError("Worker name is taken: %s" % name)
 
         if isinstance(executor, int):
             self.__executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=(None if executor == 0 else executor))
+                max_workers=(None if executor == 0 else executor)
+            )
             self.__queue = multiprocessing.Queue()
             executor = True
 
@@ -44,7 +45,8 @@ class Worker(ContainerAware):
 
             if executor:
                 self.__future = asyncio.ensure_future(
-                    self.__end(), loop=self.__loop)
+                    self.__end(), loop=self.__loop
+                )
                 self.__loop.set_default_executor(self.__executor)
 
             asyncio.run_coroutine_threadsafe(self.__quiter(), self.__loop)
@@ -54,7 +56,8 @@ class Worker(ContainerAware):
 
             if executor:
                 self.__future = asyncio.ensure_future(
-                    self.__end(), loop=self.__loop)
+                    self.__end(), loop=self.__loop
+                )
                 self.__loop.set_default_executor(self.__executor)
 
             asyncio.run_coroutine_threadsafe(self.__quiter(), self.__loop)
@@ -102,8 +105,7 @@ class Worker(ContainerAware):
         except KeyboardInterrupt:
             pass
         except Exception as e:
-            logging.critical(
-                '%s crashed due to: %s' % (self.__thread.name, e))
+            logging.critical("%s crashed due to: %s" % (self.__thread.name, e))
             logging.exception(e)
 
         self.__queue.put(None)
@@ -133,4 +135,5 @@ class Worker(ContainerAware):
     async def run_in_executor(self, callback, *args, **kwargs):
         """Add a function/method/coroutine to the event loop."""
         return await self.__loop.run_in_executor(
-            self.__executor, functools.partial(callback, *args, **kwargs))
+            self.__executor, functools.partial(callback, *args, **kwargs)
+        )

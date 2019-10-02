@@ -26,8 +26,14 @@ class Verified(Statement, OwnerMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Statement, Verified,
-                    OwnerMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Statement,
+            Verified,
+            OwnerMixin,
+        ]
         self._check_validate(validate)
         return True
 
@@ -40,8 +46,14 @@ class Trusted(Statement, OwnerMixin):
         return True
 
     def validate(self):
-        validate = [BaseDocument, Document, IssueMixin, Statement, Trusted,
-                    OwnerMixin]
+        validate = [
+            BaseDocument,
+            Document,
+            IssueMixin,
+            Statement,
+            Trusted,
+            OwnerMixin,
+        ]
         self._check_validate(validate)
         return True
 

@@ -15,11 +15,16 @@ class EidonImage:
     pixels = bytearray()
 
     def __init__(self, width, height, pixels):
-        if not isinstance(width, int): raise TypeError()  # noqa E701
-        if not 65535 >= width >= 0: raise ValueError()  # noqa E701
-        if not isinstance(height, int): raise TypeError()  # noqa E701
-        if not 65535 >= height >= 0: raise ValueError()  # noqa E701
-        if not isinstance(pixels, bytearray): raise TypeError()  # noqa E701
+        if not isinstance(width, int):
+            raise TypeError()  # noqa E701
+        if not 65535 >= width >= 0:
+            raise ValueError()  # noqa E701
+        if not isinstance(height, int):
+            raise TypeError()  # noqa E701
+        if not 65535 >= height >= 0:
+            raise ValueError()  # noqa E701
+        if not isinstance(pixels, bytearray):
+            raise TypeError()  # noqa E701
 
         self.width = width
         self.height = height
@@ -43,23 +48,28 @@ class EidonImage:
 class Image24Bit(EidonImage):
     def __init__(self, width, height, pixels=None):
         if not bool(pixels):
-            pixels = bytearray(b'\x00'*width*height*3)
+            pixels = bytearray(b"\x00" * width * height * 3)
         EidonImage.__init__(self, width, height, pixels)
 
     def get(self, x, y):
-        if not isinstance(x, int): raise TypeError()  # noqa E701
-        if not isinstance(y, int): raise TypeError()  # noqa E701
+        if not isinstance(x, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(y, int):
+            raise TypeError()  # noqa E701
 
         x = min(max(0, x), self.width)
         y = min(max(0, y), self.height)
 
         index = (y * self.width + x) * 3
-        return self.pixels[index:index+3].tolist()
+        return self.pixels[index : index + 3].tolist()
 
     def set(self, x, y, pixel):
-        if not isinstance(x, int): raise TypeError()  # noqa E701
-        if not isinstance(y, int): raise TypeError()  # noqa E701
-        if not isinstance(pixel, (tuple, list)): raise TypeError()  # noqa E701
+        if not isinstance(x, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(y, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(pixel, (tuple, list)):
+            raise TypeError()  # noqa E701
 
         x = min(max(0, x), self.width)
         y = min(max(0, y), self.height)
@@ -76,23 +86,28 @@ class ImageRGB(Image24Bit):
 class Image32Bit(EidonImage):
     def __init__(self, width, height, pixels=None):
         if not bool(pixels):
-            pixels = bytearray(b'\x00'*width*height*4)
+            pixels = bytearray(b"\x00" * width * height * 4)
         EidonImage.__init__(self, width, height, pixels)
 
     def get(self, x, y):
-        if not isinstance(x, int): raise TypeError()  # noqa E701
-        if not isinstance(y, int): raise TypeError()  # noqa E701
+        if not isinstance(x, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(y, int):
+            raise TypeError()  # noqa E701
 
         x = min(max(0, x), self.width)
         y = min(max(0, y), self.height)
 
         index = (y * self.width + x) * 4
-        return self.pixels[index:index+4].tolist()
+        return self.pixels[index : index + 4].tolist()
 
     def set(self, x, y, pixel):
-        if not isinstance(x, int): raise TypeError()  # noqa E701
-        if not isinstance(y, int): raise TypeError()  # noqa E701
-        if not isinstance(pixel, (tuple, list)): raise TypeError()  # noqa E701
+        if not isinstance(x, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(y, int):
+            raise TypeError()  # noqa E701
+        if not isinstance(pixel, (tuple, list)):
+            raise TypeError()  # noqa E701
 
         x = min(max(0, x), self.width)
         y = min(max(0, y), self.height)
