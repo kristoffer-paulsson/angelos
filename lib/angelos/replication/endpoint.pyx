@@ -9,11 +9,8 @@ This file is distributed under the terms of the MIT license.
 Replication endpoints. The endpoints binds the handlers and the business logic
 of the clients and servers.
 """
-import datetime
-import uuid
 
 from ..ioc import ContainerAware
-from ..archive.helper import Globber
 
 
 class ReplicatorClient(ContainerAware):

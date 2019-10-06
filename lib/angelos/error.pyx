@@ -265,8 +265,8 @@ ERROR_INFO = {
     ),  # noqa E501
     501: (
         ContainerLambdaExpected,
-        "The service is not configured with lambda function in the IoC container",
-    ),  # noqa E501
+        "The service is not configured with lambda function in the IoC container", # noqa E501
+    ),
     510: (
         WorkerAlreadyRegistered,
         "The worker name is already occupied",

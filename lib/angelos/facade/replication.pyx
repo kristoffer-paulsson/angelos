@@ -9,7 +9,6 @@ This file is distributed under the terms of the MIT license.
 Facade replication API."""
 import uuid
 import math
-import logging
 
 from ..replication.preset import (
     Preset,
@@ -62,7 +61,6 @@ class ReplicationAPI:
         """Create or update file in archive."""
         archive = self._facade.archive(preset.archive)
         full_path = preset.to_absolute(fileinfo.path)
-        logging.warning('%s, %s ' % (full_path, fileinfo.path))
 
         if action == Actions.CLI_CREATE:
             return archive.archive.mkfile(

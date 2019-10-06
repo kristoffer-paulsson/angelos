@@ -69,7 +69,10 @@ class Net(BaseAuto):
     def __init__(self):
         name = socket.gethostname()
         self.hostname = name.lower()
-        self.ip = socket.gethostbyname(name)
+        if '.local' in name:
+            self.ip = socket.gethostbyname('localhost')
+        else:
+            self.ip = socket.gethostbyname(name)
         self.domain = socket.getfqdn()
 
 
