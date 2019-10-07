@@ -105,9 +105,9 @@ class ReplicationAPI:
         fileinfo.modified = entry.modified
         fileinfo.owner = entry.owner
         fileinfo.fileid = entry.id
-        fileinfo.user = entry.user
-        fileinfo.group = entry.group
-        fileinfo.perms = entry.perms
+        fileinfo.user = entry.user if entry.user else fileinfo.user
+        fileinfo.group = entry.group if entry.group else fileinfo.group
+        fileinfo.perms = entry.perms if entry.perms else fileinfo.perms
 
         fileinfo.data = archive.archive.load(full_path)
         return True

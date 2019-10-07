@@ -363,7 +363,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 c_fileinfo = self.client.preset.pull_file_meta()
                 if not c_fileinfo.fileid.int:
                     break
-                self._fileinfo = c_fileinfo
+                self._clientfile = c_fileinfo
 
                 self.send_packet(
                     Packets.RPL_REQUEST,
@@ -520,6 +520,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             self.client.preset.on_after_download(
                 self._serverfile, self._clientfile, self.client.ioc)
         except Exception:
+            logging.exception("Download error")
             self.client.preset.on_after_download(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
@@ -530,17 +531,17 @@ class ReplicatorClientHandler(ReplicatorHandler):
             self.client.preset.on_before_upload(
                 self._serverfile, self._clientfile, self.client.ioc)
             self.client.ioc.facade.replication.load_file(
-                self.client.preset, self._fileinfo
+                self.client.preset, self._clientfile
             )
 
             self.send_packet(
                 Packets.RPL_UPLOAD,
                 None,
-                String(self._fileinfo.fileid.bytes),
-                String(self._fileinfo.path),
-                UInt32(self._fileinfo.size),
+                String(self._clientfile.fileid.bytes),
+                String(self._clientfile.path),
+                UInt32(self._clientfile.size),
             )
-            logging.info("RPL_UPLOAD(%s) sent" % self._fileinfo.path)
+            logging.info("RPL_UPLOAD(%s) sent" % self._clientfile.path)
 
             confirm, _ = await self.handle_packet({
                 Packets.RPL_CONFIRM: self._process_confirm
@@ -554,22 +555,23 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 Packets.RPL_PUT,
                 None,
                 String(self._chunk),
-                UInt32(self._fileinfo.pieces),
-                String(self._fileinfo.digest),
-                String(self._fileinfo.filename),
-                String(self._fileinfo.created.isoformat()),
-                String(self._fileinfo.modified.isoformat()),
-                String(self._fileinfo.owner.bytes),
-                String(self._fileinfo.user),
-                String(self._fileinfo.group),
-                UInt32(self._fileinfo.perms),
+                UInt32(self._clientfile.pieces),
+                String(self._clientfile.digest),
+                String(self._clientfile.filename),
+                String(self._clientfile.created.isoformat()),
+                String(self._clientfile.modified.isoformat()),
+                String(self._clientfile.owner.bytes),
+                String(self._serverfile.fileid.bytes),
+                String(self._clientfile.user),
+                String(self._clientfile.group),
+                UInt32(self._clientfile.perms)
             )
             logging.info("RPL_PUT(meta) sent")
 
             await self.handle_packet({
                 Packets.RPL_RECEIVED: self._process_received})
 
-            for piece in range(self._fileinfo.pieces):
+            for piece in range(self._clientfile.pieces):
                 offset = piece * CHUNK_SIZE
                 self._chunk = "data"
                 self.send_packet(
@@ -577,7 +579,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                     None,
                     String(self._chunk),
                     UInt32(piece),
-                    String(self._fileinfo.data[offset:offset + CHUNK_SIZE]),
+                    String(self._clientfile.data[offset:offset + CHUNK_SIZE]),
                 )
                 logging.info("RPL_PUT(data) sent")
                 rpiece, _ = await self.handle_packet({
@@ -590,6 +592,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             self.client.preset.on_after_upload(
                 self._serverfile, self._clientfile, self.client.ioc)
         except Exception:
+            logging.exception("Upload error")
             self.client.preset.on_after_upload(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
@@ -600,11 +603,12 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 self._serverfile, self._clientfile, self.client.ioc)
             # Delete file from Archive7
             self.client.ioc.facade.replication.del_file(
-                self.client.preset, self._fileinfo
+                self.client.preset, self._clientfile
             )
             self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self.client.ioc)
         except Exception:
+            logging.exception("Delete error")
             self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
@@ -892,11 +896,10 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def _process_get(self, packet):
         _type = packet.get_string().decode()
-        piece = packet.get_uint32()
-        packet.check_end()
-        logging.info("RPL_GET(%s, %s) received" % (_type, piece))
 
         if _type == "meta":
+            packet.check_end()
+            logging.info("RPL_GET(%s) received" % (_type))
             # Get meta from loaded file
             self._serverfile.pieces = math.ceil(
                 self._serverfile.size / CHUNK_SIZE)
@@ -914,11 +917,14 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 String(self._serverfile.fileid.bytes),
                 String(self._serverfile.user),
                 String(self._serverfile.group),
-                UInt32(self._serverfile.perms),
+                UInt32(self._serverfile.perms)
             )
             logging.info("RPL_CHUNK(meta) sent")
 
         elif _type == "data":
+            piece = packet.get_uint32()
+            packet.check_end()
+            logging.info("RPL_GET(%s, %s) received" % (_type, piece))
             # Get data from loaded file
             data = self._serverfile.data[piece*CHUNK_SIZE:min(
                 (piece+1)*CHUNK_SIZE, len(self._serverfile.data))]
@@ -934,34 +940,42 @@ class ReplicatorServerHandler(ReplicatorHandler):
             raise Error(reason="Illegal get type.", code=1)
 
     async def _process_upload(self, packet):
-        fileid = uuid.UUID(bytes=packet.get_string())
-        path = packet.get_string().decode()
-        size = packet.get_uint32()
+        self._clientfile.fileid = uuid.UUID(bytes=packet.get_string())
+        self._clientfile.path = packet.get_string().decode()
+        self._clientfile.size = packet.get_uint32()
         packet.check_end()
-        logging.info("RPL_UPLOAD(%s) received" % path)
-
-        return fileid, path, size
+        logging.info("RPL_UPLOAD(%s) received" % self._clientfile.path)
 
     async def _process_put(self, packet):
         _type = packet.get_string().decode()
-        piece = packet.get_uint32()
         if _type == "meta":
             # Get meta from loaded file
-            pieces = packet.get_uint32()
-            self._pieces = pieces
-            size = packet.get_uint32()
-            digest = packet.get_string()
+            self._clientfile.pieces = packet.get_uint32()
+            self._clientfile.digest = packet.get_string()
+
+            self._clientfile.filename = packet.get_string().decode()
+            self._clientfile.created = datetime.datetime.fromisoformat(
+                packet.get_string().decode()
+            )
+            self._clientfile.modified = datetime.datetime.fromisoformat(
+                packet.get_string().decode()
+            )
+            self._clientfile.owner = uuid.UUID(bytes=packet.get_string())
+            self._clientfile.fileid = uuid.UUID(bytes=packet.get_string())
+            self._clientfile.user = packet.get_string().decode()
+            self._clientfile.group = packet.get_string().decode()
+            self._clientfile.perms = packet.get_uint32()
+
             packet.check_end()
             logging.info("RPL_PUT(meta) received")
             # Store meta data
             self.send_packet(
                 Packets.RPL_RECEIVED,
                 None,
-                String("meta"),
-                UInt32(0),
-                String(digest),
+                String("meta")
             )
             logging.info("RPL_RECEIVED(meta) sent")
+            return self._clientfile
         elif _type == "data":
             # Get data from loaded file
             piece = packet.get_uint32()
@@ -973,6 +987,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 Packets.RPL_RECEIVED, None, String("data"), UInt32(piece)
             )
             logging.info("RPL_RECEIVED(data, %s) sent" % piece)
+            return piece, data
         else:
             raise Error(reason="Illegal put type.", code=1)
 
@@ -1237,6 +1252,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
         except Exception:
+            logging.exception("Downloading error")
             self._preset.on_after_download(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, True)
@@ -1247,19 +1263,18 @@ class ReplicatorServerHandler(ReplicatorHandler):
             self._preset.on_before_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
-            (fileid, path, size), _ = await self.handle_packet({
+            await self.handle_packet({
                 Packets.RPL_UPLOAD: self._process_upload
             })
 
             self.send_packet(Packets.RPL_CONFIRM, None, Boolean(True))
             logging.info("RPL_CONFIRM(%s) sent" % True)
 
-            (fileid, path), _ = await self.handle_packet({
-                Packets.RPL_PUT: self._process_put
-            })
+            await self.handle_packet({Packets.RPL_PUT: self._process_put})
 
+            rpiece = 0
             while True:
-                _, pkttype = await self.handle_packet({
+                result, pkttype = await self.handle_packet({
                     Packets.RPL_PUT: self._process_put,
                     Packets.RPL_DONE: self._process_done
                 })
@@ -1267,11 +1282,46 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 if pkttype == Packets.RPL_DONE:
                     break
 
+                (piece, data) = result
+
+                if rpiece != piece:
+                    raise Error(reason="Received wrong piece of data", code=1)
+                rpiece = piece + 1
+                self._clientfile.data += data
+
+            data = self._clientfile.data
+            if not (
+                len(data) == self._clientfile.size
+                and hashlib.sha1(data).digest() == self._clientfile.digest
+            ):
+                raise Error(reason='File digest mismatch', code=1)
+
+            self._server.ioc.facade.replication.save_file(
+                self._preset, self._clientfile, self._action
+            )
+
             self._preset.on_after_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
         except Exception:
+            logging.exception("Uploading error")
             self._preset.on_after_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, True)
+            raise
+
+    async def delete(self) -> bool:
+        try:
+            self._preset.on_before_delete(
+                self._serverfile, self._clientfile, self._server.ioc)
+            # Delete file from Archive7
+            self._server.ioc.facade.replication.del_file(
+                self._preset, self._serverfile
+            )
+            self.client.preset.on_after_delete(
+                self._serverfile, self._clientfile, self._server.ioc)
+        except Exception:
+            logging.exception("Delete error")
+            self._preset.on_after_delete(
+                self._serverfile, self._clientfile, self._server.ioc, True)
             raise
