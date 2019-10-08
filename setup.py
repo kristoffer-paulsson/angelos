@@ -68,7 +68,7 @@ setup(
     python_requires='~=3.7',
     setup_requires=[
         'cython', 'pyinstaller', 'kivy', 'libnacl', 'plyer', 'asyncssh',
-        'keyring', 'msgpack'],  # kivymd
+        'keyring', 'msgpack', 'broqer'],  # kivymd
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
     packages=['angelos', 'eidon'],

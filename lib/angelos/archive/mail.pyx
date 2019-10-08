@@ -13,7 +13,7 @@ import uuid
 from typing import List
 
 from ..policy import PortfolioPolicy
-from .archive7 import Entry
+from .archive7 import Entry, Archive7
 from .helper import Glue, Globber
 from .archive import BaseArchive
 
@@ -28,6 +28,10 @@ class Mail(BaseArchive):
     """
 
     HIERARCHY = ("/",)
+
+    def __init__(self, filename, secret):
+        """Initialize the Mail."""
+        BaseArchive.__init__(self, filename, secret, Archive7.Delete.HARD)
 
     async def save(self, filename, document):
         """Save a document at a certian location."""

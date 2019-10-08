@@ -84,7 +84,7 @@ class DummyPolicy:
 
         for triad in range(67):
             offset = triad * 3
-            triple = persons[offset : offset + 3]
+            triple = persons[offset:offset + 3]
 
             StatementPolicy.trusted(triple[0], triple[1])
             StatementPolicy.trusted(triple[0], triple[2])

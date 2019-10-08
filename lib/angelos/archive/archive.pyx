@@ -16,9 +16,9 @@ from ..policy import PrivatePortfolio
 
 
 class BaseArchive:
-    def __init__(self, filename, secret):
+    def __init__(self, filename, secret, delete=Archive7.Delete.HARD):
         """Initialize the Mail."""
-        self._archive = Archive7.open(filename, secret, Archive7.Delete.HARD)
+        self._archive = Archive7.open(filename, secret, delete)
         atexit.register(self._archive.close)
         self.__stats = self._archive.stats()
         self._closed = False

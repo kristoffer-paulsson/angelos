@@ -62,7 +62,7 @@ class ReplicationAPI:
         archive = self._facade.archive(preset.archive)
         full_path = preset.to_absolute(fileinfo.path)
 
-        if action == Actions.CLI_CREATE:
+        if action in (Actions.CLI_CREATE, Actions.SER_CREATE):
             return archive.archive.mkfile(
                 full_path,
                 fileinfo.data,
@@ -74,7 +74,7 @@ class ReplicationAPI:
                 group=fileinfo.group,
                 perms=fileinfo.perms,
             )
-        elif action == Actions.CLI_UPDATE:
+        elif action in (Actions.CLI_UPDATE, Actions.SER_UPDATE):
             archive.archive.save(
                 full_path, fileinfo.data, modified=fileinfo.modified
             )
@@ -88,6 +88,8 @@ class ReplicationAPI:
                 perms=fileinfo.perms,
             )
             return True
+        else:
+            raise Exception("Illegal action for save_file")
 
     def load_file(self, preset: Preset, fileinfo: FileSyncInfo) -> bool:
         """Load file and meta from archive."""

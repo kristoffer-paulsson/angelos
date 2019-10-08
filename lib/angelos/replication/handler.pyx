@@ -364,13 +364,15 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 if not c_fileinfo.fileid.int:
                     break
                 self._clientfile = c_fileinfo
+                c_rel_path = self.client.preset.to_relative(
+                    self._clientfile.path)
 
                 self.send_packet(
                     Packets.RPL_REQUEST,
                     None,
                     String("push"),
                     String(c_fileinfo.fileid.bytes),
-                    String(c_fileinfo.path),
+                    String(c_rel_path),
                     String(c_fileinfo.modified.isoformat()),
                     Boolean(c_fileinfo.deleted),
                 )
@@ -484,13 +486,13 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
             self._chunk = "meta"
             self.send_packet(
-                Packets.RPL_GET, None, String(self._chunk), UInt32(0))
+                Packets.RPL_GET, None, String(self._chunk))
             logging.info("RPL_GET(meta) sent")
 
             await self.handle_packet({Packets.RPL_CHUNK: self._process_chunk})
 
             data = b""
-            for piece in range(self._clientfile.pieces):
+            for piece in range(self._serverfile.pieces):
                 self._chunk = "data"
                 self.send_packet(
                     Packets.RPL_GET, None, String(self._chunk), UInt32(piece)
@@ -501,17 +503,17 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 })
                 if rpiece != piece:
                     raise Error(reason="Received wrong piece of data", code=1)
-                self._clientfile.data += data
+                self._serverfile.data += data
 
-            data = self._clientfile.data
+            data = self._serverfile.data
             if not (
-                len(data) == self._clientfile.size
-                and hashlib.sha1(data).digest() == self._clientfile.digest
+                len(data) == self._serverfile.size
+                and hashlib.sha1(data).digest() == self._serverfile.digest
             ):
                 raise Error(reason='File digest mismatch', code=1)
 
             self.client.ioc.facade.replication.save_file(
-                self.client.preset, self._clientfile, self._action
+                self.client.preset, self._serverfile, self._action
             )
 
             self.send_packet(Packets.RPL_DONE, None)
@@ -533,15 +535,16 @@ class ReplicatorClientHandler(ReplicatorHandler):
             self.client.ioc.facade.replication.load_file(
                 self.client.preset, self._clientfile
             )
+            c_rel_path = self.client.preset.to_relative(self._clientfile.path)
 
             self.send_packet(
                 Packets.RPL_UPLOAD,
                 None,
                 String(self._clientfile.fileid.bytes),
-                String(self._clientfile.path),
+                String(c_rel_path),
                 UInt32(self._clientfile.size),
             )
-            logging.info("RPL_UPLOAD(%s) sent" % self._clientfile.path)
+            logging.info("RPL_UPLOAD(%s) sent" % c_rel_path)
 
             confirm, _ = await self.handle_packet({
                 Packets.RPL_CONFIRM: self._process_confirm
@@ -679,26 +682,26 @@ class ReplicatorClientHandler(ReplicatorHandler):
         if meta != self._chunk:
             raise Error(reason="Wrong chunk type", code=1)
         if meta == "meta":
-            self._clientfile.pieces = packet.get_uint32()
-            self._clientfile.size = packet.get_uint32()
-            self._clientfile.digest = packet.get_string()
+            self._serverfile.pieces = packet.get_uint32()
+            self._serverfile.size = packet.get_uint32()
+            self._serverfile.digest = packet.get_string()
 
-            self._clientfile.filename = packet.get_string().decode()
-            self._clientfile.created = datetime.datetime.fromisoformat(
+            self._serverfile.filename = packet.get_string().decode()
+            self._serverfile.created = datetime.datetime.fromisoformat(
                 packet.get_string().decode()
             )
-            self._clientfile.modified = datetime.datetime.fromisoformat(
+            self._serverfile.modified = datetime.datetime.fromisoformat(
                 packet.get_string().decode()
             )
-            self._clientfile.owner = uuid.UUID(bytes=packet.get_string())
-            self._clientfile.fileid = uuid.UUID(bytes=packet.get_string())
-            self._clientfile.user = packet.get_string().decode()
-            self._clientfile.group = packet.get_string().decode()
-            self._clientfile.perms = packet.get_uint32()
+            self._serverfile.owner = uuid.UUID(bytes=packet.get_string())
+            self._serverfile.fileid = uuid.UUID(bytes=packet.get_string())
+            self._serverfile.user = packet.get_string().decode()
+            self._serverfile.group = packet.get_string().decode()
+            self._serverfile.perms = packet.get_uint32()
 
             packet.check_end()
             logging.info("RPL_CHUNK(meta) received")
-            return self._clientfile
+            return self._serverfile
         if meta == "data":
             piece = packet.get_uint32()
             data = packet.get_string()
@@ -940,11 +943,18 @@ class ReplicatorServerHandler(ReplicatorHandler):
             raise Error(reason="Illegal get type.", code=1)
 
     async def _process_upload(self, packet):
-        self._clientfile.fileid = uuid.UUID(bytes=packet.get_string())
-        self._clientfile.path = packet.get_string().decode()
-        self._clientfile.size = packet.get_uint32()
+        fileid = uuid.UUID(bytes=packet.get_string())
+        path = packet.get_string().decode()
+        size = packet.get_uint32()
         packet.check_end()
-        logging.info("RPL_UPLOAD(%s) received" % self._clientfile.path)
+        logging.info("RPL_UPLOAD(%s) received" % path)
+
+        if self._clientfile.fileid != fileid or self._clientfile.path != path:
+            raise Error(reason="File ID or path not consequent.")
+
+        self._clientfile.fileid = fileid
+        self._clientfile.path = path
+        self._clientfile.size = size
 
     async def _process_put(self, packet):
         _type = packet.get_string().decode()
@@ -1289,10 +1299,10 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 rpiece = piece + 1
                 self._clientfile.data += data
 
-            data = self._clientfile.data
             if not (
-                len(data) == self._clientfile.size
-                and hashlib.sha1(data).digest() == self._clientfile.digest
+                len(self._clientfile.data) == self._clientfile.size
+                and hashlib.sha1(
+                    self._clientfile.data).digest() == self._clientfile.digest
             ):
                 raise Error(reason='File digest mismatch', code=1)
 

@@ -106,9 +106,9 @@ class SSHClient(ContainerAware, asyncssh.SSHClient):
     def auth_completed(self):
         logging.info("Authentication completed")
 
-    def public_key_auth_requested(self):
+    async def public_key_auth_requested(self):
         if self._delay:
-            yield from asyncio.sleep(self._delay)
+            await asyncio.sleep(self._delay)
         logging.info("Public key authentication requested")
         return self._keylist.pop(0) if self._keylist else None
 

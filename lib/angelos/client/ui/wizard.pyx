@@ -383,7 +383,7 @@ class PersonSetupGuide(Screen):
                 Const.A_ROLE_PRIMARY, entity_data))
             app.ioc.facade = facade
 
-            Glue.run_async(DummyPolicy().make_community(app.ioc.facade))
+            # Glue.run_async(DummyPolicy().make_community(app.ioc.facade))
 
             app.goto_user2()
 

@@ -90,12 +90,17 @@ class ClientsServer(SSHServer):
                 issuer, PGroup.CLIENT_AUTH
             )
 
-            if StatementPolicy.validate_trusted(
-                self.ioc.facade.portfolio, self._portfolio
-            ):
+            statement = StatementPolicy.validate_trusted(
+                self.ioc.facade.portfolio, self._portfolio)
+            logging.info(statement)
+            if statement:
                 self._client_keys = [
                     NaClKey.factory(key) for key in self._portfolio.keys
                 ]
+            else:
+                logging.warning(
+                    "Unauthorized user: %s" % username)
+                self._conn.close()
         except OSError as e:
             logging.error("User not found: %s" % username)
             self._client_keys = []
