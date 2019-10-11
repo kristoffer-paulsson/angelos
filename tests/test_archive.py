@@ -186,7 +186,7 @@ class TestArchive(unittest.TestCase):
 
     def test_11_compression(self):
         """Create archive and save and load files with compression."""
-        logging.info('====== %s ======' % 'test_05_load')
+        logging.info('====== %s ======' % 'test_11_load')
         try:
             archive = os.path.join(self.dir.name, 'compressed.ar7.cnl')
 
@@ -206,6 +206,31 @@ class TestArchive(unittest.TestCase):
             with Archive7.open(archive, self.secret) as arch:
                 for i in arch.glob():
                     if i not in LIPSUM_PATH:
+                        arch.load(i)
+        except Exception as e:
+            self.fail(e)
+
+    def test_12_no_dirs(self):
+        """Create archive and save and load files without folders."""
+        logging.info('====== %s ======' % 'test_12_load')
+        try:
+            archive = os.path.join(self.dir.name, 'compressed.ar7.cnl')
+
+            with Archive7.setup(
+                    archive, self.secret, owner=self.owner) as arch:
+                # for dir in ('/'):
+                #    arch.mkdir(dir)
+
+                files = []
+                for i in range(200):
+                    data = self.generate_data()
+                    filename = '/' + self.generate_filename()
+                    files.append(filename)
+                    arch.mkfile(filename, data)
+
+            with Archive7.open(archive, self.secret) as arch:
+                for i in arch.glob():
+                    if i not in ('/'):
                         arch.load(i)
         except Exception as e:
             self.fail(e)

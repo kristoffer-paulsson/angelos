@@ -27,11 +27,12 @@ class Mail(BaseArchive):
     within the community.
     """
 
-    HIERARCHY = ("/",)
+    HIERARCHY = (
+        "/")
 
     def __init__(self, filename, secret):
         """Initialize the Mail."""
-        BaseArchive.__init__(self, filename, secret, Archive7.Delete.HARD)
+        BaseArchive.__init__(self, filename, secret, Archive7.Delete.ERASE)
 
     async def save(self, filename, document):
         """Save a document at a certian location."""

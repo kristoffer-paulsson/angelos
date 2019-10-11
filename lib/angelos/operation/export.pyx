@@ -23,7 +23,6 @@ class ExportImportOperation(Operation):
     @staticmethod
     def text_imp(data: str) -> Portfolio:
         """Import portfolio in text file format."""
-        print(data)
         match = re.findall(REGEX, data, re.MULTILINE)
         if len(match) != 1:
             return None
@@ -33,11 +32,7 @@ class ExportImportOperation(Operation):
     @staticmethod
     def text_exp(portfolio: Portfolio) -> str:
         """Export portfolio to text file format."""
-        return (
-            "\n"
-            + ExportImportOperation.exporter("Portfolio", portfolio)
-            + "\n"
-        )
+        return ExportImportOperation.exporter("Portfolio", portfolio)
 
     @staticmethod
     def exporter(name: str, portfolio: Portfolio):
@@ -47,7 +42,7 @@ class ExportImportOperation(Operation):
         )
         output += (
             "\n"
-            + "\n".join([data[i : i + 79] for i in range(0, len(data), 79)])
+            + "\n".join([data[i:i + 79] for i in range(0, len(data), 79)])
             + "\n"
         )
         output += ExportImportOperation.headline(name, "(End)")
@@ -58,4 +53,4 @@ class ExportImportOperation(Operation):
         title = " " + title + " " + filler + " "
         line = "-" * 79
         offset = int(79 / 2 - len(title) / 2)
-        return line[:offset] + title + line[offset + len(title) :]
+        return line[:offset] + title + line[offset + len(title):]

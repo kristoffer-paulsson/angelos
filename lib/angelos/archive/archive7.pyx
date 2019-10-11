@@ -24,7 +24,6 @@ import copy
 import zlib
 import gzip
 import bz2
-import logging
 
 from ..ioc import Container, ContainerAware
 from ..utils import Util
@@ -1066,7 +1065,6 @@ class Archive7(ContainerAware):
 
             if entry.type == Entry.TYPE_LINK:
                 entry, idx = ops.follow_link(entry)
-                logging.info("Links to: %s" % str(entry.id))
 
             data = self.ioc.operations.load_data(entry)
 
@@ -1079,7 +1077,6 @@ class Archive7(ContainerAware):
                     {"filename": filename, "id": entry.id},
                 )
 
-            logging.info("Loading file: %s" % filename)
             return data
 
     class Entries(ContainerAware):
@@ -1199,12 +1196,12 @@ class Archive7(ContainerAware):
 
             while space < need:
                 idx = self.get_hithermost()
-                if not idx:
+                if idx is None:
                     space = need
                     continue
 
                 hithermost = self.__all[idx]
-                if hithermost.type not in [Entry.TYPE_EMPTY, Entry.TYPE_FILE]:
+                if hithermost.type not in (Entry.TYPE_EMPTY, Entry.TYPE_FILE):
                     raise Util.exception(Error.AR7_BLANK_FAILURE)
 
                 if hithermost.type == Entry.TYPE_EMPTY:

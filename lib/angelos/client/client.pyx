@@ -14,6 +14,7 @@ import os
 import collections
 import json
 import uuid
+import logging
 from typing import Callable, Awaitable
 
 from kivy.app import App
@@ -124,6 +125,7 @@ class LogoMessenger(ContainerAware, App):
 
     def goto_user2(self):
         self.switch("setup_guide", UserScreen(name="user"))
+        Glue.run_async(self.ioc.prefs.load())
 
     def switch(self, old, screen):
         """Switch to another main screen."""
@@ -141,8 +143,12 @@ class LogoMessenger(ContainerAware, App):
 
     def check_mail(self):
         """Connect to server and start mail replication."""
-        network_id = uuid.UUID(self.ioc.prefs.network)
-        self.connect_network(network_id, self.__start_replication_mail)
+        try:
+            network_id = uuid.UUID(self.ioc.prefs.network)
+            self.connect_network(network_id, self.__start_replication_mail)
+        except ValueError:
+            Snackbar(text="No network configured.").show()
+            logging.warning("No network configured.")
 
     def __start_replication_mail(self, future: Awaitable) -> None:
         """Start replication preset for mail sync."""
