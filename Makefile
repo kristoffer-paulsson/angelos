@@ -1,6 +1,7 @@
 PYI = --log=DEBUG --onefile
 AR7_IMPORT = uuid pathlib
 
+.PHONY: docs
 default:
 
 
@@ -22,3 +23,9 @@ clean:
 	rm -fr ./dist/
 	rm -fr ./build/
 	rm -fr ./angelos/**/*.so
+	rm -fr ./docs/html/
+	rm -fr ./docs/doctrees/
+
+docs:
+	sphinx-apidoc -o docs lib/angelos
+	sphinx-build -M html docs docs

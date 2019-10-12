@@ -8,24 +8,30 @@ This file is distributed under the terms of the MIT license.
 
 Angelos build script."""
 from glob import glob
+from os import path
 from setuptools import setup
 from Cython.Build import cythonize
 
 
-DESCRIPTION = """
-"""
+base_dir = path.abspath(path.dirname(__file__))
+
+with open(path.join(base_dir, 'README.md')) as desc:
+    long_description = desc.read()
+
+with open(path.join(base_dir, 'version.py')) as version:
+    exec(version.read())
 
 
 setup(
     name="angelos",
-    version='0.2a0.dev0',
+    version=__version__,  # noqa F821
     license='MIT',
     description='A safe messaging system',
-    author='Kristoffer Paulsson',
-    author_email='kristoffer.paulsson@talenten.se',
-    long_description=DESCRIPTION,
+    author=__author__,  # noqa F821
+    author_email=__author_email_,  # noqa F821
+    long_description=long_description,  # noqa F821
     long_description_content_type='text/markdown',
-    url='https://github.com/kristoffer-paulsson/angelos',
+    url=__url__,  # noqa F821
     # project_urls={
     #    "Bug Tracker": "https://bugs.example.com/HelloWorld/",
     #    "Documentation": "https://docs.example.com/HelloWorld/",
@@ -67,14 +73,17 @@ setup(
     test_suite='',
     python_requires='~=3.7',
     setup_requires=[
-        'cython', 'pyinstaller', 'kivy', 'libnacl', 'plyer', 'asyncssh',
-        'keyring', 'msgpack', 'broqer'],  # kivymd
+        'cython', 'pyinstaller', 'sphinx', 'sphinx_rtd_theme',
+        'kivy', 'kivymd', 'libnacl', 'plyer', 'asyncssh', 'keyring', 'msgpack',
+        'broqer'],
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
     packages=['angelos', 'eidon'],
 
     scripts=glob('bin/*'),
-    ext_modules=cythonize('lib/angelos/**/*.pyx', build_dir="build")
+    ext_modules=cythonize(
+        'lib/angelos/**/*.pyx', build_dir="build",
+        compiler_directives={'embedsignature': True})
 )
 
 # cython

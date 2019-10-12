@@ -1,8 +1,9 @@
 cython
 pyinstaller
+sphinx
+sphinx_rtd_theme
 kivy
-# kivymd
-git+git://github.com/HeaTTheatR/KivyMD@master
+kivymd
 libnacl
 plyer
 asyncssh

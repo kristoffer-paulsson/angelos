@@ -1,5 +1,4 @@
 import sys
-import subprocess
 from setuptools import find_packages
 from pkgutil import iter_modules
 
