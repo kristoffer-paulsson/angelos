@@ -1,21 +1,19 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 import logging
 
 import yaml
 
 from kivy.lang import Builder
 from kivy.properties import StringProperty
-from kivymd.dialog import BaseDialog
-from kivymd.snackbars import Snackbar
-from kivymd.label import MDLabel
+from kivymd.uix.dialog import BaseDialog
+from kivymd.uix.snackbar import Snackbar
+from kivymd.uix.label import MDLabel
 
 from .common import BasePanelScreen
 from ...operation.export import ExportImportOperation
@@ -23,12 +21,6 @@ from ...archive.helper import Glue
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-#:import MDRectangleFlatIconButton kivymd.button.MDRectangleFlatIconButton
-#:import MDTextField kivymd.textfields.MDTextField
-#:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
-
-
 <DocView@MDLabel>:
     size_hint_y: None
     height: self.texture_size[1]

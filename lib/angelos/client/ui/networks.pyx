@@ -1,12 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 import uuid
 import logging
 from typing import Any
@@ -16,9 +14,9 @@ from kivy.clock import Clock
 from kivy.properties import ObjectProperty
 from kivy.uix.image import AsyncImage
 
-from kivymd.list import (
+from kivymd.uix.list import (
     OneLineAvatarIconListItem, ILeftBody, IRightBodyTouch, BaseListItem)
-from kivymd.button import MDIconButton
+from kivymd.uix.button import MDIconButton
 
 from ...archive.helper import Glue
 from .common import BasePanelScreen, EmptyList, AppGetter

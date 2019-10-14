@@ -1,12 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 from typing import List, Any
 from functools import partial
 
@@ -15,12 +13,12 @@ from kivy.properties import StringProperty
 from kivy.clock import Clock
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.image import AsyncImage
-from kivymd.label import MDLabel
-from kivymd.list import (
+from kivymd.uix.label import MDLabel
+from kivymd.uix.list import (
     TwoLineAvatarListItem, MDList, ILeftBody, IRightBodyTouch)
-from kivymd.dialog import BaseDialog
-from kivymd.button import MDIconButton
-from kivymd.menus import MDDropdownMenu
+from kivymd.uix.dialog import BaseDialog
+from kivymd.uix.button import MDIconButton
+from kivymd.uix.menu import MDDropdownMenu
 
 from ...document import Mail
 from ...archive.helper import Glue
@@ -32,14 +30,6 @@ from .common import BasePanelScreen
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-# #:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
-#:import MDTextField kivymd.textfields.MDTextField
-#:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
-
-#:import MDScrollViewRefreshLayout kivymd.refreshlayout.MDScrollViewRefreshLayout
-
-
 <EmptyList>:
     text: ''
     markup: True

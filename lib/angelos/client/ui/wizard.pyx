@@ -1,21 +1,19 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 import datetime
 
 import libnacl
 
 from kivy.lang import Builder
 from kivy.uix.screenmanager import Screen
-from kivymd.dialog import MDDialog
-from kivymd.pickers import MDDatePicker
-from kivymd.menus import MDDropdownMenu
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.picker import MDDatePicker
+from kivymd.uix.menu import MDDropdownMenu
 
 from ...error import FieldRequiredNotSet
 from ...const import Const
@@ -34,12 +32,6 @@ COUNTRIES = {'Afghanistan': 'AF', 'Åland Islands': 'AX', 'Albania': 'AL', 'Alge
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-#:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
-#:import MDTextField kivymd.textfields.MDTextField
-#:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
-
-
 <PersonSetupGuide@Screen>:
     MDBottomNavigation
         id: person_entity
@@ -389,11 +381,6 @@ class PersonSetupGuide(Screen):
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-#:import MDTextField kivymd.textfields.MDTextField
-#:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
-
-
 <MinistrySetupGuide@Screen>:
     MDBottomNavigation
         id: ministry_entity
@@ -591,11 +578,6 @@ class MinistrySetupGuide(Screen):
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-#:import MDTextField kivymd.textfields.MDTextField
-#:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
-#:import MDDropdownMenu kivymd.menus.MDDropdownMenu
-
 <ChurchSetupGuide@Screen>:
     MDBottomNavigation
         id: church_entity
@@ -875,10 +857,6 @@ class ChurchSetupGuide(Screen):
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-# #:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
-#:import MDTextField kivymd.textfields.MDTextField
-
 <SetupScreen@Screen>:
     BoxLayout:
         orientation: 'vertical'

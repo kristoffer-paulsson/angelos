@@ -28,7 +28,7 @@ setup(
     license='MIT',
     description='A safe messaging system',
     author=__author__,  # noqa F821
-    author_email=__author_email_,  # noqa F821
+    author_email=__author_email__,  # noqa F821
     long_description=long_description,  # noqa F821
     long_description_content_type='text/markdown',
     url=__url__,  # noqa F821

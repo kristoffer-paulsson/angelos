@@ -1,13 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-Archive 7.
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Archive 7."""
 import os
 import re
 import struct

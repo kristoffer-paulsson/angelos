@@ -1,17 +1,15 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 from kivy.lang import Builder
 from kivy.properties import StringProperty
 from kivy.core.clipboard import Clipboard
-from kivymd.dialog import BaseDialog
-from kivymd.snackbars import Snackbar
+from kivymd.uix.dialog import BaseDialog
+from kivymd.uix.snackbar import Snackbar
 
 from ...policy import PGroup
 from ...operation.export import ExportImportOperation

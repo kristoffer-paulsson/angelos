@@ -1,13 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-Module docstring.
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring."""
 import os
 
 # import binascii
@@ -21,7 +18,7 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.uix.screenmanager import ScreenManager
 from kivymd.theming import ThemeManager
-from kivymd.snackbars import Snackbar
+from kivymd.uix.snackbar import Snackbar
 
 from ..ioc import Container, ContainerAware, Config, Handle
 from ..worker import Worker

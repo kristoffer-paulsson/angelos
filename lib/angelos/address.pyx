@@ -1,13 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-Address fields internationalization.
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Address fields internationalization."""
 
 FORMAT = (  # Format
     f"Address formatting string",
@@ -23,8 +20,9 @@ FORMAT = (  # Format
     ),
 )
 
+"""
 SE = (  # Format
-    "{'c/o '+co'//N' if co else ''}{'Box '+pobox+'//N' if pobox else street+' '+number+'//N'}{zip if zip else ''} {city if city else ''}{'//N'+country if country else ''}"(  # noqa 501  # Row
+    f"{'c/o '+co'//N' if co else ''}{'Box '+pobox+'//N' if pobox else street+' '+number+'//N'}{zip if zip else ''} {city if city else ''}{'//N'+country if country else ''}"(  # noqa 501  # Row
         (  # Field
             "<field> (str)",
             "<fieldname> (str)",
@@ -35,6 +33,7 @@ SE = (  # Format
         )
     ),
 )
+"""
 
 """
 5.1	Argentina

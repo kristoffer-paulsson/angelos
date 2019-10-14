@@ -26,6 +26,6 @@ clean:
 	rm -fr ./docs/html/
 	rm -fr ./docs/doctrees/
 
-docs:
+docs: angelos
 	sphinx-apidoc -o docs lib/angelos
 	sphinx-build -M html docs docs

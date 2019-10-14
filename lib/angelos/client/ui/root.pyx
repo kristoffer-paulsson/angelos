@@ -1,12 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 import logging
 
 from kivy.lang import Builder
@@ -99,16 +97,6 @@ class MainScreen(Screen):
 
 
 Builder.load_string("""
-#:import MDSeparator kivymd.cards.MDSeparator
-#:import MDToolbar kivymd.toolbar.MDToolbar
-#:import NavigationLayout kivymd.navigationdrawer.NavigationLayout
-#:import MDNavigationDrawer kivymd.navigationdrawer.MDNavigationDrawer
-#:import NavigationDrawerSubheader kivymd.navigationdrawer.NavigationDrawerSubheader
-#:import NavigationDrawerIconButton kivymd.navigationdrawer.NavigationDrawerIconButton
-
-#:import MDToolbar kivymd.toolbar.MDToolbar
-#:import MDRaisedButton kivymd.button.MDRaisedButton
-
 <ContentNavigationDrawer@MDNavigationDrawer>:
     NavigationDrawerIconButton:
         text: 'Messages'

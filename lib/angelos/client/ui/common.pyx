@@ -1,12 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 import logging
 from typing import Callable, Any, Iterable
 from functools import partial
@@ -17,8 +15,8 @@ from kivy.uix.widget import Widget
 from kivy.uix.screenmanager import Screen
 from kivy.uix.scrollview import ScrollView
 
-from kivymd.label import MDLabel
-from kivymd.list import MDList, BaseListItem
+from kivymd.uix.label import MDLabel
+from kivymd.uix.list import MDList, BaseListItem
 
 from ...policy import PrivatePortfolio
 

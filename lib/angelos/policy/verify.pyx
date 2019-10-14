@@ -1,12 +1,10 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-Verify entities by issuing statements."""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Verify entities by issuing statements."""
 from .policy import Policy
 from .crypto import Crypto
 from .portfolio import Portfolio, PrivatePortfolio

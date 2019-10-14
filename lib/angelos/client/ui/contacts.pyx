@@ -1,28 +1,21 @@
 # cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-"""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Module docstring"""
 from kivy.lang import Builder
 from kivy.uix.image import AsyncImage
-from kivymd.label import MDLabel
-from kivymd.selectioncontrols import MDCheckbox
-from kivymd.list import (
-    OneLineAvatarIconListItem, MDList, ILeftBody, IRightBodyTouch)
+from kivymd.uix.label import MDLabel
+from kivymd.uix.selectioncontrol import MDCheckbox
+from kivymd.uix.list import (
+    OneLineAvatarIconListItem, ILeftBody, IRightBodyTouch)
 
 from .common import BasePanelScreen
 
 
 Builder.load_string("""
-#:import MDLabel kivymd.label.MDLabel
-#:import MDCheckbox kivymd.selectioncontrols.MDCheckbox
-#:import MDBottomNavigation kivymd.bottomnavigation.MDBottomNavigation
-
-
 <EmptyList>:
     text: ''
     markup: True
