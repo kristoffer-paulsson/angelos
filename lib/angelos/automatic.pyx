@@ -9,6 +9,7 @@ import socket
 import platform
 import os
 import sys
+import uuid
 
 import plyer
 
@@ -84,7 +85,10 @@ class Automatic(BaseAuto):
         self.ppid = os.getppid()
         self.cpus = os.cpu_count()
         self.platform = sys.platform
-        self.id = plyer.uniqueid.id.decode()
+        try:
+            self.id = plyer.uniqueid.id.decode()
+        except NotImplementedError:
+            self.id = str(uuid.getnode())
 
         self.sys = Sys()
         self.dir = Dir(app_name)

@@ -10,7 +10,7 @@
 *.cnl
 *.ar7
 *.c
-**/__pychache__
+**/__pycache__
 /build/
 /dist/
 /*.egg-info/

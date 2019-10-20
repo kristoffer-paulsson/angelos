@@ -6,8 +6,6 @@ default:
 
 
 basic:
-	# pip install -U -r requirements.txt
-	python setup.py develop
 	mkdir -p angelos
 	mkdir -p angelos/archive
 	mkdir -p angelos/client
@@ -21,6 +19,8 @@ basic:
 	mkdir -p angelos/replication
 	mkdir -p angelos/server
 	mkdir -p angelos/ssh
+	pip install -r requirements.txt
+	python setup.py develop
 
 logo: basic
 	pyinstaller ./bin/logo $(PYI)

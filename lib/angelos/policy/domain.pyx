@@ -7,6 +7,7 @@
 """Policy classes for Domain and Nodes."""
 import platform
 import ipaddress
+import uuid
 
 import plyer
 
@@ -56,12 +57,16 @@ class NodePolicy(Policy):
                 }
             )
 
+        try:
+            serial = plyer.uniqueid.id.decode()
+        except NotImplementedError:
+            serial = str(uuid.getnode())
         node = Node(
             nd={
                 "domain": portfolio.domain.id,
                 "role": role,
                 "device": platform.platform(),
-                "serial": plyer.uniqueid.id.decode("utf-8"),
+                "serial": serial,
                 "issuer": portfolio.entity.id,
                 "location": location,
             }
