@@ -21,6 +21,14 @@ class PersonMixin(metaclass=DocumentMeta):
     given_name = StringField()
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         # Validate that "given_name" is present in "names"
         if self.given_name not in self.names:
             raise Util.exception(
@@ -38,6 +46,14 @@ class MinistryMixin(metaclass=DocumentMeta):
     founded = DateField()
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return True
 
 
@@ -50,4 +66,12 @@ class ChurchMixin(metaclass=DocumentMeta):
     country = StringField(required=False)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return True

@@ -22,24 +22,51 @@ from .model import (
 
 
 class IssueMixin(metaclass=DocumentMeta):
+    """Short summary."""
     signature = SignatureField()
     issuer = UuidField()
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return True
 
 
 class OwnerMixin(metaclass=DocumentMeta):
+    """Short summary."""
     owner = UuidField()
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return True
 
 
 class UpdatedMixin(metaclass=DocumentMeta):
+    """Short summary."""
     updated = DateField(required=False)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         try:
             if bool(self.updated):
                 if self.expires - self.updated > datetime.timedelta(
@@ -57,6 +84,14 @@ class UpdatedMixin(metaclass=DocumentMeta):
         return True
 
     def renew(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         today = datetime.date.today()
         self.updated = today
         self.expires = today + datetime.timedelta(13 * 365 / 12)
@@ -64,6 +99,7 @@ class UpdatedMixin(metaclass=DocumentMeta):
 
 
 class Document(IssueMixin, BaseDocument):
+    """Short summary."""
     id = UuidField(init=uuid.uuid4)
     created = DateField(init=datetime.date.today)
     expires = DateField(
@@ -74,6 +110,14 @@ class Document(IssueMixin, BaseDocument):
     type = TypeField(value=0)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         sdate = (
             self.updated if getattr(self, "updated", None) else self.created
         )
@@ -88,6 +132,19 @@ class Document(IssueMixin, BaseDocument):
         return True
 
     def _check_type(self, _type):
+        """Short summary.
+
+        Parameters
+        ----------
+        _type : type
+            Description of parameter `_type`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         if not self.type == _type:
             raise Util.exception(
                 Error.DOCUMENT_INVALID_TYPE,
@@ -95,10 +152,31 @@ class Document(IssueMixin, BaseDocument):
             )
 
     def _check_validate(self, _list):
+        """Short summary.
+
+        Parameters
+        ----------
+        _list : type
+            Description of parameter `_list`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         for cls in _list:
             cls._validate(self)
 
     def expires_soon(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         month = self.expires - datetime.timedelta(days=365 / 12)
         today = datetime.date.today()
         if today >= month and today <= self.expires:
@@ -108,6 +186,7 @@ class Document(IssueMixin, BaseDocument):
 
 
 class DocType(enum.IntEnum):
+    """Short summary."""
     NONE = 0
 
     KEYS_PRIVATE = 1

@@ -25,18 +25,21 @@ from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
 class Header(BaseDocument):
+    """Short summary."""
     op = StringField()
     issuer = UuidField()
     timestamp = DateTimeField()
     signature = SignatureField()
 
     class Op:
+        """Short summary."""
         SEND = "SEND"
         ROUTE = "RTE"
         RECEIVE = "RECV"
 
 
 class Envelope(Document, OwnerMixin):
+    """Short summary."""
     type = TypeField(value=DocType.COM_ENVELOPE)
     expires = DateField(
         init=lambda: (datetime.date.today() + datetime.timedelta(31))
@@ -46,6 +49,14 @@ class Envelope(Document, OwnerMixin):
     posted = DateTimeField()
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         self._check_type(DocType.COM_ENVELOPE)
 
         if self.expires - self.created > datetime.timedelta(31):
@@ -60,6 +71,14 @@ class Envelope(Document, OwnerMixin):
         return True
 
     def validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         validate = [BaseDocument, Document, IssueMixin, Envelope, OwnerMixin]
         self._check_validate(validate)
         return True

@@ -14,6 +14,7 @@ from .envelope import Envelope
 
 
 class StoredLetter(Document):
+    """Short summary."""
     id = UuidField()
     type = TypeField(value=DocType.CACHED_MSG)
     expires = DateField(
@@ -23,6 +24,14 @@ class StoredLetter(Document):
     message = DocumentField(t=Message)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         self._check_type(DocType.CACHED_MSG)
 
         if self.id.int != self.message.id.int:
@@ -30,6 +39,14 @@ class StoredLetter(Document):
         return True
 
     def validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         validate = [BaseDocument, Document, IssueMixin, StoredLetter]
         self._check_validate(validate)
         return True

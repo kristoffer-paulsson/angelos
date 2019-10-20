@@ -18,7 +18,7 @@ from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.console import BootServer, AdminServer
 from .ssh.client import ClientsServer, ClientsClient
-from .server.rsa import SERVER_RSA_PRIVATE
+from .data.vars import SERVER_RSA_PRIVATE
 
 
 class Starter:

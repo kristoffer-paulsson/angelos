@@ -4,7 +4,12 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-"""Archive 7."""
+"""
+Archive 7.
+
+In future C implementation, use BTree for entries:
+https://github.com/antirez/otree
+"""
 import os
 import re
 import struct

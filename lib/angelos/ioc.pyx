@@ -4,24 +4,40 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-"""Module docstring."""
+"""
+The Inversion of Control (IoC) framework is used as a central part of both
+the server and client. It is used to start application services and make them
+available in the whole application.
+ """
 import logging
+from typing import Any
 from .utils import Util
 from .error import Error
 
 
 class Container:
-    """IoC container class."""
+    """
+    The IoC Container class is responsible for initializing and globally
+    enabling access to application services.
 
-    def __init__(self, config={}):
-        """Initialize container with dictionary of values and lambdas."""
-        Util.is_type(config, dict)
+    Parameters
+    ----------
+    config : dict
+        The configuration being loaded into the IoC.
 
+    Attributes
+    ----------
+    __config : dict
+        Internal IoC configuration.
+    __instances : dict
+        Instanced application services.
+    """
+
+    def __init__(self, config: dict={}):
         self.__config = config
         self.__instances = {}
 
-    def __getattr__(self, name):
-        """Get attribute according to container configuration."""
+    def __getattr__(self, name: str) -> Any:
         if name not in self.__instances:
             if name not in self.__config:
                 raise Util.exception(
@@ -41,65 +57,96 @@ class Container:
 
 
 class ContainerAware:
-    """Mixin that makes a class IoC aware."""
+    """Mixin that makes its inheritors aware of the IoC container.
 
-    def __init__(self, ioc):
-        """Initialize a class with IoC awareness."""
-        Util.is_type(ioc, Container)
+    Parameters
+    ----------
+    ioc : Container
+        The IoC Container.
+
+    Attributes
+    ----------
+    __ioc : type
+        Internal reference to the IoC.
+    """
+
+    def __init__(self, ioc: Container):
         self.__ioc = ioc
 
     @property
-    def ioc(self):
-        """Container property access."""
+    def ioc(self) -> Container:
+        """Makes the IoC container accessible publically.
+
+        Returns
+        -------
+        Container
+            The IoC container.
+
+        """
         return self.__ioc
 
 
 class Config:
-    def __load(self, filename):
-        pass
+    """
+    Mixin for a Configuration class that might load and prepare the Container.
+    """
 
-    def __config(self):
+    def __load(self, filename: str) -> dict:
+        return {}
+
+    def __config(self) -> dict:
         return {}
 
 
 class Handle:
-    """Handle for late IoC services."""
+    """
+    The Handle class allows application services to be instanciated at a later
+    state, rather than on boot. This allows processes that are dependent on
+    user input to make choises about services at runtime. The service in this
+    handle can be set multiple times.
+    Handle implements the Descriptor Protocol.
 
-    def __init__(self, _type):
-        """Init handle by setting allowed type."""
+    Parameters
+    ----------
+    _type : Any
+        The service class type that should be put here.
+
+    Attributes
+    ----------
+    __type : Any
+        Internally the class type supported at runtime.
+    __value : Any
+        Internally the instance of the application service class.
+    __name : str
+        Internally the name of the service.
+    """
+
+    def __init__(self, _type: Any):
         self.__type = _type
         self.__value = None
         self.__name = None
 
-    def __get__(self, instance, owner):
-        """Return None if not set or the correct instance."""
+    def __get__(self, instance: Any, owner: Any) -> Any:
         return self.__value
 
-    def __set__(self, instance, value):
-        """
-        Set the handle instance.
-
-        Handle is immutable and can only be set once.
-        """
+    def __set__(self, instance: Any, value: Any):
         Util.is_type(value, self.__type)
         self.__value = value
 
-    def __delete__(self, instance):
-        """Handle can not be deleted. It is immutable."""
+    def __delete__(self, instance: Any):
         raise ValueError("Can not delete handle for %s" % self.__name)
 
-    def __set_name__(self, owner, name):
-        """Set the attribute name."""
+    def __set_name__(self, owner: Any, name: str):
         self.__name = name
 
 
 class StaticHandle(Handle):
-    def __set__(self, instance, value):
-        """
-        Set the handle instance.
+    """
+    The static handle works the same way as the Handle, except it can only be
+    set once.
+    """
 
-        Handle is immutable and can only be set once.
-        """
+    def __set__(self, instance: Any, value: Any):
         if self.__value:
             raise ValueError(  # noqa E701
                 "Handle already set for %s" % self.__name

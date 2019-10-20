@@ -4,7 +4,22 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-"""Conceal is transparent file encryption."""
+"""
+Conceal is transparent file encryption.
+
+
+Conceal should one day be implemented in C using libc interface by implementing
+a custom stream:
+
+GNU C Library, fopencookie()
+https://www.gnu.org/software/libc/manual/html_node/Custom-Streams.html
+
+macOS/BSD, funopen()
+https://www.freebsd.org/cgi/man.cgi?query=funopen
+
+Windows, CreatePipe() + _open_osfhandle() + fdopen()
+
+"""
 import io
 import os
 import math
@@ -235,7 +250,7 @@ class ConcealIO(io.RawIOBase):
         while size > cursor:
             numcpy = min(ConcealIO.ABLK_SIZE - self._offset, size - cursor)
 
-            data += self._buffer[self._offset : self._offset + numcpy]
+            data += self._buffer[self._offset:self._offset + numcpy]
             cursor += numcpy
             self._position += numcpy
             self._offset += numcpy
@@ -335,7 +350,7 @@ class ConcealIO(io.RawIOBase):
 
         self._changed = True
         space = ConcealIO.ABLK_SIZE - blk_cursor
-        self._buffer[self._offset : ConcealIO.ABLK_SIZE] = b"\x00" * space
+        self._buffer[self._offset:ConcealIO.ABLK_SIZE] = b"\x00" * space
         self._save()
         self._count = self._index + 1
 
@@ -372,8 +387,8 @@ class ConcealIO(io.RawIOBase):
             self._changed = True
             numcpy = min(ConcealIO.ABLK_SIZE - self._offset, wrtlen - cursor)
 
-            self._buffer[self._offset : self._offset + numcpy] = b[
-                cursor : cursor + numcpy
+            self._buffer[self._offset:self._offset + numcpy] = b[
+                cursor:cursor + numcpy
             ]  # noqa E501
 
             cursor += numcpy

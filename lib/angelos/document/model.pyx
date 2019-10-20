@@ -23,6 +23,27 @@ from ..error import Error, ModelException
 
 
 class Field:
+    """Short summary.
+
+    Parameters
+    ----------
+    value : type
+        Description of parameter `value`.
+    required : type
+        Description of parameter `required`.
+    multiple : type
+        Description of parameter `multiple`.
+    init : type
+        Description of parameter `init`.
+
+    Attributes
+    ----------
+    value
+    required
+    multiple
+    init
+
+    """
     """
     Base class for all fields.
 
@@ -39,6 +60,21 @@ class Field:
         self.init = init
 
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate according to basic field functionality."""
         if self.required and not bool(value):
             logging.debug('Field with "required" not set. (%s)' % value)
@@ -63,34 +99,133 @@ class Field:
         raise NotImplementedError()
 
     def str(self, v):
+        """Short summary.
+
+        Parameters
+        ----------
+        v : type
+            Description of parameter `v`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Abstract for converting value to string."""
         raise NotImplementedError()
 
     def bytes(self, v):
+        """Short summary.
+
+        Parameters
+        ----------
+        v : type
+            Description of parameter `v`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Abstract for converting value to bytes."""
         raise NotImplementedError()
 
     def yaml(self, v):
+        """Short summary.
+
+        Parameters
+        ----------
+        v : type
+            Description of parameter `v`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Abstract for converting value to bytes."""
         return v
 
 
 def conv_dont(f, v):
+    """Short summary.
+
+    Parameters
+    ----------
+    f : type
+        Description of parameter `f`.
+    v : type
+        Description of parameter `v`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
+    """
     """None convertion activator."""
     return v
 
 
 def conv_str(f, v):
+    """Short summary.
+
+    Parameters
+    ----------
+    f : type
+        Description of parameter `f`.
+    v : type
+        Description of parameter `v`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
+    """
     """Str convertion activator."""
     return f.str(v) if v else ""
 
 
 def conv_bytes(f, v):
+    """Short summary.
+
+    Parameters
+    ----------
+    f : type
+        Description of parameter `f`.
+    v : type
+        Description of parameter `v`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
+    """
     """Bytes convertion activator."""
     return f.bytes(v) if v else b""
 
 
 def conv_yaml(f, v):
+    """Short summary.
+
+    Parameters
+    ----------
+    f : type
+        Description of parameter `f`.
+    v : type
+        Description of parameter `v`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
+    """
     """Bytes convertion activator."""
     return f.yaml(v) if v else None
 
@@ -123,6 +258,21 @@ class DocumentMeta(type):
 
 
 class BaseDocument(metaclass=DocumentMeta):
+    """Short summary.
+
+    Parameters
+    ----------
+    nd : type
+        Description of parameter `nd`.
+    strict : type
+        Description of parameter `strict`.
+
+    Attributes
+    ----------
+    _fields : type
+        Description of attribute `_fields`.
+
+    """
     """
     Field magic behind the scenes.
 
@@ -172,6 +322,21 @@ class BaseDocument(metaclass=DocumentMeta):
 
     @classmethod
     def build(cls, data):
+        """Short summary.
+
+        Parameters
+        ----------
+        cls : type
+            Description of parameter `cls`.
+        data : type
+            Description of parameter `data`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Build document from dictionary, takes dict or list of dicts."""
         doc = {}
         logging.debug("Exporting document %s" % type(cls))
@@ -191,30 +356,20 @@ class BaseDocument(metaclass=DocumentMeta):
                 doc[name] = item_list
         return cls(nd=doc, strict=False)
 
-    """
-    @classmethod
-    def build(cls, data):
-        ""Build document from dictionary, takes dict or list of dicts.""
-        doc = cls(nd={})
-        logging.debug('Exporting document %s' % type(cls))
-
-        for name, field in doc._fields.items():
-            value = data[name]
-            logging.debug('%s, %s, %s' % (type(field), name, value))
-
-            if not field.multiple:
-                setattr(doc, name, field.from_bytes(value))
-            elif isinstance(value, type(None)):
-                setattr(doc, name, [])
-            else:
-                item_list = []
-                for item in value:
-                    item_list.append(field.from_bytes(item))
-                setattr(doc, name, item_list)
-        return doc
-    """
-
     def export(self, c=conv_dont):
+        """Short summary.
+
+        Parameters
+        ----------
+        c : type
+            Description of parameter `c`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """
         Export a document as a dictionary.
 
@@ -247,21 +402,61 @@ class BaseDocument(metaclass=DocumentMeta):
         return nd
 
     def export_str(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return self.export(conv_str)
 
     def export_bytes(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return self.export(conv_bytes)
 
     def export_yaml(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return self.export(conv_yaml)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate all fields."""
         for name in self._fields.keys():
             self._fields[name].validate(getattr(self, name), name)
         return True
 
     def validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """
         Abstract document validator.
 
@@ -271,6 +466,27 @@ class BaseDocument(metaclass=DocumentMeta):
 
 
 class DocumentField(Field):
+    """Short summary.
+
+    Parameters
+    ----------
+    value : type
+        Description of parameter `value`.
+    required : type
+        Description of parameter `required`.
+    multiple : type
+        Description of parameter `multiple`.
+    init : type
+        Description of parameter `init`.
+    t : type
+        Description of parameter `t`.
+
+    Attributes
+    ----------
+    type : type
+        Description of attribute `type`.
+
+    """
     """Field that holds one or several Documents as field."""
 
     def __init__(
@@ -281,6 +497,21 @@ class DocumentField(Field):
         self.type = t
 
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate DocType and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -304,11 +535,40 @@ class DocumentField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return self.type.build(value) if value else None
 
 
 class UuidField(Field):
+    """Short summary."""
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate data type as UUID and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -329,23 +589,91 @@ class UuidField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return uuid.UUID(bytes=value) if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return str(value)
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value.bytes
 
     def yaml(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """YAML converter."""
         return str(value)
 
 
 class IPField(Field):
+    """Short summary."""
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate data type as IPvXAddress and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -368,6 +696,19 @@ class IPField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         length = len(value)
         if length == 0:
             return None
@@ -381,10 +722,36 @@ class IPField(Field):
             )
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return str(value)
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         if isinstance(value, ipaddress.IPv4Address):
             return int(value).to_bytes(4, byteorder="big")
@@ -394,12 +761,41 @@ class IPField(Field):
             raise TypeError("Arbitrary size: %s" % len(value))
 
     def yaml(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """YAML converter."""
         return str(value)
 
 
 class DateField(Field):
+    """Short summary."""
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate field type as Date and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -420,19 +816,73 @@ class DateField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return datetime.date.fromisoformat(value.decode()) if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return value.isoformat()
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value.isoformat().encode()
 
 
 class DateTimeField(Field):
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate field type as DateTime and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -453,21 +903,76 @@ class DateTimeField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return (
             datetime.datetime.fromisoformat(value.decode()) if value else None
         )
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return value.isoformat()
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value.isoformat().encode()
 
 
 class StringField(Field):
+    """Short summary."""
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate field type as String and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -485,19 +990,74 @@ class StringField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return str(value, "utf-8") if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return value
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value.encode()
 
 
 class TypeField(Field):
+    """Short summary."""
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate field type as Int and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -514,22 +1074,94 @@ class TypeField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return int.from_bytes(value, byteorder="big") if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return str(value)
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return int(value).to_bytes(4, byteorder="big")
 
     def yaml(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """YAML converter."""
         return int(value)
 
 
 class BinaryField(Field):
+    """Short summary.
+
+    Parameters
+    ----------
+    value : type
+        Description of parameter `value`.
+    required : type
+        Description of parameter `required`.
+    multiple : type
+        Description of parameter `multiple`.
+    init : type
+        Description of parameter `init`.
+    limit : type
+        Description of parameter `limit`.
+
+    Attributes
+    ----------
+    limit
+
+    """
     def __init__(
         self, value=None, required=True, multiple=False, init=None, limit=1024
     ):
@@ -537,6 +1169,21 @@ class BinaryField(Field):
         self.limit = limit
 
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """
         Validate field type as Bytes and within limits
         and inherited validation logic.
@@ -565,22 +1212,96 @@ class BinaryField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return value if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return base64.standard_b64encode(value).decode("utf-8")
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value
 
     def yaml(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """YAML converter."""
         return base64.standard_b64encode(value).decode("utf-8")
 
 
 class SignatureField(BinaryField):
+    """Short summary.
+
+    Parameters
+    ----------
+    value : type
+        Description of parameter `value`.
+    required : type
+        Description of parameter `required`.
+    multiple : type
+        Description of parameter `multiple`.
+    init : type
+        Description of parameter `init`.
+    limit : type
+        Description of parameter `limit`.
+
+    Attributes
+    ----------
+    redo : type
+        Description of attribute `redo`.
+    limit
+
+    """
     def __init__(
         self, value=None, required=True, multiple=False, init=None, limit=1024
     ):
@@ -589,6 +1310,21 @@ class SignatureField(BinaryField):
         self.redo = False
 
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate field type as String and inherited validation logic."""
         if not self.redo:
             Field.validate(self, value, name)
@@ -616,6 +1352,26 @@ class SignatureField(BinaryField):
 
 
 class ChoiceField(Field):
+    """Short summary.
+
+    Parameters
+    ----------
+    value : type
+        Description of parameter `value`.
+    required : type
+        Description of parameter `required`.
+    multiple : type
+        Description of parameter `multiple`.
+    init : type
+        Description of parameter `init`.
+    choices : type
+        Description of parameter `choices`.
+
+    Attributes
+    ----------
+    choices
+
+    """
     def __init__(
         self, value=None, required=True, multiple=False, init=None, choices=[]
     ):
@@ -625,6 +1381,21 @@ class ChoiceField(Field):
         self.choices = choices
 
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate field type as String and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -641,29 +1412,104 @@ class ChoiceField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return value.decode() if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return value
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value.encode()
 
 
 class EmailField(Field):
+    """Short summary.
+
+    Parameters
+    ----------
+    value : type
+        Description of parameter `value`.
+    required : type
+        Description of parameter `required`.
+    multiple : type
+        Description of parameter `multiple`.
+    init : type
+        Description of parameter `init`.
+    choices : type
+        Description of parameter `choices`.
+
+    Attributes
+    ----------
+    EMAIL_REGEX : type
+        Description of attribute `EMAIL_REGEX`.
+    choices
+
+    """
     EMAIL_REGEX = (
         "^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$"
     )  # noqa E501
 
     def __init__(
-        self, value=None, required=True, multiple=False, init=None, choices=[]
+        self, value=None, required=True, multiple=False, init=None
     ):
         Field.__init__(self, value, required, multiple, init)
-        self.choices = choices
 
     def validate(self, value, name):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+        name : type
+            Description of parameter `name`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Validate as Email address and inherited validation logic."""
         Field.validate(self, value, name)
 
@@ -688,12 +1534,51 @@ class EmailField(Field):
         return True
 
     def from_bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return value.decode() if value else None
 
     def str(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Str converter."""
         return value
 
     def bytes(self, value):
+        """Short summary.
+
+        Parameters
+        ----------
+        value : type
+            Description of parameter `value`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         """Bytes converter."""
         return value.encode()

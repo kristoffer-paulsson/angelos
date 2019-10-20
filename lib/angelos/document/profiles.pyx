@@ -20,6 +20,7 @@ from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class Address(BaseDocument):
+    """Short summary."""
     co = StringField(required=False)
     organisation = StringField(required=False)
     department = StringField(required=False)
@@ -38,11 +39,13 @@ class Address(BaseDocument):
 
 
 class Social(BaseDocument):
+    """Short summary."""
     token = StringField()
     service = StringField()
 
 
 class Profile(Document, UpdatedMixin):
+    """Short summary."""
     picture = BinaryField(required=False, limit=65536)
     email = EmailField(required=False)
     mobile = StringField(required=False)
@@ -53,16 +56,33 @@ class Profile(Document, UpdatedMixin):
 
 
 class PersonProfile(Profile, PersonMixin):
+    """Short summary."""
     type = TypeField(value=DocType.PROF_PERSON)
     gender = ChoiceField(required=False, choices=["man", "woman", "undefined"])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         self._check_type(DocType.PROF_PERSON)
         return True
 
     def validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         validate = [
             BaseDocument,
             Document,
@@ -77,13 +97,30 @@ class PersonProfile(Profile, PersonMixin):
 
 
 class MinistryProfile(Profile, MinistryMixin):
+    """Short summary."""
     type = TypeField(value=DocType.PROF_MINISTRY)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         self._check_type(DocType.PROF_MINISTRY)
         return True
 
     def validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         validate = [
             BaseDocument,
             Document,
@@ -98,13 +135,30 @@ class MinistryProfile(Profile, MinistryMixin):
 
 
 class ChurchProfile(Profile, ChurchMixin):
+    """Short summary."""
     type = TypeField(value=DocType.PROF_CHURCH)
 
     def _validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         self._check_type(DocType.PROF_CHURCH)
         return True
 
     def validate(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         validate = [
             BaseDocument,
             Document,
