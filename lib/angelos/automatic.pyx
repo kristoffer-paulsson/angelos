@@ -9,11 +9,9 @@ import socket
 import platform
 import os
 import sys
-import uuid
-
-import plyer
 
 from .utils import Util
+from .misc import Misc
 
 
 class BaseAuto:
@@ -68,10 +66,7 @@ class Net(BaseAuto):
     def __init__(self):
         name = socket.gethostname()
         self.hostname = name.lower()
-        if '.local' in name:
-            self.ip = socket.gethostbyname('localhost')
-        else:
-            self.ip = socket.gethostbyname(name)
+        self.ip = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [[(s.connect(("1.1.1.1", 1)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["127.0.0.1"])[0]  # noqa E501
         self.domain = socket.getfqdn()
 
 
@@ -85,10 +80,7 @@ class Automatic(BaseAuto):
         self.ppid = os.getppid()
         self.cpus = os.cpu_count()
         self.platform = sys.platform
-        try:
-            self.id = plyer.uniqueid.id.decode()
-        except NotImplementedError:
-            self.id = str(uuid.getnode())
+        self.id = Misc.unique()
 
         self.sys = Sys()
         self.dir = Dir(app_name)

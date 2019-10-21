@@ -54,3 +54,21 @@ Build one of the targets. (angelos/logo/ar7)
 
 Run the compiled target.
 > &lt;target&gt;
+
+## external access
+
+On Debian you must open the ports that will be used by angelos. If you already have a SSH daemon installed it has to be reconfigured to not run on port 22. As sudo user do this.
+
+> iptables -A INPUT -p tcp --dport 22 --jump ACCEPT
+>
+> iptables -A INPUT -p tcp --dport 3 --jump ACCEPT
+>
+> iptables -A INPUT -p tcp --dport 4 --jump ACCEPT
+>
+> iptables -A INPUT -p tcp --dport 5 --jump ACCEPT
+>
+> iptables-save
+
+Then angelos must be started with the option to listen to any
+
+> angelos -l any

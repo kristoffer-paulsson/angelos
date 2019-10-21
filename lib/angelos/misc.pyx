@@ -6,7 +6,10 @@
 #
 """Module docstring."""
 import abc
+import uuid
 from dataclasses import dataclass, asdict as data_asdict
+
+import plyer
 
 
 @dataclass
@@ -47,3 +50,28 @@ class ThresholdCounter:
         Returns True when the threshold is met.
         """
         return self.__cnt >= self.__thr
+
+
+class Misc:
+    """Namespace for miscellanious functions and methods."""
+
+    @staticmethod
+    def unique() -> str:
+        """Get the hardware ID.
+
+        Tries to find the uniqueid of the hardware, otherwise returns MAC
+        address.
+
+        Returns
+        -------
+        string
+            Unique hardware id.
+
+        """
+        try:
+            serial = plyer.uniqueid.id
+            if isinstance(serial, bytes):
+                serial = serial.decode()
+            return serial
+        except NotImplementedError:
+            return str(uuid.getnode())

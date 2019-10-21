@@ -7,10 +7,10 @@
 """Policy classes for Domain and Nodes."""
 import platform
 import ipaddress
-import uuid
 
-import plyer
+from typing import Union
 
+from ..misc import Misc
 from ._types import PrivatePortfolioABC
 from .policy import Policy
 from .crypto import Crypto
@@ -28,7 +28,7 @@ class NodePolicy(Policy):
     @staticmethod
     def current(
         portfolio: PrivatePortfolioABC,
-        role: str = "client",
+        role: Union[str, int] = "client",
         server: bool = False,
     ):
         """Generate node document from the current node."""
@@ -57,16 +57,12 @@ class NodePolicy(Policy):
                 }
             )
 
-        try:
-            serial = plyer.uniqueid.id.decode()
-        except NotImplementedError:
-            serial = str(uuid.getnode())
         node = Node(
             nd={
                 "domain": portfolio.domain.id,
                 "role": role,
                 "device": platform.platform(),
-                "serial": serial,
+                "serial": Misc.unique(),
                 "issuer": portfolio.entity.id,
                 "location": location,
             }

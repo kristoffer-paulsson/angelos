@@ -74,8 +74,8 @@ setup(
     python_requires='~=3.7',
     setup_requires=[
         'cython', 'pyinstaller', 'sphinx', 'sphinx_rtd_theme',
-        'kivy', 'kivymd', 'libnacl', 'plyer', 'asyncssh', 'keyring', 'msgpack',
-        'broqer'],
+        'kivy', 'kivymd', 'libnacl', 'plyer', 'asyncssh',
+        'keyring', 'msgpack', 'broqer'],
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
     packages=['angelos', 'eidon'],
