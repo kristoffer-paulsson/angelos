@@ -6,9 +6,15 @@
 #
 """Dummy data generation utilities."""
 import random
+import binascii
+import os
 
+from ..const import Const
+from ...facade.facade import Facade
+from ...archive.helper import Glue
 from .support import (
     random_church_entity_data,
+    random_ministry_entity_data,
     random_person_entity_data,
     generate_filename,
     generate_data,
@@ -20,11 +26,106 @@ from ..policy import (
     MessagePolicy,
     EnvelopePolicy,
 )
+from ...facade.facade import (
+    PersonClientFacade, MinistryClientFacade, ChurchClientFacade,
+    PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
 from ..operation.setup import SetupPersonOperation
+
+import libnacl
 
 
 class DummyPolicy:
     """Policy to generate dummy data according to scenarios."""
+
+    def __create_generic_facace(
+        self,
+        homedir: str,
+        entity_data: dict,
+        cls: type,
+    ) -> bytes:
+        """Generic entity facade generator."""
+        secret = libnacl.secret.SecretBox().sk
+        facade = Glue.run_async(cls.setup(
+            homedir, secret, Const.A_ROLE_PRIMARY, entity_data))
+        facade.archive(Const.CNL_VAULT).close()
+        with open(os.path.join(homedir, 'secret.key', 'w')) as key:
+            key.write(binascii.hexlify(secret).decode())
+        return secret
+
+    def create_person_facace(
+        self,
+        homedir: str,
+        server: bool = False
+    ) -> bytes:
+        """Generate random person facade.
+
+        Parameters
+        ----------
+        homedir : str
+            The destination of the encrypted archives.
+        server : bool
+            Generate a server of client, dedaults to client.
+
+        Returns
+        -------
+        bytes
+            NaCl symmetric encryption key used.
+
+        """
+        entity_data = random_person_entity_data()[0]
+        return self.__create_generic_facace(
+            homedir, entity_data,
+            PersonServerFacade if server else PersonClientFacade)
+
+    def create_ministry_facade(
+        self,
+        homedir: str,
+        server: bool = False
+    ) -> bytes:
+        """Generate random ministry facade.
+
+        Parameters
+        ----------
+        homedir : str
+            The destination of the encrypted archives.
+        server : bool
+            Generate a server of client, dedaults to client.
+
+        Returns
+        -------
+        bytes
+            NaCl symmetric encryption key used.
+
+        """
+        entity_data = random_ministry_entity_data()[0]
+        return self.__create_generic_facace(
+            homedir, entity_data,
+            MinistryServerFacade if server else MinistryClientFacade)
+
+    def create_church_facade(
+        self,
+        homedir: str,
+        server: bool = True
+    ) -> bytes:
+        """Generate random church facade.
+
+        Parameters
+        ----------
+        homedir : str
+            The destination of the encrypted archives.
+        server : bool
+            Generate a server of client, dedaults to server.
+
+        Returns
+        -------
+        bytes
+            NaCl symmetric encryption key used.
+
+        """
+        entity_data = random_church_entity_data()[0]
+        return self.__create_generic_facace(
+            homedir, entity_data,
+            ChurchServerFacade if server else ChurchClientFacade)
 
     def make_friends(self, facade, num):
         """Generate X number of friends and import to vault."""
@@ -48,7 +149,22 @@ class DummyPolicy:
 
         return sets
 
-    async def make_community(self, facade):
+    async def make_community(self, facade: Facade):
+        """
+        Creates a community with entities that sends a mail to the given
+        facade.
+
+        Parameters
+        ----------
+        facade : Facade
+            The facade to be treated.
+
+        Returns
+        -------
+        None
+            Returns nothing.
+
+        """
         person_datas = random_person_entity_data(201)
         persons = []
         for person_data in person_datas:

@@ -3,6 +3,8 @@
 # Copyright (c) 2018-2019 by:
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
+# Some parts licensed under Open Database Licence and copyrighted by their
+# respective owners.
 #
 """Dummy lipsum data of different types."""
 

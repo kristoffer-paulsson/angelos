@@ -171,8 +171,6 @@ class Starter:
         else:
             location = str(host.network.hosts[0].hostname[0])
 
-        location = "localhost"
-
         params = {
             "username": str(portfolio.entity.id),
             "client_username": str(portfolio.entity.id),

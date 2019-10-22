@@ -160,6 +160,14 @@ class FieldIsMultiple(ModelException):
     pass  # noqa E302
 
 
+class DocumentNoLocation(ModelException):
+    pass  # noqa E302
+
+
+class DocumentNoHost(ModelException):
+    pass  # noqa E302
+
+
 class ConcealException(AngelosException):
     pass  # noqa E302
 
@@ -254,6 +262,10 @@ class ArchiveNotEmpty(Archive7Exception):
 
 class LogoException(Exception):
     pass
+
+
+class PolicyBreach(AngelosException):
+    pass  # noqa E302
 
 
 ERROR_INFO = {
@@ -355,6 +367,8 @@ ERROR_INFO = {
         FieldIsMultiple,
         "Value is not list, but set to multiple",
     ),  # noqa E501
+    610: (DocumentNoLocation, "Node document has no valid location set"),  # noqa E501
+    611: (DocumentNoHost, "Network document has no valid hosts"),  # noqa E501
     700: (
         ConcealUnkownMode,
         "Conceal doesn't support unkown format",
@@ -426,6 +440,8 @@ class Error(IntEnum):
     FIELD_INVALID_EMAIL = 607
     FIELD_BEYOND_LIMIT = 608
     FIELD_IS_MULTIPLE = 609
+    DOCUMENT_NO_LOCATION = 610
+    DOCUMENT_NO_HOST = 611
 
     # 20 error codes for Conceal
     CONCEAL_UNKOWN_MODE = 700

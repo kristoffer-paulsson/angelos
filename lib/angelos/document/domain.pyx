@@ -5,6 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
+from ..utils import Util
+from ..error import Error
 from .model import (
     BaseDocument,
     StringField,
@@ -79,6 +81,9 @@ class Node(Document, UpdatedMixin):
 
         """
         self._check_type(DocType.NET_NODE)
+        if self.location and self.role == "server":
+            if not self.location.hostname and not self.location.ip:
+                raise Util.exception(Error.DOCUMENT_NO_LOCATION)
         return True
 
     def validate(self):
@@ -111,6 +116,12 @@ class Network(Document, UpdatedMixin):
 
         """
         self._check_type(DocType.NET_NETWORK)
+        info = False
+        for host in self.hosts if self.hosts else []:
+            if host.hostname or host.ip:
+                info = True
+        if not info:
+            raise Util.exception(Error.DOCUMENT_NO_HOST)
         return True
 
     def validate(self):

@@ -164,6 +164,7 @@ class LogoMessenger(ContainerAware, App):
         elif future.done():
             e = future.exception()
             if e:
+                logging.error(e, exc_info=True)
                 Snackbar(text="Connection failed. {0}".format(e)).show()
             else:
                 Snackbar(text="Success connecting to network.").show()

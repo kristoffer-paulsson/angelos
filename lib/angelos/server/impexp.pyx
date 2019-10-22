@@ -71,6 +71,7 @@ class PortfolioCommand(Command):
         )
         portfolio.privkeys = None
         self._io << ExportImportOperation.text_exp(portfolio)
+        self._io << "\n\n"
 
     async def __view(self, entity_id, group):
         entity_id = uuid.UUID(entity_id)
