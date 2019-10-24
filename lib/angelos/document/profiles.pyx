@@ -20,7 +20,41 @@ from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class Address(BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    co : StringField
+        Description of attribute `co`.
+    organisation : StringField
+        Description of attribute `organisation`.
+    department : StringField
+        Description of attribute `department`.
+    apartment : StringField
+        Description of attribute `apartment`.
+    floor : StringField
+        Description of attribute `floor`.
+    building : StringField
+        Description of attribute `building`.
+    street : StringField
+        Description of attribute `street`.
+    number : StringField
+        Description of attribute `number`.
+    area : StringField
+        Description of attribute `area`.
+    city : StringField
+        Description of attribute `city`.
+    pobox : StringField
+        Description of attribute `pobox`.
+    zip : StringField
+        Description of attribute `zip`.
+    subregion : StringField
+        Description of attribute `subregion`.
+    region : StringField
+        Description of attribute `region`.
+    country : StringField
+        Description of attribute `country`.
+    """
     co = StringField(required=False)
     organisation = StringField(required=False)
     department = StringField(required=False)
@@ -39,13 +73,39 @@ class Address(BaseDocument):
 
 
 class Social(BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    token : StringField
+        Description of attribute `token`.
+    service : StringField
+        Description of attribute `service`.
+    """
     token = StringField()
     service = StringField()
 
 
 class Profile(Document, UpdatedMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    picture : BinaryField
+        Description of attribute `picture`.
+    email : EmailField
+        Description of attribute `email`.
+    mobile : StringField
+        Description of attribute `mobile`.
+    phone : StringField
+        Description of attribute `phone`.
+    address : DocumentField
+        Description of attribute `address`.
+    language : StringField
+        Description of attribute `language`.
+    social : DocumentField
+        Description of attribute `social`.
+    """
     picture = BinaryField(required=False, limit=65536)
     email = EmailField(required=False)
     mobile = StringField(required=False)
@@ -56,30 +116,42 @@ class Profile(Document, UpdatedMixin):
 
 
 class PersonProfile(Profile, PersonMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    gender : ChoiceField
+        Description of attribute `gender`.
+    born : DateField
+        Description of attribute `born`.
+    names : StringField
+        Description of attribute `names`.
+    """
     type = TypeField(value=DocType.PROF_PERSON)
     gender = ChoiceField(required=False, choices=["man", "woman", "undefined"])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
-    def _validate(self):
+    def _validate(self) -> bool:
         """Short summary.
 
         Returns
         -------
-        type
+        bool
             Description of returned object.
 
         """
         self._check_type(DocType.PROF_PERSON)
         return True
 
-    def validate(self):
+    def validate(self) -> bool:
         """Short summary.
 
         Returns
         -------
-        type
+        bool
             Description of returned object.
 
         """
@@ -97,27 +169,33 @@ class PersonProfile(Profile, PersonMixin):
 
 
 class MinistryProfile(Profile, MinistryMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.PROF_MINISTRY)
 
-    def _validate(self):
+    def _validate(self) -> bool:
         """Short summary.
 
         Returns
         -------
-        type
+        bool
             Description of returned object.
 
         """
         self._check_type(DocType.PROF_MINISTRY)
         return True
 
-    def validate(self):
+    def validate(self) -> bool:
         """Short summary.
 
         Returns
         -------
-        type
+        bool
             Description of returned object.
 
         """
@@ -135,10 +213,16 @@ class MinistryProfile(Profile, MinistryMixin):
 
 
 class ChurchProfile(Profile, ChurchMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.PROF_CHURCH)
 
-    def _validate(self):
+    def _validate(self) -> bool:
         """Short summary.
 
         Returns
@@ -150,7 +234,7 @@ class ChurchProfile(Profile, ChurchMixin):
         self._check_type(DocType.PROF_CHURCH)
         return True
 
-    def validate(self):
+    def validate(self) -> bool:
         """Short summary.
 
         Returns

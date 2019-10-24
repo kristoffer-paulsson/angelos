@@ -6,12 +6,21 @@
 #
 """Module docstring"""
 from kivy.lang import Builder
+from kivy.clock import Clock
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.image import AsyncImage
 from kivymd.uix.label import MDLabel
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.list import (
-    OneLineAvatarIconListItem, ILeftBody, IRightBodyTouch)
+    MDList, OneLineAvatarIconListItem, ILeftBody, IRightBodyTouch)
 
+from typing import List, Any
+from functools import partial
+
+from ...archive.helper import Glue
+from ...policy import (
+    PrintPolicy, PrivatePortfolio)
+from ...operation.mail import MailOperation
 from .common import BasePanelScreen
 
 
@@ -80,6 +89,8 @@ Builder.load_string("""
                 on_leave: print('On leave')
 """)  # noqa E501
 
+EMPTY_ALL_CONTACTS = """The contacts are empty!"""
+
 
 class EmptyList(MDLabel):
     pass
@@ -115,4 +126,49 @@ class ContactsScreen(BasePanelScreen):
         widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('blocked')
 
     def list_all(self):
+        entities = Glue.run_async(self.app.ioc.facade.contact.load_all())
         widget = self.ids['bottom_nav'].ids.tab_manager.get_screen('all')
+        widget.clear_widgets()
+
+        if not entities:
+            label = EmptyList()
+            label.text = EMPTY_ALL_CONTACTS
+            widget.add_widget(label)
+            return
+
+        sv = ScrollView()
+        all = MDList()
+        sv.add_widget(all)
+        widget.add_widget(sv)
+
+        if entities:
+            Clock.schedule_once(partial(
+                self.show_contact_item, self.app.ioc.facade.portfolio,
+                entities, all))
+
+    def show_contact_item(
+            self, portfolio: PrivatePortfolio,
+            entities: List[Any], list_widget: MDList, dt):
+        """Print contact to list kivy-async."""
+
+        entity = entities.pop()
+        if isinstance(entity[1], type(None)) and (
+                portfolio.entity.id != entity[0].id):
+            try:
+                title = PrintPolicy.entity_title(entity[0])
+                source = './data/icon_72x72.png'
+            except OSError:
+                title = '<Unidentified sender>'
+                source = './data/anonymous.png'
+            item = ContactListItem(
+                text=title,
+            )
+            item.entity_id = entity[0].id
+            item.add_widget(DummyPhoto(source=source))
+            list_widget.add_widget(item)
+        else:
+            print(entity)
+
+        if entities:
+            Clock.schedule_once(partial(
+                self.show_contact_item, portfolio, entities, list_widget))

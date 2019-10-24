@@ -20,20 +20,44 @@ from .document import DocType, Document, UpdatedMixin, IssueMixin
 
 
 class Host(BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    node : UuidField
+        Description of attribute `node`.
+    ip : IPField
+        Description of attribute `ip`.
+    hostname : StringField
+        Description of attribute `hostname`.
+    """
     node = UuidField()
     ip = IPField(required=False, multiple=True)
     hostname = StringField(required=False, multiple=True)
 
 
 class Location(BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    ip : IpField
+        Description of attribute `ip`.
+    hostname : StringField
+        Description of attribute `hostname`.
+    """
     ip = IPField(required=False, multiple=True)
     hostname = StringField(required=False, multiple=True)
 
 
 class Domain(Document, UpdatedMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.NET_DOMAIN)
 
     def _validate(self):
@@ -63,7 +87,23 @@ class Domain(Document, UpdatedMixin):
 
 
 class Node(Document, UpdatedMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    domain : UuidField
+        Description of attribute `domain`.
+    role : ChoiceField
+        Description of attribute `role`.
+    device : StringField
+        Description of attribute `device`.
+    serial : StringField
+        Description of attribute `serial`.
+    location : DocumentField
+        Description of attribute `location`.
+    """
     type = TypeField(value=DocType.NET_NODE)
     domain = UuidField()
     role = ChoiceField(choices=["client", "server", "backup"])
@@ -101,7 +141,17 @@ class Node(Document, UpdatedMixin):
 
 
 class Network(Document, UpdatedMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    domain : UuidField
+        Description of attribute `domain`.
+    hosts : DocumentField
+        Description of attribute `hosts`.
+    """
     type = TypeField(value=DocType.NET_NETWORK)
     domain = UuidField()
     hosts = DocumentField(t=Host, multiple=True)

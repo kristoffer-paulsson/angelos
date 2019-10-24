@@ -10,8 +10,8 @@ import binascii
 import os
 
 from ..const import Const
-from ...facade.facade import Facade
-from ...archive.helper import Glue
+from ..facade.facade import Facade
+from ..archive.helper import Glue
 from .support import (
     random_church_entity_data,
     random_ministry_entity_data,
@@ -26,7 +26,7 @@ from ..policy import (
     MessagePolicy,
     EnvelopePolicy,
 )
-from ...facade.facade import (
+from ..facade.facade import (
     PersonClientFacade, MinistryClientFacade, ChurchClientFacade,
     PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
 from ..operation.setup import SetupPersonOperation

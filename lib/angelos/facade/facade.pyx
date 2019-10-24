@@ -13,6 +13,7 @@ import asyncio
 
 from typing import Sequence, Set, List, Tuple
 
+from .contact import ContactAPI
 from .mail import MailAPI
 from .settings import SettingsAPI
 from .replication import ReplicationAPI
@@ -212,6 +213,7 @@ class Facade:
         self.__portfolio = await self._vault.load_portfolio(
             self._vault.stats.owner, PGroup.SERVER if server else PGroup.CLIENT
         )
+        self.__contact = ContactAPI(self.__portfolio, self._vault)
         self.__mail = MailAPI(self.__portfolio, self._vault)
         self.__settings = SettingsAPI(self.__portfolio, self._vault)
         self.__replication = ReplicationAPI(self)
@@ -460,6 +462,11 @@ class Facade:
     def portfolio(self):
         """Private portfolio getter."""
         return self.__portfolio
+
+    @property
+    def contact(self):
+        """Contact interface getter."""
+        return self.__contact
 
     @property
     def mail(self):

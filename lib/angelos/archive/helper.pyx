@@ -66,7 +66,7 @@ class Glue:
                 doc.validate()
                 doclist.append(doc)
             except Exception as e:
-                pass
+                logging.error(e, exc_info=True)
 
         return doclist
 
@@ -83,6 +83,7 @@ class Glue:
                     doc.validate()
                 doclist.append((doc, None))
             except Exception as e:
+                logging.error(e, exc_info=True)
                 doclist.append((doc if doc else data, str(e)))
 
         return doclist

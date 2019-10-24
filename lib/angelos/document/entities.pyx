@@ -11,7 +11,19 @@ from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class PrivateKeys(Document):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    secret : BinaryField
+        Description of attribute `secret`.
+    seed : BinaryField
+        Description of attribute `seed`.
+    signature : SignatureField
+        Description of attribute `signature`.
+    """
     type = TypeField(value=DocType.KEYS_PRIVATE)
     secret = BinaryField()
     seed = BinaryField()
@@ -44,7 +56,19 @@ class PrivateKeys(Document):
 
 
 class Keys(Document):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    verify : BinaryField
+        Description of attribute `verify`.
+    public : BinaryField
+        Description of attribute `public`.
+    signature : SignatureField
+        Description of attribute `signature`.
+    """
     type = TypeField(value=DocType.KEYS)
     verify = BinaryField()
     public = BinaryField()
@@ -83,7 +107,13 @@ class Entity(Document, UpdatedMixin):
 
 
 class Person(Entity, PersonMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.ENTITY_PERSON)
 
     def _validate(self):
@@ -121,7 +151,13 @@ class Person(Entity, PersonMixin):
 
 
 class Ministry(Entity, MinistryMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.ENTITY_MINISTRY)
 
     def _validate(self):
@@ -159,7 +195,13 @@ class Ministry(Entity, MinistryMixin):
 
 
 class Church(Entity, ChurchMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.ENTITY_CHURCH)
 
     def _validate(self):

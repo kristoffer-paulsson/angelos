@@ -25,7 +25,13 @@ class Statement(Document):
 
 
 class Verified(Statement, OwnerMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.STAT_VERIFIED)
 
     def _validate(self):
@@ -62,7 +68,13 @@ class Verified(Statement, OwnerMixin):
 
 
 class Trusted(Statement, OwnerMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.STAT_TRUSTED)
 
     def _validate(self):
@@ -99,7 +111,15 @@ class Trusted(Statement, OwnerMixin):
 
 
 class Revoked(Statement):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    issuance : UuidField
+        Description of attribute `issuance`.
+    """
     type = TypeField(value=DocType.STAT_REVOKED)
     issuance = UuidField()
 

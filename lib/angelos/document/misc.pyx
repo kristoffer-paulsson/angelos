@@ -14,7 +14,21 @@ from .envelope import Envelope
 
 
 class StoredLetter(Document):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    id : UuidField
+        Description of attribute `id`.
+    type : TypeField
+        Description of attribute `type`.
+    expires : DateField
+        Description of attribute `expires`.
+    envelope : DocumentField
+        Description of attribute `envelope`.
+    message : DocumentField
+        Description of attribute `message`.
+    """
     id = UuidField()
     type = TypeField(value=DocType.CACHED_MSG)
     expires = DateField(

@@ -19,14 +19,36 @@ from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
 class Attachment(BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    name : StringField
+        Description of attribute `name`.
+    mime : StringField
+        Description of attribute `mime`.
+    data : BinaryField
+        Description of attribute `data`.
+    """
     name = StringField()
     mime = StringField()
     data = BinaryField()
 
 
 class Message(Document, OwnerMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    expires : DateField
+        Description of attribute `expires`.
+    reply : UuidField
+        Description of attribute `reply`.
+    body : StringField
+        Description of attribute `body`.
+    posted : DateTimeField
+        Description of attribute `posted`.
+    """
     expires = DateField(required=False)
     reply = UuidField(required=False)
     body = StringField(required=False)
@@ -34,7 +56,13 @@ class Message(Document, OwnerMixin):
 
 
 class Note(Message):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.COM_NOTE)
 
     def _validate(self):
@@ -71,7 +99,17 @@ class Note(Message):
 
 
 class Instant(Message):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    body : BinaryField
+        Description of attribute `body`.
+    mime : StringField
+        Description of attribute `mime`.
+    """
     type = TypeField(value=DocType.COM_INSTANT)
     body = BinaryField()
     mime = StringField()
@@ -110,7 +148,17 @@ class Instant(Message):
 
 
 class Mail(Message):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    subject : StringField
+        Description of attribute `subject`.
+    attachments : DocumentField
+        Description of attribute `attachments`.
+    """
     type = TypeField(value=DocType.COM_MAIL)
     subject = StringField(required=False)
     attachments = DocumentField(required=False, t=Attachment, multiple=True)
@@ -149,7 +197,13 @@ class Mail(Message):
 
 
 class Share(Mail):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.COM_SHARE)
 
     def _validate(self):
@@ -187,7 +241,13 @@ class Share(Mail):
 
 
 class Report(Mail):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    """
     type = TypeField(value=DocType.COM_REPORT)
 
     def _validate(self):

@@ -25,7 +25,19 @@ from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
 class Header(BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    op : StringField
+        Description of attribute `op`.
+    issuer : UuidField
+        Description of attribute `issuer`.
+    timestamp : DateTimeField
+        Description of attribute `timestamp`.
+    signature : SignatureField
+        Description of attribute `signature`.
+    """
     op = StringField()
     issuer = UuidField()
     timestamp = DateTimeField()
@@ -39,7 +51,21 @@ class Header(BaseDocument):
 
 
 class Envelope(Document, OwnerMixin):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    type : TypeField
+        Description of attribute `type`.
+    expires : DateField
+        Description of attribute `expires`.
+    message : BinaryField
+        Description of attribute `message`.
+    header : DocumentField
+        Description of attribute `header`.
+    posted : DateTimeField
+        Description of attribute `posted`.
+    """
     type = TypeField(value=DocType.COM_ENVELOPE)
     expires = DateField(
         init=lambda: (datetime.date.today() + datetime.timedelta(31))

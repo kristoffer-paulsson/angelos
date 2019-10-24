@@ -22,7 +22,15 @@ from .model import (
 
 
 class IssueMixin(metaclass=DocumentMeta):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    signature : SignatureField
+        Description of attribute `signature`.
+    issuer : UuidField
+        Description of attribute `issuer`.
+    """
     signature = SignatureField()
     issuer = UuidField()
 
@@ -39,7 +47,13 @@ class IssueMixin(metaclass=DocumentMeta):
 
 
 class OwnerMixin(metaclass=DocumentMeta):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    owner : UuidField
+        Description of attribute `owner`.
+    """
     owner = UuidField()
 
     def _validate(self):
@@ -55,7 +69,13 @@ class OwnerMixin(metaclass=DocumentMeta):
 
 
 class UpdatedMixin(metaclass=DocumentMeta):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    updated : DateField
+        Description of attribute `updated`.
+    """
     updated = DateField(required=False)
 
     def _validate(self):
@@ -99,7 +119,17 @@ class UpdatedMixin(metaclass=DocumentMeta):
 
 
 class Document(IssueMixin, BaseDocument):
-    """Short summary."""
+    """Short summary.
+
+    Attributes
+    ----------
+    id : UuidField
+        Description of attribute `id`.
+    created : DateField
+        Description of attribute `created`.
+    expires : DateField
+        Description of attribute `expires`.
+    """
     id = UuidField(init=uuid.uuid4)
     created = DateField(init=datetime.date.today)
     expires = DateField(

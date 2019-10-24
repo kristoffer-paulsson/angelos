@@ -12,8 +12,21 @@ from .model import DocumentMeta, ChoiceField, DateField, StringField
 
 
 class PersonMixin(metaclass=DocumentMeta):
-    """Mixin for person specific fields."""
+    """Mixin for person specific fields.
 
+    Attributes
+    ----------
+    sex : ChoiceField
+        Description of attribute `sex`.
+    born : DateField
+        Description of attribute `born`.
+    names : StringField
+        Description of attribute `names`.
+    family_name : StringField
+        Description of attribute `family_name`.
+    given_name : StringField
+        Description of attribute `given_name`.
+    """
     sex = ChoiceField(choices=["man", "woman", "undefined"])
     born = DateField()
     names = StringField(multiple=True)
@@ -39,7 +52,17 @@ class PersonMixin(metaclass=DocumentMeta):
 
 
 class MinistryMixin(metaclass=DocumentMeta):
-    """Mixin for ministry specific fields."""
+    """Mixin for ministry specific fields.
+
+    Attributes
+    ----------
+    vision : StringField
+        Description of attribute `vision`.
+    ministry : StringField
+        Description of attribute `ministry`.
+    founded : DateField
+        Description of attribute `founded`.
+    """
 
     vision = StringField(required=False)
     ministry = StringField()
@@ -58,7 +81,19 @@ class MinistryMixin(metaclass=DocumentMeta):
 
 
 class ChurchMixin(metaclass=DocumentMeta):
-    """Mixin for church specific fields."""
+    """Mixin for church specific fields.
+
+    Attributes
+    ----------
+    founded : DateField
+        Description of attribute `founded`.
+    city : StringField
+        Description of attribute `city`.
+    region : StringField
+        Description of attribute `region`.
+    country : StringField
+        Description of attribute `country`.
+    """
 
     founded = DateField()
     city = StringField()
