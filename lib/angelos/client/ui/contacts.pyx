@@ -7,21 +7,26 @@
 """Module docstring"""
 from kivy.lang import Builder
 from kivy.clock import Clock
+from kivy.properties import StringProperty
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.image import AsyncImage
+from kivymd.uix.dialog import BaseDialog
 from kivymd.uix.label import MDLabel
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.list import (
     MDList, OneLineAvatarIconListItem, ILeftBody, IRightBodyTouch)
+from kivymd.uix.bottomsheet import MDListBottomSheet
+
 
 from typing import List, Any
 from functools import partial
 
-from ...archive.helper import Glue
-from ...policy import (
-    PrintPolicy, PrivatePortfolio)
-from ...operation.mail import MailOperation
 from .common import BasePanelScreen
+
+from ...archive.helper import Glue
+from ...policy import PrintPolicy, PrivatePortfolio, PGroup
+from ...document import Mail
+from ...policy import EnvelopePolicy, MessagePolicy, Portfolio
 
 
 Builder.load_string("""
@@ -111,6 +116,47 @@ class DummyPhoto(ILeftBody, AsyncImage):
 class ContactListItem(OneLineAvatarIconListItem):
     entity_id = None
 
+    def show_menu(self, app):
+        menu = MDListBottomSheet()
+        menu.add_item(
+            "New message",
+            lambda x: self.bs_compose(app),
+            icon="email-outline",
+        )
+        menu.add_item(
+            "Profile",
+            lambda x: None,
+            icon="face-profile",
+        )
+        menu.add_item(
+            "Portfolio",
+            lambda x: None,
+            icon="briefcase-check",
+        )
+        menu.add_item(
+            "Friend",
+            lambda x: None,
+            icon="heart",
+        )
+        menu.add_item(
+            "Favorite",
+            lambda x: None,
+            icon="star",
+        )
+        menu.add_item(
+            "Block",
+            lambda x: None,
+            icon="block-helper",
+        )
+        menu.open()
+
+    def bs_compose(self, app):
+        sender = Glue.run_async(app.ioc.facade.load_portfolio(
+            self.entity_id, PGroup.VERIFIER))
+        writer = WriteMessage()
+        writer.load(app, sender)
+        writer.open()
+
 
 class ContactsScreen(BasePanelScreen):
     def list_favorites(self):
@@ -172,3 +218,84 @@ class ContactsScreen(BasePanelScreen):
         if entities:
             Clock.schedule_once(partial(
                 self.show_contact_item, portfolio, entities, list_widget))
+
+
+Builder.load_string("""
+<WriteMessage>:
+    background_color: app.theme_cls.primary_color
+    background: ''
+    BoxLayout:
+        orientation: 'vertical'
+        MDToolbar:
+            id: root.id
+            title: root.title
+            md_bg_color: app.theme_cls.primary_color
+            background_palette: 'Primary'
+            background_hue: '500'
+            elevation: 10
+            left_action_items:
+                [['chevron-left', lambda x: root.dismiss()]]
+            right_action_items:
+                [['content-save',  lambda x: root.save()], ['send',  lambda x: root.send()]]
+        ScrollView:
+            do_scroll_x: False
+            BoxLayout:
+                orientation: 'vertical'
+                MDList:
+                    OneLineAvatarListItem:
+                        text: root.recipient
+                        markup: True
+                        AvatarLeftWidget:
+                            source: './data/icon_72x72.png'
+                BoxLayout:
+                    orientation: 'vertical'
+                    valign: 'top'
+                    padding: dp(25), dp(25)
+                    MDTextField:
+                        text: root.subject
+                        id: subject
+                        hint_text: 'Subject'
+                    MDTextField:
+                        id: body
+                        hint_text: 'Message'
+                        multiline: True
+                    Widget:
+""")  # noqa E501
+
+
+class WriteMessage(BaseDialog):
+    id = ''
+    title = 'Compose message'
+    recipient = StringProperty()
+    subject = StringProperty()
+    body = StringProperty()
+
+    def load(self, app, recipient: Portfolio, reply: Mail=None):
+        """Prepare the message composer dialog box."""
+        self._app = app
+        self._recipient = recipient
+        self._builder = MessagePolicy.mail(app.ioc.facade.portfolio, recipient)
+        self._reply = reply
+
+        self.recipient = '[size=14sp][b]' + PrintPolicy.title(recipient) + '[/b][/size]'  # noqa E501
+        if reply:
+            self.subject = 'Reply to: ' + reply.subject if (
+                reply.subject) else str(reply.id)
+
+    def send(self):
+        """Compile and send message from dialog data."""
+        mail = self._app.ioc.facade.mail
+        msg = self._builder.message(
+            self.subject, self.body, self._reply).done()
+        envelope = EnvelopePolicy.wrap(
+            self._app.ioc.facade.portfolio, self._recipient, msg)
+        Glue.run_async(mail.save_outbox(envelope))
+        Glue.run_async(mail.save_sent(msg))
+        self.dismiss()
+
+    def save(self):
+        """Compile and save message as draft from dialog data."""
+        draft = self._builder.message(
+            self.subject, self.body, self._reply).draft()
+        Glue.run_async(self._app.ioc.facade.mail.save_draft(draft))
+        self.dismiss()
