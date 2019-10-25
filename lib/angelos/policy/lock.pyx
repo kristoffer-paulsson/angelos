@@ -28,9 +28,6 @@ class KeyLoader(Policy):
         )
         box = libnacl.secret.SecretBox(key)
 
-        import binascii
-        print(binascii.hexlify(master))
-
         plyer.keystore.set_key(
             "Λόγῳ", "masterkey", base64.b64encode(box.encrypt(master)).decode()
         )
