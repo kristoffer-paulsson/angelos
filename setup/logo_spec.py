@@ -10,45 +10,74 @@ import os
 
 dirname = os.path.abspath(os.curdir)
 
-SPEC = """# -*- mode: python -*-
+SPEC = """# -*- mode: python ; coding: utf-8 -*-
+
+import os
+import sys
+import glob
+from kivy.tools.packaging.pyinstaller_hooks import (
+    get_deps_all, hookspath, runtime_hooks)
+import kivymd
 
 block_cipher = None
-from kivy.tools.packaging.pyinstaller_hooks import get_deps_all, hookspath, runtime_hooks
+path = os.path.abspath(".")
+bin_path = os.path.join(path, 'bin', 'logo')
+lib_path = os.path.join(path, 'lib', 'angelos')
+sys.path.insert(0, lib_path)
+kivymd_path = os.path.dirname(kivymd.__file__)
+sys.path.insert(0, kivymd_path)
 
-a = Analysis(['/bin/logo'],
-             pathex=['{pathex:}'],
-             binaries=None,
+# from kivy_deps.sdl2 import dep_bins as sdl2_dep_bins
+# from kivy_deps.glew import dep_bins as glew_dep_bins
+from kivymd import hooks_path as kivymd_hooks_path
+
+kivydeps = get_deps_all()
+
+def angelos_import():
+    pys = []
+    for file in glob.iglob("lib/angelos/**/*", recursive=True):
+        if file.endswith(".pyx") and not "__" in file:
+            pys.append(file[4:-4].replace("/", "."))
+    return pys
+
+extra_import = [
+    "kivymd.toast", "angelos.ioc", "angelos.utils", "asyncio", "angelos.error",
+    "angelos.worker", "angelos.starter", "asyncssh"]
+
+a = Analysis([bin_path],
+             pathex=[kivymd_path],
+             binaries=kivydeps["binaries"] + [],
+             datas=[],
+             hiddenimports=kivydeps["hiddenimports"] + extra_import,
+             hookspath=hookspath() + [kivymd_hooks_path],
+             runtime_hooks=runtime_hooks() + [],
+             excludes=kivydeps["excludes"] + ["_tkinter", "Tkinter", "enchant", "twisted"],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher,
-             hookspath=hookspath(),
-             runtime_hooks=runtime_hooks(),
-             **get_deps_all())
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
+             noarchive=False)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts,
-          exclude_binaries=True,
-          name='logo',
+          a.binaries,
+          a.zipfiles,
+          a.datas,
+          [],
+          name="logo",
           debug=False,
+          bootloader_ignore_signals=False,
           strip=False,
           upx=True,
+          upx_exclude=[],
+          runtime_tmpdir=None,
           console=False )
-coll = COLLECT(exe, Tree('../kivy/examples/demo/touchtracer/'),
-               Tree('/Library/Frameworks/SDL2_ttf.framework/Versions/A/Frameworks/FreeType.framework'),
-               a.binaries,
-               a.zipfiles,
-               a.datas,
-               strip=False,
-               upx=True,
-               name='logo')
-app = BUNDLE(coll,
-             name='logo.app',
-             icon=None,
-         bundle_identifier=None)
-""".format(
-    pathex=dirname
-)
+app = BUNDLE(exe,
+             name="Logo.app",
+             icon="assets/icons/dove.icns",
+             bundle_identifier=None)
+"""  # noqa E501
 
-with open(os.path.join(dirname, 'logo.spec'), 'w') as f:
+path_spec = os.path.join(dirname, 'logo.spec')
+# os.remove(path_spec)
+with open(path_spec, 'w') as f:
     f.write(SPEC)

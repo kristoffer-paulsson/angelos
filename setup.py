@@ -21,7 +21,6 @@ with open(path.join(base_dir, 'README.md')) as desc:
 with open(path.join(base_dir, 'version.py')) as version:
     exec(version.read())
 
-
 setup(
     name="angelos",
     version=__version__,  # noqa F821
@@ -82,8 +81,10 @@ setup(
 
     scripts=glob('bin/*'),
     ext_modules=cythonize(
-        'lib/angelos/**/*.pyx', build_dir="build",
-        compiler_directives={'embedsignature': True})
+        glob('lib/angelos/**.pyx', recursive=True) + glob(
+            'lib/angelos/**/*.pyx', recursive=True),
+        build_dir="build", compiler_directives={
+            'language_level': 3, 'embedsignature': True})
 )
 
 # cython

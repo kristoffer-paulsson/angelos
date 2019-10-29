@@ -4,3 +4,8 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
+"""
+Replication logic.
+
+Implementation of the replocator logic and protocol.
+"""

@@ -23,7 +23,8 @@ basic:
 	python setup.py develop
 
 logo: basic
-	pyinstaller ./bin/logo $(PYI)
+	python ./setup/logo_spec.py
+	pyinstaller logo.spec ./bin/logo $(PYI) --windowed
 
 angelos: basic
 	pyinstaller ./bin/angelos $(PYI)
