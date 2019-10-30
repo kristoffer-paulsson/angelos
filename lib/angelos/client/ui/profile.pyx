@@ -11,7 +11,7 @@ from kivy.core.clipboard import Clipboard
 from kivymd.uix.dialog import BaseDialog
 from kivymd.uix.snackbar import Snackbar
 
-from ...policy import PGroup
+from ...policy.portfolio import PGroup
 from ...operation.export import ExportImportOperation
 from ...archive.helper import Glue
 from .common import BasePanelScreen

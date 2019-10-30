@@ -5,7 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """
-Policy module.
+Document model.
 
-Policys that will secure the data imported and exported from the facade.
+The document model defines the documents and its fields and fieldtypes avaiable
+within the angelos project. Each document has a special meaning and represents
+something.
 """

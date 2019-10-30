@@ -9,7 +9,7 @@ import uuid
 
 from typing import List
 
-from ..policy import PortfolioPolicy
+from ..policy.portfolio import PortfolioPolicy
 from .archive7 import Entry, Archive7
 from .helper import Glue, Globber
 from .archive import BaseArchive

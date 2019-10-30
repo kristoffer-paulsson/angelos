@@ -6,18 +6,11 @@
 #
 "Module docstring."""
 from .operation import Operation
-from ..policy import (
-    PersonData,
-    MinistryData,
-    ChurchData,
-    PrivatePortfolio,
-    Crypto,
-    PersonPolicy,
-    MinistryPolicy,
-    ChurchPolicy,
-    DomainPolicy,
-    NodePolicy,
-)
+from ..policy._types import PersonData, MinistryData, ChurchData
+from ..policy.portfolio import PrivatePortfolio
+from ..policy.crypto import Crypto
+from ..policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from ..policy.domain import DomainPolicy, NodePolicy
 
 
 class BaseSetupOperation(Operation):

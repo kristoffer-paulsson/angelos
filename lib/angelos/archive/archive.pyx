@@ -10,7 +10,7 @@ import atexit
 from .archive7 import Archive7
 from .helper import AsyncProxy
 
-from ..policy import PrivatePortfolio
+from ..policy.portfolio import PrivatePortfolio
 
 
 class BaseArchive:

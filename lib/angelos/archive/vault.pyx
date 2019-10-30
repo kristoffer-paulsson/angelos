@@ -12,7 +12,7 @@ from typing import Tuple, List
 
 import msgpack
 
-from ..policy import (
+from ..policy.portfolio import (
     Portfolio,
     PrivatePortfolio,
     PField,

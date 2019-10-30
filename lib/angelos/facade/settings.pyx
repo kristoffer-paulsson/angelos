@@ -11,7 +11,7 @@ import csv
 from configparser import ConfigParser, ExtendedInterpolation
 from typing import Set, Tuple
 
-from ..policy import PrivatePortfolio
+from ..policy.portfolio import PrivatePortfolio
 from ..archive.vault import Vault
 
 

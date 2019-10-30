@@ -11,7 +11,9 @@ import datetime
 from typing import Set
 
 from ..utils import Util
-from ..document import Document, Keys, Envelope, Header
+from ..document._types import DocumentT
+from ..document.entities import Keys
+from ..document.envelope import Envelope, Header
 from ..document.document import UpdatedMixin
 from .portfolio import Portfolio, PrivatePortfolio
 
@@ -20,7 +22,7 @@ class Crypto:
     """Conceal/unveil policy."""
 
     @staticmethod
-    def _document_data(document: Document, exclude: list = []) -> bytes:
+    def _document_data(document: DocumentT, exclude: list = []) -> bytes:
         new_dict = {}
         exclude += ["issuer", "signature"]
 
@@ -60,7 +62,7 @@ class Crypto:
         return stream
 
     @staticmethod
-    def _overlap(document: Document, keys: Keys) -> bool:
+    def _overlap(document: DocumentT, keys: Keys) -> bool:
         """
         Calculate key lifetime accuracy to document.
 
@@ -156,11 +158,11 @@ class Crypto:
 
     @staticmethod
     def sign(
-        document: Document,
+        document: DocumentT,
         signer: PrivatePortfolio,
         exclude=[],
         multiple=False,
-    ) -> Document:
+    ) -> DocumentT:
         """Main document signing algorithm."""
         keys = Crypto._latestkeys(signer.keys)
 
@@ -202,7 +204,7 @@ class Crypto:
         return document
 
     @staticmethod
-    def verify(document: Document, signer: Portfolio, exclude=[]) -> bool:
+    def verify(document: DocumentT, signer: Portfolio, exclude=[]) -> bool:
         """Main document verifying algorithm."""
 
         for keys in sorted(

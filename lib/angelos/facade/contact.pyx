@@ -7,8 +7,9 @@
 """Facade mail API."""
 from typing import List
 
-from ..policy import PrivatePortfolio
-from ..document import Entity, Person, Ministry, Church
+from ..policy.portfolio import PrivatePortfolio
+from ..document._types import EntityT
+from ..document.entities import Person, Ministry, Church
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 
@@ -23,7 +24,7 @@ class ContactAPI:
         self.__portfolio = portfolio
         self.__vault = vault
 
-    async def load_all(self) -> List[Entity]:
+    async def load_all(self) -> List[EntityT]:
         """Load contacts from portfolios."""
         doclist = await self.__vault.search(
             path=ContactAPI.PORTFOLIOS + "/*/*.ent",

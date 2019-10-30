@@ -13,33 +13,16 @@ from collections.abc import Iterable
 import msgpack
 
 from ._types import PortfolioABC, PrivatePortfolioABC
-from ..document import (
-    DocType,
-    Document,
-    Entity,
-    Profile,
-    PrivateKeys,
-    Keys,
-    Domain,
-    Node,
-    Network,
-    Verified,
-    Trusted,
-    Revoked,
-    Person,
-    Ministry,
-    Church,
-    PersonProfile,
-    MinistryProfile,
-    ChurchProfile,
-    Envelope,
-    Note,
-    Instant,
-    Mail,
-    Share,
-    Report,
-    StoredLetter,
-)
+
+from ..document._types import EntityT, ProfileT, DocumentT
+from ..document.document import DocType
+from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
+from ..document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from ..document.domain import Domain, Node, Network
+from ..document.statements import Verified, Trusted, Revoked
+from ..document.messages import Note, Instant, Mail, Share, Report
+from ..document.envelope import Envelope
+from ..document.misc import StoredLetter
 
 
 class PField:
@@ -295,8 +278,8 @@ class Portfolio(PortfolioABC):
         "owner",
     )
 
-    entity: Entity
-    profile: Profile
+    entity: EntityT
+    profile: ProfileT
     keys: Set[Keys]
     network: Network
     issuer: Statements
@@ -326,7 +309,7 @@ class Portfolio(PortfolioABC):
             PField.OWNER_REVOKED: self.owner.revoked,
         }
 
-    def to_sets(self) -> (Set[Document], Set[Document]):
+    def to_sets(self) -> (Set[DocumentT], Set[DocumentT]):
         """Export documents of portfolio as two sets of docs"""
         issuer = set()
         for attr in ("entity", "profile", "domain", "network", "privkeys"):
@@ -356,7 +339,7 @@ class Portfolio(PortfolioABC):
         return issuer, owner
 
     def from_sets(
-        self, issuer: Set[Document] = set(), owner: Set[Document] = set()
+        self, issuer: Set[DocumentT] = set(), owner: Set[DocumentT] = set()
     ) -> bool:
         """
         Import documents to portfolio from two sets of docs.
@@ -444,14 +427,14 @@ class PortfolioPolicy:
     """Portfolio load configurations."""
 
     @staticmethod
-    def serialize(document: Document) -> bytes:
+    def serialize(document: DocumentT) -> bytes:
         """"Serialize document into streams of bytes."""
         return msgpack.packb(
             document.export_bytes(), use_bin_type=True, strict_types=True
         )
 
     @staticmethod
-    def deserialize(data: bytes) -> Document:
+    def deserialize(data: bytes) -> DocumentT:
         """Restore document from stream of bytes."""
         docobj = msgpack.unpackb(data, raw=False)
         return DOCUMENT_TYPE[
@@ -511,7 +494,7 @@ class PortfolioPolicy:
         raise NotImplementedError()
 
     @staticmethod
-    def doc2fileident(document: Document) -> str:
+    def doc2fileident(document: DocumentT) -> str:
         """Translate document into file identifier."""
         if document.type in (
             DocType.COM_ENVELOPE,
@@ -587,7 +570,7 @@ class PortfolioPolicy:
 class DocSet:
     """Class for sets of documents"""
 
-    def __init__(self, documents: Set[Document]):
+    def __init__(self, documents: Set[DocumentT]):
         """Init docset with a set of docs."""
         self._docs = documents
 
@@ -599,13 +582,13 @@ class DocSet:
         """Unique set of all the issuers."""
         return {doc.issuer for doc in self._docs}
 
-    def get_issuer(self, issuer: uuid.UUID) -> Set[Document]:
+    def get_issuer(self, issuer: uuid.UUID) -> Set[DocumentT]:
         """Get all documents of issuer and subtract from set."""
         get = {doc for doc in self._docs if doc.issuer.int == issuer.int}
         self._docs -= get
         return get
 
-    def get_owner(self, owner: uuid.UUID) -> Set[Document]:
+    def get_owner(self, owner: uuid.UUID) -> Set[DocumentT]:
         """Get all documents of owner and subract from set."""
         get = {doc for doc in self._docs if doc.owner.int == owner.int}
         self._docs -= get

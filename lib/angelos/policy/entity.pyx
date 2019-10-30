@@ -12,7 +12,8 @@ import libnacl.dual
 # from ..utils import Util
 from .policy import Policy
 from .crypto import Crypto
-from ..document import Entity, PrivateKeys, Keys, Person, Ministry, Church
+from ..document._types import EntityT
+from ..document.entities import PrivateKeys, Keys, Person, Ministry, Church
 from .portfolio import PrivatePortfolio
 from ._types import (
     EntityData,
@@ -80,7 +81,7 @@ class BaseEntityPolicy(Policy):
         return True
 
     @staticmethod
-    def _change(entity: Entity, changed: dict, allowed: list) -> bool:
+    def _change(entity: EntityT, changed: dict, allowed: list) -> bool:
         """
         Change information on the identity.
         Don't forget to update the change.

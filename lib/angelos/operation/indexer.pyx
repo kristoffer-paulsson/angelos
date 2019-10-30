@@ -12,7 +12,8 @@ import logging
 from .operation import Operation
 from ..facade.facade import Facade
 from ..worker import Worker
-from ..policy import PortfolioPolicy, PGroup, Crypto
+from ..policy.portfolio import PortfolioPolicy, PGroup
+from ..policy.crypto import Crypto
 
 
 _networks_run = False

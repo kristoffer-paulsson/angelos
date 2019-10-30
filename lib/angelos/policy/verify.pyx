@@ -8,7 +8,8 @@
 from .policy import Policy
 from .crypto import Crypto
 from .portfolio import Portfolio, PrivatePortfolio
-from ..document import Verified, Trusted, Revoked, Statement
+from ..document._types import StatementT
+from ..document.statements import Verified, Trusted, Revoked
 
 
 class StatementPolicy(Policy):
@@ -47,7 +48,7 @@ class StatementPolicy(Policy):
         return trusted
 
     @staticmethod
-    def revoked(issuer: PrivatePortfolio, statement: Statement) -> Revoked:
+    def revoked(issuer: PrivatePortfolio, statement: StatementT) -> Revoked:
         """Revoke earlier statement."""
 
         if isinstance(statement, Revoked):

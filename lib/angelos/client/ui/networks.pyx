@@ -21,7 +21,8 @@ from kivymd.uix.button import MDIconButton
 from ...archive.helper import Glue
 from .common import BasePanelScreen, EmptyList, AppGetter
 
-from ...policy import PrivatePortfolio, PGroup, PrintPolicy
+from ...policy.portfolio import PrivatePortfolio, PGroup
+from ...policy.print import PrintPolicy
 
 
 Builder.load_string("""

@@ -8,7 +8,7 @@
 import base64
 import re
 
-from ..policy import PortfolioPolicy, Portfolio
+from ..policy.portfolio import PortfolioPolicy, Portfolio
 from .operation import Operation
 
 

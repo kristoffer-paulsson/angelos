@@ -9,14 +9,12 @@ import logging
 import uuid
 import asyncio
 
-from ..policy import StatementPolicy, PGroup
-from ..replication import (
-    ReplicatorServerHandler,
-    ReplicatorServer,
-    ReplicatorClientHandler,
-    ReplicatorClient,
-    Preset,
-)
+from ..policy.portfolio import PGroup
+from ..policy.verify import StatementPolicy
+from ..replication.handler import (
+    ReplicatorServerHandler, ReplicatorClientHandler)
+from ..replication.endpoint import ReplicatorServer, ReplicatorClient
+from ..replication.preset import Preset
 from .ssh import SSHServer, SSHClient
 from .nacl import NaClKey
 

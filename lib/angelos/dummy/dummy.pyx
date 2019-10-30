@@ -20,12 +20,8 @@ from .support import (
     generate_data,
 )
 from ..operation.setup import SetupChurchOperation
-from ..policy import (
-    NetworkPolicy,
-    StatementPolicy,
-    MessagePolicy,
-    EnvelopePolicy,
-)
+from ..policy.domain import NetworkPolicy, StatementPolicy
+from ..policy.message import MessagePolicy, EnvelopePolicy
 from ..facade.facade import (
     PersonClientFacade, MinistryClientFacade, ChurchClientFacade,
     PersonServerFacade, MinistryServerFacade, ChurchServerFacade)

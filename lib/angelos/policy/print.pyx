@@ -5,7 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Print formatting strings."""
-from ..document import DocType, Entity
+from ..document._types import EntityT
+from ..document.document import DocType
 from .portfolio import Portfolio
 
 
@@ -30,7 +31,7 @@ class PrintPolicy:
         return PrintPolicy.entity_title(portfolio.entity)
 
     @staticmethod
-    def entity_title(entity: Entity) -> str:
+    def entity_title(entity: EntityT) -> str:
         """Format an entitys title.
 
         Parameters

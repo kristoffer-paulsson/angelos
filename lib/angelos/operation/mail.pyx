@@ -9,13 +9,16 @@ import uuid
 
 from .operation import Operation
 from ..facade.facade import Facade
-from ..policy import PGroup, EnvelopePolicy
-from ..document import Message
+from ..policy.portfolio import PGroup
+from ..policy.message import EnvelopePolicy
+from ..document._types import MessageT
 
 
 class MailOperation(Operation):
     @staticmethod
-    async def open_envelope(facade: Facade, envelope_id: uuid.UUID) -> Message:
+    async def open_envelope(
+        facade: Facade, envelope_id: uuid.UUID
+    ) -> MessageT:
         """Open an envelope and verify its content according to policies."""
         envelope = await facade.mail.load_envelope(envelope_id)
         sender = await facade.load_portfolio(envelope.issuer, PGroup.VERIFIER)

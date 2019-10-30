@@ -12,30 +12,13 @@ import logging
 from typing import Set
 
 from ..utils import Util
-from ..document import (
-    Entity,
-    Person,
-    Ministry,
-    Church,
-    Keys,
-    Statement,
-    Domain,
-    Node,
-    Network,
-    Envelope,
-    Message,
-    Document,
-    PrivateKeys,
-    Revoked,
-    Trusted,
-    Verified,
-    PersonProfile,
-    MinistryProfile,
-    ChurchProfile,
-    Note,
-    Instant,
-    Mail,
-)
+from ..document._types import EntityT, DocumentT, StatementT, MessageT
+from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
+from ..document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from ..document.domain import Domain, Node, Network
+from ..document.statements import Verified, Trusted, Revoked
+from ..document.messages import Note, Instant, Mail
+from ..document.envelope import Envelope
 from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from .crypto import Crypto
 from .portfolio import Portfolio
@@ -48,7 +31,7 @@ class ImportPolicy(Policy):
     def __init__(self, portfolio: Portfolio):
         self._portfolio = portfolio
 
-    def entity(self) -> (Entity, Keys):
+    def entity(self) -> (EntityT, Keys):
         """Validate entity for import, use internal portfolio."""
         valid = True
         entity = self._portfolio.entity
@@ -75,7 +58,7 @@ class ImportPolicy(Policy):
         else:
             return None, None
 
-    def issued_document(self, document: Document) -> Document:
+    def issued_document(self, document: DocumentT) -> DocumentT:
         """Validate document issued by internal portfolio."""
         Util.is_type(
             document,
@@ -116,7 +99,7 @@ class ImportPolicy(Policy):
         else:
             return None
 
-    def _filter_set(self, documents: Set[Document]) -> Set[Document]:
+    def _filter_set(self, documents: Set[DocumentT]) -> Set[DocumentT]:
         removed = set()
         for doc in documents:
             if doc and not self.issued_document(doc):
@@ -125,7 +108,7 @@ class ImportPolicy(Policy):
         documents -= removed
         return removed
 
-    def node_document(self, node: Node) -> Document:
+    def node_document(self, node: Node) -> DocumentT:
         """Validate document issued by internal portfolio."""
         if node is None:
             return node
@@ -152,8 +135,8 @@ class ImportPolicy(Policy):
             return None
 
     def owned_document(
-        self, issuer: Portfolio, document: Statement
-    ) -> Statement:
+        self, issuer: Portfolio, document: StatementT
+    ) -> StatementT:
         """Validate document owned by internal portfolio."""
         Util.is_type(document, (Revoked, Trusted, Verified))
         if document is None:
@@ -208,7 +191,7 @@ class ImportPolicy(Policy):
         else:
             return None
 
-    def message(self, sender: Portfolio, message: Message) -> Message:
+    def message(self, sender: Portfolio, message: MessageT) -> MessageT:
         """Validate a message addressed to the internal portfolio."""
         Util.is_type(message, (Note, Instant, Mail))
         valid = True
@@ -284,7 +267,7 @@ class ImportUpdatePolicy(Policy):
 
         return valid
 
-    def entity(self, entity: Entity):
+    def entity(self, entity: EntityT):
         """Validate updated entity."""
         if isinstance(entity, Person):
             fields = PersonPolicy.FIELDS

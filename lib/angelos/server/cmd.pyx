@@ -32,6 +32,14 @@ class ConsoleIO:
         self._stdout = process.stdout
         self._size = process.get_terminal_size()
 
+    @property
+    def stdin(self):
+        return self._stdin
+
+    @property
+    def stdout(self):
+        return self._stdout
+
     def upd_size(self):
         """Update terminal size at event."""
         self._size = self._process.get_terminal_size()

@@ -13,7 +13,7 @@ import uuid
 
 from ..utils import Util
 from .archive7 import Archive7
-from ..policy import PortfolioPolicy
+from ..policy.portfolio import PortfolioPolicy
 
 
 class Glue:

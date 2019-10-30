@@ -19,30 +19,18 @@ from .settings import SettingsAPI
 from .replication import ReplicationAPI
 from ..const import Const
 
-from ..document import (
-    Document,
-    Person,
-    Ministry,
-    Church,
-    Trusted,
-    Verified,
-    Revoked,
-)
+from ..document._types import DocumentT
+from ..document.entities import Person, Ministry, Church
+from ..document.statements import Trusted, Verified, Revoked
 from ..archive.archive7 import Archive7
 from ..archive.vault import Vault
 from ..archive.mail import Mail
 from ..archive.helper import Glue
-from ..policy import (
-    PrivatePortfolio,
-    Portfolio,
-    ImportUpdatePolicy,
-    ImportPolicy,
-    NetworkPolicy,
-    EntityData,
-    PGroup,
-    DOCUMENT_PATH,
-    DocSet,
-)
+from ..policy.portfolio import (
+    PrivatePortfolio, Portfolio, PGroup, DOCUMENT_PATH, DocSet)
+from ..policy.accept import ImportUpdatePolicy, ImportPolicy
+from ..policy.domain import NetworkPolicy
+from ..policy._types import EntityData
 
 from ..operation.setup import (
     SetupPersonOperation,
@@ -226,7 +214,7 @@ class Facade:
 
     async def update_portfolio(
         self, portfolio: Portfolio
-    ) -> (bool, Set[Document], Set[Document]):
+    ) -> (bool, Set[DocumentT], Set[DocumentT]):
         """Update a portfolio by comparison."""
         old = await self._vault.load_portfolio(portfolio.entity.id, PGroup.ALL)
 
@@ -343,7 +331,7 @@ class Facade:
 
     async def import_portfolio(
         self, portfolio: Portfolio
-    ) -> (bool, Set[Document], Set[Document]):
+    ) -> (bool, Set[DocumentT], Set[DocumentT]):
         """
         Import a portfolio of douments into the vault.
 
@@ -416,8 +404,8 @@ class Facade:
         return result, rejected, removed
 
     async def docs_to_portfolios(
-        self, documents: Set[Document]
-    ) -> Set[Document]:
+        self, documents: Set[DocumentT]
+    ) -> Set[DocumentT]:
         """import loose documents into a portfolio, (Statements)."""
         documents = DocSet(documents)
         rejected = set()

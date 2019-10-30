@@ -36,13 +36,18 @@ kivydeps = get_deps_all()
 def angelos_import():
     pys = []
     for file in glob.iglob("lib/angelos/**/*", recursive=True):
-        if file.endswith(".pyx") and not "__" in file:
+        if file.endswith(".pyx") or file.endswith(".pxd"):
             pys.append(file[4:-4].replace("/", "."))
     return pys
 
-extra_import = [
-    "kivymd.toast", "angelos.ioc", "angelos.utils", "asyncio", "angelos.error",
-    "angelos.worker", "angelos.starter", "asyncssh"]
+extra_import = [  # Internal python packages
+    "asyncio", "dataclasses", "logging.config"
+    ] + [  # Third party packages
+    "kivymd.toast", "asyncssh", "msgpack", "plyer", "libnacl", "libnacl.sign",
+    "libnacl.secret", "kivymd.vendor", "kivymd.vendor.circularTimePicker",
+    "plyer.platforms", "plyer.platforms.macosx",
+    "plyer.platforms.macosx.keystore", "keyring"
+    ] + angelos_import()
 
 a = Analysis([bin_path],
              pathex=[kivymd_path],

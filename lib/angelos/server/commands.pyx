@@ -19,7 +19,7 @@ from ..utils import Util
 from ..error import Error
 from ..const import Const
 from .cmd import Command, Option
-from ..policy import PersonData, MinistryData, ChurchData
+from ..policy._types import PersonData, MinistryData, ChurchData
 from ..facade.facade import (
     Facade,
     PersonServerFacade,

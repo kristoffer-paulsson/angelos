@@ -20,7 +20,7 @@ from .lipsum import (
     CHURCHES,
 )
 
-from ..policy import PersonData, MinistryData, ChurchData
+from ..policy._types import PersonData, MinistryData, ChurchData
 
 
 def filesize(file):

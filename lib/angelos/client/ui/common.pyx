@@ -18,7 +18,7 @@ from kivy.uix.scrollview import ScrollView
 from kivymd.uix.label import MDLabel
 from kivymd.uix.list import MDList, BaseListItem
 
-from ...policy import PrivatePortfolio
+from ...policy.portfolio import PrivatePortfolio
 
 
 Builder.load_string("""

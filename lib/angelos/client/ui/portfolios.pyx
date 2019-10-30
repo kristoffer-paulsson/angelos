@@ -6,8 +6,7 @@
 #
 """Module docstring"""
 import logging
-
-import yaml
+import pprint
 
 from kivy.lang import Builder
 from kivy.properties import StringProperty
@@ -129,7 +128,7 @@ class PortfolioView(BaseDialog):
         issuer, owner = portfolio.to_sets()
         for doc in issuer | owner:
             dw = DocView()
-            dw.text = doc.__class__.__name__ + '\n' + yaml.dump(
+            dw.text = doc.__class__.__name__ + '\n' + pprint.pformat(
                 doc.export_yaml())
             self.ids.docs.add_widget(dw)
 

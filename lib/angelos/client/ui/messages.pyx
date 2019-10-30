@@ -20,11 +20,11 @@ from kivymd.uix.dialog import BaseDialog
 from kivymd.uix.button import MDIconButton
 from kivymd.uix.menu import MDDropdownMenu
 
-from ...document import Mail
+from ...document.messages import Mail
 from ...archive.helper import Glue
-from ...policy import (
-    EnvelopePolicy, MessagePolicy, PGroup, PrintPolicy, PrivatePortfolio,
-    Portfolio)
+from ...policy.message import EnvelopePolicy, MessagePolicy
+from ...policy.portfolio import PGroup, PrivatePortfolio, Portfolio
+from ...policy.print import PrintPolicy
 from ...operation.mail import MailOperation
 from .common import BasePanelScreen
 

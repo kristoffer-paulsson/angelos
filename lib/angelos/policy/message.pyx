@@ -13,30 +13,22 @@ from typing import List
 from .crypto import Crypto
 from .policy import Policy
 from .portfolio import PrivatePortfolio, Portfolio, PortfolioPolicy
-from ..document import (
-    Message,
-    Instant,
-    Note,
-    Mail,
-    Report,
-    Share,
-    Envelope,
-    Header,
-    Attachment,
-)
+from ..document._types import MessageT
+from ..document.messages import Instant, Note, Mail, Report, Share, Attachment
+from ..document.envelope import Envelope, Header
 
 
 REPORT_TEXT = {
     "Unsolicited": "Unwanted messages you do not wish to receive.",
     "Spam": "Unsolicited advertisment.",
-    "Suspicious": "Professional messages that seem to be deceptive or fraudulent.",
-    "Harmful": "Promotion of behaviors or actions which harmful if carried out.",
-    "Defamation": "A message which content is defaming or slanderous towards someone.",
+    "Suspicious": "Professional messages that seem to be deceptive or fraudulent.",  # noqa E501
+    "Harmful": "Promotion of behaviors or actions which harmful if carried out.",  # noqa E501
+    "Defamation": "A message which content is defaming or slanderous towards someone.",  # noqa E501
     "Offensive": "A message which content is detestable or repulsive.",
     "Hateful": "A message that is malicious or insulting and spreads hate.",
     "Sedition": "Sedition to mischief and spread hate or commit crimes.",
     "Harassment": "A message is considered to be harassment or stalking.",
-    "Menace": "A message is intimidating and menacing or contains direct threats.",
+    "Menace": "A message is intimidating and menacing or contains direct threats.",  # noqa E501
     "Blackmail": "A message that intimidates you to conform to demands.",
     "Solicitation": "Solicitation for criminal purposes.",
     "Conspiracy": "Conspiracy to commit a crime.",
@@ -152,7 +144,8 @@ class ShareBuilder(MailBuilder):
 
 class ReportBuilder(MailBuilder):
     def report(
-        self, message: Message, envelope: Envelope, claims: List[str], msg: str
+        self, message: MessageT, envelope: Envelope,
+        claims: List[str], msg: str
     ) -> Report:
         """Create a Share message containing documents to be shared."""
         if len(claims) < 1 or len(claims) > 3:
@@ -274,7 +267,7 @@ class EnvelopePolicy(Policy):
 
     @staticmethod
     def wrap(
-        sender: PrivatePortfolio, recipient: Portfolio, message: Message
+        sender: PrivatePortfolio, recipient: Portfolio, message: MessageT
     ) -> Envelope:
         """Wrap a message in an envelope."""
         Crypto.verify(message, sender)
@@ -311,7 +304,7 @@ class EnvelopePolicy(Policy):
     @staticmethod
     def open(
         recipient: PrivatePortfolio, sender: Portfolio, envelope: Envelope
-    ) -> Message:
+    ) -> MessageT:
         """Open an envelope and unveil the message."""
 
         if not Crypto.verify(envelope, sender, exclude=["header"]):

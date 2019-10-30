@@ -10,8 +10,13 @@ import datetime
 import uuid
 from typing import List, Set
 
-from ..policy import PrivatePortfolio, EnvelopePolicy, DOCUMENT_PATH, Crypto
-from ..document import Envelope, Message, DocType, StoredLetter, Mail
+from ..policy.portfolio import PrivatePortfolio, DOCUMENT_PATH
+from ..policy.message import EnvelopePolicy
+from ..policy.crypto import Crypto
+from ..document.document import DocType
+from ..document.envelope import Envelope
+from ..document.messages import Message, Mail
+from ..document.misc import StoredLetter
 from ..archive.vault import Vault
 from ..archive.helper import Glue
 

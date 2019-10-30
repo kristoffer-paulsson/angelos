@@ -24,9 +24,11 @@ from functools import partial
 from .common import BasePanelScreen
 
 from ...archive.helper import Glue
-from ...policy import PrintPolicy, PrivatePortfolio, PGroup
-from ...document import Mail
-from ...policy import EnvelopePolicy, MessagePolicy, Portfolio
+from ...policy.print import PrintPolicy
+from ...policy.portfolio import PrivatePortfolio, PGroup
+from ...document.messages import Mail
+from ...policy.message import EnvelopePolicy, MessagePolicy
+from ...policy.portfolio import Portfolio
 
 
 Builder.load_string("""

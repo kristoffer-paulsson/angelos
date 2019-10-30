@@ -15,7 +15,7 @@ import pathlib
 from ..const import Const
 from ..facade.mail import MailAPI
 from ..ioc import Container
-from ..policy import Portfolio
+from ..policy.portfolio import Portfolio
 
 
 class FileSyncInfo:

@@ -8,8 +8,9 @@
 import uuid
 
 from .support import generate_filename, generate_data
-from ..policy import MessagePolicy, EnvelopePolicy, PGroup, DOCUMENT_PATTERN
-from ..document import DocType
+from ..policy.message import MessagePolicy, EnvelopePolicy
+from ..policy.portfolio import PGroup, DOCUMENT_PATTERN
+from ..document.document import DocType
 
 from ..const import Const
 from ..server.cmd import Command, Option

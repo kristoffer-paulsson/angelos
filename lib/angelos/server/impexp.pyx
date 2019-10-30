@@ -6,10 +6,12 @@
 #
 """Import and export commands."""
 import uuid
-import yaml
+import pprint
 
 from .cmd import Command, Option
-from ..policy import PGroup, PrintPolicy, StatementPolicy
+from ..policy.portfolio import PGroup
+from ..policy.print import PrintPolicy
+from ..policy.verify import StatementPolicy
 from ..operation.export import ExportImportOperation
 
 
@@ -48,7 +50,7 @@ class PortfolioCommand(Command):
         issuer, owner = portfolio.to_sets()
         for doc in issuer | owner:
             self._io << doc.__class__.__name__ + "\n"
-            self._io << yaml.dump(doc.export_yaml())
+            pprint.pprint(doc.export_yaml(), self._io.stdout)
             self._io << "\n\n"
 
         imp = await self._io.confirm(
@@ -88,7 +90,7 @@ class PortfolioCommand(Command):
         issuer, owner = portfolio.to_sets()
         for doc in issuer | owner:
             self._io << doc.__class__.__name__ + "\n"
-            self._io << yaml.dump(doc.export_yaml())
+            pprint.pprint(doc.export_yaml(), self._io.stdout)
             self._io << "\n\n"
 
         if portfolio.entity.id == self.__facade.portfolio.entity.id:
@@ -295,7 +297,7 @@ class ImportCommand(Command):
         issuer, owner = portfolio.to_sets()
         for doc in issuer | owner:
             self._io << doc.__class__.__name__ + "\n"
-            self._io << yaml.dump(doc.export_yaml())
+            pprint.pprint(doc.export_yaml(), self._io.stdout)
             self._io << "\n\n"
 
         imp = await self._io.confirm(

@@ -14,8 +14,8 @@ import logging
 import asyncssh
 
 from .ioc import Container
-from .document import Keys
-from .policy import PrivatePortfolio, Portfolio
+from .document.entities import Keys
+from .policy.portfolio import PrivatePortfolio, Portfolio
 from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
 from .ssh.ssh import SSHClient, SSHServer
 from .ssh.console import BootServer, AdminServer
