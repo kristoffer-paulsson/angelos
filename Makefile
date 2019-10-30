@@ -6,19 +6,22 @@ default:
 
 
 basic:
+	mkdir -p libangelos
+	mkdir -p libangelos/archive
+	mkdir -p libangelos/client
+	mkdir -p libangelos/client/ui
+	mkdir -p libangelos/data
+	mkdir -p libangelos/document
+	mkdir -p libangelos/dummy
+	mkdir -p libangelos/facade
+	mkdir -p libangelos/operation
+	mkdir -p libangelos/policy
+	mkdir -p libangelos/replication
+	mkdir -p libangelos/server
+	mkdir -p libangelos/ssh
+	mkdir -p logo
+	mkdir -p logo/ui
 	mkdir -p angelos
-	mkdir -p angelos/archive
-	mkdir -p angelos/client
-	mkdir -p angelos/client/ui
-	mkdir -p angelos/data
-	mkdir -p angelos/document
-	mkdir -p angelos/dummy
-	mkdir -p angelos/facade
-	mkdir -p angelos/operation
-	mkdir -p angelos/policy
-	mkdir -p angelos/replication
-	mkdir -p angelos/server
-	mkdir -p angelos/ssh
 	pip install -r requirements.txt
 	python setup.py develop
 
@@ -27,7 +30,8 @@ logo: basic
 	pyinstaller logo.spec ./bin/logo $(PYI) --windowed
 
 angelos: basic
-	pyinstaller ./bin/angelos $(PYI)
+	python ./setup/angelos_spec.py
+	pyinstaller angelos.spec ./bin/angelos $(PYI)
 
 ar7: basic
 	python ./setup/ar7_spec.py

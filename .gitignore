@@ -1,4 +1,5 @@
 /venv/
+/venv*/
 .eggs
 *.spec
 *.pyc
@@ -13,6 +14,8 @@
 **/__pycache__
 /build/
 /dist/
+/libangelos/
+/logo/
 /*.egg-info/
 /.buildozer/
 

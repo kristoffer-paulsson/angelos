@@ -7,7 +7,7 @@ This file is distributed under the terms of the MIT license.
 
 
 Entry point."""
-from angelos.server.main import start
+from angelos.main import start
 
 
 if __name__ == '__main__':

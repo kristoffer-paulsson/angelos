@@ -46,6 +46,10 @@ Download source tree from Github.
 Setup a virtual environment with Python 3.
 > virtualenv -p /usr/bin/python3.7 venv
 
+Linux: */usr/bin/python3.x*
+
+macOS: */Library/Frameworks/Python.framework/Versions/3.x/bin/python3.x*
+
 Install required packages.
 > pip install -r requirements.txt
 

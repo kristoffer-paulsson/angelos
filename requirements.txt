@@ -4,7 +4,7 @@ sphinx
 sphinx_rtd_theme
 kivy
 # kivymd
-# https://github.com/HeaTTheatR/KivyMD.git@master
+# git+https://github.com/HeaTTheatR/KivyMD.git@master
 libnacl
 plyer
 asyncssh

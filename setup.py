@@ -1,12 +1,10 @@
 #!/usr/bin/env python
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-Angelos build script."""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Angelos build script."""
 from glob import glob
 from os import path
 from setuptools import setup
@@ -74,15 +72,19 @@ setup(
     setup_requires=[
         'cython', 'pyinstaller', 'sphinx', 'sphinx_rtd_theme',
         'kivy', 'kivymd', 'libnacl', 'plyer', 'asyncssh',
-        'keyring', 'msgpack', 'broqer'],
+        'keyring', 'msgpack'],
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
-    packages=['angelos', 'eidon'],
+    packages=['libangelos', 'logo', 'eidon'],
 
     scripts=glob('bin/*'),
-    ext_modules=cythonize(
-        glob('lib/angelos/**.pyx', recursive=True) + glob(
-            'lib/angelos/**/*.pyx', recursive=True),
+    ext_modules=cythonize(glob(
+        'lib/libangelos/**.pyx', recursive=True) + glob(
+        'lib/libangelos/**/*.pyx', recursive=True) + glob(
+        'lib/logo/**.pyx', recursive=True) + glob(
+        'lib/logo/**/*.pyx', recursive=True) + glob(
+        'lib/angelos/**.pyx', recursive=True) + glob(
+        'lib/angelos/**/*.pyx', recursive=True),
         build_dir="build", compiler_directives={
             'language_level': 3, 'embedsignature': True})
 )
