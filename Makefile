@@ -4,7 +4,6 @@ AR7_IMPORT = uuid pathlib
 .PHONY: docs
 default:
 
-
 init:
 	mkdir -p libangelos
 	mkdir -p libangelos/archive
@@ -19,18 +18,12 @@ init:
 	mkdir -p libangelos/replication
 	mkdir -p libangelos/server
 	mkdir -p libangelos/ssh
-	mkdir -p logo
-	mkdir -p logo/ui
 	mkdir -p angelos
 	pip install -r requirements.txt
 	python setup.py develop
 
 basic:
 	python setup.py develop
-
-logo: basic
-	python ./setup/logo_spec.py
-	pyinstaller logo.spec ./bin/logo $(PYI) --windowed
 
 angelos: basic
 	python ./setup/angelos_spec.py
