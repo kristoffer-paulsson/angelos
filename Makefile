@@ -36,7 +36,9 @@ ar7: basic
 clean:
 	rm -fr ./dist/
 	rm -fr ./build/
-	rm -fr ./angelos/**/*.so
+	find ./lib -name \*.so -type f -delete
+	find ./lib -name \*.dylib -type f -delete
+	find ./lib -name \*.dll -type f -delete
 	rm -fr ./docs/html/
 	rm -fr ./docs/doctrees/
 

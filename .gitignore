@@ -16,7 +16,7 @@
 /dist/
 /libangelos/
 /logo/
-/*.egg-info/
+*.egg-info/
 /.buildozer/
 
 .DS_Store
