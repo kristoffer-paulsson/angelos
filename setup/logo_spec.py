@@ -45,7 +45,7 @@ extra_import = [  # Internal python packages
     ] + [  # Third party packages
     "kivymd.toast", "asyncssh", "msgpack", "plyer", "libnacl", "libnacl.sign",
     "libnacl.secret", "kivymd.vendor", "kivymd.vendor.circularTimePicker",
-    "plyer.platforms", "plyer.platforms.macosx",
+    "plyer.platforms", "plyer.platforms.macosx", "macos_keychain", "macos_keychain.main"
     "plyer.platforms.macosx.keystore", "keyring"
     ] + angelos_import("lib/libangelos") + angelos_import("lib/logo")
 
@@ -79,7 +79,10 @@ exe = EXE(pyz,
 app = BUNDLE(exe,
              name="Logo.app",
              icon="assets/icons/dove.icns",
-             bundle_identifier=None)
+             bundle_identifier=None,
+             info_plist={
+                'NSHighResolutionCapable': 'True'
+                })
 """  # noqa E501
 
 path_spec = os.path.join(dirname, 'logo.spec')

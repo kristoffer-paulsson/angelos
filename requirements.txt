@@ -11,3 +11,4 @@ asyncssh
 keyring
 msgpack
 pyyaml
+macos-keychain

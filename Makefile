@@ -5,7 +5,7 @@ AR7_IMPORT = uuid pathlib
 default:
 
 
-basic:
+init:
 	mkdir -p libangelos
 	mkdir -p libangelos/archive
 	mkdir -p libangelos/client
@@ -23,6 +23,9 @@ basic:
 	mkdir -p logo/ui
 	mkdir -p angelos
 	pip install -r requirements.txt
+	python setup.py develop
+
+basic:
 	python setup.py develop
 
 logo: basic
@@ -44,6 +47,6 @@ clean:
 	rm -fr ./docs/html/
 	rm -fr ./docs/doctrees/
 
-docs: angelos
+docs: basic
 	sphinx-apidoc -o docs lib/angelos
 	sphinx-build -M html docs docs
