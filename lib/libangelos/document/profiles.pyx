@@ -20,56 +20,28 @@ from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class Address(BaseDocument):
-    """Short summary.
-
-    Attributes
-    ----------
-    co : StringField
-        Description of attribute `co`.
-    organisation : StringField
-        Description of attribute `organisation`.
-    department : StringField
-        Description of attribute `department`.
-    apartment : StringField
-        Description of attribute `apartment`.
-    floor : StringField
-        Description of attribute `floor`.
-    building : StringField
-        Description of attribute `building`.
-    street : StringField
-        Description of attribute `street`.
-    number : StringField
-        Description of attribute `number`.
-    area : StringField
-        Description of attribute `area`.
-    city : StringField
-        Description of attribute `city`.
-    pobox : StringField
-        Description of attribute `pobox`.
-    zip : StringField
-        Description of attribute `zip`.
-    subregion : StringField
-        Description of attribute `subregion`.
-    region : StringField
-        Description of attribute `region`.
-    country : StringField
-        Description of attribute `country`.
-    """
-    co = StringField(required=False)
-    organisation = StringField(required=False)
-    department = StringField(required=False)
-    apartment = StringField(required=False)
-    floor = StringField(required=False)
-    building = StringField(required=False)
-    street = StringField(required=False)
-    number = StringField(required=False)
-    area = StringField(required=False)
+    """Short summary."""
+    care_of = StringField(required=False)
+    house = StringField(required=False)
+    house_number = StringField(required=False)
+    road = StringField(required=False)
+    postcode = StringField(required=False)
+    neighbourhood = StringField(required=False)
+    village = StringField(required=False)
+    town = StringField(required=False)
+    suburb = StringField(required=False)
+    city_district = StringField(required=False)
     city = StringField(required=False)
-    pobox = StringField(required=False)
-    zip = StringField(required=False)
-    subregion = StringField(required=False)
+    county = StringField(required=False)
+    county_code = StringField(required=False)
+    state_district = StringField(required=False)
+    state = StringField(required=False)
+    state_code = StringField(required=False)
     region = StringField(required=False)
+    province = StringField(required=False)
+    island = StringField(required=False)
     country = StringField(required=False)
+    continent = StringField(required=False)
 
 
 class Social(BaseDocument):
@@ -130,7 +102,7 @@ class PersonProfile(Profile, PersonMixin):
         Description of attribute `names`.
     """
     type = TypeField(value=DocType.PROF_PERSON)
-    gender = ChoiceField(required=False, choices=["man", "woman", "undefined"])
+    sex = ChoiceField(required=False, choices=["man", "woman", "undefined"])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 

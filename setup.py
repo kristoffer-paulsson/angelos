@@ -75,7 +75,7 @@ setup(
         'keyring', 'msgpack'],
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
-    packages=['libangelos', 'angelos', 'eidon'],
+    packages=['libangelos', 'angelos', 'eidon', 'dummy'],
     package_dir={'': 'lib'},
     scripts=glob('bin/*'),
     ext_modules=cythonize(glob(
