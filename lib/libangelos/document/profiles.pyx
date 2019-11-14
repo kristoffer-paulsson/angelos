@@ -41,6 +41,7 @@ class Address(BaseDocument):
     province = StringField(required=False)
     island = StringField(required=False)
     country = StringField(required=False)
+    country_code = StringField(required=False)
     continent = StringField(required=False)
 
 
