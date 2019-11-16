@@ -1,22 +1,19 @@
-# cython: language_level=3
-"""
-
-Copyright (c) 2018-2019, Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-
-This file is distributed under the terms of the MIT license.
-
-
-Random dummy data generators."""
+#
+# Copyright (c) 2018-2019 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Random dummy data generators."""
 import os
 import io
 import random
 import string
 import datetime
 
-from lipsum import (
+from .lipsum import (
     SURNAMES, MALE_NAMES, FEMALE_NAMES, LIPSUM_LINES, LIPSUM_WORDS, CHURCHES)
 
-from angelos.policy import PersonData, MinistryData, ChurchData
+from libangelos.policy._types import PersonData, MinistryData, ChurchData
 
 
 def filesize(file):

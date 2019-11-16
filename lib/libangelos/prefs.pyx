@@ -8,9 +8,10 @@
 Preferences classes and functions that are saved in vault.ar7.cnl.
 /settings/preferences.ini
 """
+import collections
 
 
-class Preferences:
+class Preferences(collections.MutableMapping):
     """Loads, saves and serves preferences from the vault.
 
     The preferences that are of special significance is programmed via a
@@ -32,46 +33,63 @@ class Preferences:
     fields : dict
         Dictionary of predefined settings.
     """
-    def __init__(self, facade, fields):
-        self._facade = facade
-        self._parser = None
+    def __init__(self, facade, fields={}):
+        self.__facade = facade
+        self.__parser = None
         self.__fields = fields
 
     async def load(self):
-        self._parser = await self._facade.settings.preferences()
+        self.__parser = await self.__facade.settings.preferences()
+        print(self.__parser)
 
     async def save(self):
-        return await self._facade.settings.save_prefs(self._parser)
+        return await self.__facade.settings.save_prefs(self.__parser)
 
     # @property
     # def network(self):
-    #    return self._parser.get(
+    #    return self.__parser.get(
     #       "Preferences", "CurrentNetwork", fallback=None)
 
     # @network.setter
     # def network(self, value):
-    #    self._parser.set("Preferences", "CurrentNetwork", value)
+    #    self.__parser.set("Preferences", "CurrentNetwork", value)
 
-    def __getattr__(self, name: str) -> str:
-        if name.startswith("free_"):
-            return self._parser.get("Free", name, fallback=None)
-        elif name in self.__fields.keys():
-            return self._parser.get(
-                self.__fields[name][0],
-                self.__fields[name][1],
-                self.__fields[name][2]
+    def __getitem__(self, key: str) -> str:
+        if key in self.__dict__:
+            return self.__dict__[key]
+        elif key.startswith("free_"):
+            return self.__parser.get("Free", key, fallback=None)
+        elif key in self.__fields:
+            return self.__parser.get(
+                self.__fields[key][0],
+                self.__fields[key][1],
+                self.__fields[key][2]
             )
         else:
-            raise AttributeError()
+            raise KeyError()
 
-    def __setattr__(self, name: str, value: str):
-        if name.startswith("free_"):
-            self._parser.set("Free", name, value)
-        elif name in self.__fields.keys():
-            self._parser.set(
-                self.__fields[name][0],
-                self.__fields[name][1],
+    def __setitem__(self, key, value):
+        if key in self.__dict__:
+            self.__dict__[key] = value
+        elif key.startswith("free_"):
+            self.__parser.set("Free", key, value)
+        elif key in self.__fields:
+            self.__parser.set(
+                self.__fields[key][0],
+                self.__fields[key][1],
                 value
             )
         else:
-            raise AttributeError()
+            raise KeyError()
+
+    def __delitem__(self, key):
+        pass
+
+    def __iter__(self):
+        pass
+
+    def __len__(self):
+        pass
+
+    def __repr__(self):
+        return ""
