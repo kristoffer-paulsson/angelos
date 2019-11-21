@@ -18,6 +18,7 @@
 /logo/
 *.egg-info/
 /.buildozer/
+/.idea/
 
 .DS_Store
 MANIFEST
@@ -26,18 +27,6 @@ MANIFEST
 !/include/
 /include/**
 !/include/*.mk
-
-!/serverroot/
-/serverroot/**
-!/serverroot/.gitkeep
-
-!/clientroot/
-/clientroot/**
-!/clientroot/.gitkeep
-
-!/tests/communities/
-/tests/communities/**
-!/tests/communities/.gitkeep
 
 !/docs/doctrees/
 /docs/doctrees/**

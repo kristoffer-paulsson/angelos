@@ -1,6 +1,6 @@
 # Caveats to Heed
 
-If you don't heed those caveats, suit your self!
+If you don't heed those caveats, suit your mcs!
 
 Angelos is a project with many requirements that affects a lot of design decisions. It is a client/server system that is mainly prototyped in Python, it should work at as many platforms as possible in as many formats available.
 

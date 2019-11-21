@@ -148,7 +148,7 @@ class DocumentPersonNotInNames(ModelException):
     pass  # noqa E302
 
 
-class FieldInvalidEmail(ModelException):
+class FieldInvalidRegex(ModelException):
     pass  # noqa E302
 
 
@@ -359,7 +359,7 @@ ERROR_INFO = {
     605: (DocumentInvalidType, "Invalid type set"),  # noqa E501
     606: (DocumentPersonNotInNames, "Given name not in names"),  # noqa E501
     607: (
-        FieldInvalidEmail,
+        FieldInvalidRegex,
         "Given email not a regular email address",
     ),  # noqa E501
     608: (FieldBeyondLimit, "Given data to large"),  # noqa E501
@@ -437,7 +437,7 @@ class Error(IntEnum):
     DOCUMENT_SHORT_EXPIREY = 604
     DOCUMENT_INVALID_TYPE = 605
     DOCUMENT_PERSON_NAMES = 606
-    FIELD_INVALID_EMAIL = 607
+    FIELD_INVALID_REGEX = 607
     FIELD_BEYOND_LIMIT = 608
     FIELD_IS_MULTIPLE = 609
     DOCUMENT_NO_LOCATION = 610

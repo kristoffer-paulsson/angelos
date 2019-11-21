@@ -8,7 +8,7 @@
 Model module.
 
 Contains the document model. A document is made up of a number of fields.
-All fields are selfvalidating. Also all classes based on the BaseDocument can
+All fields are self-validating. Also all classes based on the BaseDocument can
 implement validation.
 """
 import re
@@ -17,14 +17,15 @@ import uuid
 import ipaddress
 import base64
 import logging
+from abc import ABC, ABCMeta
 
-from typing import Any, Union, Callable
+from typing import Any, Union, Callable, Type
 
 from ..utils import Util
 from ..error import Error, ModelException
 
 
-class Field:
+class Field(ABC):
     """Base class for all fields.
 
     Implements basic functionality for fields such as support for init value
@@ -54,19 +55,51 @@ class Field:
         Same as parameter.
 
     """
+    TYPES = ()
 
     def __init__(
-        self,
-        value: Any=None,
-        required: bool=True,
-        multiple: bool=False,
-        init: Callable=None
+            self,
+            value: object = None,
+            required: object = True,
+            multiple: object = False,
+            init: object = None
     ):
         """Initialize basic field functionality."""
         self.value = value
         self.required = required
         self.multiple = multiple
         self.init = init
+
+    def _check_required(self, value: Any, name: str) -> bool:
+        if self.required and not bool(value):
+            raise Util.exception(Error.FIELD_NOT_SET, {"field": name})
+        return True
+
+    def _check_multiple(self, value: Any, name: str) -> bool:
+        if not self.multiple and isinstance(value, list):
+            raise Util.exception(
+                Error.FIELD_NOT_MULTIPLE,
+                {"type": type(self), "value": value, "field": name},
+            )
+        if self.multiple and not isinstance(value, (list, type(None))):
+            raise Util.exception(
+                Error.FIELD_IS_MULTIPLE,
+                {"type": type(self), "value": value, "field": name},
+            )
+        return True
+
+    def _check_types(self, value: Any, name: str) -> bool:
+        for v in value if isinstance(value, list) else [value]:
+            if not type(v) in (self.TYPES + (type(None),)):
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {
+                        "expected": str(self.TYPES),
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
+        return True
 
     def validate(self, value: Any, name: str) -> bool:
         """Validate according to basic field functionality.
@@ -84,23 +117,10 @@ class Field:
             Result of validation.
 
         """
-        if self.required and not bool(value):
-            logging.debug('Field with "required" not set. (%s)' % value)
-            raise Util.exception(Error.FIELD_NOT_SET, {"field": name})
-
-        if not self.multiple and isinstance(value, list):
-            logging.debug('Field not "multiple" but list. (%s)' % value)
-            raise Util.exception(
-                Error.FIELD_NOT_MULTIPLE,
-                {"type": type(self), "value": value, "field": name},
-            )
-        if self.multiple and not isinstance(value, (list, type(None))):
-            logging.debug('Field "multiple" but not list. (%s)' % value)
-            raise Util.exception(
-                Error.FIELD_IS_MULTIPLE,
-                {"type": type(self), "value": value, "field": name},
-            )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Abstract to restore field from bytes.
@@ -164,16 +184,17 @@ class Field:
             Value as YAML formatted string.
 
         """
-        return v
+        raise NotImplementedError()
+        # return v
 
 
 def conv_dont(f: Field, v: Any) -> Any:
-    """None convertion activator.
+    """None conversion activator.
 
     Parameters
     ----------
     f : Field
-        Dummy argument for compatability.
+        Dummy argument for compatibility.
     v : any
         Value not to be converted.
 
@@ -185,14 +206,13 @@ def conv_dont(f: Field, v: Any) -> Any:
     """
     return v
 
-
 def conv_str(f: Field, v: Any) -> str:
-    """Str convertion activator.
+    """Str conversion activator.
 
     Parameters
     ----------
     f : Field
-        Field type for convertion.
+        Field type for conversion.
     v : Any
         Value to be converted.
 
@@ -204,14 +224,13 @@ def conv_str(f: Field, v: Any) -> str:
     """
     return f.str(v) if v else ""
 
-
 def conv_bytes(f: Field, v: Any) -> bytes:
-    """Bytes convertion activator.
+    """Bytes conversion activator.
 
     Parameters
     ----------
     f : Field
-        Field type for convertion.
+        Field type for conversion.
     v : Any
         Value to be converted.
 
@@ -223,14 +242,13 @@ def conv_bytes(f: Field, v: Any) -> bytes:
     """
     return f.bytes(v) if v else b""
 
-
 def conv_yaml(f: Field, v: Any) -> str:
-    """YAML convertion activator.
+    """YAML conversion activator.
 
     Parameters
     ----------
     f : Field
-        Field type for convertion.
+        Field type for conversion.
     v : Any
         Value to be converted.
 
@@ -250,7 +268,7 @@ class DocumentMeta(type):
     Implements accumulation of all field into one namespace.
     """
 
-    def __new__(self, name: str, bases: tuple, namespace: dict):
+    def __new__(mcs, name: str, bases: tuple, namespace: dict):
         """Create new class."""
         fields = {}
         for base in bases:
@@ -267,7 +285,7 @@ class DocumentMeta(type):
                 del ns[fname]
 
         ns["_fields"] = fields
-        return super().__new__(self, name, bases, ns)
+        return super().__new__(mcs, name, bases, ns)
 
 
 class BaseDocument(metaclass=DocumentMeta):
@@ -289,7 +307,7 @@ class BaseDocument(metaclass=DocumentMeta):
 
     """
 
-    def __init__(self, nd: dict={}, strict: bool=True):
+    def __init__(self, nd: dict = dict(), strict: bool = True):
         """
         Initialize a document.
 
@@ -480,7 +498,7 @@ class DocumentField(Field):
         Whether the field allows multiple values.
     init : Callable
         Initializing method to be used.
-    t : Any
+    doc_class : Type[BaseDocument]
         Set a type to be accepted in particular.
 
     Attributes
@@ -489,17 +507,35 @@ class DocumentField(Field):
         Document type allowed.
 
     """
+    TYPES = ()
 
     def __init__(
-        self,
-        value: Any=None,
-        required: bool=True,
-        multiple: bool=False,
-        init: Callable=None,
-        t: Any=None
+            self,
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None,
+            doc_class: Type[BaseDocument] = BaseDocument
     ):
         Field.__init__(self, value, required, multiple, init)
-        self.type = t
+        self.type = doc_class
+
+    def _check_document(self, value: Any, name: str) -> bool:
+        for v in value if isinstance(value, list) else [value]:
+            if isinstance(v, self.type):
+                 v._validate()
+            elif isinstance(v, type(None)):
+                 pass
+            else:
+                raise Util.exception(
+                    Error.FIELD_INVALID_TYPE,
+                    {
+                        "expected": type(self.type),
+                        "current": type(v),
+                        "field": name,
+                    },
+                )
+        return True
 
     def validate(self, value: Any, name: str) -> bool:
         """Validate DocType and inherited validation logic.
@@ -517,26 +553,11 @@ class DocumentField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if isinstance(v, (BaseDocument, self.type)):
-                v._validate()
-            elif not isinstance(v, type(None)):
-                logging.debug("Field is not BaseDocument but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {
-                        "expected": type(BaseDocument),
-                        "current": type(v),
-                        "field": name,
-                    },
-                )
-
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_document(value, name)
+        ])
 
     def from_bytes(self, v: Union[bytes, dict]) -> Any:
         """Restore field from bytes.
@@ -552,11 +573,13 @@ class DocumentField(Field):
             Returns restored field.
 
         """
-        return self.type.build(v) if v else None
+        return self.type.build(v) if isinstance(v, (bytes, dict)) else None
 
 
 class UuidField(Field):
     """UUID field."""
+    TYPES = (uuid.UUID,)
+
     def validate(self, value: Any, name: str) -> bool:
         """Validate data type as UUID and inherited validation logic.
 
@@ -573,23 +596,11 @@ class UuidField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (uuid.UUID, type(None))):
-                logging.debug("Field is not UUID but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {
-                        "expected": "uuid.UUID",
-                        "current": type(v),
-                        "field": name,
-                    },
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -658,6 +669,8 @@ class UuidField(Field):
 
 class IPField(Field):
     """IP address field."""
+    TYPES = (ipaddress.IPv4Address, ipaddress.IPv6Address)
+
     def validate(self, value: Any, name: str) -> bool:
         """Validate data type as IPvXAddress and inherited validation logic.
 
@@ -674,25 +687,11 @@ class IPField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(
-                v, (ipaddress.IPv4Address, ipaddress.IPv6Address, type(None))
-            ):
-                logging.debug("Field is not IPaddress but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {
-                        "expected": "ipaddress.IPv[4|6]Address",
-                        "current": type(v),
-                        "field": name,
-                    },
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -776,6 +775,8 @@ class IPField(Field):
 
 class DateField(Field):
     """Date field."""
+    TYPES = (datetime.date,)
+
     def validate(self, value: Any, name: str) -> bool:
         """Validate field type as Date and inherited validation logic.
 
@@ -792,23 +793,11 @@ class DateField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (datetime.date, type(None))):
-                logging.debug("Field is not datetime.date but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {
-                        "expected": "datetime.date",
-                        "current": type(v),
-                        "field": name,
-                    },
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -858,9 +847,27 @@ class DateField(Field):
         """
         return v.isoformat().encode()
 
+    def yaml(self, v: Any) -> str:
+        """Converting value to string.
+
+        Parameters
+        ----------
+        v : Any
+            Value to be converted.
+
+        Returns
+        -------
+        str
+            Value in string representation.
+
+        """
+        return v.isoformat()
+
 
 class DateTimeField(Field):
     """Date and time field."""
+    TYPES = (datetime.datetime,)
+
     def validate(self, value: Any, name: str) -> bool:
         """Validate field type as DateTime and inherited validation logic.
 
@@ -877,23 +884,11 @@ class DateTimeField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (datetime.datetime, type(None))):
-                logging.debug("Field is not datetime.date but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {
-                        "expected": "datetime.date",
-                        "current": type(v),
-                        "field": name,
-                    },
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -945,57 +940,7 @@ class DateTimeField(Field):
         """
         return v.isoformat().encode()
 
-
-class StringField(Field):
-    """String field."""
-    def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as String and inherited validation logic.
-
-        Parameters
-        ----------
-        value : Any
-            Value to be validated.
-        name : str
-            Name of the field.
-
-        Returns
-        -------
-        bool
-            Result of validation.
-
-        """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            # if not isinstance(v, (str, bytes, type(None))):
-            if not isinstance(v, (str, type(None))):
-                logging.debug('Field is not "str" but %s' % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {"expected": "str", "current": type(v), "field": name},
-                )
-        return True
-
-    def from_bytes(self, v: bytes) -> Any:
-        """Restore field from bytes.
-
-        Parameters
-        ----------
-        v : bytes
-            Value representation in bytes.
-
-        Returns
-        -------
-        Any
-            Returns restored field.
-
-        """
-        return str(v, "utf-8") if v else None
-
-    def str(self, v: Any) -> str:
+    def yaml(self, v: Any) -> str:
         """Converting value to string.
 
         Parameters
@@ -1009,27 +954,13 @@ class StringField(Field):
             Value in string representation.
 
         """
-        return v
-
-    def bytes(self, v: Any) -> bytes:
-        """Abstract for converting value to bytes.
-
-        Parameters
-        ----------
-        v : Any
-            Value to be converted.
-
-        Returns
-        -------
-        bytes
-            Value in bytes representation.
-
-        """
-        return v.encode()
+        return v.isoformat()
 
 
 class TypeField(Field):
     """Document type field"""
+    TYPES = (int,)
+
     def validate(self, value: Any, name: str) -> bool:
         """Validate field type as Int and inherited validation logic.
 
@@ -1046,19 +977,11 @@ class TypeField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (int, type(None))):
-                logging.debug('Field is not "int" but %s' % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {"expected": "int", "current": type(v), "field": name},
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -1122,7 +1045,7 @@ class TypeField(Field):
             Value as YAML formatted string.
 
         """
-        return int(v)
+        return str(v)
 
 
 class BinaryField(Field):
@@ -1146,16 +1069,27 @@ class BinaryField(Field):
     limit
 
     """
+    TYPES = (bytes,)
+
     def __init__(
-        self,
-        value: Any=None,
-        required: bool=True,
-        multiple: bool=False,
-        init: Callable=None,
-        limit: int=1024
+            self,
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None,
+            limit: int = 1024
     ):
         Field.__init__(self, value, required, multiple, init)
         self.limit = limit
+
+    def _check_limit(self, value: Any, name: str) -> bool:
+        for v in value if isinstance(value, list) else [value]:
+            if not isinstance(v, type(None)) and len(v) > self.limit:
+                raise Util.exception(
+                    Error.FIELD_BEYOND_LIMIT,
+                    {"limit": self.limit, "size": len(v), "field": name},
+                )
+        return True
 
     def validate(self, value: Any, name: str) -> bool:
         """Validate field type as Bytes and within limits and inherited
@@ -1174,28 +1108,12 @@ class BinaryField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (bytes, type(None))):
-                logging.debug('Field is not "bytes" but %s' % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {"expected": "bytes", "current": type(v), "field": name},
-                )
-
-            if not isinstance(v, type(None)) and len(v) > self.limit:
-                logging.debug(
-                    "Field beyond limit %s but %s" % (self.limit, len(v))
-                )
-                raise Util.exception(
-                    Error.FIELD_BEYOND_LIMIT,
-                    {"limit": self.limit, "size": len(v), "field": name},
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name),
+            self._check_limit(value, name)
+        ])
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -1286,12 +1204,12 @@ class SignatureField(BinaryField):
 
     """
     def __init__(
-        self,
-        value: Any=None,
-        required: bool=True,
-        multiple: bool=False,
-        init: Callable=None,
-        limit: int=1024
+            self,
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None,
+            limit: int = 1024
     ):
         BinaryField.__init__(self, value, required, multiple, init, limit)
         self.redo = False
@@ -1312,32 +1230,107 @@ class SignatureField(BinaryField):
             Result of validation.
 
         """
-        if not self.redo:
-            BinaryField.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (bytes, type(None))):
-                logging.debug('Field is not "bytes" but %s' % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {"expected": "bytes", "current": type(v), "field": name},
-                )
-
-            if not isinstance(v, type(None)) and len(v) > self.limit:
-                logging.debug(
-                    "Field beyond limit %s but %s" % (self.size, len(v))
-                )
-                raise Util.exception(
-                    Error.FIELD_BEYOND_LIMIT,
-                    {"limit": self.limit, "size": len(v), "field": name},
-                )
-        return True
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name),
+            self._check_limit(value, name)
+        ])
 
 
-class ChoiceField(Field):
+class StringField(Field):
+    """String field."""
+    TYPES = (str,)
+
+    def validate(self, value: Any, name: str) -> bool:
+        """Validate field type as String and inherited validation logic.
+
+        Parameters
+        ----------
+        value : Any
+            Value to be validated.
+        name : str
+            Name of the field.
+
+        Returns
+        -------
+        bool
+            Result of validation.
+
+        """
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name)
+        ])
+
+    def from_bytes(self, v: bytes) -> Any:
+        """Restore field from bytes.
+
+        Parameters
+        ----------
+        v : bytes
+            Value representation in bytes.
+
+        Returns
+        -------
+        Any
+            Returns restored field.
+
+        """
+        # return str(v, "utf-8") if v else None
+        return v.decode() if v else None
+
+    def str(self, v: Any) -> str:
+        """Converting value to string.
+
+        Parameters
+        ----------
+        v : Any
+            Value to be converted.
+
+        Returns
+        -------
+        str
+            Value in string representation.
+
+        """
+        return v
+
+    def bytes(self, v: Any) -> bytes:
+        """Abstract for converting value to bytes.
+
+        Parameters
+        ----------
+        v : Any
+            Value to be converted.
+
+        Returns
+        -------
+        bytes
+            Value in bytes representation.
+
+        """
+        return v.encode()
+
+    def yaml(self, v: Any) -> str:
+        """Converting value to string.
+
+        Parameters
+        ----------
+        v : Any
+            Value to be converted.
+
+        Returns
+        -------
+        str
+            Value in string representation.
+
+        """
+        return v
+
+
+class ChoiceField(StringField):
     """Choice field.
 
     Parameters
@@ -1359,17 +1352,26 @@ class ChoiceField(Field):
 
     """
     def __init__(
-        self,
-        value: Any=None,
-        required: bool=True,
-        multiple: bool=False,
-        init: Callable=None,
-        choices: list=[]
-    ):
+            self,
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None,
+            choices: list = list(),
+    ) -> object:
         Field.__init__(self, value, required, multiple, init)
         if not all(isinstance(n, str) for n in choices):
             raise TypeError()
         self.choices = choices
+
+    def _check_choices(self, value: Any, name: str) -> bool:
+        for v in value if isinstance(value, list) else [value]:
+            if not isinstance(v, type(None)) and v not in self.choices:
+                raise Util.exception(
+                    Error.FIELD_INVALID_CHOICE,
+                    {"expected": self.choices, "current": v},
+                )
+        return True
 
     def validate(self, value: Any, name: str) -> bool:
         """Validate field type as String and inherited validation logic.
@@ -1387,70 +1389,15 @@ class ChoiceField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, type(None)) and v not in self.choices:
-                logging.debug("Field is not valid choice but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_CHOICE,
-                    {"expected": self.choices, "current": v},
-                )
-        return True
-
-    def from_bytes(self, v: bytes) -> Any:
-        """Restore field from bytes.
-
-        Parameters
-        ----------
-        v : bytes
-            Value representation in bytes.
-
-        Returns
-        -------
-        Any
-            Returns restored field.
-
-        """
-        return v.decode() if v else None
-
-    def str(self, v: Any) -> str:
-        """Converting value to string.
-
-        Parameters
-        ----------
-        v : Any
-            Value to be converted.
-
-        Returns
-        -------
-        str
-            Value in string representation.
-
-        """
-        return v
-
-    def bytes(self, v: Any) -> bytes:
-        """Abstract for converting value to bytes.
-
-        Parameters
-        ----------
-        v : Any
-            Value to be converted.
-
-        Returns
-        -------
-        bytes
-            Value in bytes representation.
-
-        """
-        return v.encode()
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name),
+            self._check_choices(value, name)
+        ])
 
 
-class EmailField(Field):
+class RegexField(StringField):
     """Email field.
 
     Parameters
@@ -1466,20 +1413,87 @@ class EmailField(Field):
 
     Attributes
     ----------
-    EMAIL_REGEX : str
+    REGEX : str
         Regular expression for validating email.
 
     """
-    EMAIL_REGEX = (
-        "^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$"
-    )  # noqa E501
+    REGEX = ("^(.*)$",)
 
     def __init__(
-        self,
-        value: Any=None,
-        required: bool=True,
-        multiple: bool=False,
-        init: Callable=None
+            self,
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None
+    ):
+        Field.__init__(self, value, required, multiple, init)
+
+    def _check_regex(self, value: Any, name: str) -> bool:
+        for v in value if isinstance(value, list) else [value]:
+            if not isinstance(v, type(None)) and not bool(
+                    re.match(self.REGEX[0], v)
+            ):
+                raise Util.exception(
+                    Error.FIELD_INVALID_REGEX, {"value": v, "field": name}
+                )
+        return True
+
+    def validate(self, value: Any, name: str) -> bool:
+        """Validate as Email address and inherited validation logic.
+
+        Parameters
+        ----------
+        value : Any
+            Value to be validated.
+        name : str
+            Name of the field.
+
+        Returns
+        -------
+        bool
+            Result of validation.
+
+        """
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name),
+            self._check_regex(value, name)
+        ])
+
+
+class EmailField(RegexField):
+    """Email field.
+
+    Parameters
+    ----------
+    value : Any
+        Preconfigured value.
+    required : bool
+        Whether the field is required or not.
+    multiple : bool
+        Whether the field allows multiple values.
+    init : Callable
+        Initializing method to be used.
+
+    Attributes
+    ----------
+    REGEX : str
+        Regular expression for validating email.
+
+    """
+
+    # Regex from https://emailregex.com
+    REGEX = (
+        r"""^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$""",
+    )
+
+    def __init__(
+            self,
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None
     ):
         Field.__init__(self, value, required, multiple, init)
 
@@ -1499,72 +1513,9 @@ class EmailField(Field):
             Result of validation.
 
         """
-        Field.validate(self, value, name)
-
-        if not isinstance(value, list):
-            value = [value]
-
-        for v in value:
-            if not isinstance(v, (str, type(None))):
-                logging.debug('Field is not "str" but %s' % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_TYPE,
-                    {"expected": "str", "current": type(v), "field": name},
-                )
-
-            if not isinstance(v, type(None)) and not bool(
-                re.match(EmailField.EMAIL_REGEX, v)
-            ):
-                logging.debug("Field is not valid email but %s" % type(v))
-                raise Util.exception(
-                    Error.FIELD_INVALID_EMAIL, {"email": v, "field": name}
-                )
-        return True
-
-    def from_bytes(self, v: bytes) -> Any:
-        """Restore field from bytes.
-
-        Parameters
-        ----------
-        v : bytes
-            Value representation in bytes.
-
-        Returns
-        -------
-        Any
-            Returns restored field.
-
-        """
-        return v.decode() if v else None
-
-    def str(self, v: Any) -> str:
-        """Converting value to string.
-
-        Parameters
-        ----------
-        v : Any
-            Value to be converted.
-
-        Returns
-        -------
-        str
-            Value in string representation.
-
-        """
-        return v
-
-    def bytes(self, v: Any) -> bytes:
-        """Abstract for converting value to bytes.
-
-        Parameters
-        ----------
-        v : Any
-            Value to be converted.
-
-        Returns
-        -------
-        bytes
-            Value in bytes representation.
-
-        """
-        return v.encode()
+        return all([
+            self._check_required(value, name),
+            self._check_multiple(value, name),
+            self._check_types(value, name),
+            self._check_regex(value, name)
+        ])
