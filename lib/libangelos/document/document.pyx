@@ -34,7 +34,7 @@ class IssueMixin(metaclass=DocumentMeta):
     signature = SignatureField()
     issuer = UuidField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -56,7 +56,7 @@ class OwnerMixin(metaclass=DocumentMeta):
     """
     owner = UuidField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -78,8 +78,26 @@ class UpdatedMixin(metaclass=DocumentMeta):
     """
     updated = DateField(required=False)
 
-    def _validate(self):
-        """Short summary.
+    def _check_expiry_period(self):
+        """Checks that the expiry time period.
+
+        The time period between update date and
+        expiry date should not be less than 13 months.
+        """
+        if bool(self.updated) and hasattr(self, "expires"):
+            if (self.expires - self.updated) < datetime.timedelta(
+                13 * 365 / 12 - 1
+            ):
+                raise Util.exception(
+                    Error.DOCUMENT_SHORT_EXPIREY,
+                    {
+                        "expected": datetime.timedelta(13 * 365 / 12),
+                        "current": self.expires - self.updated,
+                    },
+                )
+
+    def apply_rules(self):
+        """Applies all class related rules to document.
 
         Returns
         -------
@@ -87,20 +105,7 @@ class UpdatedMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
-        try:
-            if bool(self.updated):
-                if self.expires - self.updated > datetime.timedelta(
-                    13 * 365 / 12
-                ):
-                    raise Util.exception(
-                        Error.DOCUMENT_SHORT_EXPIREY,
-                        {
-                            "expected": datetime.timedelta(13 * 365 / 12),
-                            "current": self.expires - self.updated,
-                        },
-                    )
-        except AttributeError:
-            pass
+        self._check_expiry_period()
         return True
 
     def renew(self):
@@ -114,8 +119,11 @@ class UpdatedMixin(metaclass=DocumentMeta):
         """
         today = datetime.date.today()
         self.updated = today
-        self.expires = today + datetime.timedelta(13 * 365 / 12)
-        self.signature = None
+        if hasattr(self, "expires"):
+            setattr(self, "expires", today + datetime.timedelta(13 * 365 / 12))
+        if hasattr(self, "signature"):
+            self._fields["signature"].redo = True
+            setattr(self, "signature", None)
 
 
 class Document(IssueMixin, BaseDocument):
@@ -139,7 +147,25 @@ class Document(IssueMixin, BaseDocument):
     )
     type = TypeField(value=0)
 
-    def _validate(self):
+    def _check_expiry_period(self):
+        """Checks that the expiry time period.
+
+        The time period between update date and
+        expiry date should not be less than 13 months.
+        """
+        sdate = (
+            self.updated if getattr(self, "updated", None) else self.created
+        )
+        if (self.expires - sdate) < datetime.timedelta(13 * 365 / 12 - 1):
+            raise Util.exception(
+                Error.DOCUMENT_SHORT_EXPIREY,
+                {
+                    "expected": datetime.timedelta(13 * 365 / 12),
+                    "current": self.expires - sdate,
+                },
+            )
+
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -148,17 +174,6 @@ class Document(IssueMixin, BaseDocument):
             Description of returned object.
 
         """
-        sdate = (
-            self.updated if getattr(self, "updated", None) else self.created
-        )
-        if self.expires - sdate > datetime.timedelta(13 * 365 / 12):
-            raise Util.exception(
-                Error.DOCUMENT_SHORT_EXPIREY,
-                {
-                    "expected": datetime.timedelta(13 * 365 / 12),
-                    "current": self.expires - self.created,
-                },
-            )
         return True
 
     def _check_type(self, _type):
@@ -181,12 +196,12 @@ class Document(IssueMixin, BaseDocument):
                 {"expected": _type, "current": self.type},
             )
 
-    def _check_validate(self, _list):
+    def validate(self):
         """Short summary.
 
         Parameters
         ----------
-        _list : type
+        instance_list : type
             Description of parameter `_list`.
 
         Returns
@@ -195,10 +210,11 @@ class Document(IssueMixin, BaseDocument):
             Description of returned object.
 
         """
-        for cls in _list:
-            cls._validate(self)
+        for cls in self.__class__.mro()[:-1]:
+            cls.apply_rules(self)
+        return True
 
-    def expires_soon(self):
+    def expires_soon(self) -> bool:
         """Short summary.
 
         Returns

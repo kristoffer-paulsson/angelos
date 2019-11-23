@@ -23,7 +23,7 @@ class TestEmailField(TestRegexField):
         "email@example.name",
         "email@example.museum",
         "email@example.co.jp",
-        "firstname-lastname@example.com"
+        "firstname-lastname@example.com",
     ]
     regex_failure = [
         "plainaddress",

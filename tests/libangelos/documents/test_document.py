@@ -10,13 +10,16 @@ class TestDocument(TestCase):
     def tearDown(self):
         del self.instance
 
-    def test__validate(self):
+    def test__check_expiry_period(self):
+        self.fail()
+
+    def test_apply_rules(self):
         self.fail()
 
     def test__check_type(self):
         self.fail()
 
-    def test__check_validate(self):
+    def test_validate(self):
         self.fail()
 
     def test_expires_soon(self):

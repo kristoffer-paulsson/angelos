@@ -12,7 +12,7 @@ from .model import UuidField
 
 class Statement(Document):
     """Short summary."""
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -34,7 +34,7 @@ class Verified(Statement, OwnerMixin):
     """
     type = TypeField(value=DocType.STAT_VERIFIED)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -77,7 +77,7 @@ class Trusted(Statement, OwnerMixin):
     """
     type = TypeField(value=DocType.STAT_TRUSTED)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -123,7 +123,7 @@ class Revoked(Statement):
     type = TypeField(value=DocType.STAT_REVOKED)
     issuance = UuidField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

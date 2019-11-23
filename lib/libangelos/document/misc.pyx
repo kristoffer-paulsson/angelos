@@ -37,7 +37,7 @@ class StoredLetter(Document):
     envelope = DocumentField(t=Envelope)
     message = DocumentField(t=Message)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

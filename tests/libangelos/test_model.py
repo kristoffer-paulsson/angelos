@@ -13,12 +13,15 @@ import documents.test_signatureField as test_signatureField
 import documents.test_stringField as test_stringField
 import documents.test_typeField as test_typeField
 import documents.test_uuidField as test_uuidField
+import documents.test_documentMeta as test_documentMeta
+import documents.test_baseDocument as test_baseDocument
 
 
 def build_suite():
     suite = unittest.TestSuite()
     loader = unittest.TestLoader()
 
+    # Testing of fields
     suite.addTest(loader.loadTestsFromModule(test_field))
     suite.addTest(loader.loadTestsFromModule(test_typeField))
     suite.addTest(loader.loadTestsFromModule(test_uuidField))
@@ -32,6 +35,10 @@ def build_suite():
     suite.addTest(loader.loadTestsFromModule(test_emailField))
     suite.addTest(loader.loadTestsFromModule(test_choiceField))
     suite.addTest(loader.loadTestsFromModule(test_documentField))
+
+    # Testing of Document core parts
+    suite.addTest(loader.loadTestsFromModule(test_documentMeta))
+    suite.addTest(loader.loadTestsFromModule(test_baseDocument))
 
     return suite
 

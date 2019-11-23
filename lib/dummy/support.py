@@ -9,6 +9,8 @@ import io
 import random
 import string
 import datetime
+import uuid
+import ipaddress
 
 from .lipsum import (
     SURNAMES,
@@ -32,7 +34,7 @@ def filesize(file):
 
 class Generate:
     @staticmethod
-    def random_person_entity_data(num=1):
+    def person_data(num=1):
         """Generate random entity data for number of person entities."""
         identities = []
         for i in range(num):
@@ -63,7 +65,7 @@ class Generate:
         return identities
 
     @staticmethod
-    def random_ministry_entity_data(num=1):
+    def ministry_data(num=1):
         """Generate random entity data for number of ministry entities."""
         ministries = []
         for i in range(num):
@@ -82,7 +84,7 @@ class Generate:
         return ministries
 
     @staticmethod
-    def random_church_entity_data(num=1):
+    def church_data(num=1):
         """Generate random entity data for number of church entities."""
         churches = []
         for i in range(num):
@@ -119,3 +121,13 @@ class Generate:
             )
             + postfix
         )
+
+    @staticmethod
+    def uuid():
+        """Random uuid."""
+        return uuid.uuid4()
+
+    @staticmethod
+    def ipv4():
+        """Random uuid."""
+        return ipaddress.IPv4Address(os.urandom(4))

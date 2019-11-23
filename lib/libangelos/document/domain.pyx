@@ -60,7 +60,7 @@ class Domain(Document, UpdatedMixin):
     """
     type = TypeField(value=DocType.NET_DOMAIN)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -111,7 +111,7 @@ class Node(Document, UpdatedMixin):
     serial = StringField()
     location = DocumentField(required=False, t=Location)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -156,7 +156,7 @@ class Network(Document, UpdatedMixin):
     domain = UuidField()
     hosts = DocumentField(t=Host, multiple=True)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

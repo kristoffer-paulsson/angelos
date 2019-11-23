@@ -65,7 +65,7 @@ class Note(Message):
     """
     type = TypeField(value=DocType.COM_NOTE)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -114,7 +114,7 @@ class Instant(Message):
     body = BinaryField()
     mime = StringField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -163,7 +163,7 @@ class Mail(Message):
     subject = StringField(required=False)
     attachments = DocumentField(required=False, t=Attachment, multiple=True)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -206,7 +206,7 @@ class Share(Mail):
     """
     type = TypeField(value=DocType.COM_SHARE)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -250,7 +250,7 @@ class Report(Mail):
     """
     type = TypeField(value=DocType.COM_REPORT)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

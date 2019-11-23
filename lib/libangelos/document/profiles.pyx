@@ -107,7 +107,7 @@ class PersonProfile(Profile, PersonMixin):
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
-    def _validate(self) -> bool:
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -151,7 +151,7 @@ class MinistryProfile(Profile, MinistryMixin):
     """
     type = TypeField(value=DocType.PROF_MINISTRY)
 
-    def _validate(self) -> bool:
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -195,7 +195,7 @@ class ChurchProfile(Profile, ChurchMixin):
     """
     type = TypeField(value=DocType.PROF_CHURCH)
 
-    def _validate(self) -> bool:
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns

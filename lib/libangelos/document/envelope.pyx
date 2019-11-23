@@ -74,7 +74,7 @@ class Envelope(Document, OwnerMixin):
     header = DocumentField(required=False, t=Header, multiple=True)
     posted = DateTimeField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

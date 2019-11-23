@@ -59,10 +59,10 @@ class Field(ABC):
 
     def __init__(
             self,
-            value: object = None,
-            required: object = True,
-            multiple: object = False,
-            init: object = None
+            value: Any = None,
+            required: bool = True,
+            multiple: bool = False,
+            init: Callable = None,
     ):
         """Initialize basic field functionality."""
         self.value = value
@@ -458,7 +458,7 @@ class BaseDocument(metaclass=DocumentMeta):
         """
         return self.export(conv_yaml)
 
-    def _validate(self) -> bool:
+    def apply_rules(self) -> bool:
         """Validate all fields individually in the document.
 
         Returns
@@ -523,7 +523,7 @@ class DocumentField(Field):
     def _check_document(self, value: Any, name: str) -> bool:
         for v in value if isinstance(value, list) else [value]:
             if isinstance(v, self.type):
-                 v._validate()
+                 v.apply_rules()
             elif isinstance(v, type(None)):
                  pass
             else:
@@ -1231,7 +1231,7 @@ class SignatureField(BinaryField):
 
         """
         return all([
-            self._check_required(value, name),
+            True if self.redo else self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name),
             self._check_limit(value, name)

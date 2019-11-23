@@ -33,7 +33,7 @@ class PersonMixin(metaclass=DocumentMeta):
     family_name = StringField()
     given_name = StringField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -68,7 +68,7 @@ class MinistryMixin(metaclass=DocumentMeta):
     ministry = StringField()
     founded = DateField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -100,7 +100,7 @@ class ChurchMixin(metaclass=DocumentMeta):
     region = StringField(required=False)
     country = StringField(required=False)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

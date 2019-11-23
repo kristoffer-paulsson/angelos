@@ -29,7 +29,7 @@ class PrivateKeys(Document):
     seed = BinaryField()
     signature = SignatureField()
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -74,7 +74,7 @@ class Keys(Document):
     public = BinaryField()
     signature = SignatureField(multiple=True)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -102,7 +102,7 @@ class Keys(Document):
 
 class Entity(Document, UpdatedMixin):
     """Short summary."""
-    def _validate(self):
+    def apply_rules(self):
         return True
 
 
@@ -116,7 +116,7 @@ class Person(Entity, PersonMixin):
     """
     type = TypeField(value=DocType.ENTITY_PERSON)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -160,7 +160,7 @@ class Ministry(Entity, MinistryMixin):
     """
     type = TypeField(value=DocType.ENTITY_MINISTRY)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns
@@ -204,7 +204,7 @@ class Church(Entity, ChurchMixin):
     """
     type = TypeField(value=DocType.ENTITY_CHURCH)
 
-    def _validate(self):
+    def apply_rules(self):
         """Short summary.
 
         Returns

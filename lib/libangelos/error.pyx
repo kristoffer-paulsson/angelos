@@ -136,7 +136,7 @@ class FieldInvalidChoice(ModelException):
     pass  # noqa E302
 
 
-class DocumentShortExpiery(ModelException):
+class DocumentShortExpiry(ModelException):
     pass  # noqa E302
 
 
@@ -355,7 +355,7 @@ ERROR_INFO = {
         FieldInvalidChoice,
         "Value not among acceptable choices",
     ),  # noqa E501
-    604: (DocumentShortExpiery, "Expiery date to short"),  # noqa E501
+    604: (DocumentShortExpiry, "Expiery date to short"),  # noqa E501
     605: (DocumentInvalidType, "Invalid type set"),  # noqa E501
     606: (DocumentPersonNotInNames, "Given name not in names"),  # noqa E501
     607: (
