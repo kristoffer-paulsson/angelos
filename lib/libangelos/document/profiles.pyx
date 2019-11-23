@@ -83,9 +83,9 @@ class Profile(Document, UpdatedMixin):
     email = EmailField(required=False)
     mobile = StringField(required=False)
     phone = StringField(required=False)
-    address = DocumentField(required=False, t=Address)
+    address = DocumentField(required=False, doc_class=Address)
     language = StringField(required=False, multiple=True)
-    social = DocumentField(required=False, t=Social, multiple=True)
+    social = DocumentField(required=False, doc_class=Social, multiple=True)
 
 
 class PersonProfile(Profile, PersonMixin):
@@ -119,27 +119,6 @@ class PersonProfile(Profile, PersonMixin):
         self._check_type(DocType.PROF_PERSON)
         return True
 
-    def validate(self) -> bool:
-        """Short summary.
-
-        Returns
-        -------
-        bool
-            Description of returned object.
-
-        """
-        validate = [
-            BaseDocument,
-            Document,
-            IssueMixin,
-            Profile,
-            UpdatedMixin,
-            PersonProfile,
-            PersonMixin,
-        ]
-        self._check_validate(validate)
-        return True
-
 
 class MinistryProfile(Profile, MinistryMixin):
     """Short summary.
@@ -163,27 +142,6 @@ class MinistryProfile(Profile, MinistryMixin):
         self._check_type(DocType.PROF_MINISTRY)
         return True
 
-    def validate(self) -> bool:
-        """Short summary.
-
-        Returns
-        -------
-        bool
-            Description of returned object.
-
-        """
-        validate = [
-            BaseDocument,
-            Document,
-            IssueMixin,
-            Profile,
-            UpdatedMixin,
-            MinistryProfile,
-            MinistryMixin,
-        ]
-        self._check_validate(validate)
-        return True
-
 
 class ChurchProfile(Profile, ChurchMixin):
     """Short summary.
@@ -205,25 +163,4 @@ class ChurchProfile(Profile, ChurchMixin):
 
         """
         self._check_type(DocType.PROF_CHURCH)
-        return True
-
-    def validate(self) -> bool:
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [
-            BaseDocument,
-            Document,
-            IssueMixin,
-            Profile,
-            UpdatedMixin,
-            ChurchProfile,
-            ChurchMixin,
-        ]
-        self._check_validate(validate)
         return True

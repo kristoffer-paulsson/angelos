@@ -72,19 +72,6 @@ class Domain(Document, UpdatedMixin):
         self._check_type(DocType.NET_DOMAIN)
         return True
 
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, Domain, UpdatedMixin]
-        self._check_validate(validate)
-        return True
-
 
 class Node(Document, UpdatedMixin):
     """Short summary.
@@ -109,7 +96,12 @@ class Node(Document, UpdatedMixin):
     role = ChoiceField(choices=["client", "server", "backup"])
     device = StringField()
     serial = StringField()
-    location = DocumentField(required=False, t=Location)
+    location = DocumentField(required=False, doc_class=Location)
+
+    def _check_location(self):
+        if self.location and self.role == "server":
+            if not (self.location.hostname or self.location.ip):
+                raise Util.exception(Error.DOCUMENT_NO_LOCATION)
 
     def apply_rules(self):
         """Short summary.
@@ -121,22 +113,7 @@ class Node(Document, UpdatedMixin):
 
         """
         self._check_type(DocType.NET_NODE)
-        if self.location and self.role == "server":
-            if not self.location.hostname and not self.location.ip:
-                raise Util.exception(Error.DOCUMENT_NO_LOCATION)
-        return True
-
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, Node, UpdatedMixin]
-        self._check_validate(validate)
+        self._check_location()
         return True
 
 
@@ -154,7 +131,7 @@ class Network(Document, UpdatedMixin):
     """
     type = TypeField(value=DocType.NET_NETWORK)
     domain = UuidField()
-    hosts = DocumentField(t=Host, multiple=True)
+    hosts = DocumentField(doc_class=Host, multiple=True)
 
     def apply_rules(self):
         """Short summary.
@@ -172,17 +149,4 @@ class Network(Document, UpdatedMixin):
                 info = True
         if not info:
             raise Util.exception(Error.DOCUMENT_NO_HOST)
-        return True
-
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, Network, UpdatedMixin]
-        self._check_validate(validate)
         return True

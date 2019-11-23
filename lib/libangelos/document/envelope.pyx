@@ -71,7 +71,7 @@ class Envelope(Document, OwnerMixin):
         init=lambda: (datetime.date.today() + datetime.timedelta(31))
     )
     message = BinaryField(limit=131072)
-    header = DocumentField(required=False, t=Header, multiple=True)
+    header = DocumentField(required=False, doc_class=Header, multiple=True)
     posted = DateTimeField()
 
     def apply_rules(self):
@@ -94,17 +94,4 @@ class Envelope(Document, OwnerMixin):
                 },
             )
 
-        return True
-
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, Envelope, OwnerMixin]
-        self._check_validate(validate)
         return True

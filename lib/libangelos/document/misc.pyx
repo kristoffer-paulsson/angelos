@@ -34,8 +34,8 @@ class StoredLetter(Document):
     expires = DateField(
         init=lambda: (datetime.date.today() + datetime.timedelta(3 * 365 / 12))
     )
-    envelope = DocumentField(t=Envelope)
-    message = DocumentField(t=Message)
+    envelope = DocumentField(doc_class=Envelope)
+    message = DocumentField(doc_class=Message)
 
     def apply_rules(self):
         """Short summary.
@@ -50,17 +50,4 @@ class StoredLetter(Document):
 
         if self.id.int != self.message.id.int:
             raise ValueError("StoredLetter ID is not the same as Message ID.")
-        return True
-
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, StoredLetter]
-        self._check_validate(validate)
         return True

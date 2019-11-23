@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from libangelos.document.profiles import MinistryMixin
+from libangelos.document.entity_mixin import MinistryMixin
 
 
 class TestMinistryMixin(TestCase):
@@ -10,5 +10,8 @@ class TestMinistryMixin(TestCase):
     def tearDown(self):
         del self.instance
 
-    def test__validate(self):
-        self.fail()
+    def test_apply_rules(self):
+        try:
+            self.assertTrue(self.instance.apply_rules())
+        except Exception as e:
+            self.fail(e)

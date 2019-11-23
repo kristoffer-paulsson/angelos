@@ -9,6 +9,3 @@ class TestLocation(TestCase):
 
     def tearDown(self):
         del self.instance
-
-    def test_document(self):
-        self.fail()

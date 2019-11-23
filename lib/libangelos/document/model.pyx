@@ -458,8 +458,13 @@ class BaseDocument(metaclass=DocumentMeta):
         """
         return self.export(conv_yaml)
 
+    def _check_fields(self):
+        """Validate all fields individually in the document."""
+        for name in self._fields.keys():
+            self._fields[name].validate(getattr(self, name), name)
+
     def apply_rules(self) -> bool:
-        """Validate all fields individually in the document.
+        """Apply all rules on BaseDocument level.
 
         Returns
         -------
@@ -467,8 +472,7 @@ class BaseDocument(metaclass=DocumentMeta):
             Result of validation.
 
         """
-        for name in self._fields.keys():
-            self._fields[name].validate(getattr(self, name), name)
+        self._check_fields()
         return True
 
     def validate(self) -> bool:

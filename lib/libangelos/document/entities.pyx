@@ -41,19 +41,6 @@ class PrivateKeys(Document):
         self._check_type(DocType.KEYS_PRIVATE)
         return True
 
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, PrivateKeys]
-        self._check_validate(validate)
-        return True
-
 
 class Keys(Document):
     """Short summary.
@@ -86,19 +73,6 @@ class Keys(Document):
         self._check_type(DocType.KEYS)
         return True
 
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [BaseDocument, Document, IssueMixin, Keys]
-        self._check_validate(validate)
-        return True
-
 
 class Entity(Document, UpdatedMixin):
     """Short summary."""
@@ -128,27 +102,6 @@ class Person(Entity, PersonMixin):
         self._check_type(DocType.ENTITY_PERSON)
         return True
 
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [
-            BaseDocument,
-            Document,
-            IssueMixin,
-            Entity,
-            UpdatedMixin,
-            Person,
-            PersonMixin,
-        ]
-        self._check_validate(validate)
-        return True
-
 
 class Ministry(Entity, MinistryMixin):
     """Short summary.
@@ -172,27 +125,6 @@ class Ministry(Entity, MinistryMixin):
         self._check_type(DocType.ENTITY_MINISTRY)
         return True
 
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [
-            BaseDocument,
-            Document,
-            IssueMixin,
-            Entity,
-            UpdatedMixin,
-            Ministry,
-            MinistryMixin,
-        ]
-        self._check_validate(validate)
-        return True
-
 
 class Church(Entity, ChurchMixin):
     """Short summary.
@@ -214,25 +146,4 @@ class Church(Entity, ChurchMixin):
 
         """
         self._check_type(DocType.ENTITY_CHURCH)
-        return True
-
-    def validate(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        validate = [
-            BaseDocument,
-            Document,
-            IssueMixin,
-            Entity,
-            UpdatedMixin,
-            Church,
-            ChurchMixin,
-        ]
-        self._check_validate(validate)
         return True

@@ -81,10 +81,17 @@ class TestBaseDocument(TestCase):
         except Exception as e:
             self.fail(e)
 
+    def test__check_fields(self):
+        try:
+            doc = self._populate_test()
+            doc._check_fields()
+        except Exception as e:
+            self.fail(e)
+
     def test_apply_rules(self):
         try:
             doc = self._populate_test()
-            doc.apply_rules()
+            self.assertTrue(doc.apply_rules())
         except Exception as e:
             self.fail(e)
 

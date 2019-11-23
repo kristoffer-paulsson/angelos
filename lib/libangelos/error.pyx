@@ -148,6 +148,10 @@ class DocumentPersonNotInNames(ModelException):
     pass  # noqa E302
 
 
+class DocumentUpdatedNotLatest(ModelException):
+    pass  # noqa E302
+
+
 class FieldInvalidRegex(ModelException):
     pass  # noqa E302
 
@@ -369,6 +373,8 @@ ERROR_INFO = {
     ),  # noqa E501
     610: (DocumentNoLocation, "Node document has no valid location set"),  # noqa E501
     611: (DocumentNoHost, "Network document has no valid hosts"),  # noqa E501
+    612: (DocumentUpdatedNotLatest, "Document updated earlier than created"),  # noqa E501
+
     700: (
         ConcealUnkownMode,
         "Conceal doesn't support unkown format",
@@ -442,6 +448,7 @@ class Error(IntEnum):
     FIELD_IS_MULTIPLE = 609
     DOCUMENT_NO_LOCATION = 610
     DOCUMENT_NO_HOST = 611
+    DOCUMENT_UPDATED_NOT_LATEST = 612
 
     # 20 error codes for Conceal
     CONCEAL_UNKOWN_MODE = 700

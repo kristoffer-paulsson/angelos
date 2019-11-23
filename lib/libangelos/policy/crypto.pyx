@@ -66,7 +66,7 @@ class Crypto:
         """
         Calculate key lifetime accuracy to document.
 
-        The document created date or updated date should be within the key
+        The document created-date or updated-date should be within the key
         lifetime.
         """
         if document is UpdatedMixin:

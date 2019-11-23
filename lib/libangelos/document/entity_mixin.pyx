@@ -33,6 +33,14 @@ class PersonMixin(metaclass=DocumentMeta):
     family_name = StringField()
     given_name = StringField()
 
+    def _check_names(self):
+        """Check that given name is among names."""
+        if self.given_name not in self.names:
+            raise Util.exception(
+                Error.DOCUMENT_PERSON_NAMES,
+                {"name": self.given_name, "not_in": self.names},
+            )
+
     def apply_rules(self):
         """Short summary.
 
@@ -42,12 +50,7 @@ class PersonMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
-        # Validate that "given_name" is present in "names"
-        if self.given_name not in self.names:
-            raise Util.exception(
-                Error.DOCUMENT_PERSON_NAMES,
-                {"name": self.given_name, "not_in": self.names},
-            )
+        self._check_names()
         return True
 
 

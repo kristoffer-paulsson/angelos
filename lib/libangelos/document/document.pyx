@@ -34,7 +34,7 @@ class IssueMixin(metaclass=DocumentMeta):
     signature = SignatureField()
     issuer = UuidField()
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -56,7 +56,7 @@ class OwnerMixin(metaclass=DocumentMeta):
     """
     owner = UuidField()
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -96,7 +96,16 @@ class UpdatedMixin(metaclass=DocumentMeta):
                     },
                 )
 
-    def apply_rules(self):
+    def _check_updated_latest(self):
+        """Checks that updated is newer than created."""
+        if bool(self.updated) and hasattr(self, "created"):
+            if self.created > self.updated:
+                raise Util.exception(
+                    Error.DOCUMENT_UPDATED_NOT_LATEST,
+                    {"id": getattr(self, "id", None)},
+                )
+
+    def apply_rules(self) -> bool:
         """Applies all class related rules to document.
 
         Returns
@@ -105,6 +114,7 @@ class UpdatedMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
+        self._check_updated_latest()
         self._check_expiry_period()
         return True
 
@@ -153,31 +163,20 @@ class Document(IssueMixin, BaseDocument):
         The time period between update date and
         expiry date should not be less than 13 months.
         """
-        sdate = (
-            self.updated if getattr(self, "updated", None) else self.created
-        )
-        if (self.expires - sdate) < datetime.timedelta(13 * 365 / 12 - 1):
+        touched = self.get_touched()
+        if (self.expires - touched) < datetime.timedelta(13 * 365 / 12 - 1):
             raise Util.exception(
                 Error.DOCUMENT_SHORT_EXPIREY,
                 {
                     "expected": datetime.timedelta(13 * 365 / 12),
-                    "current": self.expires - sdate,
+                    "current": self.expires - touched,
                 },
             )
 
-    def apply_rules(self):
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        return True
-
     def _check_type(self, _type):
-        """Short summary.
+        """Checks that document type is set.
+
+        This check is called from each finalized document!
 
         Parameters
         ----------
@@ -196,7 +195,27 @@ class Document(IssueMixin, BaseDocument):
                 {"expected": _type, "current": self.type},
             )
 
-    def validate(self):
+    def get_touched(self) -> datetime.date:
+        """Latest touch, created or updated date."""
+        return self.updated if getattr(self, "updated", None) else self.created
+
+    def get_owner(self) -> uuid.UUID:
+        """Correct owner of document."""
+        return self.owner if getattr(self, "owner", None) else self.issuer
+
+    def apply_rules(self) -> bool:
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
+        self._check_expiry_period()
+        return True
+
+    def validate(self) -> bool:
         """Short summary.
 
         Parameters
@@ -214,8 +233,12 @@ class Document(IssueMixin, BaseDocument):
             cls.apply_rules(self)
         return True
 
+    def is_expired(self) -> bool:
+        """Is the document expired."""
+        return self.expires < datetime.date.today()
+
     def expires_soon(self) -> bool:
-        """Short summary.
+        """Within a month of expiry.
 
         Returns
         -------
@@ -225,10 +248,7 @@ class Document(IssueMixin, BaseDocument):
         """
         month = self.expires - datetime.timedelta(days=365 / 12)
         today = datetime.date.today()
-        if today >= month and today <= self.expires:
-            return True
-        else:
-            return False
+        return month <= today <= self.expires
 
 
 class DocType(enum.IntEnum):
