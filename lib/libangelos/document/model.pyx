@@ -335,18 +335,14 @@ class BaseDocument(metaclass=DocumentMeta):
 
         Sets a field and validates transparently.
         """
-        if key in self._fields:
-            try:
-                if self._fields[key].validate(value, key):
-                    object.__setattr__(self, key, value)
-                else:
-                    raise AttributeError(
-                        'Invalid value "%s" for field "%s"'.format(value, key)
-                    )
-            except ModelException:
-                pass
-        else:
+        if key not in self._fields:
             raise AttributeError('Unknown field "%s"'.format(key))
+        if not self._fields[key].validate(value, key):
+            raise AttributeError(
+                'Invalid value "%s" for field "%s"'.format(value, key)
+            )
+        object.__setattr__(self, key, value)
+
 
     @classmethod
     def build(cls: DocumentMeta, data: dict) -> DocumentMeta:

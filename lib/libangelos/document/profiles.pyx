@@ -87,6 +87,9 @@ class Profile(Document, UpdatedMixin):
     language = StringField(required=False, multiple=True)
     social = DocumentField(required=False, doc_class=Social, multiple=True)
 
+    def apply_rules(self) -> bool:
+        return True
+
 
 class PersonProfile(Profile, PersonMixin):
     """Short summary.

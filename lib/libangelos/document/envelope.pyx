@@ -74,6 +74,21 @@ class Envelope(Document, OwnerMixin):
     header = DocumentField(required=False, doc_class=Header, multiple=True)
     posted = DateTimeField()
 
+    def _check_expiry_period(self):
+        """Checks the expiry time period.
+
+        The time period between update date and
+        expiry date should not be less than 31 days.
+        """
+        if (self.expires - self.created) < datetime.timedelta(31 - 1):
+            raise Util.exception(
+                Error.DOCUMENT_SHORT_EXPIREY,
+                {
+                    "expected": datetime.timedelta(31),
+                    "current": self.expires - self.created,
+                },
+            )
+
     def apply_rules(self):
         """Short summary.
 
@@ -84,14 +99,5 @@ class Envelope(Document, OwnerMixin):
 
         """
         self._check_type(DocType.COM_ENVELOPE)
-
-        if self.expires - self.created > datetime.timedelta(31):
-            raise Util.exception(
-                Error.DOCUMENT_SHORT_EXPIREY,
-                {
-                    "expected": datetime.timedelta(31),
-                    "current": self.expires - self.created,
-                },
-            )
-
+        self._check_expiry_period()
         return True

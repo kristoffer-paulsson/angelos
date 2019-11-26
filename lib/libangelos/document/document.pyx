@@ -158,7 +158,7 @@ class Document(IssueMixin, BaseDocument):
     type = TypeField(value=0)
 
     def _check_expiry_period(self):
-        """Checks that the expiry time period.
+        """Checks the expiry time period.
 
         The time period between update date and
         expiry date should not be less than 13 months.

@@ -133,6 +133,11 @@ class Network(Document, UpdatedMixin):
     domain = UuidField()
     hosts = DocumentField(doc_class=Host, multiple=True)
 
+    def _check_host(self):
+        for host in self.hosts if self.hosts else []:
+            if not (host.hostname or host.ip):
+                raise Util.exception(Error.DOCUMENT_NO_HOST)
+
     def apply_rules(self):
         """Short summary.
 
@@ -143,10 +148,5 @@ class Network(Document, UpdatedMixin):
 
         """
         self._check_type(DocType.NET_NETWORK)
-        info = False
-        for host in self.hosts if self.hosts else []:
-            if host.hostname or host.ip:
-                info = True
-        if not info:
-            raise Util.exception(Error.DOCUMENT_NO_HOST)
+        self._check_host()
         return True

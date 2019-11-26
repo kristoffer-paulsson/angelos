@@ -32,7 +32,7 @@ class StoredLetter(Document):
     id = UuidField()
     type = TypeField(value=DocType.CACHED_MSG)
     expires = DateField(
-        init=lambda: (datetime.date.today() + datetime.timedelta(3 * 365 / 12))
+        init=lambda: (datetime.date.today() + datetime.timedelta(365 / 12 * 3))
     )
     envelope = DocumentField(doc_class=Envelope)
     message = DocumentField(doc_class=Message)
