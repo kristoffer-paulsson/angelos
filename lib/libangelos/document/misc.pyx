@@ -7,6 +7,9 @@
 """Miscellaneous documents."""
 import datetime
 
+from ..error import Error
+from ..utils import Util
+
 from .model import TypeField, DateField, DocumentField, UuidField, BaseDocument
 from .document import Document, DocType, IssueMixin
 from .messages import Message
@@ -37,6 +40,23 @@ class StoredLetter(Document):
     envelope = DocumentField(doc_class=Envelope)
     message = DocumentField(doc_class=Message)
 
+    def _check_document_id(self):
+        # if not self.message and self.id:
+        #    return
+        slid = getattr(self, "id", None)
+        message = getattr(self, "message", None)
+        mid = getattr(message, "id", None) if message else message
+
+        if slid != mid:
+            raise Util.exception(
+                Error.DOCUMENT_WRONG_ID,
+                {
+                    "expected": self.message.id,
+                    "current": self.id,
+                },
+            )
+            raise ValueError("StoredLetter ID is not the same as Message ID.")
+
     def apply_rules(self):
         """Short summary.
 
@@ -47,7 +67,5 @@ class StoredLetter(Document):
 
         """
         self._check_type(DocType.CACHED_MSG)
-
-        if self.id.int != self.message.id.int:
-            raise ValueError("StoredLetter ID is not the same as Message ID.")
+        self._check_document_id()
         return True

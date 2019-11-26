@@ -152,6 +152,10 @@ class DocumentUpdatedNotLatest(ModelException):
     pass  # noqa E302
 
 
+class DocumentWrongID(ModelException):
+    pass  # noqa E302
+
+
 class FieldInvalidRegex(ModelException):
     pass  # noqa E302
 
@@ -374,6 +378,7 @@ ERROR_INFO = {
     610: (DocumentNoLocation, "Node document has no valid location set"),  # noqa E501
     611: (DocumentNoHost, "Network document has no valid hosts"),  # noqa E501
     612: (DocumentUpdatedNotLatest, "Document updated earlier than created"),  # noqa E501
+    613: (DocumentWrongID, "Document ID is not the same as Containing document."),  # noqa E501
 
     700: (
         ConcealUnkownMode,
@@ -449,6 +454,7 @@ class Error(IntEnum):
     DOCUMENT_NO_LOCATION = 610
     DOCUMENT_NO_HOST = 611
     DOCUMENT_UPDATED_NOT_LATEST = 612
+    DOCUMENT_WRONG_ID = 613
 
     # 20 error codes for Conceal
     CONCEAL_UNKOWN_MODE = 700
