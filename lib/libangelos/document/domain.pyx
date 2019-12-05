@@ -58,7 +58,7 @@ class Domain(Document, UpdatedMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.NET_DOMAIN)
+    type = TypeField(value=int(DocType.NET_DOMAIN))
 
     def apply_rules(self):
         """Short summary.
@@ -69,7 +69,7 @@ class Domain(Document, UpdatedMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.NET_DOMAIN)
+        self._check_doc_type(DocType.NET_DOMAIN)
         return True
 
 
@@ -91,7 +91,7 @@ class Node(Document, UpdatedMixin):
     location : DocumentField
         Description of attribute `location`.
     """
-    type = TypeField(value=DocType.NET_NODE)
+    type = TypeField(value=int(DocType.NET_NODE))
     domain = UuidField()
     role = ChoiceField(choices=["client", "server", "backup"])
     device = StringField()
@@ -112,7 +112,7 @@ class Node(Document, UpdatedMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.NET_NODE)
+        self._check_doc_type(DocType.NET_NODE)
         self._check_location()
         return True
 
@@ -129,7 +129,7 @@ class Network(Document, UpdatedMixin):
     hosts : DocumentField
         Description of attribute `hosts`.
     """
-    type = TypeField(value=DocType.NET_NETWORK)
+    type = TypeField(value=int(DocType.NET_NETWORK))
     domain = UuidField()
     hosts = DocumentField(doc_class=Host, multiple=True)
 
@@ -147,6 +147,6 @@ class Network(Document, UpdatedMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.NET_NETWORK)
+        self._check_doc_type(DocType.NET_NETWORK)
         self._check_host()
         return True

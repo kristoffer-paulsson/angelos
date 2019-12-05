@@ -24,7 +24,7 @@ class PrivateKeys(Document):
     signature : SignatureField
         Description of attribute `signature`.
     """
-    type = TypeField(value=DocType.KEYS_PRIVATE)
+    type = TypeField(value=int(DocType.KEYS_PRIVATE))
     secret = BinaryField()
     seed = BinaryField()
     signature = SignatureField()
@@ -38,7 +38,7 @@ class PrivateKeys(Document):
             Description of returned object.
 
         """
-        self._check_type(DocType.KEYS_PRIVATE)
+        self._check_doc_type(DocType.KEYS_PRIVATE)
         return True
 
 
@@ -56,7 +56,7 @@ class Keys(Document):
     signature : SignatureField
         Description of attribute `signature`.
     """
-    type = TypeField(value=DocType.KEYS)
+    type = TypeField(value=int(DocType.KEYS))
     verify = BinaryField()
     public = BinaryField()
     signature = SignatureField(multiple=True)
@@ -70,7 +70,7 @@ class Keys(Document):
             Description of returned object.
 
         """
-        self._check_type(DocType.KEYS)
+        self._check_doc_type(DocType.KEYS)
         return True
 
 
@@ -88,7 +88,7 @@ class Person(Entity, PersonMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.ENTITY_PERSON)
+    type = TypeField(value=int(DocType.ENTITY_PERSON))
 
     def apply_rules(self):
         """Short summary.
@@ -99,7 +99,7 @@ class Person(Entity, PersonMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.ENTITY_PERSON)
+        self._check_doc_type(DocType.ENTITY_PERSON)
         return True
 
 
@@ -111,7 +111,7 @@ class Ministry(Entity, MinistryMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.ENTITY_MINISTRY)
+    type = TypeField(value=int(DocType.ENTITY_MINISTRY))
 
     def apply_rules(self):
         """Short summary.
@@ -122,7 +122,7 @@ class Ministry(Entity, MinistryMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.ENTITY_MINISTRY)
+        self._check_doc_type(DocType.ENTITY_MINISTRY)
         return True
 
 
@@ -134,7 +134,7 @@ class Church(Entity, ChurchMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.ENTITY_CHURCH)
+    type = TypeField(value=int(DocType.ENTITY_CHURCH))
 
     def apply_rules(self):
         """Short summary.
@@ -145,5 +145,5 @@ class Church(Entity, ChurchMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.ENTITY_CHURCH)
+        self._check_doc_type(DocType.ENTITY_CHURCH)
         return True

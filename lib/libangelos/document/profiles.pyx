@@ -105,7 +105,7 @@ class PersonProfile(Profile, PersonMixin):
     names : StringField
         Description of attribute `names`.
     """
-    type = TypeField(value=DocType.PROF_PERSON)
+    type = TypeField(value=int(DocType.PROF_PERSON))
     sex = ChoiceField(required=False, choices=["man", "woman", "undefined"])
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
@@ -119,7 +119,7 @@ class PersonProfile(Profile, PersonMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.PROF_PERSON)
+        self._check_doc_type(DocType.PROF_PERSON)
         return True
 
 
@@ -131,7 +131,7 @@ class MinistryProfile(Profile, MinistryMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.PROF_MINISTRY)
+    type = TypeField(value=int(DocType.PROF_MINISTRY))
 
     def apply_rules(self) -> bool:
         """Short summary.
@@ -142,7 +142,7 @@ class MinistryProfile(Profile, MinistryMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.PROF_MINISTRY)
+        self._check_doc_type(DocType.PROF_MINISTRY)
         return True
 
 
@@ -154,7 +154,7 @@ class ChurchProfile(Profile, ChurchMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.PROF_CHURCH)
+    type = TypeField(value=int(DocType.PROF_CHURCH))
 
     def apply_rules(self) -> bool:
         """Short summary.
@@ -165,5 +165,5 @@ class ChurchProfile(Profile, ChurchMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.PROF_CHURCH)
+        self._check_doc_type(DocType.PROF_CHURCH)
         return True

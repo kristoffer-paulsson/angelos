@@ -66,7 +66,7 @@ class Envelope(Document, OwnerMixin):
     posted : DateTimeField
         Description of attribute `posted`.
     """
-    type = TypeField(value=DocType.COM_ENVELOPE)
+    type = TypeField(value=int(DocType.COM_ENVELOPE))
     expires = DateField(
         init=lambda: (datetime.date.today() + datetime.timedelta(31))
     )
@@ -98,6 +98,6 @@ class Envelope(Document, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.COM_ENVELOPE)
+        self._check_doc_type(DocType.COM_ENVELOPE)
         self._check_expiry_period()
         return True

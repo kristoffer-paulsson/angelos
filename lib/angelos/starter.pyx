@@ -102,7 +102,7 @@ class ConsoleStarter(Starter):
             "server_factory": lambda: BootServer(ioc),
             "host": host,
             "port": port,
-            "loop": loop,
+            # "loop": loop,
             "server_host_keys": [
                 asyncssh.import_private_key(SERVER_RSA_PRIVATE)
             ],

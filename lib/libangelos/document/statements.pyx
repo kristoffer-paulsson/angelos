@@ -32,7 +32,7 @@ class Verified(Statement, OwnerMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.STAT_VERIFIED)
+    type = TypeField(value=int(DocType.STAT_VERIFIED))
 
     def apply_rules(self):
         """Short summary.
@@ -43,7 +43,7 @@ class Verified(Statement, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.STAT_VERIFIED)
+        self._check_doc_type(DocType.STAT_VERIFIED)
         return True
 
 
@@ -55,7 +55,7 @@ class Trusted(Statement, OwnerMixin):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.STAT_TRUSTED)
+    type = TypeField(value=int(DocType.STAT_TRUSTED))
 
     def apply_rules(self):
         """Short summary.
@@ -66,7 +66,7 @@ class Trusted(Statement, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_type(DocType.STAT_TRUSTED)
+        self._check_doc_type(DocType.STAT_TRUSTED)
         return True
 
 
@@ -80,7 +80,7 @@ class Revoked(Statement):
     issuance : UuidField
         Description of attribute `issuance`.
     """
-    type = TypeField(value=DocType.STAT_REVOKED)
+    type = TypeField(value=int(DocType.STAT_REVOKED))
     issuance = UuidField()
 
     def apply_rules(self):
@@ -92,5 +92,5 @@ class Revoked(Statement):
             Description of returned object.
 
         """
-        self._check_type(DocType.STAT_REVOKED)
+        self._check_doc_type(DocType.STAT_REVOKED)
         return True

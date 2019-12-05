@@ -32,14 +32,14 @@ class Event:
 
     """
     def __init__(
-        self, sender: NotifierMixin, action: int=0, data: dict=None  # noqa F821
+        self, sender: "NotifierMixin", action: int=0, data: dict=None  # noqa F821
     ):
         self.__sender = sender
         self.__action = action
         self.__data = data
 
     @property
-    def sender(self) -> NotifierMixin:  # noqa F821
+    def sender(self) -> "NotifierMixin":  # noqa F821
         """Sender property.
 
         Returns
@@ -86,13 +86,13 @@ class ObserverMixin:
         All notifiers subscribed to.
 
     """
-    __subscriptions: Set[NotifierMixin]  # noqa F821
+    __subscriptions: Set["NotifierMixin"]  # noqa F821
 
     def __init__(self):
         self.__subscriptions = set()
 
     def add_subscription(
-        self, notifier: NotifierMixin, internal: bool=False  # noqa F821
+        self, notifier: "NotifierMixin", internal: bool=False  # noqa F821
     ):
         """Add a subscription to the observer.
 
@@ -109,7 +109,7 @@ class ObserverMixin:
             notifier.subscribe(self, True)
 
     def end_subscription(
-        self, notifier: NotifierMixin, internal: bool=False  # noqa F821
+        self, notifier: "NotifierMixin", internal: bool=False  # noqa F821
     ):
         """End subscription from notifier.
 
@@ -142,7 +142,7 @@ class ObserverMixin:
         """Cancel all subscriptions upon deletion."""
         for observer in self.__subscriptions:
             observer.unsubscribe(self, True)
-        self.__subscribers.clear()
+        self.__subscriptions.clear()
 
 
 class NotifierMixin:
@@ -154,12 +154,12 @@ class NotifierMixin:
         All subscribers that observe.
 
     """
-    __subscribers: Set[ObserverMixin]
+    __subscribers: Set["ObserverMixin"]
 
     def __init__(self):
         self.__subscribers = set()
 
-    def subscribe(self, observer: ObserverMixin, internal: bool=False):
+    def subscribe(self, observer: "ObserverMixin", internal: bool=False):
         """Adds a subscriber to the notifier to be notified.
 
         Parameters
@@ -174,7 +174,7 @@ class NotifierMixin:
         if not internal:
             observer.add_subscription(self, True)
 
-    def unsubscribe(self, observer: ObserverMixin, internal: bool=False):
+    def unsubscribe(self, observer: "ObserverMixin", internal: bool=False):
         """Removes subscriber from the notifier
 
         Parameters
@@ -208,8 +208,9 @@ class NotifierMixin:
 
         """
         event = Event(self, action, data)
-        return asyncio.create_task(asyncio.gather(
-            [obs.notify(event) for obs in self.__subscribers]))
+        # asyncio.get_event_loop().call_soon(asyncio.gather, *[obs.notify(event) for obs in self.__subscribers])
+        return await asyncio.gather(
+           *[obs.notify(event) for obs in self.__subscribers])
 
     def __del__(self):
         """Cancel all subscriptions upon deletion."""

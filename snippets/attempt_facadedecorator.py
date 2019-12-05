@@ -1,89 +1,151 @@
-import inspect
-import pprint
-
-# class facadeonly:
-#    def __init__(self, decorated):
-#        self.__decorated = decorated
-
-#    def __call__(self, *args, **kwargs):
-#        return self.__decorated(*args, **kwargs)
+from libangelos.facade.base import BaseFacade
 
 
-def facadeonly(decorator):
-    stack2 = inspect.stack()
-    owner_obj = stack2[0][0].f_locals['decorator'].__name__
-    print(decorator.__self__)
-    pprint.pprint(dir(owner_obj))
-
-    def inner_func(calling_obj, *args, **kwargs):
-        stack = inspect.stack()
-        caller_obj = stack[1][0].f_locals["self"]
-        print(caller_obj)
-        # caller_obj is the caller of my_method
-        return decorator(calling_obj, *args, **kwargs)
-    return inner_func
-
-
-class internal:
-    def __init__(self, decoratee, owner="internal"):
-        self.__decoratee = decoratee
-        self.__owner = owner
-
-    def __get__(self, instance, owner):
-        self.__instance = instance
-        return self.__call__
-
-    def __call__(self, *args, **kwargs):
-        stack = inspect.stack()
-        caller_instance = stack[1][0].f_locals["self"]
-        owner_instance = getattr(self.__instance, self.__owner, None)
-
-        if caller_instance != owner_instance:
-            raise RuntimeError("Illegal access to internal method %s.%s" % (
-                type(self.__instance).__name__, self.__decoratee.__name__))
-
-        return self.__decoratee(self.__instance, *args, **kwargs)
-
-
-class Facade:
+class Facade(BaseFacade):
     pass
 
 
-class FacadeFrozen:
-    def __init__(self, facade):
-        self.__facade = facade
+class EntityFacadeMixin:
+    """Abstract baseclass for Entities FacadeMixin's."""
 
-    @property
-    def facade(self):
-        """Expose a readonly weakref of the facade.
-
-        Returns
-        -------
-        Facade
-            weak reference to the owning facade.
-
-        """
-        return self.__facade
+    pass
 
 
-class Proxy(FacadeFrozen):
-    @internal
-    def test(self):
-        print("Hello, world")
+class PersonFacadeMixin(EntityFacadeMixin):
+    """Mixin for a Person Facade."""
+
+    def __init__(self):
+        """Initialize facade."""
+        EntityFacadeMixin.__init__(self)
 
 
-class Caller:
-    def __init__(self, proxy):
-        self.__proxy = proxy
+class MinistryFacadeMixin(EntityFacadeMixin):
+    """Mixin for a Ministry Facade."""
 
-    def test(self):
-        self.__proxy.test()
+    def __init__(self):
+        """Initialize facade."""
+        EntityFacadeMixin.__init__(self)
+
+
+class ChurchFacadeMixin(EntityFacadeMixin):
+    """Mixin for a Church Facade."""
+
+    def __init__(self):
+        """Initialize facade."""
+        EntityFacadeMixin.__init__(self)
+
+
+class TypeFacadeMixin:
+    """Abstract baseclass for type FacadeMixin's."""
+
+    ARCHIVES = (VaultArchive,)
+    APIS = ()
+    DATAS = ()
+    TASKS = ()
+
+    def __init__(self):
+        """Initialize facade."""
+        pass
+
+
+class ServerFacadeMixin(TypeFacadeMixin):
+    """Mixin for a Server Facade."""
+
+    ARCHIVES = (MailArchive, PoolArchive, RoutingArchive, FtpArchive) + TypeFacadeMixin.ARCHIVES
+    APIS = () + TypeFacadeMixin.APIS
+    DATAS = () + TypeFacadeMixin.DATAS
+    TASKS = () + TypeFacadeMixin.TASKS
+
+    def __init__(self):
+        """Initialize facade."""
+        TypeFacadeMixin.__init__(self)
+
+
+class ClientFacadeMixin(TypeFacadeMixin):
+    """Mixin for a Church Facade."""
+
+    ARCHIVES = (HomeArchive, ) + TypeFacadeMixin.ARCHIVES
+    APIS = () + TypeFacadeMixin.APIS
+    DATAS = () + TypeFacadeMixin.DATAS
+    TASKS = () + TypeFacadeMixin.TASKS
+
+    def __init__(self):
+        """Initialize facade."""
+        TypeFacadeMixin.__init__(self)
+
+
+class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):
+    """Final facade for Person entity in a client."""
+
+    INFO = (Const.A_TYPE_PERSON_CLIENT,)
+
+    def __init__(self, home_dir: str, secret: bytes):
+        """Initialize the facade and its mixins."""
+        Facade.__init__(self, home_dir, secret, vault)
+        ClientFacadeMixin.__init__(self)
+        PersonFacadeMixin.__init__(self)
+
+
+class PersonServerFacade(Facade, ServerFacadeMixin, PersonFacadeMixin):
+    """Final facade for Person entity as a server."""
+
+    INFO = (Const.A_TYPE_PERSON_SERVER,)
+
+    def __init__(self, home_dir: str, secret: bytes):
+        """Initialize the facade and its mixins."""
+        Facade.__init__(self, home_dir, secret, vault)
+        ServerFacadeMixin.__init__(self)
+        PersonFacadeMixin.__init__(self)
+
+
+class MinistryClientFacade(Facade, ClientFacadeMixin, MinistryFacadeMixin):
+    """Final facade for Ministry entity in a client."""
+
+    INFO = (Const.A_TYPE_MINISTRY_CLIENT,)
+
+    def __init__(self, home_dir: str, secret: bytes):
+        """Initialize the facade and its mixins."""
+        Facade.__init__(self, home_dir, secret, vault)
+        ClientFacadeMixin.__init__(self)
+        MinistryFacadeMixin.__init__(self)
+
+
+class MinistryServerFacade(Facade, ServerFacadeMixin, MinistryFacadeMixin):
+    """Final facade for Ministry entity as a server."""
+
+    INFO = (Const.A_TYPE_MINISTRY_SERVER,)
+
+    def __init__(self, home_dir: str, secret: bytes):
+        """Initialize the facade and its mixins."""
+        Facade.__init__(self, home_dir, secret, vault)
+        ServerFacadeMixin.__init__(self)
+        MinistryFacadeMixin.__init__(self)
+
+
+class ChurchClientFacade(Facade, ClientFacadeMixin, ChurchFacadeMixin):
+    """Final facade for Church entity in a client."""
+
+    INFO = (Const.A_TYPE_CHURCH_CLIENT,)
+
+    def __init__(self, home_dir: str, secret: bytes):
+        """Initialize the facade and its mixins."""
+        Facade.__init__(self, home_dir, secret, vault)
+        ClientFacadeMixin.__init__(self)
+        ChurchFacadeMixin.__init__(self)
+
+
+class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
+    """Final facade for Church entity as a server."""
+
+    INFO = (Const.A_TYPE_CHURCH_SERVER,)
+
+    def __init__(self, home_dir: str, secret: bytes):
+        """Initialize the facade and its mixins."""
+        Facade.__init__(self, home_dir, secret, vault)
+        ServerFacadeMixin.__init__(self)
+        ChurchFacadeMixin.__init__(self)
 
 
 if "__main__" in __name__:
-    facade = Facade()
-    proxy = Proxy(facade)
-    caller = Caller(proxy)
-    print("Caller:", caller)
-    print("Facade:", proxy.facade)
-    caller.test()
+    home_dir
+    facade = Facade.setup()

@@ -28,8 +28,8 @@ import fcntl
 
 import libnacl.secret
 
-from ..utils import Util
-from ..error import Error
+from .utils import Util
+from .error import Error
 
 
 class ConcealIO(io.RawIOBase):

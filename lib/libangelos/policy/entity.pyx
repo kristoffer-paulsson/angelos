@@ -16,7 +16,7 @@ from ..document._types import EntityT
 from ..document.entities import PrivateKeys, Keys, Person, Ministry, Church
 from .portfolio import PrivatePortfolio
 from ._types import (
-    EntityData,
+    EntityDataT,
     PersonData,
     MinistryData,
     ChurchData,
@@ -29,7 +29,7 @@ class BaseEntityPolicy(Policy):
         self._box = None
 
     @staticmethod
-    def _generate(klass, entity_data: EntityData) -> PrivatePortfolio:
+    def _generate(klass, entity_data: EntityDataT) -> PrivatePortfolio:
         box = libnacl.dual.DualSecret()
 
         entity = klass(nd=entity_data._asdict())

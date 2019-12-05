@@ -21,7 +21,7 @@ import pathlib
 
 import libnacl
 
-from .archive7 import Archive7, Entry
+from archive7 import Archive7, Entry
 from ..error import ArchiveInvalidSeek
 
 

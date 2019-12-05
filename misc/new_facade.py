@@ -115,6 +115,12 @@ class ArchiveFacadeExtension(FacadeExtension):
     pass
 
 
+class DataFacadeExtension(FacadeExtension):
+    """Archive extension to isolate the archives."""
+
+    pass
+
+
 class FacadeMapping(FacadeFrozen):
     """Mapping of services offered by the Facade.
 

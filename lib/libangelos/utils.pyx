@@ -14,6 +14,7 @@ import os
 import sys
 import importlib
 import asyncio
+import typing
 from .error import ERROR_INFO
 
 
@@ -88,6 +89,18 @@ class Util:
                     str(types), str(instance)
                 )
             )
+
+    def is_typing(instance, types):
+        """
+        Check instance, even on typing classes.
+
+        Instance    The instanced variable
+        type        The class type of expected type, or tuple of them
+        """
+        if isinstance(types, typing._GenericAlias):
+            return isinstance(instance, types.__args__)
+        else:
+            return isinstance(instance, types)
 
     @staticmethod
     def is_path(instance):

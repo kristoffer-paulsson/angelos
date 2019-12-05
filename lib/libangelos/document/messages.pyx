@@ -63,7 +63,7 @@ class Note(Message):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.COM_NOTE)
+    type = TypeField(value=int(DocType.COM_NOTE))
 
     def apply_rules(self):
         """Short summary.
@@ -74,7 +74,7 @@ class Note(Message):
             Description of returned object.
 
         """
-        self._check_type(DocType.COM_NOTE)
+        self._check_doc_type(DocType.COM_NOTE)
         return True
 
 
@@ -90,7 +90,7 @@ class Instant(Message):
     mime : StringField
         Description of attribute `mime`.
     """
-    type = TypeField(value=DocType.COM_INSTANT)
+    type = TypeField(value=int(DocType.COM_INSTANT))
     body = BinaryField()
     mime = StringField()
 
@@ -103,7 +103,7 @@ class Instant(Message):
             Description of returned object.
 
         """
-        self._check_type(DocType.COM_INSTANT)
+        self._check_doc_type(DocType.COM_INSTANT)
         return True
 
 
@@ -119,7 +119,7 @@ class Mail(Message):
     attachments : DocumentField
         Description of attribute `attachments`.
     """
-    type = TypeField(value=DocType.COM_MAIL)
+    type = TypeField(value=int(DocType.COM_MAIL))
     subject = StringField(required=False)
     attachments = DocumentField(required=False, doc_class=Attachment, multiple=True)
 
@@ -132,7 +132,7 @@ class Mail(Message):
             Description of returned object.
 
         """
-        self._check_type(DocType.COM_MAIL)
+        self._check_doc_type(DocType.COM_MAIL)
         return True
 
 
@@ -144,7 +144,7 @@ class Share(Mail):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.COM_SHARE)
+    type = TypeField(value=int(DocType.COM_SHARE))
 
     def apply_rules(self):
         """Short summary.
@@ -155,7 +155,7 @@ class Share(Mail):
             Description of returned object.
 
         """
-        self._check_type(DocType.COM_SHARE)
+        self._check_doc_type(DocType.COM_SHARE)
         return True
 
 
@@ -167,7 +167,7 @@ class Report(Mail):
     type : TypeField
         Description of attribute `type`.
     """
-    type = TypeField(value=DocType.COM_REPORT)
+    type = TypeField(value=int(DocType.COM_REPORT))
 
     def apply_rules(self):
         """Short summary.
@@ -178,5 +178,5 @@ class Report(Mail):
             Description of returned object.
 
         """
-        self._check_type(DocType.COM_REPORT)
+        self._check_doc_type(DocType.COM_REPORT)
         return True

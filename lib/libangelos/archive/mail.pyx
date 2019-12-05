@@ -9,13 +9,14 @@ import uuid
 
 from typing import List
 
+from ..const import Const
 from ..policy.portfolio import PortfolioPolicy
-from .archive7 import Entry, Archive7
-from .helper import Glue, Globber
-from .archive import BaseArchive
+from archive7 import Entry, Archive7
+from helper import Glue, Globber
+from .storage import StorageFacadeExtension
 
 
-class Mail(BaseArchive):
+class MailStorage(StorageFacadeExtension):
     """
     Mail box interface.
 
@@ -23,13 +24,12 @@ class Mail(BaseArchive):
     server. Clients will push and pull their messages to the server for routing
     within the community.
     """
+    ATTRIBUTE = ("mail",)
+    CONCEAL = (Const.CNL_MAIL,)
+    USEFLAG = (Const.A_USE_MAIL,)
 
     HIERARCHY = (
         "/")
-
-    def __init__(self, filename, secret):
-        """Initialize the Mail."""
-        BaseArchive.__init__(self, filename, secret, Archive7.Delete.ERASE)
 
     async def save(self, filename, document):
         """Save a document at a certian location."""

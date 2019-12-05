@@ -1,29 +1,25 @@
-# cython: language_level=3
-#
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
-#
-"""Module docstring."""
+import os
+import asyncio
+import tracemalloc
 
-from ..api.contact import ContactAPI
-from ..api.mail import MailAPI
-from ..api.settings import SettingsAPI
-from ..api.replication import ReplicationAPI
-from ..archive.ftp import FtpStorage
-from ..archive.home import HomeStorage
-from ..archive.mail import MailStorage
-from ..archive.pool import PoolStorage
-from ..archive.routing import RoutingStorage
-from ..archive.vault import VaultStorage
-from ..const import Const
+from unittest import TestCase
+from tempfile import TemporaryDirectory
 
-from ..document.entities import Person, Ministry, Church
-from ..policy.portfolio import (
-    PrivatePortfolio, PGroup)
+from libangelos.const import Const
+from libangelos.facade.base import BaseFacade
+from libangelos.policy.portfolio import PrivatePortfolio
 
-from ..data.vars import PREFERENCES_INI
-from .base import BaseFacade
+from libangelos.document.entities import Person, Ministry, Church
+from libangelos.archive.ftp import FtpStorage
+from libangelos.archive.home import HomeStorage
+from libangelos.archive.mail import MailStorage
+from libangelos.archive.pool import PoolStorage
+from libangelos.archive.routing import RoutingStorage
+from libangelos.archive.vault import VaultStorage
+
+from libangelos.operation.setup import SetupChurchOperation, SetupPersonOperation, SetupMinistryOperation
+
+from dummy.support import Generate
 
 
 class EntityFacadeMixin:
@@ -168,15 +164,6 @@ class ChurchServerFacade(BaseFacade, ServerFacadeMixin, ChurchFacadeMixin):
 
 
 class Facade:
-    """
-    Facade baseclass.
-
-    The Facade is the gatekeeper of the integrity. The facade guarantees the
-    integrity of the entity and its domain. It is here where all policies are
-    enforced and where security is checked. No document can be imported without
-    being verified.
-    """
-
     MAP = ({
         Const.A_TYPE_PERSON_CLIENT: PersonClientFacade,
         Const.A_TYPE_PERSON_SERVER: PersonServerFacade,
@@ -240,53 +227,47 @@ class Facade:
             raise TypeError("Entity in portfolio of unknown type")
 
 
-class OldFacade(BaseFacade):
+class TestFacade(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        tracemalloc.start()
 
+    def setUp(self) -> None:
+        self.secret = os.urandom(32)
+        self.dir = TemporaryDirectory()
+        self.home = self.dir.name
+        self.server = True
 
-        # await vault.save_settings("preferences.ini", PREFERENCES_INI)
+    def _portfolio(self):
+        return SetupPersonOperation.create(Generate.person_data()[0], server=self.server)
 
-    async def _post_init(self):
-        """Load private portfolio for facade."""
-        server = (
-            True
-            if self._vault.stats.type
-            in (
-                Const.A_TYPE_PERSON_SERVER,
-                Const.A_TYPE_MINISTRY_SERVER,
-                Const.A_TYPE_CHURCH_SERVER,
-            )
-            else False
-        )
+    def _setup(self, portfolio):
+        return asyncio.run(Facade.setup(
+                self.home, self.secret,
+                Const.A_ROLE_PRIMARY, self.server, portfolio=portfolio
+            ))
 
-        self.__portfolio = await self._vault.load_portfolio(
-            self._vault.stats.owner, PGroup.SERVER if server else PGroup.CLIENT
-        )
-        self.__contact = ContactAPI(self.__portfolio, self._vault)
-        self.__mail = MailAPI(self.__portfolio, self._vault)
-        self.__settings = SettingsAPI(self.__portfolio, self._vault)
-        self.__replication = ReplicationAPI(self)
+    def _open(self):
+        return asyncio.run(Facade.open(self.home, self.secret))
 
-    @property
-    def portfolio(self):
-        """Private portfolio getter."""
-        return self.__portfolio
+    def tearDown(self) -> None:
+        self.dir.cleanup()
 
-    @property
-    def contact(self):
-        """Contact interface getter."""
-        return self.__contact
+    def test_setup(self):
+        try:
+            portfolio = self._portfolio()
+            facade = self._setup(portfolio)
+            facade.close()
+        except Exception as e:
+            self.fail(e)
 
-    @property
-    def mail(self):
-        """Mail interface getter."""
-        return self.__mail
+    def test_open(self):
+        try:
+            portfolio = self._portfolio()
+            facade = self._setup(portfolio)
+            facade.close()
 
-    @property
-    def settings(self):
-        """Settings interface getter."""
-        return self.__settings
-
-    @property
-    def replication(self):
-        """Replication interface getter."""
-        return self.__replication
+            facade = self._open()
+            facade.close()
+        except Exception as e:
+            self.fail(e)

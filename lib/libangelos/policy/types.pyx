@@ -75,4 +75,4 @@ class ChurchData(BaseDataClass):
         }
 
 
-EntityData = Union[PersonData, MinistryData, ChurchData]
+EntityDataT = Union[PersonData, MinistryData, ChurchData]

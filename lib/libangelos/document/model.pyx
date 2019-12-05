@@ -17,6 +17,7 @@ import uuid
 import ipaddress
 import base64
 import logging
+import enum
 from abc import ABC, ABCMeta
 
 from typing import Any, Union, Callable, Type

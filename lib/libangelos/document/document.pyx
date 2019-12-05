@@ -173,7 +173,7 @@ class Document(IssueMixin, BaseDocument):
                 },
             )
 
-    def _check_type(self, _type):
+    def _check_doc_type(self, _type):
         """Checks that document type is set.
 
         This check is called from each finalized document!
@@ -251,7 +251,7 @@ class Document(IssueMixin, BaseDocument):
         return month <= today <= self.expires
 
 
-class DocType(enum.IntEnum):
+class DocType:
     """Short summary."""
     NONE = 0
 

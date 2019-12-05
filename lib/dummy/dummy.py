@@ -11,15 +11,10 @@ import os
 from libangelos.const import Const
 from libangelos.facade.facade import Facade
 from libangelos.archive.helper import Glue
-from .support import (
-    random_church_entity_data,
-    random_ministry_entity_data,
-    random_person_entity_data,
-    generate_filename,
-    generate_data,
-)
+from .support import Generate
 from libangelos.operation.setup import SetupChurchOperation
-from libangelos.policy.domain import NetworkPolicy, StatementPolicy
+from libangelos.policy.verify import StatementPolicy
+from libangelos.policy.domain import NetworkPolicy
 from libangelos.policy.message import MessagePolicy, EnvelopePolicy
 from libangelos.facade.facade import (
     PersonClientFacade, MinistryClientFacade, ChurchClientFacade,
@@ -43,7 +38,7 @@ class DummyPolicy:
         facade = Glue.run_async(cls.setup(
             homedir, secret, Const.A_ROLE_PRIMARY, entity_data))
         facade.archive(Const.CNL_VAULT).close()
-        with open(os.path.join(homedir, 'secret.key', 'w')) as key:
+        with open(os.path.join(homedir, 'secret.key'), 'w') as key:
             key.write(binascii.hexlify(secret).decode())
         return secret
 
@@ -67,7 +62,7 @@ class DummyPolicy:
             NaCl symmetric encryption key used.
 
         """
-        entity_data = random_person_entity_data()[0]
+        entity_data = Generate.person_data()[0]
         return self.__create_generic_facace(
             homedir, entity_data,
             PersonServerFacade if server else PersonClientFacade)
@@ -92,7 +87,7 @@ class DummyPolicy:
             NaCl symmetric encryption key used.
 
         """
-        entity_data = random_ministry_entity_data()[0]
+        entity_data = Generate.ministry_data()[0]
         return self.__create_generic_facace(
             homedir, entity_data,
             MinistryServerFacade if server else MinistryClientFacade)
@@ -117,7 +112,7 @@ class DummyPolicy:
             NaCl symmetric encryption key used.
 
         """
-        entity_data = random_church_entity_data()[0]
+        entity_data = Generate.church_data()[0]
         return self.__create_generic_facace(
             homedir, entity_data,
             ChurchServerFacade if server else ChurchClientFacade)

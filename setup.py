@@ -67,7 +67,7 @@ setup(
         'Topic :: Utilities',
     ],
     zip_safe=False,
-    test_suite='',
+    test_suite='tests',
     python_requires='~=3.7',
     setup_requires=[
         'cython', 'pyinstaller', 'sphinx', 'sphinx_rtd_theme',

@@ -33,7 +33,7 @@ class StoredLetter(Document):
         Description of attribute `message`.
     """
     id = UuidField()
-    type = TypeField(value=DocType.CACHED_MSG)
+    type = TypeField(value=int(DocType.CACHED_MSG))
     expires = DateField(
         init=lambda: (datetime.date.today() + datetime.timedelta(365 / 12 * 3))
     )
@@ -66,6 +66,6 @@ class StoredLetter(Document):
             Description of returned object.
 
         """
-        self._check_type(DocType.CACHED_MSG)
+        self._check_doc_type(DocType.CACHED_MSG)
         self._check_document_id()
         return True

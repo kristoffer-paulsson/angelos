@@ -23,7 +23,6 @@ from .commands import (
     ProcessCommand,
 )
 from .impexp import ImportCommand, ExportCommand, PortfolioCommand
-from .dummy import DummyCommand
 
 
 class ConsoleServerProcess(asyncssh.SSHServerProcess):
@@ -120,7 +119,6 @@ class AdminServer(SSHServer):
         ExportCommand,
         ProcessCommand,
         PortfolioCommand,
-        DummyCommand,
     ]
 
     def begin_auth(self, username):

@@ -27,9 +27,9 @@ import zlib
 import gzip
 import bz2
 
-from ..ioc import Container, ContainerAware
-from ..utils import Util
-from ..error import Error
+from .ioc import Container, ContainerAware
+from .utils import Util
+from .error import Error
 from .conceal import ConcealIO
 
 

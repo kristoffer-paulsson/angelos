@@ -12,6 +12,7 @@ from typing import Tuple, List
 
 import msgpack
 
+from ..const import Const
 from ..policy.portfolio import (
     Portfolio,
     PrivatePortfolio,
@@ -20,18 +21,22 @@ from ..policy.portfolio import (
     PORTFOLIO_PATTERN,
     PortfolioPolicy,
 )
-from .archive7 import Entry
-from .helper import Glue, Globber
-from .archive import BaseArchive
+from ..archive7 import Entry
+from ..helper import Glue, Globber
+from .storage import StorageFacadeExtension
 
 
-class Vault(BaseArchive):
+class VaultStorage(StorageFacadeExtension):
     """
     Vault interface.
 
     The Vault is the most important archive in a facade, because it contains
     the private entity data.
     """
+
+    ATTRIBUTE = ("vault",)
+    CONCEAL = (Const.CNL_VAULT,)
+    USEFLAG = (Const.A_USE_VAULT,)
 
     HIERARCHY = (
         "/",
@@ -68,12 +73,33 @@ class Vault(BaseArchive):
     NODES = "/settings/nodes"
     INBOX = "/messages/inbox/"
 
+    @classmethod
+    def setup(
+        cls,
+        home_dir: str,
+        secret: bytes,
+        portfolio: PrivatePortfolio,
+        vtype=None,
+        vrole=None,
+    ) -> object:
+        """Create and setup the whole Vault according to policy's."""
+        return super(VaultStorage, cls).setup(
+            None,
+            home_dir,
+            secret,
+            owner=portfolio.entity.id,
+            node=next(iter(portfolio.nodes)).id,
+            domain=portfolio.domain.id,
+            vtype=vtype,
+            vrole=vrole
+        )
+
     async def save(self, filename, document):
-        """Save a document at a certian location."""
+        """Save a document at a certain location."""
         created, updated, owner = Glue.doc_save(document)
 
-        return await self._proxy.call(
-            self._archive.mkfile,
+        return await self.proxy.call(
+            self.archive.mkfile,
             filename=filename,
             data=PortfolioPolicy.serialize(document),
             id=document.id,
@@ -84,15 +110,15 @@ class Vault(BaseArchive):
         )
 
     async def delete(self, filename):
-        """Remove a document at a certian location."""
-        return await self._proxy.call(self._archive.remove, filename=filename)
+        """Remove a document at a certain location."""
+        return await self.proxy.call(self.archive.remove, filename=filename)
 
     async def update(self, filename, document):
         """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
-        return await self._proxy.call(
-            self._archive.save,
+        return await self.proxy.call(
+            self.archive.save,
             filename=filename,
             data=PortfolioPolicy.serialize(document),
             modified=updated,
@@ -103,16 +129,16 @@ class Vault(BaseArchive):
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
         def callback():
-            result = Globber.owner(self._archive, issuer, path)
+            result = Globber.owner(self.archive, issuer, path)
             result.sort(reverse=True, key=lambda e: e[2])
 
             datalist = []
             for r in result[:limit]:
-                datalist.append(self._archive.load(r[0]))
+                datalist.append(self.archive.load(r[0]))
 
             return datalist
 
-        return await self._proxy.call(callback, 0, 5)
+        return await self.proxy.call(callback, 0, 5)
 
     async def search(
         self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
@@ -121,27 +147,27 @@ class Vault(BaseArchive):
 
         def callback():
             if issuer:
-                result = Globber.owner(self._archive, issuer, path)
+                result = Globber.owner(self.archive, issuer, path)
             else:
-                result = Globber.path(self._archive, path)
+                result = Globber.path(self.archive, path)
 
             result.sort(reverse=True, key=lambda e: e[2])
 
             datalist = []
             for r in result[:limit]:
-                datalist.append(self._archive.load(r[0]))
+                datalist.append(self.archive.load(r[0]))
 
             return datalist
 
-        return await self._proxy.call(callback, 0, 5)
+        return await self.proxy.call(callback, 0, 5)
 
     async def new_portfolio(self, portfolio: Portfolio) -> bool:
         """Save a portfolio for the first time."""
         dirname = "/portfolios/{0}".format(portfolio.entity.id)
-        if self._archive.isdir(dirname):
+        if self.archive.isdir(dirname):
             raise OSError("Portfolio already exists: %s" % portfolio.entity.id)
 
-        self._archive.mkdir(dirname)
+        self.archive.mkdir(dirname)
 
         files = []
         issuer, owner = portfolio.to_sets()
@@ -154,8 +180,8 @@ class Vault(BaseArchive):
         for doc in files:
             created, updated, owner = Glue.doc_save(doc[1])
             ops.append(
-                self._proxy.call(
-                    self._archive.mkfile,
+                self.proxy.call(
+                    self.archive.mkfile,
                     filename=doc[0],
                     data=PortfolioPolicy.serialize(doc[1]),
                     id=doc[1].id,
@@ -183,10 +209,10 @@ class Vault(BaseArchive):
     ) -> Portfolio:
         """Load portfolio from uuid."""
         dirname = "/portfolios/{0}".format(eid)
-        if not self._archive.isdir(dirname):
+        if not self.archive.isdir(dirname):
             raise OSError("Portfolio doesn't exists: %s" % eid)
 
-        result = self._archive.glob(name="{0}/*".format(dirname), owner=eid)
+        result = self.archive.glob(name="{0}/*".format(dirname), owner=eid)
 
         files = set()
         for field in config:
@@ -197,7 +223,7 @@ class Vault(BaseArchive):
 
         ops = []
         for doc in files:
-            ops.append(self._proxy.call(self._archive.load, filename=doc))
+            ops.append(self.proxy.call(self.archive.load, filename=doc))
 
         results = await asyncio.shield(
             asyncio.gather(*ops, return_exceptions=True)
@@ -231,10 +257,10 @@ class Vault(BaseArchive):
     ) -> bool:
         """Reload portfolio."""
         dirname = "/portfolios/{0}".format(portfolio.entity.id)
-        if not self._archive.isdir(dirname):
+        if not self.archive.isdir(dirname):
             raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
 
-        result = self._archive.glob(
+        result = self.archive.glob(
             name="{dir}/*".format(dirname), owner=portfolio.entity.id
         )
 
@@ -264,7 +290,7 @@ class Vault(BaseArchive):
 
         ops = []
         for doc in files:
-            ops.append(self._proxy.call(self._archive.load, filename=doc))
+            ops.append(self.proxy.call(self.archive.load, filename=doc))
 
         results = await asyncio.shield(
             asyncio.gather(*ops, return_exceptions=True)
@@ -290,10 +316,10 @@ class Vault(BaseArchive):
     async def save_portfolio(self, portfolio: PrivatePortfolio) -> bool:
         """Save a changed portfolio."""
         dirname = "/portfolios/{0}".format(portfolio.entity.id)
-        if not self._archive.isdir(dirname):
+        if not self.archive.isdir(dirname):
             raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
 
-        files = self._archive.glob(
+        files = self.archive.glob(
             name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id
         )
 
@@ -304,8 +330,8 @@ class Vault(BaseArchive):
             filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
             if filename in files:
                 ops.append(
-                    self._proxy.call(
-                        self._archive.save,
+                    self.proxy.call(
+                        self.archive.save,
                         filename=filename,
                         data=msgpack.packb(
                             doc.export_bytes(),
@@ -318,8 +344,8 @@ class Vault(BaseArchive):
             else:
                 created, updated, owner = Glue.doc_save(doc)
                 ops.append(
-                    self._proxy.call(
-                        self._archive.mkfile,
+                    self.proxy.call(
+                        self.archive.mkfile,
                         filename=filename,
                         data=PortfolioPolicy.serialize(doc),
                         id=doc.id,
@@ -345,10 +371,10 @@ class Vault(BaseArchive):
         """Save or update a settings file."""
         try:
             filename = "/settings/" + name
-            if self._archive.isfile(filename):
-                self._archive.save(filename, data)
+            if self.archive.isfile(filename):
+                self.archive.save(filename, data)
             else:
-                self._archive.mkfile(filename, data)
+                self.archive.mkfile(filename, data)
         except Exception as e:
             logging.exception(e)
             return False
@@ -358,6 +384,6 @@ class Vault(BaseArchive):
     async def load_settings(self, name: str) -> bytes:
         """Load a settings file."""
         filename = "/settings/" + name
-        if self._archive.isfile(filename):
-            return self._archive.load(filename)
+        if self.archive.isfile(filename):
+            return self.archive.load(filename)
         return b""
