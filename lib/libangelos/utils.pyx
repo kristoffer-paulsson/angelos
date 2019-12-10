@@ -10,12 +10,13 @@ Utility module.
 The utility module containse all minor extras that is used globally in the
 application.
 """
+import asyncio
+import importlib
 import os
 import sys
-import importlib
-import asyncio
-import typing
-from .error import ERROR_INFO
+from typing import Any, Callable, _GenericAlias
+
+from libangelos.error import ERROR_INFO
 
 
 class Event(asyncio.Event):
@@ -97,7 +98,7 @@ class Util:
         Instance    The instanced variable
         type        The class type of expected type, or tuple of them
         """
-        if isinstance(types, typing._GenericAlias):
+        if isinstance(types, _GenericAlias):
             return isinstance(instance, types.__args__)
         else:
             return isinstance(instance, types)
@@ -117,6 +118,19 @@ class Util:
             raise TypeError(
                 "Path like object expected, but got: {0}".format(str(instance))
             )
+
+    @staticmethod
+    def populate(klass: object, attributes: dict) -> None:
+        """
+        Populate class attributes from dictionary.
+
+        Args:
+            klass:
+            attributes:
+        """
+        for attr, value in attributes.items():
+            if hasattr(klass, attr):
+                setattr(klass, attr, value)
 
     @staticmethod
     def exception(error_code, debug_info={}):
@@ -277,3 +291,21 @@ class FactoryInterface:
     def factory(cls, **kwargs):
         """Docstring"""
         return cls(kwargs["io"])
+
+
+class LazyAttribute:
+    """
+    Attribute class that allows lazy loading using a lambda.
+    """
+    def __init__(self, loader: Callable):
+        self.__loader = loader
+        self.__done = False
+        self.__value = None
+
+    def __get__(self, obj, obj_type) -> Any:
+        return self.__value if self.__done else self.__load()
+
+    def __load(self) -> Any:
+        self.__value = self.__loader()
+        self.__done = True
+        return self.__value

@@ -12,10 +12,10 @@ import libnacl.dual
 # from ..utils import Util
 from .policy import Policy
 from .crypto import Crypto
-from ..document._types import EntityT
+from ..document.types import EntityT
 from ..document.entities import PrivateKeys, Keys, Person, Ministry, Church
 from .portfolio import PrivatePortfolio
-from ._types import (
+from .types import (
     EntityDataT,
     PersonData,
     MinistryData,

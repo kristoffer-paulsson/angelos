@@ -21,7 +21,7 @@ from .lipsum import (
     CHURCHES,
 )
 
-from libangelos.policy._types import PersonData, MinistryData, ChurchData
+from libangelos.policy.types import PersonData, MinistryData, ChurchData
 
 
 def filesize(file):

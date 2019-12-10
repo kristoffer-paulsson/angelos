@@ -8,21 +8,25 @@
 import asyncio
 import datetime
 import uuid
-from typing import List, Set
+from typing import List, Set, Any
 
-from ..policy.portfolio import PrivatePortfolio, DOCUMENT_PATH
-from ..policy.message import EnvelopePolicy
-from ..policy.crypto import Crypto
-from ..document.document import DocType
-from ..document.envelope import Envelope
-from ..document.messages import Message, Mail
-from ..document.misc import StoredLetter
-from ..archive.vault import Vault
-from ..archive.helper import Glue
+from libangelos.api.api import ApiFacadeExtension
+from libangelos.document.document import DocType
+from libangelos.document.envelope import Envelope
+from libangelos.document.messages import Message, Mail
+from libangelos.document.misc import StoredLetter
+from libangelos.facade.base import BaseFacade
+from libangelos.helper import Glue
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.message import EnvelopePolicy
+from libangelos.policy.portfolio import DOCUMENT_PATH
+from libangelos.utils import LazyAttribute
 
 
-class MailAPI:
+class MailboxAPI(ApiFacadeExtension):
     """An interface class to be placed on the facade."""
+
+    ATTRIBUTE = ("mailbox",)
 
     INBOX = "/messages/inbox"
     READ = "/messages/read"
@@ -32,17 +36,18 @@ class MailAPI:
     DRAFT = "/messages/drafts"
     TRASH = "/messages/trash"
 
-    def __init__(self, portfolio: PrivatePortfolio, vault: Vault):
-        """Init mail interface."""
-        self.__portfolio = portfolio
-        self.__vault = vault
+    def __init__(self, facade: BaseFacade):
+        """Initialize the Mail."""
+        ApiFacadeExtension.__init__(self, facade)
+        self.__vault = LazyAttribute(lambda: self.facade.storage.vault)
+        self.__portfolio = LazyAttribute(lambda: self.facade.data.portfolio)
 
     async def mail_to_inbox(
         self, envelopes: Envelope
     ) -> (bool, Set[Envelope], bool):
         """Import envelope to inbox. Check owner and then validate."""
         reject = set()
-        savelist = []
+        save_list = list()
 
         for envelope in envelopes:
             envelope = EnvelopePolicy.receive(self.__portfolio, envelope)
@@ -50,53 +55,44 @@ class MailAPI:
                 reject.add(envelope)
                 continue
 
-            savelist.append(
+            save_list.append(
                 self.__vault.save(
                     DOCUMENT_PATH[envelope.type].format(
-                        dir=MailAPI.INBOX, file=envelope.id
+                        dir=MailboxAPI.INBOX, file=envelope.id
                     ),
                     envelope,
                 )
             )
 
-        result = await asyncio.gather(*savelist, return_exceptions=True)
+        result = await asyncio.gather(*save_list, return_exceptions=True)
         return True, reject, result
 
     async def load_inbox(self) -> List[Envelope]:
         """Load envelopes from the inbox."""
-        doclist = await self.__vault.search(
-            self.__portfolio.entity.id, MailAPI.INBOX + "/*", limit=200
+        doc_list = await self.__vault.search(
+            self.facade.data.portfolio.entity.id, MailboxAPI.INBOX + "/*", limit=200
         )
-        result = Glue.doc_validate_report(doclist, Envelope)
+        result = Glue.doc_validate_report(doc_list, Envelope)
         return result
 
     async def load_envelope(self, envelope_id: uuid.UUID) -> Envelope:
         """Load specific envelope from the inbox."""
-        doclist = await self.__vault.search(
-            path=DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailAPI.INBOX, file=envelope_id
-            ),
-            limit=1,
-        )
-        if not doclist:
-            return None
-        result = Glue.doc_validate_report(doclist, Envelope)
-        if isinstance(result[0][1], Exception):
-            return None
-
-        return result[0][0]
+        return await self._load_doc(envelope_id, DocType.COM_ENVELOPE, MailboxAPI.INBOX, Envelope)
 
     async def load_message(self, message_id: uuid.UUID) -> Mail:
         """Load specific message from the read folder."""
-        doclist = await self.__vault.search(
-            path=DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailAPI.READ, file=message_id
+        return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.READ, Mail)
+
+    async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
+        doc_list = await self.__vault.search(
+            path=DOCUMENT_PATH[doc_type_num].format(
+                dir=box_dir, file=doc_id
             ),
             limit=1,
         )
-        if not doclist:
+        if not doc_list:
             return None
-        result = Glue.doc_validate_report(doclist, Mail)
+        result = Glue.doc_validate_report(doc_list, doc_class)
         if isinstance(result[0][1], Exception):
             return None
 
@@ -131,7 +127,7 @@ class MailAPI:
 
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.CACHED_MSG].format(
-                dir=MailAPI.CACHE, file=letter.id
+                dir=MailboxAPI.CACHE, file=letter.id
             ),
             letter,
         )
@@ -140,7 +136,7 @@ class MailAPI:
 
         result = await self.__vault.delete(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailAPI.INBOX, file=envelope.id
+                dir=MailboxAPI.INBOX, file=envelope.id
             )
         )
         if isinstance(result, Exception):
@@ -152,7 +148,7 @@ class MailAPI:
         """Save a message as read in the read message folder."""
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailAPI.READ, file=message.id
+                dir=MailboxAPI.READ, file=message.id
             ),
             message,
         )
@@ -163,7 +159,7 @@ class MailAPI:
     async def load_read(self) -> List[Mail]:
         """Load read folder from the messages store."""
         doclist = await self.__vault.search(
-            self.__portfolio.entity.id, MailAPI.READ + "/*", limit=100
+            self.__portfolio.entity.id, MailboxAPI.READ + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Mail)
         return result
@@ -172,7 +168,7 @@ class MailAPI:
         """Save a message to outbox folder to be sent."""
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailAPI.OUTBOX, file=envelope.id
+                dir=MailboxAPI.OUTBOX, file=envelope.id
             ),
             envelope,
         )
@@ -183,7 +179,7 @@ class MailAPI:
     async def load_outbox(self) -> List[Envelope]:
         """Load letters from outbox folder."""
         doclist = await self.__vault.search(
-            path=MailAPI.OUTBOX + "/*", limit=100
+            path=MailboxAPI.OUTBOX + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Envelope)
         return result
@@ -192,7 +188,7 @@ class MailAPI:
         """Save a message to sent folder for archiving."""
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailAPI.SENT, file=message.id
+                dir=MailboxAPI.SENT, file=message.id
             ),
             message,
         )
@@ -204,7 +200,7 @@ class MailAPI:
         """Save a message to draft folder for archiving."""
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailAPI.DRAFT, file=message.id
+                dir=MailboxAPI.DRAFT, file=message.id
             ),
             message,
         )
@@ -215,7 +211,7 @@ class MailAPI:
     async def load_drafts(self) -> List[Mail]:
         """Load read folder from the messages store."""
         doclist = await self.__vault.search(
-            path=MailAPI.DRAFT + "/*", limit=100
+            path=MailboxAPI.DRAFT + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Mail, False)
         return result
@@ -224,7 +220,7 @@ class MailAPI:
         """Imports an envelope to inbox."""
         result = await self.__vault.save(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailAPI.INBOX, file=envelope.id
+                dir=MailboxAPI.INBOX, file=envelope.id
             ),
             envelope,
         )

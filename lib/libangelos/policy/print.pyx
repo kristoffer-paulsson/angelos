@@ -5,7 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Print formatting strings."""
-from ..document._types import EntityT
+from ..document.types import EntityT
 from ..document.document import DocType
 from .portfolio import Portfolio
 

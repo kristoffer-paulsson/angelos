@@ -12,7 +12,7 @@ import logging
 from typing import Set
 
 from ..utils import Util
-from ..document._types import EntityT, DocumentT, StatementT, MessageT
+from ..document.types import EntityT, DocumentT, StatementT, MessageT
 from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from ..document.profiles import PersonProfile, MinistryProfile, ChurchProfile
 from ..document.domain import Domain, Node, Network

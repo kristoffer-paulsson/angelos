@@ -5,26 +5,31 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Automatic values about the digital environment."""
-import socket
-import platform
+import logging
 import os
+import platform
+import socket
 import sys
 
-from .utils import Util
-from .misc import Misc
+from libangelos.misc import Misc
+from libangelos.utils import Util
 
 
 class BaseAuto:
+    """Baseclass."""
     pass
 
 
 class Opts(BaseAuto):
+    """Automatic values about the options."""
     def __init__(self, parser):
         for k, v in vars(parser.args).items():
             self.__dict__[k] = v
 
 
 class Dir(BaseAuto):
+    """Automatic values about the File system."""
+
     def __init__(self, app_name):
         app = Util.app_dir()
         self.stem = ""
@@ -49,6 +54,7 @@ class Dir(BaseAuto):
 
 
 class Sys(BaseAuto):
+    """Automatic values about the platform."""
     def __init__(self):
         (
             self.system,
@@ -64,10 +70,19 @@ class Sys(BaseAuto):
 
 
 class Net(BaseAuto):
+    """Automatic values about the network."""
+
     def __init__(self):
         name = socket.gethostname()
         self.hostname = name.lower()
-        self.ip = (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [[(s.connect(("1.1.1.1", 1)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["127.0.0.1"])[0]  # noqa E501
+        try:
+            self.ip = \
+            (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
+                [(s.connect(("1.1.1.1", 1)), s.getsockname()[0], s.close()) for s in
+                 [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["127.0.0.1"])[0]
+        except socket.gaierror as e:
+            logging.exception(e, exc_info=True)
+            self.ip = "127.0.0.1"
         self.domain = socket.getfqdn()
 
 
@@ -75,7 +90,7 @@ class Automatic(BaseAuto):
     """Automatic values about the system."""
 
     def __init__(self, app_name, parser=None):
-        """Generate the values and instanciate vars."""
+        """Generate the values and instantiate vars."""
         self.name = socket.gethostname()
         self.pid = os.getpid()
         self.ppid = os.getppid()

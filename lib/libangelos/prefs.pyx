@@ -39,11 +39,11 @@ class Preferences(collections.MutableMapping):
         self.__fields = fields
 
     async def load(self):
-        self.__parser = await self.__facade.settings.preferences()
+        self.__parser = await self.__facade.settings.load_preferences()
         print(self.__parser)
 
     async def save(self):
-        return await self.__facade.settings.save_prefs(self.__parser)
+        return await self.__facade.settings.save_preferences(self.__parser)
 
     # @property
     # def network(self):

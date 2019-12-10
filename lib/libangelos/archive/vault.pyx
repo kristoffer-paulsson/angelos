@@ -8,10 +8,9 @@
 import asyncio
 import uuid
 import logging
-from typing import Tuple, List
+from typing import List
 
-import msgpack
-
+from .portfolio_mixin import PortfolioMixin
 from ..const import Const
 from ..policy.portfolio import (
     Portfolio,
@@ -26,7 +25,7 @@ from ..helper import Glue, Globber
 from .storage import StorageFacadeExtension
 
 
-class VaultStorage(StorageFacadeExtension):
+class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     """
     Vault interface.
 
@@ -160,212 +159,6 @@ class VaultStorage(StorageFacadeExtension):
             return datalist
 
         return await self.proxy.call(callback, 0, 5)
-
-    async def new_portfolio(self, portfolio: Portfolio) -> bool:
-        """Save a portfolio for the first time."""
-        dirname = "/portfolios/{0}".format(portfolio.entity.id)
-        if self.archive.isdir(dirname):
-            raise OSError("Portfolio already exists: %s" % portfolio.entity.id)
-
-        self.archive.mkdir(dirname)
-
-        files = []
-        issuer, owner = portfolio.to_sets()
-        for doc in issuer | owner:
-            files.append(
-                (DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id), doc)
-            )
-
-        ops = []
-        for doc in files:
-            created, updated, owner = Glue.doc_save(doc[1])
-            ops.append(
-                self.proxy.call(
-                    self.archive.mkfile,
-                    filename=doc[0],
-                    data=PortfolioPolicy.serialize(doc[1]),
-                    id=doc[1].id,
-                    created=created,
-                    modified=updated,
-                    owner=owner,
-                    compression=Entry.COMP_NONE,
-                )
-            )
-
-        results = await asyncio.shield(
-            asyncio.gather(*ops, return_exceptions=True)
-        )
-        success = True
-        for result in results:
-            logging.debug("%s" % result)
-            if isinstance(result, Exception):
-                success = False
-                logging.warning("Failed to save document: %s" % result)
-                logging.exception(result)
-        return success
-
-    async def load_portfolio(
-        self, eid: uuid.UUID, config: Tuple[str]
-    ) -> Portfolio:
-        """Load portfolio from uuid."""
-        dirname = "/portfolios/{0}".format(eid)
-        if not self.archive.isdir(dirname):
-            raise OSError("Portfolio doesn't exists: %s" % eid)
-
-        result = self.archive.glob(name="{0}/*".format(dirname), owner=eid)
-
-        files = set()
-        for field in config:
-            pattern = PORTFOLIO_PATTERN[field]
-            for filename in result:
-                if pattern == filename[-4:]:
-                    files.add(filename)
-
-        ops = []
-        for doc in files:
-            ops.append(self.proxy.call(self.archive.load, filename=doc))
-
-        results = await asyncio.shield(
-            asyncio.gather(*ops, return_exceptions=True)
-        )
-
-        issuer = set()
-        owner = set()
-        for data in results:
-            if isinstance(data, Exception):
-                logging.warning("Failed to load document: %s" % data)
-                logging.exception(data)
-                continue
-
-            document = PortfolioPolicy.deserialize(data)
-
-            if document.issuer != eid:
-                owner.add(document)
-            else:
-                issuer.add(document)
-
-        if PField.PRIVKEYS in config:
-            portfolio = PrivatePortfolio()
-        else:
-            portfolio = Portfolio()
-
-        portfolio.from_sets(issuer, owner)
-        return portfolio
-
-    async def reload_portfolio(
-        self, portfolio: PrivatePortfolio, config: Tuple[str]
-    ) -> bool:
-        """Reload portfolio."""
-        dirname = "/portfolios/{0}".format(portfolio.entity.id)
-        if not self.archive.isdir(dirname):
-            raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
-
-        result = self.archive.glob(
-            name="{dir}/*".format(dirname), owner=portfolio.entity.id
-        )
-
-        files = set()
-        for field in config:
-            pattern = PORTFOLIO_PATTERN[field]
-            for filename in result:
-                if pattern == filename[-4:]:
-                    files.add(filename)
-
-        available = set()
-        for filename in files:
-            available.add(PortfolioPolicy.path2fileident(filename))
-
-        issuer, owner = portfolio.to_sets()
-        loaded = set()
-        for doc in issuer + owner:
-            loaded.add(PortfolioPolicy.doc2fileident(doc))
-
-        toload = available - loaded
-        files2 = set()
-        for filename in files:
-            if PortfolioPolicy.path2fileident(filename) not in toload:
-                files2.add(filename)
-
-        files = files - files2
-
-        ops = []
-        for doc in files:
-            ops.append(self.proxy.call(self.archive.load, filename=doc))
-
-        results = await asyncio.shield(
-            asyncio.gather(*ops, return_exceptions=True)
-        )
-
-        issuer = set()
-        owner = set()
-        for data in results:
-            if isinstance(data, Exception):
-                logging.warning("Failed to load document: %s" % data)
-                continue
-
-            document = PortfolioPolicy.deserialize(data)
-
-            if document.issuer != portfolio.entity.id:
-                owner.add(document)
-            else:
-                issuer.add(document)
-
-        portfolio.from_sets(issuer, owner)
-        return portfolio
-
-    async def save_portfolio(self, portfolio: PrivatePortfolio) -> bool:
-        """Save a changed portfolio."""
-        dirname = "/portfolios/{0}".format(portfolio.entity.id)
-        if not self.archive.isdir(dirname):
-            raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
-
-        files = self.archive.glob(
-            name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id
-        )
-
-        ops = []
-        save, _ = portfolio.to_sets()
-
-        for doc in save:
-            filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
-            if filename in files:
-                ops.append(
-                    self.proxy.call(
-                        self.archive.save,
-                        filename=filename,
-                        data=msgpack.packb(
-                            doc.export_bytes(),
-                            use_bin_type=True,
-                            strict_types=True,
-                        ),
-                        compression=Entry.COMP_NONE,
-                    )
-                )
-            else:
-                created, updated, owner = Glue.doc_save(doc)
-                ops.append(
-                    self.proxy.call(
-                        self.archive.mkfile,
-                        filename=filename,
-                        data=PortfolioPolicy.serialize(doc),
-                        id=doc.id,
-                        created=created,
-                        updated=updated,
-                        owner=owner,
-                        compression=Entry.COMP_NONE,
-                    )
-                )
-
-        results = await asyncio.shield(
-            asyncio.gather(*ops, return_exceptions=True)
-        )
-
-        success = True
-        for result in results:
-            if isinstance(result, Exception):
-                success = False
-                logging.warning("Failed to save document: %s" % result)
-        return success
 
     async def save_settings(self, name: str, data: bytes) -> bool:
         """Save or update a settings file."""

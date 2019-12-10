@@ -9,7 +9,7 @@ Policy module.
 
 Policys that will secure the data imported and exported from the facade.
 """
-from ._types import EntityData, PersonData, MinistryData, ChurchData
+from .types import EntityData, PersonData, MinistryData, ChurchData
 from .crypto import Crypto
 from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from .accept import ImportPolicy, ImportUpdatePolicy

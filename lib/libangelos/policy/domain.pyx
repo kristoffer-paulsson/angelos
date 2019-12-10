@@ -11,7 +11,7 @@ import ipaddress
 from typing import Union
 
 from ..misc import Misc
-from ._types import PrivatePortfolioABC
+from .types import PrivatePortfolioABC
 from .policy import Policy
 from .crypto import Crypto
 

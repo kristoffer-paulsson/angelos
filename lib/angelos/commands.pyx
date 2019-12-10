@@ -19,7 +19,7 @@ from libangelos.utils import Util
 from libangelos.error import Error
 from libangelos.const import Const
 from .cmd import Command, Option
-from libangelos.policy._types import PersonData, MinistryData, ChurchData
+from libangelos.policy.types import PersonData, MinistryData, ChurchData
 from libangelos.facade.facade import (
     Facade,
     PersonServerFacade,

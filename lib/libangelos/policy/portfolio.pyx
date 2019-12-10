@@ -6,26 +6,26 @@
 #
 """Policy classes for document portfolios."""
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Set, Tuple
-from collections.abc import Iterable
 
 import msgpack
-
-from ._types import PortfolioABC, PrivatePortfolioABC
-
-from ..document._types import EntityT, ProfileT, DocumentT
-from ..document.document import DocType
-from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
-from ..document.profiles import PersonProfile, MinistryProfile, ChurchProfile
-from ..document.domain import Domain, Node, Network
-from ..document.statements import Verified, Trusted, Revoked
-from ..document.messages import Note, Instant, Mail, Share, Report
-from ..document.envelope import Envelope
-from ..document.misc import StoredLetter
+from libangelos.document.document import DocType
+from libangelos.document.domain import Domain, Node, Network
+from libangelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
+from libangelos.document.envelope import Envelope
+from libangelos.document.messages import Note, Instant, Mail, Share, Report
+from libangelos.document.misc import StoredLetter
+from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from libangelos.document.statements import Verified, Trusted, Revoked
+from libangelos.document.types import EntityT, ProfileT, DocumentT
+from libangelos.policy.types import PortfolioABC, PrivatePortfolioABC
 
 
 class PField:
+    """Definition of portfolio fields."""
+
     ENTITY = "entity"
     PROFILE = "profile"
     PRIVKEYS = "privkeys"
@@ -183,7 +183,6 @@ DOCUMENT_PATTERN = {
     DocType.STAT_VERIFIED: ".ver",
     DocType.STAT_TRUSTED: ".rst",
     DocType.STAT_REVOKED: ".rev",
-    DocType.STAT_REVOKED: ".rev",
     DocType.COM_ENVELOPE: ".env",
 }
 
@@ -244,8 +243,6 @@ class Statements:
     Portfolio of Statement documents.
     """
 
-    __slots__ = ("verified", "trusted", "revoked")
-
     verified: Set[Verified]
     trusted: Set[Trusted]
     revoked: Set[Revoked]
@@ -266,17 +263,6 @@ class Portfolio(PortfolioABC):
     way it is easy to handle documents related to entities and execute policies
     and operations that are related.
     """
-
-    __slots__ = (
-        "entity",
-        "profile",
-        "keys",
-        "domain",
-        "nodes",
-        "network",
-        "issuer",
-        "owner",
-    )
 
     entity: EntityT
     profile: ProfileT
@@ -416,7 +402,7 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
 
     def _disassemble(self) -> dict:
         """Disassemble portfolio into dictionary."""
-        assembly = self.super()._disassemble()
+        assembly = super()._disassemble(self)
         assembly[PField.PRIVKEYS] = self.privkeys
         assembly[PField.DOMAIN] = self.domain
         assembly[PField.NODES] = self.nodes
@@ -481,13 +467,13 @@ class PortfolioPolicy:
 
     @staticmethod
     def validate_belonging(portfolio: Portfolio) -> bool:
-        """Valdidates that all elements belong to entity."""
+        """Validates that all elements belong to entity."""
         raise NotImplementedError()
 
     @staticmethod
     def validate_verify(portfolio: Portfolio) -> bool:
         """
-        Verify cryptographicaly the documents.
+        Verify cryptographically the documents.
 
         Validate issuership of all except "owner" docs.
         """
@@ -589,7 +575,7 @@ class DocSet:
         return get
 
     def get_owner(self, owner: uuid.UUID) -> Set[DocumentT]:
-        """Get all documents of owner and subract from set."""
+        """Get all documents of owner and subtract from set."""
         get = {doc for doc in self._docs if doc.owner.int == owner.int}
         self._docs -= get
         return get

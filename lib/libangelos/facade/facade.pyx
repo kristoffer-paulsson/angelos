@@ -6,24 +6,22 @@
 #
 """Module docstring."""
 
-from ..api.contact import ContactAPI
-from ..api.mail import MailAPI
-from ..api.settings import SettingsAPI
-from ..api.replication import ReplicationAPI
-from ..archive.ftp import FtpStorage
-from ..archive.home import HomeStorage
-from ..archive.mail import MailStorage
-from ..archive.pool import PoolStorage
-from ..archive.routing import RoutingStorage
-from ..archive.vault import VaultStorage
-from ..const import Const
+from libangelos.archive.ftp import FtpStorage
+from libangelos.archive.home import HomeStorage
+from libangelos.archive.mail import MailStorage
+from libangelos.archive.pool import PoolStorage
+from libangelos.archive.routing import RoutingStorage
+from libangelos.archive.vault import VaultStorage
+from libangelos.const import Const
+from libangelos.document.entities import Person, Ministry, Church
+from libangelos.facade.base import BaseFacade
+from libangelos.policy.portfolio import PrivatePortfolio
 
-from ..document.entities import Person, Ministry, Church
-from ..policy.portfolio import (
-    PrivatePortfolio, PGroup)
-
-from ..data.vars import PREFERENCES_INI
-from .base import BaseFacade
+from libangelos.api.contact import ContactAPI
+from libangelos.api.mailbox import MailboxAPI
+from libangelos.api.replication import ReplicationAPI
+from libangelos.api.settings import SettingsAPI
+from libangelos.data.portfolio import PortfolioData
 
 
 class EntityFacadeMixin:
@@ -60,8 +58,8 @@ class TypeFacadeMixin:
     """Abstract baseclass for type FacadeMixin's."""
 
     STORAGES = ()
-    APIS = ()
-    DATAS = ()
+    APIS = (SettingsAPI, MailboxAPI, ContactAPI, ReplicationAPI)
+    DATAS = (PortfolioData, )
     TASKS = ()
 
     def __init__(self):
@@ -199,7 +197,7 @@ class Facade:
         vault_type = Facade._check_type(portfolio, server)
 
         vault = VaultStorage.setup(home_dir, secret, portfolio, vault_type, vault_role)
-        await vault.new_portfolio(portfolio)
+        await vault.add_portfolio(portfolio)
 
         facade_class = Facade.MAP[0][vault_type]
         facade = facade_class(home_dir, secret, vault)
@@ -238,55 +236,3 @@ class Facade:
             return Const.A_TYPE_CHURCH_SERVER if server else Const.A_TYPE_CHURCH_CLIENT
         else:
             raise TypeError("Entity in portfolio of unknown type")
-
-
-class OldFacade(BaseFacade):
-
-
-        # await vault.save_settings("preferences.ini", PREFERENCES_INI)
-
-    async def _post_init(self):
-        """Load private portfolio for facade."""
-        server = (
-            True
-            if self._vault.stats.type
-            in (
-                Const.A_TYPE_PERSON_SERVER,
-                Const.A_TYPE_MINISTRY_SERVER,
-                Const.A_TYPE_CHURCH_SERVER,
-            )
-            else False
-        )
-
-        self.__portfolio = await self._vault.load_portfolio(
-            self._vault.stats.owner, PGroup.SERVER if server else PGroup.CLIENT
-        )
-        self.__contact = ContactAPI(self.__portfolio, self._vault)
-        self.__mail = MailAPI(self.__portfolio, self._vault)
-        self.__settings = SettingsAPI(self.__portfolio, self._vault)
-        self.__replication = ReplicationAPI(self)
-
-    @property
-    def portfolio(self):
-        """Private portfolio getter."""
-        return self.__portfolio
-
-    @property
-    def contact(self):
-        """Contact interface getter."""
-        return self.__contact
-
-    @property
-    def mail(self):
-        """Mail interface getter."""
-        return self.__mail
-
-    @property
-    def settings(self):
-        """Settings interface getter."""
-        return self.__settings
-
-    @property
-    def replication(self):
-        """Replication interface getter."""
-        return self.__replication

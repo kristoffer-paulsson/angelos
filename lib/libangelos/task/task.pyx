@@ -10,8 +10,8 @@ import datetime
 import math
 import logging
 import asyncio
-from ..facade.base import BaseFacade, FacadeExtension
-from ..reactive import NotifierMixin
+from libangelos.facade.base import BaseFacade, FacadeExtension
+from libangelos.reactive import NotifierMixin
 
 
 class TaskFacadeExtension(FacadeExtension, NotifierMixin):

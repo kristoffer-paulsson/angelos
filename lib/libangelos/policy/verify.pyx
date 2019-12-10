@@ -8,7 +8,7 @@
 from .policy import Policy
 from .crypto import Crypto
 from .portfolio import Portfolio, PrivatePortfolio
-from ..document._types import StatementT
+from ..document.types import StatementT
 from ..document.statements import Verified, Trusted, Revoked
 
 

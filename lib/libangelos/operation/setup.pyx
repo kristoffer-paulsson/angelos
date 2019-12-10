@@ -6,7 +6,7 @@
 #
 "Module docstring."""
 from .operation import Operation
-from ..policy._types import PersonData, MinistryData, ChurchData
+from ..policy.types import PersonData, MinistryData, ChurchData
 from ..policy.portfolio import PrivatePortfolio
 from ..policy.crypto import Crypto
 from ..policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy

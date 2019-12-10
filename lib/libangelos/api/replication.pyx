@@ -5,27 +5,41 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Facade replication API."""
-import uuid
 import math
+import uuid
 
-from ..replication.preset import (
-    Preset,
-    MailClientPreset,
-    MailServerPreset,
-    CustomPreset,
-    FileSyncInfo,
-)
-from ..replication.handler import Actions, CHUNK_SIZE
-from ..archive.helper import Globber
+from libangelos.api.api import ApiFacadeExtension
+from libangelos.facade.base import BaseFacade
+from libangelos.helper import Globber
+from libangelos.replication.handler import Actions, CHUNK_SIZE
+from libangelos.replication.preset import Preset, MailClientPreset, MailServerPreset, CustomPreset, FileSyncInfo
+from libangelos.utils import LazyAttribute
 
 
-class ReplicationAPI:
-    def __init__(self, facade):
-        self._facade = facade
+class ReplicationAPI(ApiFacadeExtension):
+    """
+    API for the replication protocol to interact through.
+    """
+
+    ATTRIBUTE = ("replication",)
+
+    def __init__(self, facade: BaseFacade):
+        ApiFacadeExtension.__init__(self, facade)
+        self.__vault = LazyAttribute(lambda: self.facade.storage.vault)
+        self.__portfolio = LazyAttribute(lambda: self.facade.data.portfolio)
 
     def create_preset(
-        self, name: str, ptype: int, userid: uuid.UUID, **kwargs
+            self, name: str, p_type: int, user_id: uuid.UUID, **kwargs
     ):
+        """
+        Create a preset based on input data.
+
+        :param name:
+        :param p_type:
+        :param user_id:
+        :param kwargs:
+        :return:
+        """
         if name == Preset.T_CUSTOM:
             return CustomPreset(
                 kwargs["archive"],
@@ -35,10 +49,10 @@ class ReplicationAPI:
                 kwargs["owner"],
             )
         elif name == Preset.T_MAIL:
-            if ptype == Preset.CLIENT:
+            if p_type == Preset.CLIENT:
                 return MailClientPreset()
-            elif ptype == Preset.SERVER:
-                return MailServerPreset(owner=userid)
+            elif p_type == Preset.SERVER:
+                return MailServerPreset(owner=user_id)
 
     def load_files_list(self, preset: Preset):
         """Index and load the list of files to be replicated.
@@ -55,65 +69,65 @@ class ReplicationAPI:
         )
 
     def save_file(
-            self, preset: Preset, fileinfo: FileSyncInfo, action: str) -> bool:
+            self, preset: Preset, file_info: FileSyncInfo, action: str) -> bool:
         """Create or update file in archive."""
         archive = self._facade.archive(preset.archive)
-        full_path = preset.to_absolute(fileinfo.path)
+        full_path = preset.to_absolute(file_info.path)
 
         if action in (Actions.CLI_CREATE, Actions.SER_CREATE):
             return archive.archive.mkfile(
                 full_path,
-                fileinfo.data,
-                created=fileinfo.created,
-                modified=fileinfo.modified,
-                owner=fileinfo.owner,
-                id=fileinfo.fileid,
-                user=fileinfo.user,
-                group=fileinfo.group,
-                perms=fileinfo.perms,
+                file_info.data,
+                created=file_info.created,
+                modified=file_info.modified,
+                owner=file_info.owner,
+                id=file_info.fileid,
+                user=file_info.user,
+                group=file_info.group,
+                perms=file_info.perms,
             )
         elif action in (Actions.CLI_UPDATE, Actions.SER_UPDATE):
             archive.archive.save(
-                full_path, fileinfo.data, modified=fileinfo.modified
+                full_path, file_info.data, modified=file_info.modified
             )
             archive.archive.chmod(
                 full_path,
-                id=fileinfo.fileid,
-                owner=fileinfo.owner,
-                created=fileinfo.created,
-                user=fileinfo.user,
-                group=fileinfo.group,
-                perms=fileinfo.perms,
+                id=file_info.fileid,
+                owner=file_info.owner,
+                created=file_info.created,
+                user=file_info.user,
+                group=file_info.group,
+                perms=file_info.perms,
             )
             return True
         else:
             raise Exception("Illegal action for save_file")
 
-    def load_file(self, preset: Preset, fileinfo: FileSyncInfo) -> bool:
+    def load_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Load file and meta from archive."""
         archive = self._facade.archive(preset.archive)
-        full_path = preset.to_absolute(fileinfo.path)
+        full_path = preset.to_absolute(file_info.path)
 
         entry = archive.archive.info(full_path)
 
-        fileinfo.pieces = int(math.ceil(entry.length / CHUNK_SIZE))
-        fileinfo.size = entry.length
-        fileinfo.digest = entry.digest
+        file_info.pieces = int(math.ceil(entry.length / CHUNK_SIZE))
+        file_info.size = entry.length
+        file_info.digest = entry.digest
 
-        fileinfo.filename = entry.name
-        fileinfo.created = entry.created
-        fileinfo.modified = entry.modified
-        fileinfo.owner = entry.owner
-        fileinfo.fileid = entry.id
-        fileinfo.user = entry.user if entry.user else fileinfo.user
-        fileinfo.group = entry.group if entry.group else fileinfo.group
-        fileinfo.perms = entry.perms if entry.perms else fileinfo.perms
+        file_info.filename = entry.name
+        file_info.created = entry.created
+        file_info.modified = entry.modified
+        file_info.owner = entry.owner
+        file_info.fileid = entry.id
+        file_info.user = entry.user if entry.user else file_info.user
+        file_info.group = entry.group if entry.group else file_info.group
+        file_info.perms = entry.perms if entry.perms else file_info.perms
 
-        fileinfo.data = archive.archive.load(full_path)
+        file_info.data = archive.archive.load(full_path)
         return True
 
-    def del_file(self, preset: Preset, fileinfo: FileSyncInfo) -> bool:
+    def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Remove file from archive"""
         archive = self._facade.archive(preset.archive)
-        full_path = preset.to_absolute(fileinfo.path)
+        full_path = preset.to_absolute(file_info.path)
         return archive.archive.remove(full_path)

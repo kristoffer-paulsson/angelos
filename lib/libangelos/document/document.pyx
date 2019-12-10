@@ -7,7 +7,8 @@
 """Module docstring."""
 import datetime
 import uuid
-import enum
+
+import msgpack
 
 from ..utils import Util
 from ..error import Error
@@ -249,6 +250,21 @@ class Document(IssueMixin, BaseDocument):
         month = self.expires - datetime.timedelta(days=365 / 12)
         today = datetime.date.today()
         return month <= today <= self.expires
+
+    def save(self) -> bytes:
+        """Serialize document.
+
+        Returns
+        -------
+        bytes
+            Stream of bytes representing the document.
+
+        """
+        return msgpack.packb(
+            self.export_bytes(),
+            use_bin_type=True,
+            strict_types=True
+        )
 
 
 class DocType:

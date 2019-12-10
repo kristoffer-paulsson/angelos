@@ -11,7 +11,7 @@ from .operation import Operation
 from ..facade.facade import Facade
 from ..policy.portfolio import PGroup
 from ..policy.message import EnvelopePolicy
-from ..document._types import MessageT
+from ..document.types import MessageT
 
 
 class MailOperation(Operation):

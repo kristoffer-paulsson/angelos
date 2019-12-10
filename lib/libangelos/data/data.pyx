@@ -5,10 +5,11 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Layout for new Facade framework."""
-from ..facade.base import FacadeExtension
+from libangelos.facade.base import FacadeExtension, BaseFacade
 
 
 class DataFacadeExtension(FacadeExtension):
     """Archive extension to isolate the archives."""
 
-    pass
+    def __init__(self, facade: BaseFacade):
+        FacadeExtension.__init__(self, facade)

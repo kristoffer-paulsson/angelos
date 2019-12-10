@@ -13,7 +13,7 @@ from typing import List
 from .crypto import Crypto
 from .policy import Policy
 from .portfolio import PrivatePortfolio, Portfolio, PortfolioPolicy
-from ..document._types import MessageT
+from ..document.types import MessageT
 from ..document.messages import Instant, Note, Mail, Report, Share, Attachment
 from ..document.envelope import Envelope, Header
 

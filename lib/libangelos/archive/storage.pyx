@@ -5,15 +5,13 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring"""
+import atexit
 import os
 import uuid
-import atexit
 
-from ..facade.base import BaseFacade, FacadeExtension
-from ..archive7 import Archive7
-from ..helper import AsyncProxy
-
-from ..policy.portfolio import PrivatePortfolio
+from libangelos.archive7 import Archive7
+from libangelos.facade.base import BaseFacade, FacadeExtension
+from libangelos.helper import AsyncProxy
 
 
 class StorageFacadeExtension(FacadeExtension):
@@ -23,7 +21,7 @@ class StorageFacadeExtension(FacadeExtension):
     CONCEAL = ("",)
     USEFLAG = (0,)
 
-    HIERARCHY = ("/")
+    HIERARCHY = ("/",)
 
     def __init__(self, facade: BaseFacade, home_dir: str, secret: bytes, delete=Archive7.Delete.HARD):
         """Initialize the Mail."""
@@ -35,14 +33,24 @@ class StorageFacadeExtension(FacadeExtension):
 
     @property
     def archive(self):
+        """
+
+        Returns:
+
+        """
         return self.__archive
 
     @property
     def proxy(self):
+        """
+
+        Returns:
+
+        """
         return self.__proxy
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Indicate if archive is closed."""
         return self.__closed
 
@@ -85,6 +93,14 @@ class StorageFacadeExtension(FacadeExtension):
 
     @classmethod
     def filename(cls, dir_name):
+        """
+
+        Args:
+            dir_name:
+
+        Returns:
+
+        """
         return os.path.join(dir_name, cls.CONCEAL[0])
 
     @classmethod

@@ -5,54 +5,14 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Layout for new Facade framework."""
+import asyncio
+import logging
 import os
-import inspect
-from typing import Any, Union, Dict
 from collections import namedtuple
+from typing import Awaitable
 
-from ..policy._types import EntityDataT
-from ..policy.portfolio import PrivatePortfolio
-
-
-class internal:
-    """Checking external access to methods.
-
-    internal is a decorator you put on class methods to authorize external
-    access. The class applying the decorator should have an owning instance,
-    and the owning instance must be available in apublicly accessible
-    attribute.
-
-    Parameters
-    ----------
-    decoratee : type
-        Description of parameter `decoratee`.
-    owner : str
-        Class owner attribute name.
-
-    """
-
-    def __init__(self, decoratee, owner="internal"):
-        """Initialize the @internal decorator."""
-        self.__decoratee = decoratee
-        self.__owner = owner
-        self.__instance = None
-
-    def __get__(self, instance, owner):
-        """Get the instance of the owner."""
-        self.__instance = instance
-        return self.__call__
-
-    def __call__(self, *args, **kwargs):
-        """Access checker of decorated method."""
-        stack = inspect.stack()
-        caller_instance = stack[1][0].f_locals["self"]
-        owner_instance = getattr(self.__instance, self.__owner, None)
-
-        if caller_instance not in (owner_instance, self.__instance):
-            raise RuntimeError("Illegal access to internal method %s.%s" % (
-                self.__instance, owner_instance))
-
-        return self.__decoratee(self.__instance, *args, **kwargs)
+from libangelos.policy.portfolio import PGroup
+from libangelos.utils import Util
 
 
 class FacadeFrozen:
@@ -109,21 +69,65 @@ class FacadeExtension(FacadeFrozen):
         """Initialize facade extension."""
         FacadeFrozen.__init__(self, facade)
 
+    async def async_gather(self, *aws: Awaitable) -> bool:
+        """Run multiple awaitables in asyncio.gather.
+
+        If there is any exceptions they will be printed to the logs.
+
+        Parameters
+        ----------
+        *aws : Awaitable
+            Multiple awaitables to be run async.
+
+        Returns
+        -------
+        bool
+            Success or failure.
+
+        """
+        results = await asyncio.shield(asyncio.gather(*aws, return_exceptions=True))
+        exceptions = list(filter(lambda element: isinstance(element, Exception), results))
+        if exceptions:
+            for exc in exceptions:
+                logging.exception(exc, exc_info=True)
+            return False
+        else:
+            return True
+
+
 
 class BaseFacade:
     """Facade is the interface and firewall for an entity and its documents.
 
+    Parameters
+    ----------
+    home_dir : str
+        Path to the facade storage archives.
+    secret : bytes
+        32 byte encryption key.
+    vault : "StorageFacadeExtension"
+        The vault storage.
+
     Attributes
     ----------
+    __home_dir : type
+        Description of attribute `__home_dir`.
+    __secret : type
+        Description of attribute `__secret`.
+    __post_init : type
+        Description of attribute `__post_init`.
+    __closed : type
+        Description of attribute `__closed`.
+    __data : type
+        Description of attribute `__data`.
     __api : type
         Description of attribute `__api`.
     __task : type
         Description of attribute `__task`.
-    __archive : type
-        Description of attribute `__archive`.
+    __storage : type
+        Description of attribute `__storage`.
 
     """
-
     def __init__(self, home_dir: str, secret: bytes, vault: "StorageFacadeExtension"):
         """Initialize the facade."""
         vault.facade = self
@@ -144,7 +148,7 @@ class BaseFacade:
         self._load_extensions("DATAS", self.__data)
         self._load_extensions("TASKS", self.__task)
 
-    def _load_extensions(self, attr: str, exts: dict):
+    def _load_extensions(self, attr: str, exts: dict) -> None:
         if hasattr(self, attr):
             for ext_cls in getattr(self, attr, []):
                 extension = ext_cls(self)
@@ -152,10 +156,10 @@ class BaseFacade:
                 attribute = extension.ATTRIBUTE[0]
                 if attribute in exts.keys():
                     raise RuntimeError(
-                        "Extension attribute \"%s\" in \"%s\"already occupied." % (attribute, exts.__name__))
+                        "Extension attribute \"%s\" in \"%s\" already occupied." % (attribute, attr))
                 exts[attribute] = extension
 
-    def _load_storages(self, stats):
+    def _load_storages(self, stats) -> None:
         if hasattr(self, "STORAGES"):
             for stor_cls in self.STORAGES:
                 if os.path.isfile(stor_cls.filename(stor_cls.CONCEAL[0])):
@@ -170,35 +174,59 @@ class BaseFacade:
                         "Extension attribute \"%s\" in \"%s\"already occupied." % (attribute, self.__storages.__name__))
                 self.__storage[attribute] = storage
 
-    async def post_init(self):
-        """Post __init__ initialization.
-
-        When implementing _post_init, don't forget to call:
-        super().post_init(self)
-        """
-        if self.__post_init:
-            raise RuntimeError("Post init already done")
-        else:
-            self.__post_init = True
+    async def post_init(self) -> None:
+        """Async post initialization."""
+        self._check_post_init()
 
         self.__data = namedtuple("DataNTuple", self.__data.keys())(**self.__data)
         self.__api = namedtuple("ApiNTuple", self.__api.keys())(**self.__api)
         self.__task = namedtuple("TaskNTuple", self.__task.keys())(**self.__task)
         self.__storage = namedtuple("ArchiveNTuple", self.__storage.keys())(**self.__storage)
 
+        portfolio = await self.storage.vault.load_portfolio(
+            self.storage.vault.archive.stats().owner, PGroup.ALL)
+        Util.populate(self.data.portfolio, vars(portfolio))
+
+        self.__post_init = True
+
+    def _check_post_init(self) -> None:
+        if self.__post_init:
+            raise RuntimeError("Post init already done")
+
     @property
     def path(self) -> str:
-        """Property exposing the Facade home directory."""
+        """Property exposing the Facade home directory..
+
+        Returns
+        -------
+        str
+            Facade home path.
+
+        """
         return self.__home_dir
 
     @property
     def secret(self) -> bytes:
-        """Property exposing the Facade encryption key."""
+        """Property exposing the Facade encryption key.
+
+        Returns
+        -------
+        bytes
+            Facade encryption key.
+
+        """
         return self.__secret
 
     @property
-    def closed(self):
-        """Indicate if archive is closed."""
+    def closed(self) -> bool:
+        """Indicate if archive is closed.
+
+        Returns
+        -------
+        bool
+            Facade closed state.
+
+        """
         return self.__closed
 
     @property
@@ -249,8 +277,8 @@ class BaseFacade:
         """
         return self.__storage
 
-    def close(self):
-        """Close down facade."""
+    def close(self) -> None:
+        """Close down the facade in a proper way."""
         if not self.__closed:
             self.__closed = True
             for storage in self.__storage:

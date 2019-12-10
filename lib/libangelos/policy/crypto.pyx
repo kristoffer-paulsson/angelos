@@ -11,7 +11,7 @@ import datetime
 from typing import Set
 
 from ..utils import Util
-from ..document._types import DocumentT
+from ..document.types import DocumentT
 from ..document.entities import Keys
 from ..document.envelope import Envelope, Header
 from ..document.document import UpdatedMixin

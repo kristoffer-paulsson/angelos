@@ -13,7 +13,7 @@ import datetime
 import pathlib
 
 from ..const import Const
-from ..facade.mail import MailAPI
+from ..api.mailbox import MailboxAPI
 from ..ioc import Container
 from ..policy.portfolio import Portfolio
 
@@ -222,12 +222,12 @@ class CustomPreset(Preset):
 class MailClientPreset(Preset):
     def __init__(self, modified: datetime.datetime = None):
         Preset.__init__(
-            self, Const.CNL_VAULT, Preset.T_MAIL, modified, MailAPI.OUTBOX
+            self, Const.CNL_VAULT, Preset.T_MAIL, modified, MailboxAPI.OUTBOX
         )
 
     def to_absolute(self, path: str) -> str:
         """Convert relative path to absolute."""
-        return str(pathlib.PurePath(MailAPI.INBOX).joinpath(path))
+        return str(pathlib.PurePath(MailboxAPI.INBOX).joinpath(path))
 
     def on_after_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
