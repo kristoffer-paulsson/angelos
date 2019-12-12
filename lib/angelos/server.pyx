@@ -5,29 +5,27 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-import os
-import signal
-import functools
 import asyncio
 import collections
+import functools
 import json
+import os
+import signal
 
-from libangelos.utils import Event
-from libangelos.ioc import (
-    Container, ContainerAware, Config, Handle, StaticHandle)
+from angelos.parser import Parser
+from angelos.starter import ConsoleStarter
+from angelos.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
+from libangelos.automatic import Automatic
+from libangelos.facade.facade import Facade
+from libangelos.ioc import Container, ContainerAware, Config, Handle, StaticHandle
+from libangelos.logger import LogHandler
+from libangelos.prefs import Preferences
+from libangelos.ssh.ssh import SessionManager
 from libangelos.starter import Starter
+from libangelos.utils import Event
 from libangelos.worker import Worker
 
 from .state import StateMachine
-from libangelos.logger import LogHandler
-from libangelos.ssh.ssh import SessionManager
-from libangelos.facade.facade import Facade
-from libangelos.automatic import Automatic
-from libangelos.prefs import Preferences
-from .parser import Parser
-from .starter import ConsoleStarter
-
-from .vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
 
 
 class Configuration(Config, Container):
@@ -218,7 +216,7 @@ class Server(ContainerAware):
                     await self.ioc.state.on("clients")
                     self._applog.info("Clients server turned ON")
                     self.ioc.clients = await Starter().clients_server(
-                        self.ioc.facade.portfolio,
+                        self.ioc.facade.data.portfolio,
                         self._listen(),
                         port=self.ioc.config["ports"]["clients"],
                         ioc=self.ioc,
@@ -245,7 +243,7 @@ class Server(ContainerAware):
                     await self.ioc.state.on("hosts")
                     self._applog.info("Hosts server turned ON")
                     self.ioc.hosts = await ConsoleStarter().hosts_server(
-                        self.ioc.facade.portfolio,
+                        self.ioc.facade.data.portfolio,
                         self._listen(),
                         port=self.ioc.config["ports"]["hosts"],
                         ioc=self.ioc,
@@ -270,7 +268,7 @@ class Server(ContainerAware):
                     await self.ioc.state.on("nodes")
                     self._applog.info("Nodes server turned ON")
                     self.ioc.nodes = await Starter().nodes_server(
-                        self.ioc.facade.portfolio,
+                        self.ioc.facade.data.portfolio,
                         self._listen(),
                         port=self.ioc.config["ports"]["nodes"],
                         ioc=self.ioc,

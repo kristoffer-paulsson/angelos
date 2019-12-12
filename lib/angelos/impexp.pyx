@@ -8,7 +8,7 @@
 import uuid
 import pprint
 
-from .cmd import Command, Option
+from angelos.cmd import Command, Option
 from libangelos.policy.portfolio import PGroup
 from libangelos.policy.print import PrintPolicy
 from libangelos.policy.verify import StatementPolicy
@@ -64,7 +64,7 @@ class PortfolioCommand(Command):
 
     async def __export(self, entity_id, group):
         if entity_id == "self":
-            entity_id = self.__facade.portfolio.entity.id
+            entity_id = self.__facade.data.portfolio.entity.id
         else:
             entity_id = uuid.UUID(entity_id)
 
@@ -93,14 +93,14 @@ class PortfolioCommand(Command):
             pprint.pprint(doc.export_yaml(), self._io.stdout)
             self._io << "\n\n"
 
-        if portfolio.entity.id == self.__facade.portfolio.entity.id:
+        if portfolio.entity.id == self.__facade.data.portfolio.entity.id:
             return
 
         verified = StatementPolicy.validate_verified(
-            self.__facade.portfolio, portfolio
+            self.__facade.data.portfolio, portfolio
         )
         trusted = StatementPolicy.validate_trusted(
-            self.__facade.portfolio, portfolio
+            self.__facade.data.portfolio, portfolio
         )
 
         v_renewable = False
@@ -136,27 +136,27 @@ class PortfolioCommand(Command):
         statement = None
         if do == 0 and not verified:
             statement = StatementPolicy.verified(
-                self.__facade.portfolio, portfolio
+                self.__facade.data.portfolio, portfolio
             )
         elif do == 1 and v_renewable:
             statement = StatementPolicy.verified(
-                self.__facade.portfolio, portfolio
+                self.__facade.data.portfolio, portfolio
             )
         elif do == 2 and verified:
             statement = StatementPolicy.revoked(
-                self.__facade.portfolio, verified
+                self.__facade.data.portfolio, verified
             )
         elif do == 3 and not trusted:
             statement = StatementPolicy.trusted(
-                self.__facade.portfolio, portfolio
+                self.__facade.data.portfolio, portfolio
             )
         elif do == 4 and t_renewable:
             statement = StatementPolicy.trusted(
-                self.__facade.portfolio, portfolio
+                self.__facade.data.portfolio, portfolio
             )
         elif do == 5 and trusted:
             statement = StatementPolicy.revoked(
-                self.__facade.portfolio, trusted
+                self.__facade.data.portfolio, trusted
             )
 
         if statement:
@@ -327,7 +327,7 @@ class ExportCommand(Command):
         if opts["vault"]:
             if opts["vault"] == "self":
                 portfolio = await self.__facade.load_portfolio(
-                    self.__facade.portfolio.entity.id,
+                    self.__facade.data.portfolio.entity.id,
                     PGroup.SHARE_MED_COMMUNITY,
                 )
                 self._io << ExportImportOperation.text_exp(portfolio)

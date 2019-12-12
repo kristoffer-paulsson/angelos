@@ -5,13 +5,13 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Daemonize starter."""
+import atexit
 import os
+import signal
 import sys
 import time
-import atexit
-import signal
 
-from .parser import Parser
+from angelos.parser import Parser
 
 
 class Application:

@@ -7,8 +7,8 @@
 """State machine."""
 import asyncio
 
-from libangelos.utils import Event
 from libangelos.error import AngelosException
+from libangelos.utils import Event
 
 
 class StateMachineError(AngelosException):

@@ -16,8 +16,7 @@ from typing import Set, Tuple
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.facade.base import BaseFacade
-
-from utils import LazyAttribute
+from libangelos.utils import LazyAttribute
 
 
 class SettingsAPI(ApiFacadeExtension):

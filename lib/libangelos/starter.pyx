@@ -12,13 +12,12 @@ import asyncio
 import logging
 
 import asyncssh
-
-from .ioc import Container
-from .document.entities import Keys
-from .policy.portfolio import PrivatePortfolio, Portfolio
-from .ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
-from .ssh.ssh import SSHClient, SSHServer
-from .ssh.client import ClientsServer, ClientsClient
+from libangelos.document.entities import Keys
+from libangelos.ioc import Container
+from libangelos.policy.portfolio import PrivatePortfolio, Portfolio
+from libangelos.ssh.client import ClientsServer, ClientsClient
+from libangelos.ssh.nacl import NaClKey, NaClPublicKey, NaClPrivateKey
+from libangelos.ssh.ssh import SSHClient, SSHServer
 
 
 class Starter:
@@ -61,7 +60,7 @@ class Starter:
             "server_host_keys": [Starter.private_key(portfolio.privkeys)],
             "process_factory": lambda: None,
             "session_factory": lambda: None,
-            "loop": loop,
+            # "loop": loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -105,7 +104,7 @@ class Starter:
             "host": host,
             "port": port,
             "server_host_keys": [Starter.private_key(portfolio.privkeys)],
-            "loop": loop,
+            # "loop": loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -139,20 +138,44 @@ class Starter:
 
     @staticmethod
     def start_server(params):
+        """
+
+        Args:
+            params:
+
+        Returns:
+
+        """
         try:
             return asyncssh.create_server(**params)
         except (OSError, asyncssh.Error) as exc:
-            logging.critical("Error starting server: %s" % str(exc))
+            logging.critical("Error starting server: %s" % str(exc), exc_info=True)
 
     @staticmethod
     def start_client(params):
+        """
+
+        Args:
+            params:
+
+        Returns:
+
+        """
         try:
             return asyncssh.create_connection(**params)
         except (OSError, asyncssh.Error) as exc:
-            logging.critical("SSH connection failed: %s" % str(exc))
+            logging.critical("SSH connection failed: %s" % str(exc), exc_info=True)
 
     @staticmethod
     def known_host(host_keys):
+        """
+
+        Args:
+            host_keys:
+
+        Returns:
+
+        """
         def callback(h, a, p):
             return (
                 [
@@ -167,8 +190,26 @@ class Starter:
 
     @staticmethod
     def public_key(keys):
+        """
+        Prepares a public key for SSH use
+
+        Args:
+            keys:
+
+        Returns:
+
+        """
         return NaClKey(key=NaClPublicKey.construct(keys.verify))
 
     @staticmethod
-    def _private_key(privkeys):
+    def private_key(privkeys):
+        """
+        Prepares a private key for SSH use
+
+        Args:
+            privkeys:
+
+        Returns:
+
+        """
         return NaClKey(key=NaClPrivateKey.construct(privkeys.seed))

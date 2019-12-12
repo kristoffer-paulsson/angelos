@@ -17,8 +17,8 @@ from libangelos.ioc import Container
 from libangelos.document.entities import Keys
 from libangelos.policy.portfolio import PrivatePortfolio
 from libangelos.ssh.ssh import SSHClient, SSHServer
-from .console import BootServer, AdminServer
-from .vars import SERVER_RSA_PRIVATE
+from angelos.console import BootServer, AdminServer
+from angelos.vars import SERVER_RSA_PRIVATE
 
 
 class ConsoleStarter(Starter):
@@ -40,7 +40,7 @@ class ConsoleStarter(Starter):
             "server_host_keys": [Starter.private_key(portfolio.privkeys)],
             "process_factory": lambda: None,
             "session_factory": lambda: None,
-            "loop": loop,
+            # "loop": loop,
         }
         params = {**params, **self.ALGS, **self.SARGS}
 
@@ -80,7 +80,7 @@ class ConsoleStarter(Starter):
             "server_factory": lambda: AdminServer(ioc),
             "host": host,
             "port": port,
-            "loop": loop,
+            # "loop": loop,
             "server_host_keys": [
                 asyncssh.import_private_key(SERVER_RSA_PRIVATE)
             ],

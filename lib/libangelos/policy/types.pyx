@@ -6,18 +6,18 @@
 #
 """Commonly used types and functions go here."""
 import datetime
-import abc
+from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Union, List
 
-from ..misc import BaseDataClass
+from libangelos.misc import BaseDataClass
 
 
-class PortfolioABC(metaclass=abc.ABCMeta):
+class PortfolioABC(metaclass=ABCMeta):
     pass
 
 
-class PrivatePortfolioABC(metaclass=abc.ABCMeta):
+class PrivatePortfolioABC(metaclass=ABCMeta):
     pass
 
 

@@ -5,28 +5,23 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Server commands."""
+import asyncio
+import binascii
+import datetime
+import logging
 import os
 import signal
-import asyncio
 import time
-import datetime
-import binascii
-import logging
 
 import libnacl
-
-from libangelos.utils import Util
-from libangelos.error import Error
-from libangelos.const import Const
-from .cmd import Command, Option
-from libangelos.policy.types import PersonData, MinistryData, ChurchData
-from libangelos.facade.facade import (
-    Facade,
-    PersonServerFacade,
-    MinistryServerFacade,
-    ChurchServerFacade,
-)
+from angelos.cmd import Command, Option
 from libangelos.automatic import BaseAuto
+from libangelos.const import Const
+from libangelos.error import Error
+from libangelos.facade.facade import Facade
+from libangelos.operation.setup import SetupPersonOperation, SetupChurchOperation, SetupMinistryOperation
+from libangelos.policy.types import PersonData, MinistryData, ChurchData
+from libangelos.utils import Util
 
 
 class ProcessCommand(Command):
@@ -212,17 +207,14 @@ documents and connect to the nodes on the current domain network.
 
                 os.makedirs(self._root, exist_ok=True)
                 if subdo == 0:
-                    facade = await PersonServerFacade.setup(
-                        self._root, secret, role, entity_data
-                    )
+                    portfolio = SetupPersonOperation.create(entity_data, server=True)
+                    facade = await Facade.setup(self._root, secret, role, True, portfolio=portfolio)
                 elif subdo == 1:
-                    facade = await MinistryServerFacade.setup(
-                        self._root, secret, role, entity_data
-                    )
+                    portfolio = SetupMinistryOperation.create(entity_data, server=True)
+                    facade = await Facade.setup(self._root, secret, role, True, portfolio=portfolio)
                 elif subdo == 2:
-                    facade = await ChurchServerFacade.setup(
-                        self._root, secret, role, entity_data
-                    )
+                    portfolio = SetupChurchOperation.create(entity_data, server=True)
+                    facade = await Facade.setup(self._root, secret, role, True, portfolio=portfolio)
 
                 self._ioc.facade = facade
 
@@ -527,7 +519,7 @@ class StartupCommand(Command):
                 facade = await Facade.open(self._root, secret)
                 self._ioc.facade = facade
                 self._io << "\nSuccessfully loaded the facade.\nID: %s\n\n" % (
-                    facade.portfolio.entity.id
+                    facade.data.portfolio.entity.id
                 )
 
             self._io << (

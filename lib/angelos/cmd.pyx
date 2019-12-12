@@ -5,21 +5,14 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-import re
 import asyncio
 import logging
+import re
 
 import asyncssh
-
-from libangelos.utils import Util, FactoryInterface
-from libangelos.error import (
-    CmdShellException,
-    CmdShellEmpty,
-    CmdShellInvalidCommand,
-    CmdShellExit,
-    Error,
-)
+from libangelos.error import CmdShellException, CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit, Error
 from libangelos.ioc import ContainerAware
+from libangelos.utils import Util, FactoryInterface
 
 
 class ConsoleIO:

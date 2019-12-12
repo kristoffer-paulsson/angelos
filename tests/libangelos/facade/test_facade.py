@@ -2,6 +2,7 @@ import os
 import asyncio
 import tracemalloc
 
+from pprint import pprint
 from unittest import TestCase
 from tempfile import TemporaryDirectory
 
@@ -43,6 +44,7 @@ class TestFacade(TestCase):
         try:
             portfolio = self._portfolio()
             facade = self._setup(portfolio)
+            pprint(facade.data.portfolio.entity.export_yaml())
             facade.close()
         except Exception as e:
             self.fail(e)
