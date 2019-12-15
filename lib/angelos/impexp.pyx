@@ -58,9 +58,9 @@ class PortfolioCommand(Command):
         )
         if imp:
             try:
-                await self.__facade.import_portfolio(portfolio)
+                await self.__facade.storage.vault.import_portfolio(portfolio)
             except OSError as e:
-                await self.__facade.update_portfolio(portfolio)
+                await self.__facade.storage.vault.update_portfolio(portfolio)
 
     async def __export(self, entity_id, group):
         if entity_id == "self":
@@ -68,7 +68,7 @@ class PortfolioCommand(Command):
         else:
             entity_id = uuid.UUID(entity_id)
 
-        portfolio = await self.__facade.load_portfolio(
+        portfolio = await self.__facade.storage.vault.load_portfolio(
             entity_id, self.__group(group)
         )
         portfolio.privkeys = None
@@ -77,7 +77,7 @@ class PortfolioCommand(Command):
 
     async def __view(self, entity_id, group):
         entity_id = uuid.UUID(entity_id)
-        portfolio = await self.__facade.load_portfolio(
+        portfolio = await self.__facade.storage.vault.load_portfolio(
             entity_id, self.__group(group)
         )
 
@@ -160,12 +160,12 @@ class PortfolioCommand(Command):
             )
 
         if statement:
-            await self.__facade.docs_to_portfolios(set([statement]))
+            await self.__facade.storage.vault.docs_to_portfolios(set([statement]))
             self._io << "\nSaved statement changes to portfolio.\n"
 
     async def __list(self, search="*"):
         self._io << "\n"
-        for doc in await self.__facade.list_portfolios(query=search):
+        for doc in await self.__facade.storage.vault.list_portfolios(query=search):
             if not doc[1]:
                 self._io << (
                     PrintPolicy.entity_title(doc[0])
@@ -304,7 +304,7 @@ class ImportCommand(Command):
             "Confirm that you want to import this portfolio"
         )
         if imp:
-            await self.__facade.import_portfolio(portfolio)
+            await self.__facade.storage.vault.import_portfolio(portfolio)
 
     @classmethod
     def factory(cls, **kwargs):
@@ -326,13 +326,13 @@ class ExportCommand(Command):
     async def _command(self, opts):
         if opts["vault"]:
             if opts["vault"] == "self":
-                portfolio = await self.__facade.load_portfolio(
+                portfolio = await self.__facade.storage.vault.load_portfolio(
                     self.__facade.data.portfolio.entity.id,
                     PGroup.SHARE_MED_COMMUNITY,
                 )
                 self._io << ExportImportOperation.text_exp(portfolio)
             elif opts["vault"] == "list":
-                for doc in await self.__facade.list_portfolios():
+                for doc in await self.__facade.storage.vault.list_portfolios():
                     if not doc[1]:
                         self._io << (
                             PrintPolicy.entity_title(doc[0])

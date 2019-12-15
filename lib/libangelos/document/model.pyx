@@ -11,19 +11,17 @@ Contains the document model. A document is made up of a number of fields.
 All fields are self-validating. Also all classes based on the BaseDocument can
 implement validation.
 """
-import re
-import datetime
-import uuid
-import ipaddress
 import base64
+import datetime
+import ipaddress
 import logging
-import enum
-from abc import ABC, ABCMeta
-
+import re
+import uuid
+from abc import ABC
 from typing import Any, Union, Callable, Type
 
-from ..utils import Util
-from ..error import Error, ModelException
+from libangelos.error import Error
+from libangelos.utils import Util
 
 
 class Field(ABC):

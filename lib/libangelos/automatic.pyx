@@ -81,8 +81,8 @@ class Net(BaseAuto):
                 [(s.connect(("1.1.1.1", 1)), s.getsockname()[0], s.close()) for s in
                  [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["127.0.0.1"])[0]
         except socket.gaierror as e:
-            logging.exception(e, exc_info=True)
-            self.ip = "127.0.0.1"
+            logging.warning(e, exc_info=True)
+            self.ip = None
         self.domain = socket.getfqdn()
 
 

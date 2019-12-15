@@ -13,6 +13,7 @@ from typing import Tuple, List, Set, Any
 
 import msgpack
 from libangelos.archive7 import Entry
+from libangelos.document.entities import Entity
 from libangelos.document.types import EntityT, StatementT, DocumentT
 from libangelos.helper import Glue
 from libangelos.policy.accept import ImportPolicy, ImportUpdatePolicy
@@ -314,7 +315,7 @@ class PortfolioMixin:
         doclist = await self.search(
             path="{0}{1}.ent".format(self.PATH_PORTFOLIOS[0], query), limit=100
         )
-        result = Glue.doc_validate_report(doclist, EntityT)
+        result = Glue.doc_validate_report(doclist, (Entity))
         return result
 
     async def import_portfolio(self, portfolio: Portfolio) -> bool:
