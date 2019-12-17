@@ -1,13 +1,15 @@
 import random
-from .test_field import BaseTestField
+import uuid
 
-from libangelos.document.model import DocumentField
 from libangelos.document.document import BaseDocument
+from libangelos.document.model import DocumentField, UuidField
 from libangelos.error import FieldInvalidType
+
+from .test_field import BaseTestField
 
 
 class TestDocument(BaseDocument):
-    pass
+    id = UuidField(init=uuid.uuid4)
 
 
 class TestDocumentField(BaseTestField):

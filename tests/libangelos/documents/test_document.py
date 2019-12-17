@@ -2,20 +2,21 @@ import datetime
 import uuid
 from unittest import TestCase
 
-from libangelos.error import DocumentShortExpiry, DocumentInvalidType
 from libangelos.document.document import Document, UpdatedMixin, OwnerMixin
+from libangelos.document.model import UuidField
+from libangelos.error import DocumentShortExpiry, DocumentInvalidType
 
 
 class StubDocument(Document):
-    pass
+    id = UuidField(init=uuid.uuid4)
 
 
 class StubDocumentUpdated(Document, UpdatedMixin):
-    pass
+    id = UuidField(init=uuid.uuid4)
 
 
 class StubDocumentOwner(Document, OwnerMixin):
-    pass
+    id = UuidField(init=uuid.uuid4)
 
 
 class TestDocument(TestCase):
@@ -34,13 +35,13 @@ class TestDocument(TestCase):
     def test__check_type(self):
         try:
             stub = StubDocument()
-            stub._check_type(0)
+            stub._check_doc_type(0)
         except Exception as e:
             self.fail(e)
 
         with self.assertRaises(DocumentInvalidType) as context:
             stub = StubDocument()
-            stub._check_type(1)
+            stub._check_doc_type(1)
 
     def test_get_touched(self):
         try:

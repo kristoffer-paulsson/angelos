@@ -55,6 +55,10 @@ class Container:
                 )
         return self.__instances[name]
 
+    def __iter__(self):
+        for instance in self.__instances.values():
+            yield instance
+
 
 class ContainerAware:
     """Mixin that makes its inheritors aware of the IoC container.

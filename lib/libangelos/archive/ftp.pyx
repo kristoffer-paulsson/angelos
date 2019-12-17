@@ -5,11 +5,15 @@
 # This file is distributed under the terms of the MIT license.
 #
 """FTP."""
-from ..const import Const
-from .storage import StorageFacadeExtension
+from libangelos.const import Const
+from libangelos.archive.storage import StorageFacadeExtension
 
 
 class FtpStorage(StorageFacadeExtension):
+    """
+    Storage for internal FTP service.
+    """
+
     ATTRIBUTE = ("ftp",)
     CONCEAL = (Const.CNL_FTP,)
     USEFLAG = (Const.A_USE_FTP,)

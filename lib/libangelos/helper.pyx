@@ -244,7 +244,8 @@ class NullProxy(Proxy):
             return result
         except Exception as e:
             logging.error(
-                'Proxy execution failed: "%s"' % str(callback.__name__)
+                'Proxy execution failed: "%s"' % str(callback.__name__),
+                exc_info=True
             )
             return e
 
@@ -299,7 +300,7 @@ class AsyncProxy(Proxy):
             await asyncio.wait_for(self.__queue.put(task), timeout)
             return task.result
         except asyncio.TimeoutError as e:
-            logging.exception(e)
+            logging.exception(e, exc_info=True)
             return None
 
     async def run(self):
@@ -321,6 +322,7 @@ class AsyncProxy(Proxy):
             task.result = result  # if result else None
         except Exception as e:
             logging.error(
-                'Proxy execution failed: "%s"' % str(task.callable.__name__)
+                'Proxy execution failed: "%s"' % str(task.callable.__name__),
+                exc_info=True
             )
             task.result = e

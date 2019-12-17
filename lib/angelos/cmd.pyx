@@ -4,10 +4,13 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-"""Module docstring."""
+"""
+Server terminal and command classes.
+"""
 import asyncio
 import logging
 import re
+from typing import Any
 
 import asyncssh
 from libangelos.error import CmdShellException, CmdShellEmpty, CmdShellInvalidCommand, CmdShellExit, Error
@@ -16,35 +19,77 @@ from libangelos.utils import Util, FactoryInterface
 
 
 class ConsoleIO:
-    """IO class for the commands to gather input."""
+    """
+    IO helper class.
 
-    def __init__(self, process):
-        """Configure the stdin and stdout stream."""
+    With this class commands can prompt the user and format output.
+    """
+
+    def __init__(self, process: asyncssh.SSHServerProcess):
+        """Configure the stdin and stdout stream.
+
+        Args:
+            process (asyncssh.SSHServerProcess):
+                The server process used for IO.
+        """
+
         self._process = process
         self._stdin = process.stdin
         self._stdout = process.stdout
         self._size = process.get_terminal_size()
 
     @property
-    def stdin(self):
+    def stdin(self) -> asyncssh.SSHReader:
+        """Property access to the process input stream.
+
+        Returns:
+            asyncssh.SSHReader:
+                The input stream
+        """
         return self._stdin
 
     @property
-    def stdout(self):
+    def stdout(self) -> asyncssh.SSHWriter:
+        """Property access to the process output stream.
+
+        Returns:
+            asyncssh.SSHWriter:
+                The output stream
+        """
         return self._stdout
 
-    def upd_size(self):
+    def upd_size(self) -> None:
         """Update terminal size at event."""
         self._size = self._process.get_terminal_size()
 
-    def __lshift__(self, other):
-        """Print to stdout C++ - style."""
-        Util.is_type(other, str)
+    def __lshift__(self, other: str) -> ConsoleIO:
+        """Print to stdout C++ - style.
+
+        Args:
+            other (str):
+                String to output stream
+
+        Returns:
+            ConsoleIO:
+                Returns the console IO instance.
+
+        """
         self._stdout.write(other)
         return self
 
-    async def prompt(self, msg="", t=str):
-        """Prompt for user input."""
+    async def prompt(self, msg: str="", t=str) -> Any:
+        """Prompt for user input.
+
+        Args:
+            msg (str):
+                Output printed as prompt.
+            t (callable):
+                Method for input type casting.
+
+        Returns:
+            The input in desirable format.
+
+        """
         while True:
             self._stdout.write("%s: " % msg)
             input = await self._stdin.readline()
@@ -58,8 +103,19 @@ class ConsoleIO:
 
         return input
 
-    async def multiline(self, msg="", t=str):
-        """Prompt for multiline user input."""
+    async def multiline(self, msg="", t=str) -> Any:
+        """Prompt for multiline user input.
+
+        Args:
+            msg (str):
+                Output printed as prompt.
+            t (callable):
+                Method for input type casting.
+
+        Returns:
+            The input in desirable format.
+
+        """
         lines = ""
         while True:
             self._stdout.write("%s:\n" % msg)

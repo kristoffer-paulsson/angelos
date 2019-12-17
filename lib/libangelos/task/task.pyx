@@ -93,21 +93,21 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         when = self.__loop.time() + run_in
         self.__timer = self.__loop.call_at(when, self.__launch, self.ATTRIBUTE[0])
 
-    async def __start(self) -> bool:
+    def __start(self) -> bool:
         """Standard preparations before execution."""
         if self.__running:
             return False
 
         self.__time_end = 0
         self.__running = True
-        await self.notify_all(self.ACTION_START, {"name": self.ATTRIBUTE[0]})
+        self.notify_all(self.ACTION_START, {"name": self.ATTRIBUTE[0]})
         self.__time_start = time.monotonic_ns()
         return True
 
-    async def __end(self) -> None:
+    def __end(self) -> None:
         """Standard cleanup after execution."""
         self.__time_end = time.monotonic_ns()
-        await self.notify_all(self.ACTION_COMPLETE, {"name": self.ATTRIBUTE[0]})
+        self.notify_all(self.ACTION_COMPLETE, {"name": self.ATTRIBUTE[0]})
         self.__running = False
         if self.__period:
             self.__next_run()
@@ -146,8 +146,8 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
 
     async def __exe(self) -> None:
         """Task executor that prepares, executes and finalizes."""
-        await self.__start()
+        self.__start()
         await self._initialize()
         await self._run()
         await self._finilize()
-        await self.__end()
+        self.__end()

@@ -8,9 +8,10 @@
 import asyncio
 import logging
 import os
-from collections import namedtuple
 from typing import Awaitable
 
+from libangelos.error import ContainerServiceNotConfigured
+from libangelos.ioc import Container
 from libangelos.policy.portfolio import PGroup
 from libangelos.utils import Util
 
@@ -95,7 +96,6 @@ class FacadeExtension(FacadeFrozen):
             return True
 
 
-
 class BaseFacade:
     """Facade is the interface and firewall for an entity and its documents.
 
@@ -138,54 +138,102 @@ class BaseFacade:
 
         self.__closed = False
 
-        self.__data = dict()
-        self.__api = dict()
-        self.__task = dict()
-        self.__storage = {"vault": vault}
+        self.__storage = self._load_storages(vault)
+        self.__api = self._load_extensions("APIS")
+        self.__data = self._load_extensions("DATAS")
+        self.__task = self._load_extensions("TASKS")
 
-        self._load_storages(vault.archive.stats())
-        self._load_extensions("APIS", self.__api)
-        self._load_extensions("DATAS", self.__data)
-        self._load_extensions("TASKS", self.__task)
+    def _load_extensions(self, attr: str) -> Container:
+        """Prepare facade extensions in an ioc container.
 
-    def _load_extensions(self, attr: str, exts: dict) -> None:
+        Args:
+            attr (str):
+                The attribute name to look for class type.
+
+        Returns:
+            Initiated ioc Container.
+
+        """
+        def generator(klass, facade):
+            """Container lambda generator."""
+            return lambda x: klass(facade)
+
         if hasattr(self, attr):
-            for ext_cls in getattr(self, attr, []):
-                extension = ext_cls(self)
+            config = dict()
 
-                attribute = extension.ATTRIBUTE[0]
-                if attribute in exts.keys():
+            for ext_cls in getattr(self, attr, []):
+                attribute = ext_cls.ATTRIBUTE[0]
+                if attribute in config.keys():
                     raise RuntimeError(
                         "Extension attribute \"%s\" in \"%s\" already occupied." % (attribute, attr))
-                exts[attribute] = extension
+                config[attribute] = generator(ext_cls, self)
 
-    def _load_storages(self, stats) -> None:
+            return Container(config)
+        else:
+            return None
+
+    def _load_storages(self, vault: "StorageFacadeExtension") -> Container:
+        """Prepare facade storage extensions in an ioc container.
+
+        Args:
+            vault (StorageFacadeExtension):
+                Already instantiated VaultStorage.
+
+        Returns:
+            Initiated ioc Container.
+
+        """
+        def generator(klass, facade, path, secret):
+            """Container lambda generator."""
+            return lambda x: klass(facade, path, secret)
+
+        def generator_setup(klass, facade, path, secret, owner, node, domain):
+            """Container lambda generator."""
+            return lambda x: storage_cls.setup(
+                self, self.__home_dir, self.__secret, owner=owner, node=node, domain=domain)
+
         if hasattr(self, "STORAGES"):
-            for stor_cls in self.STORAGES:
-                if os.path.isfile(stor_cls.filename(stor_cls.CONCEAL[0])):
-                    storage = stor_cls(self, self.__home_dir, self.__secret)
-                else:
-                    storage = stor_cls.setup(self, self.__home_dir, self.__secret, owner=stats.owner, node=stats.node,
-                                             domain=stats.domain)
+            config = {"vault": lambda x: vault}
+            stats = vault.archive.stats()
 
-                attribute = storage.ATTRIBUTE[0]
-                if attribute in self.__storage.keys():
+            for storage_cls in self.STORAGES:
+                attribute = storage_cls.ATTRIBUTE[0]
+                if attribute in config.keys():
                     raise RuntimeError(
                         "Extension attribute \"%s\" in \"%s\"already occupied." % (attribute, self.__storages.__name__))
-                self.__storage[attribute] = storage
+
+                if os.path.isfile(storage_cls.filename(storage_cls.CONCEAL[0])):
+                    config[attribute] = generator(storage_cls, self.__home_dir, self.__secret)
+                else:
+                    config[attribute] = generator_setup(
+                        storage_cls, self, self.__home_dir, self.__secret,
+                        owner=stats.owner, node=stats.node, domain=stats.domain
+                    )
+
+            return Container(config)
+        else:
+            return None
 
     async def post_init(self) -> None:
         """Async post initialization."""
         self._check_post_init()
 
-        self.__data = namedtuple("DataNTuple", self.__data.keys())(**self.__data)
-        self.__api = namedtuple("ApiNTuple", self.__api.keys())(**self.__api)
-        self.__task = namedtuple("TaskNTuple", self.__task.keys())(**self.__task)
-        self.__storage = namedtuple("ArchiveNTuple", self.__storage.keys())(**self.__storage)
-
         portfolio = await self.storage.vault.load_portfolio(
             self.storage.vault.archive.stats().owner, PGroup.ALL)
         Util.populate(self.data.portfolio, vars(portfolio))
+
+        await self.api.settings.load_preferences()
+        self.data.prefs.post_init()
+
+        try:
+            self.data.server.post_init()
+        except ContainerServiceNotConfigured as e:
+            pass
+
+        try:
+            self.data.client.post_init()
+        except ContainerServiceNotConfigured as e:
+            pass
 
         self.__post_init = True
 

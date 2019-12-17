@@ -5,11 +5,14 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Routing."""
-from ..const import Const
-from .storage import StorageFacadeExtension
+from libangelos.const import Const
+from libangelos.archive.storage import StorageFacadeExtension
 
 
 class RoutingStorage(StorageFacadeExtension):
+    """
+    Storage for inter-domain mail routing.
+    """
     ATTRIBUTE = ("routing",)
     CONCEAL = (Const.CNL_ROUTING,)
     USEFLAG = (Const.A_USE_ROUTING,)

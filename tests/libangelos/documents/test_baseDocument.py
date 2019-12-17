@@ -24,7 +24,7 @@ class TestDocument(BaseDocument):
 
 class TestBaseDocument(TestCase):
     def setUp(self):
-        self.instance = BaseDocument()
+        self.instance = TestDocument()
 
     def tearDown(self):
         del self.instance

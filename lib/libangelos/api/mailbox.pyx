@@ -20,7 +20,7 @@ from libangelos.helper import Glue
 from libangelos.policy.crypto import Crypto
 from libangelos.policy.message import EnvelopePolicy
 from libangelos.policy.portfolio import DOCUMENT_PATH
-from libangelos.utils import LazyAttribute
+from libangelos.misc import LazyAttribute
 
 
 class MailboxAPI(ApiFacadeExtension):
@@ -39,8 +39,6 @@ class MailboxAPI(ApiFacadeExtension):
     def __init__(self, facade: BaseFacade):
         """Initialize the Mail."""
         ApiFacadeExtension.__init__(self, facade)
-        self.__vault = LazyAttribute(lambda: self.facade.storage.vault)
-        self.__portfolio = LazyAttribute(lambda: self.facade.data.portfolio)
 
     async def mail_to_inbox(
         self, envelopes: Envelope
@@ -50,13 +48,13 @@ class MailboxAPI(ApiFacadeExtension):
         save_list = list()
 
         for envelope in envelopes:
-            envelope = EnvelopePolicy.receive(self.__portfolio, envelope)
+            envelope = EnvelopePolicy.receive(self.facade.data.portfolio, envelope)
             if not envelope:
                 reject.add(envelope)
                 continue
 
             save_list.append(
-                self.__vault.save(
+                self.facade.storage.vault.save(
                     DOCUMENT_PATH[envelope.type].format(
                         dir=MailboxAPI.INBOX, file=envelope.id
                     ),
@@ -69,7 +67,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_inbox(self) -> List[Envelope]:
         """Load envelopes from the inbox."""
-        doc_list = await self.__vault.search(
+        doc_list = await self.facade.storage.vault.search(
             self.facade.data.portfolio.entity.id, MailboxAPI.INBOX + "/*", limit=200
         )
         result = Glue.doc_validate_report(doc_list, Envelope)
@@ -84,7 +82,7 @@ class MailboxAPI(ApiFacadeExtension):
         return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.READ, Mail)
 
     async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
-        doc_list = await self.__vault.search(
+        doc_list = await self.facade.storage.vault.search(
             path=DOCUMENT_PATH[doc_type_num].format(
                 dir=box_dir, file=doc_id
             ),
@@ -117,15 +115,15 @@ class MailboxAPI(ApiFacadeExtension):
         letter = StoredLetter(
             nd={
                 "id": message.id,
-                "issuer": self.__portfolio.entity.id,
+                "issuer": self.facade.data.portfolio.entity.id,
                 "envelope": envelope,
                 "message": message,
             }
         )
-        letter = Crypto.sign(letter, self.__portfolio)
+        letter = Crypto.sign(letter, self.facade.data.portfolio)
         letter.validate()
 
-        result = await self.__vault.save(
+        result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.CACHED_MSG].format(
                 dir=MailboxAPI.CACHE, file=letter.id
             ),
@@ -134,7 +132,7 @@ class MailboxAPI(ApiFacadeExtension):
         if isinstance(result, Exception):
             raise result
 
-        result = await self.__vault.delete(
+        result = await self.facade.storage.vault.delete(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.INBOX, file=envelope.id
             )
@@ -146,7 +144,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def save_read(self, message: Mail):
         """Save a message as read in the read message folder."""
-        result = await self.__vault.save(
+        result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.READ, file=message.id
             ),
@@ -158,8 +156,8 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_read(self) -> List[Mail]:
         """Load read folder from the messages store."""
-        doclist = await self.__vault.search(
-            self.__portfolio.entity.id, MailboxAPI.READ + "/*", limit=100
+        doclist = await self.facade.storage.vault.search(
+            self.facade.data.portfolio.entity.id, MailboxAPI.READ + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Mail)
         return result
@@ -178,7 +176,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_outbox(self) -> List[Envelope]:
         """Load letters from outbox folder."""
-        doclist = await self.__vault.search(
+        doclist = await self.facade.storage.vault.search(
             path=MailboxAPI.OUTBOX + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Envelope)
@@ -186,7 +184,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def save_sent(self, message: Mail):
         """Save a message to sent folder for archiving."""
-        result = await self.__vault.save(
+        result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.SENT, file=message.id
             ),
@@ -198,7 +196,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def save_draft(self, message: Mail):
         """Save a message to draft folder for archiving."""
-        result = await self.__vault.save(
+        result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.DRAFT, file=message.id
             ),
@@ -210,7 +208,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_drafts(self) -> List[Mail]:
         """Load read folder from the messages store."""
-        doclist = await self.__vault.search(
+        doclist = await self.facade.storage.vault.search(
             path=MailboxAPI.DRAFT + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Mail, False)
@@ -218,7 +216,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def import_envelope(self, envelope: Envelope):
         """Imports an envelope to inbox."""
-        result = await self.__vault.save(
+        result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.INBOX, file=envelope.id
             ),

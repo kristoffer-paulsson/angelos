@@ -6,7 +6,7 @@
 #
 """Module for reactive programming, using the observer pattern."""
 import asyncio
-from typing import Set
+from typing import Set, Any
 
 
 class Event:
@@ -86,10 +86,9 @@ class ObserverMixin:
         All notifiers subscribed to.
 
     """
-    __subscriptions: Set["NotifierMixin"]  # noqa F821
 
     def __init__(self):
-        self.__subscriptions = set()
+        self.__subscriptions  = set()
 
     def add_subscription(
         self, notifier: "NotifierMixin", internal: bool=False  # noqa F821
@@ -154,12 +153,11 @@ class NotifierMixin:
         All subscribers that observe.
 
     """
-    __subscribers: Set["ObserverMixin"]
 
     def __init__(self):
         self.__subscribers = set()
 
-    def subscribe(self, observer: "ObserverMixin", internal: bool=False):
+    def subscribe(self, observer: "ObserverMixin", internal: bool=False) -> None:
         """Adds a subscriber to the notifier to be notified.
 
         Parameters
@@ -174,7 +172,7 @@ class NotifierMixin:
         if not internal:
             observer.add_subscription(self, True)
 
-    def unsubscribe(self, observer: "ObserverMixin", internal: bool=False):
+    def unsubscribe(self, observer: "ObserverMixin", internal: bool=False) -> None:
         """Removes subscriber from the notifier
 
         Parameters
@@ -189,7 +187,7 @@ class NotifierMixin:
         if not internal:
             observer.end_subscription(self, True)
 
-    async def notify_all(self, action: int, data: dict=None) -> asyncio.Task:
+    def notify_all(self, action: int, data: dict=None) -> asyncio.Task:
         """Invoke this method to notify all observers about an action.
 
         This method
@@ -208,12 +206,31 @@ class NotifierMixin:
 
         """
         event = Event(self, action, data)
-        # asyncio.get_event_loop().call_soon(asyncio.gather, *[obs.notify(event) for obs in self.__subscribers])
-        return await asyncio.gather(
-           *[obs.notify(event) for obs in self.__subscribers])
+        return asyncio.ensure_future(asyncio.gather(*[obs.notify(event) for obs in self.__subscribers]))
 
     def __del__(self):
         """Cancel all subscriptions upon deletion."""
         for observer in self.__subscribers:
             observer.end_subscription(self, True)
         self.__subscribers.clear()
+
+
+class ReactiveAttribute(NotifierMixin):
+    """
+    A class holding a value that can be subscribed to.
+    """
+    def __init__(self, attribute: str, value: Any=None):
+        NotifierMixin.__init__(self)
+        self.__attr = attribute
+        self.__value = value
+
+    def __get__(self, instance, owner):
+        self.notify_all(1, {"attr": self.__attr, "value": self.__value})
+        return self.__value
+
+    def __set__(self, instance, value):
+        self.__value = value
+        self.notify_all(2, {"attr": self.__attr, "value": self.__value})
+
+    def __delete__(self, instance):
+        self.notify_all(3, {"attr": self.__attr, "value": self.__value})

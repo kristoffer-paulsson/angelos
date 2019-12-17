@@ -5,39 +5,34 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive7 utility code."""
-import os
-import sys
-import re
-import pwd
-import grp
-import uuid
+import binascii
 import getpass
 import glob
-import binascii
-import logging
+import grp
 import hashlib
+import logging
 import math
+import os
 import pathlib
+import pwd
+import re
+import sys
+import uuid
 
 import libnacl
-
-from archive7 import Archive7, Entry
-from ..error import ArchiveInvalidSeek
-
+from libangelos.archive7 import Archive7, Entry
+from libangelos.error import ArchiveInvalidSeek
 
 BYTES_SUF = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 ENDING_SUF = ".ar7.cnl"
-
 
 def out(*args):
     """Stream wrapper for sys.stdout."""
     sys.stdout.write(" ".join([str(s) for s in args]) + "\n")
 
-
 def err(*args):
     """Stream wrapper for sys.stderr."""
     sys.stderr.write(" ".join([str(s) for s in args]) + "\n")
-
 
 def get_key(args, generate=False):
     """Receive encryption key if --key argument not set."""
@@ -78,12 +73,10 @@ def get_key(args, generate=False):
         )
         return binascii.unhexlify(hashlib.sha512(key).hexdigest()[64:])
 
-
 def file_size(size):
     """Human readable filesize."""
     order = int(math.log2(size) / 10) if size else 0
     return "{:<5.4g} {:}".format(size / (1 << (order * 10)), BYTES_SUF[order])
-
 
 def run_test(args, parser):
     """Run command test."""
@@ -166,7 +159,6 @@ def run_test(args, parser):
         else:
             parser.exit(1)
 
-
 def run_list(args, parser):
     """Run command list."""
     src = args.list
@@ -219,7 +211,6 @@ def run_list(args, parser):
                 "Statistics:\nFiles: %s\nDirs: %s\nLinks: %s\nSpace: %s\n"
                 % (files, dirs, links, size)
             )
-
 
 def run_extract(args, parser):
     """Run command extract."""
@@ -345,7 +336,6 @@ def run_extract(args, parser):
         else:
             parser.exit(1)
 
-
 def run_create(args, parser):
     """Run command extract."""
     archive = args.create.pop(0)
@@ -373,7 +363,7 @@ def run_create(args, parser):
 
             elif os.path.isdir(source):
                 for filename in glob.iglob(
-                    os.path.join(source, "**/*"), recursive=True
+                        os.path.join(source, "**/*"), recursive=True
                 ):
 
                     if args.unix:
@@ -432,7 +422,6 @@ def run_create(args, parser):
             + "\033[32m%s\033[0m\n(\033[36;5mMake a backup!\033[0m)\n"
             % (binascii.hexlify(key).decode())
         )
-
 
 def main():
     """Ar7 utility main method."""
@@ -536,7 +525,7 @@ def main():
             logging.exception(e)
             err("-" * 21, "Verbose info end", "-" * 21)
         if not args.quite:
-            parser.exit(1, "Program exited bacause of: %s.\n\n" % e)
+            parser.exit(1, "Program exited because of: %s.\n\n" % e)
         else:
             parser.exit(1)
 

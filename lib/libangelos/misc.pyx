@@ -6,10 +6,63 @@
 #
 """Module docstring."""
 import abc
+import asyncio
+import atexit
+import concurrent
 import uuid
 from dataclasses import dataclass, asdict as data_asdict
+from threading import Thread
+from typing import Callable, Awaitable, Any
 
 import plyer
+
+
+class Loop:
+    """
+    Isolated asynchronous loop inside a thread.
+    """
+
+    __main = None
+
+    def __init__(self):
+        loop = asyncio.new_event_loop()
+        self.__thread = Thread(target=self.__run, daemon=True)
+        atexit.register(self.__stop)
+        self.__thread.start()
+
+    @classmethod
+    def main(cls, coro: Awaitable):
+        """Global instance of Loop."""
+        if not cls.__main:
+            cls.__main = Loop()
+        cls.__main(coro)
+
+    def __run(self) -> None:
+        asyncio.set_event_loop(self.__loop)
+        self.__loop.run_forever()
+
+    def __stop(self) -> None:
+        self.__loop.call_soon_threadsafe(self.__loop.stop)
+
+    def __call__(
+            self,
+            coro: Awaitable,
+            callback: Callable[[concurrent.futures.Future], None] = None,
+            wait=False
+    ) -> Any:
+        future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
+        if callback:
+            future.add_done_callback(callback)
+        else:
+            future.add_done_callback(self.__callback)
+
+        if wait:
+            return future.result()
+        else:
+            return future
+
+    def __callback(self, future: concurrent.futures.Future = None):
+        pass
 
 
 @dataclass
@@ -74,3 +127,21 @@ class Misc:
             return serial
         except NotImplementedError:
             return str(uuid.getnode())
+
+
+class LazyAttribute:
+    """
+    Attribute class that allows lazy loading using a lambda.
+    """
+    def __init__(self, loader: Callable):
+        self.__loader = loader
+        self.__done = False
+        self.__value = None
+
+    def __get__(self, obj, obj_type) -> Any:
+        return self.__value if self.__done else self.__load()
+
+    def __load(self) -> Any:
+        self.__value = self.__loader()
+        self.__done = True
+        return self.__value

@@ -1270,6 +1270,9 @@ class Archive7(ContainerAware):
                     idx = i
                     offset = self.__all[i].offset
 
+            if not idx:
+                raise RuntimeError("Unknown bug!")
+
             return idx
 
         def update(self, entry, index):

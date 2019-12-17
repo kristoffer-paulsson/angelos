@@ -409,7 +409,7 @@ class PortfolioMixin:
         for data in results:
             if isinstance(data, Exception):
                 logging.warning("Failed to load document: %s" % data)
-                logging.exception(data)
+                logging.exception(data, exc_info=True)
                 continue
 
             document = PortfolioPolicy.deserialize(data)

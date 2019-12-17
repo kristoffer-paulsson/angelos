@@ -5,12 +5,15 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Pool."""
-from .portfolio_mixin import PortfolioMixin
-from ..const import Const
-from .storage import StorageFacadeExtension
+from libangelos.archive.portfolio_mixin import PortfolioMixin
+from libangelos.const import Const
+from libangelos.archive.storage import StorageFacadeExtension
 
 
 class PoolStorage(StorageFacadeExtension, PortfolioMixin):
+    """
+    Storage for the information pool.
+    """
     ATTRIBUTE = ("pool",)
     CONCEAL = (Const.CNL_POOL,)
     USEFLAG = (Const.A_USE_POOL,)

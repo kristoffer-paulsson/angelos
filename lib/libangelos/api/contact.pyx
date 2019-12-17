@@ -12,7 +12,7 @@ from libangelos.document.entities import Person, Ministry, Church
 from libangelos.document.types import EntityT
 from libangelos.facade.base import BaseFacade
 from libangelos.helper import Glue
-from libangelos.utils import LazyAttribute
+from libangelos.misc import LazyAttribute
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -25,12 +25,10 @@ class ContactAPI(ApiFacadeExtension):
     def __init__(self, facade: BaseFacade):
         """Initialize the Contacts."""
         ApiFacadeExtension.__init__(self, facade)
-        self.__vault = LazyAttribute(lambda: self.facade.storage.vault)
-        self.__portfolio = LazyAttribute(lambda: self.facade.data.portfolio)
 
     async def load_all(self) -> List[EntityT]:
         """Load contacts from portfolios."""
-        doc_list = await self.__vault.search(
+        doc_list = await self.facade.storage.vault.search(
             path=ContactAPI.PORTFOLIOS + "/*/*.ent",
             limit=1000
         )

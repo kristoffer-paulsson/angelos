@@ -9,11 +9,11 @@ import uuid
 
 from typing import List
 
-from ..const import Const
-from ..policy.portfolio import PortfolioPolicy
-from ..archive7 import Entry, Archive7
-from ..helper import Glue, Globber
-from .storage import StorageFacadeExtension
+from libangelos.const import Const
+from libangelos.policy.portfolio import PortfolioPolicy
+from libangelos.archive7 import Entry, Archive7
+from libangelos.helper import Glue, Globber
+from libangelos.archive.storage import StorageFacadeExtension
 
 
 class MailStorage(StorageFacadeExtension):
@@ -28,8 +28,8 @@ class MailStorage(StorageFacadeExtension):
     CONCEAL = (Const.CNL_MAIL,)
     USEFLAG = (Const.A_USE_MAIL,)
 
-    HIERARCHY = (
-        "/")
+    INIT_HIERARCHY = (
+        "/",)
 
     async def save(self, filename, document):
         """Save a document at a certian location."""

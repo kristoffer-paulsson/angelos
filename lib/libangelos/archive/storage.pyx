@@ -21,10 +21,11 @@ class StorageFacadeExtension(FacadeExtension):
     CONCEAL = ("",)
     USEFLAG = (0,)
 
-    HIERARCHY = ("/",)
+    INIT_HIERARCHY = ("/",)
+    INIT_FILES = ()
 
     def __init__(self, facade: BaseFacade, home_dir: str, secret: bytes, delete=Archive7.Delete.HARD):
-        """Initialize the Mail."""
+        """Initialize the Storage extension."""
         FacadeExtension.__init__(self, facade)
         self.__archive = Archive7.open(self.filename(home_dir), secret, delete)
         atexit.register(self.__archive.close)
@@ -87,6 +88,7 @@ class StorageFacadeExtension(FacadeExtension):
             use=cls.USEFLAG[0],
         )
         cls._hierarchy(arch)
+        # cls._files(arch)
         arch.close()
 
         return cls(facade, home_dir, secret)
@@ -105,5 +107,10 @@ class StorageFacadeExtension(FacadeExtension):
 
     @classmethod
     def _hierarchy(cls, archive):
-        for i in cls.HIERARCHY:
+        for i in cls.INIT_HIERARCHY:
             archive.mkdir(i)
+
+    @classmethod
+    def _files(cls, archive):
+        for i in cls.INIT_FILES:
+            archive.mkfile(i[0], i[1])

@@ -284,6 +284,7 @@ class DocumentMeta(type):
                 del ns[fname]
 
         ns["_fields"] = fields
+
         return super().__new__(mcs, name, bases, ns)
 
 
@@ -327,6 +328,9 @@ class BaseDocument(metaclass=DocumentMeta):
             except AttributeError as e:
                 if strict:
                     raise e
+
+        if not self._fields:
+            raise RuntimeError("Fields are required.")
 
     def __setattr__(self, key, value):
         """
@@ -572,7 +576,7 @@ class DocumentField(Field):
             Returns restored field.
 
         """
-        return self.type.build(v) if isinstance(v, (bytes, dict)) else None
+        return self.type.build(v) if v else None
 
 
 class UuidField(Field):

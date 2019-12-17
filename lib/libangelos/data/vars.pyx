@@ -9,6 +9,7 @@
 PREFERENCES_INI = b"""
 [Preferences]
 CurrentNetwork=None
+NightMode=True
 ; The preselected network to connect to.
 """
 

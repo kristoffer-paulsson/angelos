@@ -13,7 +13,7 @@ from libangelos.facade.base import BaseFacade
 from libangelos.helper import Globber
 from libangelos.replication.handler import Actions, CHUNK_SIZE
 from libangelos.replication.preset import Preset, MailClientPreset, MailServerPreset, CustomPreset, FileSyncInfo
-from libangelos.utils import LazyAttribute
+from libangelos.misc import LazyAttribute
 
 
 class ReplicationAPI(ApiFacadeExtension):
@@ -25,8 +25,6 @@ class ReplicationAPI(ApiFacadeExtension):
 
     def __init__(self, facade: BaseFacade):
         ApiFacadeExtension.__init__(self, facade)
-        self.__vault = LazyAttribute(lambda: self.facade.storage.vault)
-        self.__portfolio = LazyAttribute(lambda: self.facade.data.portfolio)
 
     def create_preset(
             self, name: str, p_type: int, user_id: uuid.UUID, **kwargs

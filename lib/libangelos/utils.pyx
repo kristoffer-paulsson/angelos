@@ -14,7 +14,7 @@ import asyncio
 import importlib
 import os
 import sys
-from typing import Any, Callable, _GenericAlias
+from typing import _GenericAlias
 
 from libangelos.error import ERROR_INFO
 
@@ -293,19 +293,3 @@ class FactoryInterface:
         return cls(kwargs["io"])
 
 
-class LazyAttribute:
-    """
-    Attribute class that allows lazy loading using a lambda.
-    """
-    def __init__(self, loader: Callable):
-        self.__loader = loader
-        self.__done = False
-        self.__value = None
-
-    def __get__(self, obj, obj_type) -> Any:
-        return self.__value if self.__done else self.__load()
-
-    def __load(self) -> Any:
-        self.__value = self.__loader()
-        self.__done = True
-        return self.__value

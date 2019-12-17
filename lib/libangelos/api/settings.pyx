@@ -12,58 +12,90 @@ import csv
 import io
 import uuid
 from configparser import ConfigParser, ExtendedInterpolation
-from typing import Set, Tuple
+from typing import Set, Tuple, Any
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.facade.base import BaseFacade
-from libangelos.utils import LazyAttribute
+from libangelos.misc import LazyAttribute
 
 
 class SettingsAPI(ApiFacadeExtension):
     """An interface class to be placed on the facade."""
 
     ATTRIBUTE = ("settings",)
+    PATH_PREFS = ("preferences.ini",)
+
+    add_section = None
+    options = None
+    sections = None
+    items = None
+    get = None
+    set = None
 
     def __init__(self, facade: BaseFacade):
         """Initialize the Mail."""
         ApiFacadeExtension.__init__(self, facade)
-        self.__vault = LazyAttribute(lambda: self.facade.storage.vault)
-        self.__portfolio = LazyAttribute(lambda: self.facade.data.portfolio)
+        self.__config = ConfigParser()
+        self.__config.optionxform = str
+        self.add_section = self.__config.add_section
+        self.options = self.__config.options
+        self.sections = self.__config.sections
+        self.items = self.__config.items
+        self.get = self.__config.get
+        self.set = self.__config.set
 
-    async def __load(self, name: str) -> io.StringIO:
-        return io.StringIO((await self.__vault.load_settings(name)).decode())
-
-    async def __save(self, name: str, text: io.StringIO) -> bool:
-        return await self.__vault.save_settings(name, text.getvalue().encode())
-
-    async def load_preferences(self) -> ConfigParser:
+    async def load_preferences(self) -> None:
         """
-        Load all available networks.
-
-        :return:
+        Load preferences.ini file into a configparser.
         """
-        parser = ConfigParser(interpolation=ExtendedInterpolation())
-        parser.read_file(await self.__load("preferences.ini"))
-        return parser
+        self.__config.read_file(await self.facade.storage.vault.load_settings(self.PATH_PREFS[0]))
 
-    async def save_preferences(self, parser: ConfigParser) -> bool:
+    async def save_preferences(self) -> bool:
         """
-        Load all available networks.
-
-        :param parser:
-        :return:
+        Save a configparser into preferences.ini file.
         """
         text = io.StringIO()
-        parser.write(text)
-        return await self.__save("preferences.ini", text)
+        self.__config.write(text)
+        return await self.facade.storage.vault.save_settings(self.PATH_PREFS[0], text)
+
+    async def load_set(self, name: str) -> Set[Tuple[Any, ...]]:
+        """
+        Load a csv file into a set of tuples.
+
+        Args:
+            name: filename
+
+        Returns:
+            Set of tupled data.
+        """
+        data = set()
+        for row in csv.reader(await self.facade.storage.vault.load_settings(name)):
+            data.add(tuple(row))
+        return data
+
+    async def save_set(self, name: str, data: Set[Tuple[Any, ...]]) -> bool:
+        """
+        Save a set of tuples as rows in a csv file.
+
+        Args:
+            name: filename
+            data: set of tuples
+
+        Returns:
+            Success of failure
+        """
+        output = io.StringIO()
+        writer  = csv.writer(output)
+        for row in data:
+            writer.writerow(row)
+        output.close()
+        return await self.facade.storage.vault.save_settings(name, output)
 
     async def networks(self) -> Set[Tuple[uuid.UUID, bool]]:
         """
-        Load all available networks
+        Load all available networks.
 
-        :return:
+        Returns:
+            set of tuples width network UUID's
         """
-        nets = set()
-        for row in csv.reader(await self.__load("networks.csv")):
-            nets.add(tuple(row))
-        return nets
+        return await self.load_set("network.csv")

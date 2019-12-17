@@ -6,6 +6,10 @@
 #
 """Module docstring."""
 
+from libangelos.api.contact import ContactAPI
+from libangelos.api.mailbox import MailboxAPI
+from libangelos.api.replication import ReplicationAPI
+from libangelos.api.settings import SettingsAPI
 from libangelos.archive.ftp import FtpStorage
 from libangelos.archive.home import HomeStorage
 from libangelos.archive.mail import MailStorage
@@ -13,15 +17,14 @@ from libangelos.archive.pool import PoolStorage
 from libangelos.archive.routing import RoutingStorage
 from libangelos.archive.vault import VaultStorage
 from libangelos.const import Const
+from libangelos.data.portfolio import PortfolioData
 from libangelos.document.entities import Person, Ministry, Church
 from libangelos.facade.base import BaseFacade
 from libangelos.policy.portfolio import PrivatePortfolio
 
-from libangelos.api.contact import ContactAPI
-from libangelos.api.mailbox import MailboxAPI
-from libangelos.api.replication import ReplicationAPI
-from libangelos.api.settings import SettingsAPI
-from libangelos.data.portfolio import PortfolioData
+from libangelos.data.client import ClientData
+from libangelos.data.prefs import PreferencesData
+from libangelos.data.server import ServerData
 
 
 class EntityFacadeMixin:
@@ -59,7 +62,7 @@ class TypeFacadeMixin:
 
     STORAGES = ()
     APIS = (SettingsAPI, MailboxAPI, ContactAPI, ReplicationAPI)
-    DATAS = (PortfolioData, )
+    DATAS = (PortfolioData, PreferencesData)
     TASKS = ()
 
     def __init__(self):
@@ -72,7 +75,7 @@ class ServerFacadeMixin(TypeFacadeMixin):
 
     STORAGES = (MailStorage, PoolStorage, RoutingStorage, FtpStorage) + TypeFacadeMixin.STORAGES
     APIS = () + TypeFacadeMixin.APIS
-    DATAS = () + TypeFacadeMixin.DATAS
+    DATAS = (ServerData, ) + TypeFacadeMixin.DATAS
     TASKS = () + TypeFacadeMixin.TASKS
 
     def __init__(self):
@@ -85,7 +88,7 @@ class ClientFacadeMixin(TypeFacadeMixin):
 
     STORAGES = (HomeStorage,) + TypeFacadeMixin.STORAGES
     APIS = () + TypeFacadeMixin.APIS
-    DATAS = () + TypeFacadeMixin.DATAS
+    DATAS = (ClientData, ) + TypeFacadeMixin.DATAS
     TASKS = () + TypeFacadeMixin.TASKS
 
     def __init__(self):
@@ -215,14 +218,14 @@ class Facade:
         return facade
 
     @classmethod
-    def _check_role(cls, role):
+    def _check_role(cls, role: int) -> int:
         """Check that vault role is valid."""
         if role not in (Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP):
             raise ValueError("Illegal role")
         return role
 
     @classmethod
-    def _check_type(cls, portfolio: PrivatePortfolio, server: bool):
+    def _check_type(cls, portfolio: PrivatePortfolio, server: bool) -> None:
         """Check that entity type is valid and calculate vault type."""
         if not portfolio.entity:
             raise ValueError("No entity present in portfolio")

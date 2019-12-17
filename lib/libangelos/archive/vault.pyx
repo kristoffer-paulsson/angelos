@@ -5,24 +5,17 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Vault."""
-import asyncio
-import uuid
 import logging
+import uuid
+import io
 from typing import List
 
-from .portfolio_mixin import PortfolioMixin
-from ..const import Const
-from ..policy.portfolio import (
-    Portfolio,
-    PrivatePortfolio,
-    PField,
-    DOCUMENT_PATH,
-    PORTFOLIO_PATTERN,
-    PortfolioPolicy,
-)
-from ..archive7 import Entry
-from ..helper import Glue, Globber
-from .storage import StorageFacadeExtension
+from libangelos.archive.portfolio_mixin import PortfolioMixin
+from libangelos.archive.storage import StorageFacadeExtension
+from libangelos.archive7 import Entry
+from libangelos.const import Const
+from libangelos.helper import Glue, Globber
+from libangelos.policy.portfolio import PrivatePortfolio, PortfolioPolicy
 
 
 class VaultStorage(StorageFacadeExtension, PortfolioMixin):
@@ -37,7 +30,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     CONCEAL = (Const.CNL_VAULT,)
     USEFLAG = (Const.A_USE_VAULT,)
 
-    HIERARCHY = (
+    INIT_HIERARCHY = (
         "/",
         "/cache",
         "/cache/msg",
@@ -69,17 +62,22 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         "/portfolios",
     )
 
+    INIT_FILES = (
+        ("/settings/preferences.ini", b""),
+        ("/settings/networks.csv", b"")
+    )
+
     NODES = "/settings/nodes"
     INBOX = "/messages/inbox/"
 
     @classmethod
     def setup(
-        cls,
-        home_dir: str,
-        secret: bytes,
-        portfolio: PrivatePortfolio,
-        vtype=None,
-        vrole=None,
+            cls,
+            home_dir: str,
+            secret: bytes,
+            portfolio: PrivatePortfolio,
+            vtype=None,
+            vrole=None,
     ) -> object:
         """Create and setup the whole Vault according to policy's."""
         return super(VaultStorage, cls).setup(
@@ -140,7 +138,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         return await self.proxy.call(callback, 0, 5)
 
     async def search(
-        self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
+            self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
 
@@ -160,23 +158,33 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
 
         return await self.proxy.call(callback, 0, 5)
 
-    async def save_settings(self, name: str, data: bytes) -> bool:
-        """Save or update a settings file."""
+    async def save_settings(self, name: str, text: io.StringIO) -> bool:
+        """Save or update a text settings file."""
         try:
             filename = "/settings/" + name
             if self.archive.isfile(filename):
-                self.archive.save(filename, data)
+                method = self.archive.save
             else:
-                self.archive.mkfile(filename, data)
+                method = self.archive.mkfile
+
+            return await self.proxy.call(
+                method,
+                filename=filename,
+                data=text.getvalue().encode(),
+                owner=self.facade.data.portfolio.entity.id,
+            )
         except Exception as e:
             logging.exception(e)
-            return False
 
-        return True
+        return False
 
-    async def load_settings(self, name: str) -> bytes:
-        """Load a settings file."""
+    async def load_settings(self, name: str) -> io.StringIO:
+        """Load a text settings file."""
         filename = "/settings/" + name
         if self.archive.isfile(filename):
-            return self.archive.load(filename)
-        return b""
+            data = await self.proxy.call(
+                self.archive.load,
+                filename=filename
+            )
+            return io.StringIO(data.decode())
+        return io.StringIO()
