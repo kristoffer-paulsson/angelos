@@ -42,7 +42,7 @@ class DictionaryMixin:
             settings.add_section(self.SECTION[0])
 
         for key, value in settings.items(self.SECTION[0]):
-            self.__items[key] = ReactiveValue(value)
+            self.__items[key] = ReactiveValue(self.from_ini(value))
 
     def subscribe(self, option: str, observer: ObserverMixin) -> None:
         """Adds a subscriber to said option.
@@ -81,16 +81,86 @@ class DictionaryMixin:
         return self.__items[item].value
 
     def __setitem__(self, key: str, value: Any) -> None:
-        value = str(value)
         if key not in self.__items.keys():
             self.__items[key] = ReactiveValue(value)
 
         item = self.__items[key]
         item.value = value
-        self.facade.api.settings.set(self.SECTION[0], key, value)
+        self.facade.api.settings.set(self.SECTION[0], key, self.to_ini(value))
 
         item.notify_all(1, {"attr": key, "value": value})
         asyncio.ensure_future(self.facade.api.settings.save_preferences())
 
     def __delitem__(self, key: str) -> None:
         pass
+
+    def to_ini(self, value: Any) -> str:
+        """Convert python value to INI string.
+
+        Args:
+            value (Any):
+                Value to stringify.
+        Returns(str):
+            INI string.
+
+        """
+        if type(value) in (bool, type(None)):
+            return str(value).lower()
+        else:
+            return str(value)
+
+    def from_ini(self, value: str) -> Any:
+        """Convert INI string to python value.
+
+        Args:
+            value (str):
+                INI string to pythonize.
+        Returns (Any):
+            Python value.
+
+        """
+        if is_int(value):
+            return int(value)
+        elif is_float(value):
+            return float(value)
+        elif is_bool(value):
+            return to_bool(value)
+        elif is_none(value):
+            return None
+        else:
+            return value
+
+
+# ATTRIBUTION
+#
+# The following section is copied from the "localconfig" project:
+# https://github.com/maxzheng/localconfig.git
+# Copyright (c) 2014 maxzheng
+# Licensed under the MIT license
+
+def is_float(value):
+    """Checks if the value is a float """
+    return _is_type(value, float)
+
+def is_int(value):
+    """Checks if the value is an int """
+    return _is_type(value, int)
+
+def is_bool(value):
+    """Checks if the value is a bool """
+    return value.lower() in ['true', 'false', 'yes', 'no', 'on', 'off']
+
+def is_none(value):
+    """Checks if the value is a None """
+    return value.lower() == str(None).lower()
+
+def to_bool(value):
+    """Converts value to a bool """
+    return value.lower() in ['true', 'yes', 'on']
+
+def _is_type(value, t):
+    try:
+        t(value)
+        return True
+    except Exception:
+        return False

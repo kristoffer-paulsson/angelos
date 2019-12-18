@@ -88,7 +88,7 @@ class StorageFacadeExtension(FacadeExtension):
             use=cls.USEFLAG[0],
         )
         cls._hierarchy(arch)
-        # cls._files(arch)
+        cls._files(arch)
         arch.close()
 
         return cls(facade, home_dir, secret)

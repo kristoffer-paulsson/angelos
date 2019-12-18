@@ -164,12 +164,12 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             filename = "/settings/" + name
             kwargs = {"filename": filename, "data": text.getvalue().encode()}
             if self.archive.isfile(filename):
-                method = self.archive.save
+                kwargs["callback"] = self.archive.save
             else:
-                method = self.archive.mkfile
+                kwargs["callback"] = self.archive.mkfile
                 kwargs["owner"] = self.facade.data.portfolio.entity.id
 
-            return await self.proxy.call(method, **kwargs)
+            return await self.proxy.call(**kwargs)
         except Exception as e:
             logging.exception(e)
 
