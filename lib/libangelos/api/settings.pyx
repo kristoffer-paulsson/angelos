@@ -11,12 +11,11 @@
 import csv
 import io
 import uuid
-from configparser import ConfigParser, ExtendedInterpolation
+from configparser import ConfigParser
 from typing import Set, Tuple, Any
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.facade.base import BaseFacade
-from libangelos.misc import LazyAttribute
 
 
 class SettingsAPI(ApiFacadeExtension):

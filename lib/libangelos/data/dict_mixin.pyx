@@ -89,7 +89,7 @@ class DictionaryMixin:
         item.value = value
         self.facade.api.settings.set(self.SECTION[0], key, value)
 
-        item.notify_all(1, {"value": value})
+        item.notify_all(1, {"attr": key, "value": value})
         asyncio.ensure_future(self.facade.api.settings.save_preferences())
 
     def __delitem__(self, key: str) -> None:

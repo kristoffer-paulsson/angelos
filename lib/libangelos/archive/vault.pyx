@@ -162,17 +162,14 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """Save or update a text settings file."""
         try:
             filename = "/settings/" + name
+            kwargs = {"filename": filename, "data": text.getvalue().encode()}
             if self.archive.isfile(filename):
                 method = self.archive.save
             else:
                 method = self.archive.mkfile
+                kwargs["owner"] = self.facade.data.portfolio.entity.id
 
-            return await self.proxy.call(
-                method,
-                filename=filename,
-                data=text.getvalue().encode(),
-                owner=self.facade.data.portfolio.entity.id,
-            )
+            return await self.proxy.call(method, **kwargs)
         except Exception as e:
             logging.exception(e)
 

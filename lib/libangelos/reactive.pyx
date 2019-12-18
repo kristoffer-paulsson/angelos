@@ -92,7 +92,7 @@ class ObserverMixin:
 
     def add_subscription(
         self, notifier: "NotifierMixin", internal: bool=False  # noqa F821
-    ):
+    ) -> None:
         """Add a subscription to the observer.
 
         Parameters
@@ -109,7 +109,7 @@ class ObserverMixin:
 
     def end_subscription(
         self, notifier: "NotifierMixin", internal: bool=False  # noqa F821
-    ):
+    ) -> None:
         """End subscription from notifier.
 
         Parameters
@@ -124,7 +124,7 @@ class ObserverMixin:
         if not internal:
             notifier.unsubscribe(self, True)
 
-    async def notify(self, event: Event):
+    async def notify(self, event: Event) -> None:
         """Invoked by the notifier.
 
         This method should be implemented on the observer class.

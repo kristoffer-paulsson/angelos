@@ -19,7 +19,6 @@ from libangelos.automatic import Automatic
 from libangelos.facade.facade import Facade
 from libangelos.ioc import Container, ContainerAware, Config, Handle, StaticHandle
 from libangelos.logger import LogHandler
-from libangelos.prefs import Preferences
 from libangelos.ssh.ssh import SessionManager
 from libangelos.starter import Starter
 from libangelos.utils import Event
@@ -60,7 +59,6 @@ class Configuration(Config, Container):
             "nodes": lambda self: Handle(asyncio.base_events.Server),
             "hosts": lambda self: Handle(asyncio.base_events.Server),
             "opts": lambda self: Parser(),
-            "prefs": lambda self: Preferences(self.facade),
             "auto": lambda self: Automatic("angelos", self.opts),
             "quit": lambda self: Event(),
         }
