@@ -7,6 +7,7 @@
 """Mixin for enforcing portfolio policy's before importing."""
 import asyncio
 import copy
+import functools
 import logging
 import uuid
 from typing import Tuple, List, Set, Any
@@ -293,7 +294,7 @@ class PortfolioMixin:
                 else:
                     rejected.add(document)
 
-        result = await asyncio.gather(*ops, return_exceptions=True)
+        result = await self.gather(*ops, return_exceptions=True)
         return rejected, result
 
     async def list_portfolios(
@@ -312,7 +313,7 @@ class PortfolioMixin:
             List with a tuple of bytes and exceptions
 
         """
-        doclist = await self.search(
+        doclist = await self.search_docs(
             path="{0}{1}.ent".format(self.PATH_PORTFOLIOS[0], query), limit=100
         )
         result = Glue.doc_validate_report(doclist, (Entity))
@@ -338,7 +339,7 @@ class PortfolioMixin:
         if self.archive.isdir(dirname):
             raise OSError("Portfolio already exists: %s" % portfolio.entity.id)
 
-        self.archive.mkdir(dirname)
+        await self.archive.mkdir(dirname)
 
         files = list()
         issuer, owner = portfolio.to_sets()
@@ -350,20 +351,18 @@ class PortfolioMixin:
         ops = list()
         for doc in files:
             created, updated, owner = Glue.doc_save(doc[1])
-            ops.append(
-                self.proxy.call(
-                    self.archive.mkfile,
+            ops.append(self.archive.mkfile(
                     filename=doc[0],
                     data=PortfolioPolicy.serialize(doc[1]),
                     id=doc[1].id,
                     created=created,
                     modified=updated,
                     owner=owner,
-                    compression=Entry.COMP_NONE,
+                    compression=Entry.COMP_NONE
                 )
             )
 
-        return await self.async_gather(*ops)
+        return await self.gather(*ops)
 
     async def load_portfolio(
         self, eid: uuid.UUID, config: Tuple[str]
@@ -387,7 +386,7 @@ class PortfolioMixin:
         if not self.archive.isdir(dirname):
             raise OSError("Portfolio doesn't exists: %s" % eid)
 
-        result = self.archive.glob(name="{0}/*".format(dirname), owner=eid)
+        result = await self.archive.glob(name="{0}/*".format(dirname), owner=eid)
 
         files = set()
         for field in config:
@@ -397,19 +396,18 @@ class PortfolioMixin:
                     files.add(filename)
 
         ops = list()
+        loop = asyncio.get_running_loop()
         for doc in files:
-            ops.append(self.proxy.call(self.archive.load, filename=doc))
+            ops.append(self.archive.load(filename=doc))
 
-        results = await asyncio.shield(
-            asyncio.gather(*ops, return_exceptions=True)
-        )
+        results = await asyncio.gather(*ops, return_exceptions=True)
 
         issuer = set()
         owner = set()
         for data in results:
             if isinstance(data, Exception):
                 logging.warning("Failed to load document: %s" % data)
-                logging.exception(data, exc_info=True)
+                logging.error(data, exc_info=True)
                 continue
 
             document = PortfolioPolicy.deserialize(data)
@@ -449,7 +447,7 @@ class PortfolioMixin:
         if not self.archive.isdir(dirname):
             raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
 
-        result = self.archive.glob(
+        result = await self.archive.glob(
             name="{dir}/*".format(dirname), owner=portfolio.entity.id
         )
 
@@ -479,11 +477,9 @@ class PortfolioMixin:
 
         ops = list()
         for doc in files:
-            ops.append(self.proxy.call(self.archive.load, filename=doc))
+            ops.append(self.archive.load(filename=doc))
 
-        results = await asyncio.shield(
-            asyncio.gather(*ops, return_exceptions=True)
-        )
+        results = await asyncio.gather(*ops, return_exceptions=True)
 
         issuer = set()
         owner = set()
@@ -510,33 +506,32 @@ class PortfolioMixin:
         if not self.archive.isdir(dirname):
             raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
 
-        files = self.archive.glob(
+        files = await self.archive.glob(
             name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id
         )
 
         ops = list()
         save, _ = portfolio.to_sets()
 
+        loop = asyncio.get_running_loop()
         for doc in save:
             filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
             if filename in files:
                 ops.append(
-                    self.proxy.call(
-                        self.archive.save,
+                   self.archive.save(
                         filename=filename,
                         data=msgpack.packb(
                             doc.export_bytes(),
                             use_bin_type=True,
                             strict_types=True,
                         ),
-                        compression=Entry.COMP_NONE,
+                        compression=Entry.COMP_NONE
                     )
                 )
             else:
                 created, updated, owner = Glue.doc_save(doc)
                 ops.append(
-                    self.proxy.call(
-                        self.archive.mkfile,
+                    self.archive.mkfile(
                         filename=filename,
                         data=PortfolioPolicy.serialize(doc),
                         id=doc.id,
@@ -547,4 +542,4 @@ class PortfolioMixin:
                     )
                 )
 
-        return await self.async_gather(*ops)
+        return await self.gather(*ops)

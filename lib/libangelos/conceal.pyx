@@ -20,16 +20,15 @@ https://www.freebsd.org/cgi/man.cgi?query=funopen
 Windows, CreatePipe() + _open_osfhandle() + fdopen()
 
 """
-import io
-import os
-import math
-import struct
 import fcntl
+import io
+import math
+import os
+import struct
 
 import libnacl.secret
-
-from .utils import Util
-from .error import Error
+from libangelos.error import Error
+from libangelos.utils import Util
 
 
 class ConcealIO(io.RawIOBase):
@@ -60,9 +59,9 @@ class ConcealIO(io.RawIOBase):
             self._fd = open(file, mode)
             self._fdclose = True
 
-        self._readable = True if mode in ["rb", "rb+"] else False
-        self._writable = True if mode in ["wb", "rb+"] else False
-        self._seekable = True if mode in ["rb", "rb+", "wb"] else False
+        self._readable = True if mode in ("rb", "rb+") else False
+        self._writable = True if mode in ("wb", "rb+") else False
+        self._seekable = True if mode in ("rb", "rb+", "wb") else False
 
         self._closed = False
 
@@ -195,13 +194,14 @@ class ConcealIO(io.RawIOBase):
         This method has no effect if the file is already closed.
         """
         if not self.closed:
-            self._closed = True
             self._save()
             self.__length(self._end)
             fcntl.flock(self._fd, fcntl.LOCK_UN)
             io.RawIOBase.close(self)
             if self._fdclose:
                 self._fd.close()
+            self._closed = True
+
 
     def fileno(self):
         """

@@ -13,7 +13,6 @@ from libangelos.facade.base import BaseFacade
 from libangelos.helper import Globber
 from libangelos.replication.handler import Actions, CHUNK_SIZE
 from libangelos.replication.preset import Preset, MailClientPreset, MailServerPreset, CustomPreset, FileSyncInfo
-from libangelos.misc import LazyAttribute
 
 
 class ReplicationAPI(ApiFacadeExtension):
@@ -52,21 +51,21 @@ class ReplicationAPI(ApiFacadeExtension):
             elif p_type == Preset.SERVER:
                 return MailServerPreset(owner=user_id)
 
-    def load_files_list(self, preset: Preset):
+    async def load_files_list(self, preset: Preset):
         """Index and load the list of files to be replicated.
 
         preset.files[name] = (entry.id, entry.deleted, entry.modified)
         """
         archive = self._facade.archive(preset.archive)
-        preset._files = Globber.syncro(
+        preset._files = await Globber.syncro(
             archive.archive,
             preset.path,
             preset.owner if preset.owner.int else None,
             preset.modified,
-            True,
+            True
         )
 
-    def save_file(
+    async def save_file(
             self, preset: Preset, file_info: FileSyncInfo, action: str) -> bool:
         """Create or update file in archive."""
         archive = self._facade.archive(preset.archive)
@@ -101,7 +100,7 @@ class ReplicationAPI(ApiFacadeExtension):
         else:
             raise Exception("Illegal action for save_file")
 
-    def load_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
+    async def load_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Load file and meta from archive."""
         archive = self._facade.archive(preset.archive)
         full_path = preset.to_absolute(file_info.path)
@@ -124,7 +123,7 @@ class ReplicationAPI(ApiFacadeExtension):
         file_info.data = archive.archive.load(full_path)
         return True
 
-    def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
+    async def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Remove file from archive"""
         archive = self._facade.archive(preset.archive)
         full_path = preset.to_absolute(file_info.path)

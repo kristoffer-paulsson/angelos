@@ -5,37 +5,32 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-import datetime
-import threading
 import asyncio
+import datetime
 import logging
 import uuid
 
-from .utils import Util
-from .archive7 import Archive7
-from .policy.portfolio import PortfolioPolicy
+from libangelos.archive7 import Archive7
+from libangelos.policy.portfolio import PortfolioPolicy
+from libangelos.utils import Util
 
 
 class Glue:
     @staticmethod
     def doc_save(document):
-        try:
-            owner = document.owner
-        except AttributeError:
-            owner = document.issuer
+        """Calculates the correct meta information about a document to be updated
 
-        try:
-            updated = datetime.datetime.combine(
-                document.updated, datetime.datetime.min.time()
-            )
-        except (AttributeError, TypeError):
-            updated = None
+        Args:
+            document (Document):
+                Enter a valid Document.
 
-        created = datetime.datetime.combine(
-            document.created, datetime.datetime.min.time()
-        )
+        Returns (datetime.datetime, datetime.datetime, uuid.UUID):
+            Correct meta-data (created datetime, touched datetime, owner).
 
-        return created, updated, owner
+        """
+        return datetime.datetime.combine(
+            document.created, datetime.datetime.min.time()), datetime.datetime.combine(
+            document.get_touched(), datetime.datetime.min.time()), document.get_owner()
 
     @staticmethod
     def doc_check(datalist, _type, expiry_check=True):
@@ -110,219 +105,105 @@ class Glue:
 
 class Globber:
     @staticmethod
-    def full(archive: Archive7, filename: str = "*", cmp_uuid: bool = False):
-        with archive.lock:
-            sq = Archive7.Query(pattern=filename)
-            sq.type(b"f")
-            idxs = archive.ioc.entries.search(sq)
-            ids = archive.ioc.hierarchy.ids
+    async def full(archive: Archive7, *args, **kwargs):
+        return await archive.execute(Globber.__full, archive, *args, **kwargs)
 
-            files = {}
-            for i in idxs:
-                idx, entry = i
-                if entry.parent.int == 0:
-                    name = "/" + str(entry.name, "utf-8")
-                else:
-                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
-                if cmp_uuid:
-                    files[entry.id] = (name, entry.deleted, entry.modified)
-                else:
-                    files[name] = (entry.id, entry.deleted, entry.modified)
+    @staticmethod
+    def __full(archive: Archive7, filename: str = "*", cmp_uuid: bool = False):
+        sq = Archive7.Query(pattern=filename)
+        sq.type(b"f")
+        idxs = archive.ioc.entries.search(sq)
+        ids = archive.ioc.hierarchy.ids
+
+        files = {}
+        for i in idxs:
+            idx, entry = i
+            if entry.parent.int == 0:
+                name = "/" + str(entry.name, "utf-8")
+            else:
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
+            if cmp_uuid:
+                files[entry.id] = (name, entry.deleted, entry.modified)
+            else:
+                files[name] = (entry.id, entry.deleted, entry.modified)
 
         return files
 
     @staticmethod
-    def syncro(
-        archive: Archive7,
-        path: str = "/",
-        owner: uuid.UUID = None,
-        modified: datetime.datetime = None,
-        cmp_uuid: bool = False,
+    async def syncro(archive: Archive7, *args, **kwargs):
+        return await archive.execute(Globber.__syncro, archive, *args, **kwargs)
+
+    @staticmethod
+    def __syncro(
+            archive: Archive7,
+            path: str = "/",
+            owner: uuid.UUID = None,
+            modified: datetime.datetime = None,
+            cmp_uuid: bool = False,
     ):
-        with archive.lock:
-            pid = archive.ioc.operations.get_pid(path)
-            sq = Archive7.Query()
-            sq.parent(pid)
-            if owner:
-                sq.owner(owner)
-            if modified:
-                sq.modified(modified)
-            sq.type(b"f")
-            idxs = archive.ioc.entries.search(sq)
-            ids = archive.ioc.hierarchy.ids
+        pid = archive.ioc.operations.get_pid(path)
+        sq = Archive7.Query()
+        sq.parent(pid)
+        if owner:
+            sq.owner(owner)
+        if modified:
+            sq.modified(modified)
+        sq.type(b"f")
+        idxs = archive.ioc.entries.search(sq)
+        ids = archive.ioc.hierarchy.ids
 
-            files = {}
-            for i in idxs:
-                idx, entry = i
-                if entry.parent.int == 0:
-                    name = "/" + str(entry.name, "utf-8")
-                else:
-                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
-                if cmp_uuid:
-                    files[entry.id] = (name, entry.modified, entry.deleted)
-                else:
-                    files[name] = (entry.id, entry.modified, entry.deleted)
-
-        return files
-
-    @staticmethod
-    def owner(archive: Archive7, owner: uuid.UUID, path: str = "/"):
-        with archive.lock:
-            sq = Archive7.Query(path).owner(owner).type(b"f")
-            idxs = archive.ioc.entries.search(sq)
-            ids = archive.ioc.hierarchy.ids
-
-            files = []
-            for i in idxs:
-                idx, entry = i
-                if entry.parent.int == 0:
-                    name = "/" + str(entry.name, "utf-8")
-                else:
-                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
-                files.append((name, entry.id, entry.created))
+        files = {}
+        for i in idxs:
+            idx, entry = i
+            if entry.parent.int == 0:
+                name = "/" + str(entry.name, "utf-8")
+            else:
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
+            if cmp_uuid:
+                files[entry.id] = (name, entry.modified, entry.deleted)
+            else:
+                files[name] = (entry.id, entry.modified, entry.deleted)
 
         return files
 
     @staticmethod
-    def path(archive: Archive7, path: str = "*"):
-        with archive.lock:
-            sq = Archive7.Query(path).type(b"f")
-            idxs = archive.ioc.entries.search(sq)
-            ids = archive.ioc.hierarchy.ids
+    async def owner(archive: Archive7, *args, **kwargs):
+        return await archive.execute(Globber.__owner, archive, *args, **kwargs)
 
-            files = []
-            for i in idxs:
-                idx, entry = i
-                if entry.parent.int == 0:
-                    name = "/" + str(entry.name, "utf-8")
-                else:
-                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
-                files.append((name, entry.id, entry.created))
+    @staticmethod
+    def __owner(archive: Archive7, owner: uuid.UUID, path: str = "/"):
+        sq = Archive7.Query(path).owner(owner).type(b"f")
+        idxs = archive.ioc.entries.search(sq)
+        ids = archive.ioc.hierarchy.ids
+
+        files = []
+        for i in idxs:
+            idx, entry = i
+            if entry.parent.int == 0:
+                name = "/" + str(entry.name, "utf-8")
+            else:
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
+            files.append((name, entry.id, entry.created))
 
         return files
 
+    @staticmethod
+    async def path(archive: Archive7, *args, **kwargs):
+        return await archive.execute(Globber.__path, archive, *args, **kwargs)
 
-class Proxy:
-    def __init__(self):
-        self._quit = False
+    @staticmethod
+    def __path(archive: Archive7, path: str = "*"):
+        sq = Archive7.Query(path).type(b"f")
+        idxs = archive.ioc.entries.search(sq)
+        ids = archive.ioc.hierarchy.ids
 
-    def call(self, callback, priority=1024, timeout=10, **kwargs):
-        if not callable(callback):
-            raise TypeError("Not a callable. Type: %s" % type(callback))
-        if self._quit:
-            raise RuntimeError("Proxy has quit, no more calls")
+        files = []
+        for i in idxs:
+            idx, entry = i
+            if entry.parent.int == 0:
+                name = "/" + str(entry.name, "utf-8")
+            else:
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
+            files.append((name, entry.id, entry.created))
 
-    def run(self):
-        pass
-
-    def quit(self):
-        self._quit = True
-
-    class Task:
-        def __init__(self, prio, callback, params):
-            self.prio = prio
-            self.callable = callback
-            self.params = params
-            self.result = None
-
-        def __eq__(self, other):
-            return self.prio == other.prio
-
-        def __lt__(self, other):
-            return self.prio < other.prio
-
-
-class NullProxy(Proxy):
-    def call(self, callback, priority=1024, timeout=10, **kwargs):
-        if not callable(callback):
-            raise TypeError("Not a callable. Type: %s" % type(callback))
-        if self._quit:
-            raise RuntimeError("Proxy has quit, no more calls")
-        try:
-            result = callback(**kwargs)
-            logging.info('Proxy execution: "%s"' % str(callback.__name__))
-            return result
-        except Exception as e:
-            logging.error(
-                'Proxy execution failed: "%s"' % str(callback.__name__),
-                exc_info=True
-            )
-            return e
-
-
-class ThreadProxy(Proxy):
-    def __init__(self, size=0):
-        Proxy.__init__(self)
-        self.__queue = threading.PriorityQueue(size)
-
-    def call(self, callback, priority=1024, timeout=10, **kwargs):
-        if not callable(callback):
-            raise TypeError("Not a callable. Type: %s" % type(callback))
-        if self._quit:
-            raise RuntimeError("Proxy has quit, no more calls")
-
-        task = Proxy.Task(priority, callback, kwargs)
-        self.__queue.put(task)
-        return task.result
-
-    def run(self):
-        while not (self._quit and self.__queue.empty()):
-            task = self.__queue.get()
-            try:
-                result = task.callable(**task.params)
-                logging.info(
-                    'Proxy execution: "%s"' % str(task.callable.__name__)
-                )
-                task.result = result  # if result else None
-            except Exception as e:
-                logging.error(
-                    'Proxy execution failed: "%s"'
-                    % str(task.callable.__name__)
-                )
-                task.result = e
-            self.__queue.task_done()
-
-
-class AsyncProxy(Proxy):
-    def __init__(self, size=0):
-        Proxy.__init__(self)
-        self.__queue = asyncio.PriorityQueue(size)
-        self.task = asyncio.ensure_future(self.run())
-
-    async def call(self, callback, priority=1024, timeout=10, **kwargs):
-        if not callable(callback):
-            raise TypeError("Not a callable. Type: %s" % type(callback))
-        if self._quit:
-            raise RuntimeError("Proxy has quit, no more calls")
-
-        try:
-            task = Proxy.Task(priority, callback, kwargs)
-            await asyncio.wait_for(self.__queue.put(task), timeout)
-            return task.result
-        except asyncio.TimeoutError as e:
-            logging.exception(e, exc_info=True)
-            return None
-
-    async def run(self):
-        while True:
-            task = await self.__queue.get()
-            if task is None:
-                break
-            await self.__executor(task)
-            self.__queue.task_done()
-
-    def quit(self):
-        Proxy.quit(self)
-        self.__queue.put_nowait(None)
-
-    async def __executor(self, task):
-        try:
-            result = task.callable(**task.params)
-            logging.info('Proxy execution: "%s"' % str(task.callable.__name__))
-            task.result = result  # if result else None
-        except Exception as e:
-            logging.error(
-                'Proxy execution failed: "%s"' % str(task.callable.__name__),
-                exc_info=True
-            )
-            task.result = e
+        return files

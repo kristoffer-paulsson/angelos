@@ -67,7 +67,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_inbox(self) -> List[Envelope]:
         """Load envelopes from the inbox."""
-        doc_list = await self.facade.storage.vault.search(
+        doc_list = await self.facade.storage.vault.search_docs(
             self.facade.data.portfolio.entity.id, MailboxAPI.INBOX + "/*", limit=200
         )
         result = Glue.doc_validate_report(doc_list, Envelope)
@@ -82,7 +82,7 @@ class MailboxAPI(ApiFacadeExtension):
         return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.READ, Mail)
 
     async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
-        doc_list = await self.facade.storage.vault.search(
+        doc_list = await self.facade.storage.vault.search_docs(
             path=DOCUMENT_PATH[doc_type_num].format(
                 dir=box_dir, file=doc_id
             ),
@@ -156,7 +156,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_read(self) -> List[Mail]:
         """Load read folder from the messages store."""
-        doclist = await self.facade.storage.vault.search(
+        doclist = await self.facade.storage.vault.search_docs(
             self.facade.data.portfolio.entity.id, MailboxAPI.READ + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Mail)
@@ -176,7 +176,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_outbox(self) -> List[Envelope]:
         """Load letters from outbox folder."""
-        doclist = await self.facade.storage.vault.search(
+        doclist = await self.facade.storage.vault.search_docs(
             path=MailboxAPI.OUTBOX + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Envelope)
@@ -208,7 +208,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_drafts(self) -> List[Mail]:
         """Load read folder from the messages store."""
-        doclist = await self.facade.storage.vault.search(
+        doclist = await self.facade.storage.vault.search_docs(
             path=MailboxAPI.DRAFT + "/*", limit=100
         )
         result = Glue.doc_validate_report(doclist, Mail, False)

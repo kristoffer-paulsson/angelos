@@ -10,27 +10,29 @@ Archive 7.
 In future C implementation, use BTree for entries:
 https://github.com/antirez/otree
 """
+import bz2
+import collections
+import copy
+import datetime
+import enum
+import functools
+import gzip
+import hashlib
+import logging
+import math
 import os
 import re
 import struct
-import collections
-import uuid
-import time
-import datetime
-import enum
-import hashlib
 import sys
-import math
-import threading
-import copy
+import time
+import uuid
 import zlib
-import gzip
-import bz2
 
-from .ioc import Container, ContainerAware
-from .utils import Util
-from .error import Error
-from .conceal import ConcealIO
+from libangelos.conceal import ConcealIO
+from libangelos.error import Error
+from libangelos.ioc import Container, ContainerAware
+from libangelos.misc import SharedResource
+from libangelos.utils import Util
 
 
 class Header(
@@ -491,15 +493,15 @@ class Entry(
         )
 
 
-class Archive7(ContainerAware):
+class Archive7(ContainerAware, SharedResource):
     """Archive main class and high level API."""
 
     BLOCK_SIZE = 512
 
     def __init__(self, fileobj, delete=3):
         """Init archive using a file object and set delete mode."""
+        SharedResource.__init__(self)
         self.__closed = False
-        self.__lock = threading.Lock()
         self.__file = fileobj
         self.__size = os.path.getsize(self.__file.name)
         self.__delete = delete if delete else Archive7.Delete.ERASE
@@ -593,16 +595,6 @@ class Archive7(ContainerAware):
         """File closed property."""
         return self.__closed
 
-    @property
-    def locked(self):
-        """Lock mode property."""
-        return self.__lock.locked()
-
-    @property
-    def lock(self):
-        """Lock property."""
-        return self.__lock
-
     def _update_header(self, cnt):
         """Update archive header with new entries count."""
         header = self.__header._asdict()
@@ -612,27 +604,32 @@ class Archive7(ContainerAware):
 
     def close(self):
         """Close archive."""
-        with self.__lock:
-            if not self.__closed:
-                self.__file.close()
-                self.__closed = True
+        if not self.__closed:
+            self.__file.close()
+            self.__closed = True
 
     def stats(self):
         """Archive stats."""
         return copy.deepcopy(self.__header)
 
-    def info(self, filename):
+
+    async def info(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__info, *args, **kwargs))
+
+    def __info(self, filename):
         """Return file info."""
-        with self.__lock:
-            ops = self.ioc.operations
+        ops = self.ioc.operations
 
-            dirname, name = os.path.split(filename)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(name, pid)
+        dirname, name = os.path.split(filename)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(name, pid)
 
-            return copy.deepcopy(entry)
+        return copy.deepcopy(entry)
 
-    def glob(
+    async def glob(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__glob, *args, **kwargs))
+
+    def __glob(
         self,
         name="*",
         id=None,
@@ -642,60 +639,65 @@ class Archive7(ContainerAware):
         modified=None,
         deleted=False,
         user=None,
-        group=None,
+        group=None
     ):
         """Glob the file system in the archive."""
-        with self.__lock:
-            entries = self.ioc.entries
-            ids = self.ioc.hierarchy.ids
+        entries = self.ioc.entries
+        ids = self.ioc.hierarchy.ids
 
-            sq = Archive7.Query(pattern=name)
-            if id:
-                sq.id(id)
-            if parent:
-                sq.parent(parent)
-            if owner:
-                sq.owner(owner)
-            if created:
-                sq.created(created)
-            if modified:
-                sq.modified(modified)
-            if deleted:
-                sq.deleted(deleted)
-            if user:
-                sq.user(user)
-            if group:
-                sq.group(group)
-            idxs = entries.search(sq)
+        sq = Archive7.Query(pattern=name)
+        if id:
+            sq.id(id)
+        if parent:
+            sq.parent(parent)
+        if owner:
+            sq.owner(owner)
+        if created:
+            sq.created(created)
+        if modified:
+            sq.modified(modified)
+        if deleted:
+            sq.deleted(deleted)
+        if user:
+            sq.user(user)
+        if group:
+            sq.group(group)
+        idxs = entries.search(sq)
 
-            files = []
-            for i in idxs:
-                idx, entry = i
-                if entry.parent.int == 0:
-                    name = "/" + str(entry.name, "utf-8")
-                else:
-                    name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
-                files.append(name)
+        files = set()
+        for i in idxs:
+            idx, entry = i
+            filename = entry.name.decode()
+            if entry.parent.int == 0:
+                name = "/" + filename
+            else:
+                name = ids[entry.parent] + "/" + filename
+            files.add(name)
 
-            return files
+        return files
 
-    def move(self, src, dest):
+    async def move(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__move, *args, **kwargs))
+
+    def __move(self, src, dest):
         """Move file/dir to another directory."""
-        with self.__lock:
-            ops = self.ioc.operations
+        ops = self.ioc.operations
 
-            dirname, name = os.path.split(src)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(name, pid)
-            did = ops.get_pid(dest)
-            ops.is_available(name, did)
+        dirname, name = os.path.split(src)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(name, pid)
+        did = ops.get_pid(dest)
+        ops.is_available(name, did)
 
-            entry = entry._asdict()
-            entry["parent"] = did
-            entry = Entry(**entry)
-            self.ioc.entries.update(entry, idx)
+        entry = entry._asdict()
+        entry["parent"] = did
+        entry = Entry(**entry)
+        self.ioc.entries.update(entry, idx)
 
-    def chmod(
+    async def chmod(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__chmod, *args, **kwargs))
+
+    def __chmod(
         self,
         path,
         id=None,
@@ -706,121 +708,124 @@ class Archive7(ContainerAware):
         perms=None,
     ):
         """Update ID/owner or deleted status for an entry."""
-        with self.__lock:
-            ops = self.ioc.operations
+        ops = self.ioc.operations
 
-            dirname, name = os.path.split(path)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(name, pid)
+        dirname, name = os.path.split(path)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(name, pid)
 
+        entry = entry._asdict()
+        if id:
+            entry["id"] = id
+        if owner:
+            entry["owner"] = owner
+        if deleted:
+            entry["deleted"] = deleted
+        if user:
+            entry["user"] = user
+        if group:
+            entry["group"] = group
+        if perms:
+            entry["perms"] = perms
+        entry = Entry(**entry)
+        self.ioc.entries.update(entry, idx)
+
+    async def remove(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__remove, *args, **kwargs))
+
+    def __remove(self, filename, mode=None):
+        """Remove file or dir."""
+        ops = self.ioc.operations
+        entries = self.ioc.entries
+
+        dirname, name = os.path.split(filename)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(name, pid)
+
+        # Check for unsupported types
+        if entry.type not in (
+            Entry.TYPE_FILE,
+            Entry.TYPE_DIR,
+            Entry.TYPE_LINK,
+        ):
+            raise Util.exception(
+                Error.AR7_WRONG_ENTRY, {"type": entry.type, "id": entry.id}
+            )
+
+        # If directory is up for removal, check that it is empty or abort
+        if entry.type == Entry.TYPE_DIR:
+            cidx = entries.search(Archive7.Query().parent(entry.id))
+            if len(cidx):
+                raise Util.exception(Error.AR7_NOT_EMPTY, {"index": cidx})
+
+        if not mode:
+            mode = self.__delete
+
+        if mode == Archive7.Delete.ERASE:
+            if entry.type == Entry.TYPE_FILE:
+                entries.update(
+                    Entry.empty(
+                        offset=entry.offset,
+                        size=entries._sector(entry.size),
+                    ),
+                    idx,
+                )
+            elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
+                entries.update(Entry.blank(), idx)
+        elif mode == Archive7.Delete.SOFT:
             entry = entry._asdict()
-            if id:
-                entry["id"] = id
-            if owner:
-                entry["owner"] = owner
-            if deleted:
-                entry["deleted"] = deleted
-            if user:
-                entry["user"] = user
-            if group:
-                entry["group"] = group
-            if perms:
-                entry["perms"] = perms
+            entry["deleted"] = True
+            entry["modified"] = datetime.datetime.now()
             entry = Entry(**entry)
             self.ioc.entries.update(entry, idx)
-
-    def remove(self, filename, mode=None):
-        """Remove file or dir."""
-        with self.__lock:
-            ops = self.ioc.operations
-            entries = self.ioc.entries
-
-            dirname, name = os.path.split(filename)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(name, pid)
-
-            # Check for unsupported types
-            if entry.type not in (
-                Entry.TYPE_FILE,
-                Entry.TYPE_DIR,
-                Entry.TYPE_LINK,
-            ):
-                raise Util.exception(
-                    Error.AR7_WRONG_ENTRY, {"type": entry.type, "id": entry.id}
+        elif mode == Archive7.Delete.HARD:
+            if entry.type == Entry.TYPE_FILE:
+                if not entries.find_blank():
+                    entries.make_blanks()
+                bidx = entries.get_blank()
+                entries.update(
+                    Entry.empty(
+                        offset=entry.offset,
+                        size=entries._sector(entry.size),
+                    ),
+                    bidx,
                 )
-
-            # If directory is up for removal, check that it is empty or abort
-            if entry.type == Entry.TYPE_DIR:
-                cidx = entries.search(Archive7.Query().parent(entry.id))
-                if len(cidx):
-                    raise Util.exception(Error.AR7_NOT_EMPTY, {"index": cidx})
-
-            if not mode:
-                mode = self.__delete
-
-            if mode == Archive7.Delete.ERASE:
-                if entry.type == Entry.TYPE_FILE:
-                    entries.update(
-                        Entry.empty(
-                            offset=entry.offset,
-                            size=entries._sector(entry.size),
-                        ),
-                        idx,
-                    )
-                elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
-                    entries.update(Entry.blank(), idx)
-            elif mode == Archive7.Delete.SOFT:
+                entry = entry._asdict()
+                entry["deleted"] = True
+                entry["modified"] = datetime.datetime.now()
+                entry["size"] = 0
+                entry["length"] = 0
+                entry["offset"] = 0
+                entry = Entry(**entry)
+                self.ioc.entries.update(entry, idx)
+            elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
                 entry = entry._asdict()
                 entry["deleted"] = True
                 entry["modified"] = datetime.datetime.now()
                 entry = Entry(**entry)
                 self.ioc.entries.update(entry, idx)
-            elif mode == Archive7.Delete.HARD:
-                if entry.type == Entry.TYPE_FILE:
-                    if not entries.find_blank():
-                        entries.make_blanks()
-                    bidx = entries.get_blank()
-                    entries.update(
-                        Entry.empty(
-                            offset=entry.offset,
-                            size=entries._sector(entry.size),
-                        ),
-                        bidx,
-                    )
-                    entry = entry._asdict()
-                    entry["deleted"] = True
-                    entry["modified"] = datetime.datetime.now()
-                    entry["size"] = 0
-                    entry["length"] = 0
-                    entry["offset"] = 0
-                    entry = Entry(**entry)
-                    self.ioc.entries.update(entry, idx)
-                elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
-                    entry = entry._asdict()
-                    entry["deleted"] = True
-                    entry["modified"] = datetime.datetime.now()
-                    entry = Entry(**entry)
-                    self.ioc.entries.update(entry, idx)
-            else:
-                raise Util.exception(
-                    Error.AR7_INVALID_DELMODE, {"mode": self.__delete}
-                )
+        else:
+            raise Util.exception(
+                Error.AR7_INVALID_DELMODE, {"mode": self.__delete}
+            )
 
-    def rename(self, path, dest):
+    async def rename(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__rename, *args, **kwargs))
+
+    def __rename(self, path, dest):
         """Rename file or directory."""
-        with self.__lock:
-            ops = self.ioc.operations
-            entries = self.ioc.entries
+        ops = self.ioc.operations
+        entries = self.ioc.entries
 
-            dirname, name = os.path.split(path)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(name, pid)
-            ops.is_available(dest, pid)
+        dirname, name = os.path.split(path)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(name, pid)
+        ops.is_available(dest, pid)
 
-            entry = entry._asdict()
-            entry["name"] = bytes(dest, "utf-8")
-            entry = Entry(**entry)
-            entries.update(entry, idx)
+        entry = entry._asdict()
+        entry["name"] = bytes(dest, "utf-8")
+        entry = Entry(**entry)
+        entries.update(entry, idx)
 
     def isdir(self, dirname):
         """Check if a path is a known directory."""
@@ -830,54 +835,59 @@ class Archive7(ContainerAware):
             dirname = dirname[:-1]
         return dirname in self.ioc.hierarchy.paths.keys()
 
+    def __is_type(self, filename, etype):
+        ops = self.ioc.operations
+
+        dirname, name = os.path.split(filename)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(name, pid)
+        return True if entry.type == etype else False
+
     def isfile(self, filename):
         """Check if a path is a known file."""
-        with self.__lock:
-            try:
-                ops = self.ioc.operations
+        return self.__is_type(filename, Entry.TYPE_FILE)
 
-                dirname, name = os.path.split(filename)
-                pid = ops.get_pid(dirname)
-                entry, idx = ops.find_entry(name, pid)
-                if entry.type == Entry.TYPE_FILE:
-                    return True
-            except Exception:
-                pass
+    def islink(self, filename):
+        """Check if a path is a known file."""
+        return self.__is_type(filename, Entry.TYPE_LINK)
 
-        return False
+    async def mkdir(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__mkdir, *args, **kwargs))
 
-    def mkdir(self, dirname, user=None, group=None, perms=None):
+    def __mkdir(self, dirname, user=None, group=None, perms=None):
         """
         Make a new directory and super directories if missing.
 
             name        The full path and name of new directory
             returns     the entry ID
         """
-        with self.__lock:
-            paths = self.ioc.hierarchy.paths
+        paths = self.ioc.hierarchy.paths
 
-            if dirname in paths.keys():
-                return paths[dirname]
+        if dirname in paths.keys():
+            return paths[dirname]
 
-            subpath = []
-            while len(dirname) and dirname not in paths.keys():
-                dirname, name = os.path.split(dirname)
-                subpath.append(name)
+        subpath = []
+        while len(dirname) and dirname not in paths.keys():
+            dirname, name = os.path.split(dirname)
+            subpath.append(name)
 
-            subpath.reverse()
-            pid = paths[dirname]
-            entries = self.ioc.entries
+        subpath.reverse()
+        pid = paths[dirname]
+        entries = self.ioc.entries
 
-            for newdir in subpath:
-                entry = Entry.dir(
-                    name=name, parent=pid, user=user, group=group, perms=perms
-                )
-                entries.add(entry)
-                pid = entry.id
+        for newdir in subpath:
+            entry = Entry.dir(
+                name=name, parent=pid, user=user, group=group, perms=perms
+            )
+            entries.add(entry)
+            pid = entry.id
 
         return entry.id
 
-    def mkfile(
+    async def mkfile(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__mkfile, *args, **kwargs))
+
+    def __mkfile(
         self,
         filename,
         data,
@@ -889,52 +899,56 @@ class Archive7(ContainerAware):
         compression=Entry.COMP_NONE,
         user=None,
         group=None,
-        perms=None,
+        perms=None
     ):
         """Create a new file."""
-        with self.__lock:
-            ops = self.ioc.operations
-            dirname, name = os.path.split(filename)
-            pid = None
+        ops = self.ioc.operations
+        dirname, name = os.path.split(filename)
+        pid = None
 
-            if parent:
-                ids = self.ioc.hierarchy.ids
-                if parent not in ids.keys():
-                    raise Util.exception(
-                        Error.AR7_PATH_INVALID, {"parent": parent}
-                    )
-                pid = parent
-            elif dirname:
-                pid = ops.get_pid(dirname)
+        logging.info("archive.mkfile %s" % filename)
 
-            ops.is_available(name, pid)
+        if parent:
+            ids = self.ioc.hierarchy.ids
+            if parent not in ids.keys():
+                raise Util.exception(
+                    Error.AR7_PATH_INVALID, {"parent": parent}
+                )
+            pid = parent
+        elif dirname:
+            pid = ops.get_pid(dirname)
 
-            length = len(data)
-            digest = hashlib.sha1(data).digest()
-            if compression and data:
-                data = ops.zip(data, compression)
-            size = len(data)
+        ops.is_available(name, pid)
 
-            entry = Entry.file(
-                name=name,
-                size=size,
-                offset=0,
-                digest=digest,
-                id=id,
-                parent=pid,
-                owner=owner,
-                created=created,
-                modified=modified,
-                length=length,
-                compression=compression,
-                user=user,
-                group=group,
-                perms=perms,
-            )
+        length = len(data)
+        digest = hashlib.sha1(data).digest()
+        if compression and data:
+            data = ops.zip(data, compression)
+        size = len(data)
+
+        entry = Entry.file(
+            name=name,
+            size=size,
+            offset=0,
+            digest=digest,
+            id=id,
+            parent=pid,
+            owner=owner,
+            created=created,
+            modified=modified,
+            length=length,
+            compression=compression,
+            user=user,
+            group=group,
+            perms=perms,
+        )
 
         return self.ioc.entries.add(entry, data)
 
-    def link(
+    async def link(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__link, *args, **kwargs))
+
+    def __link(
         self,
         path,
         link,
@@ -942,144 +956,147 @@ class Archive7(ContainerAware):
         modified=None,
         user=None,
         group=None,
-        perms=None,
+        perms=None
     ):
         """Create a new link to file or directory."""
-        with self.__lock:
-            ops = self.ioc.operations
-            dirname, name = os.path.split(path)
-            pid = ops.get_pid(dirname)
-            ops.is_available(name, pid)
+        ops = self.ioc.operations
+        dirname, name = os.path.split(path)
+        pid = ops.get_pid(dirname)
+        ops.is_available(name, pid)
 
-            ldir, lname = os.path.split(link)
-            lpid = ops.get_pid(ldir)
-            target, tidx = ops.find_entry(lname, lpid)
+        ldir, lname = os.path.split(link)
+        lpid = ops.get_pid(ldir)
+        target, tidx = ops.find_entry(lname, lpid)
 
-            if target.type == Entry.TYPE_LINK:
-                raise Util.exception(
-                    Error.AR7_LINK_2_LINK, {"path": path, "link": target}
-                )
-
-            entry = Entry.link(
-                name=name,
-                link=target.id,
-                parent=pid,
-                created=created,
-                modified=modified,
-                user=user,
-                group=group,
-                perms=perms,
+        if target.type == Entry.TYPE_LINK:
+            raise Util.exception(
+                Error.AR7_LINK_2_LINK, {"path": path, "link": target}
             )
+
+        entry = Entry.link(
+            name=name,
+            link=target.id,
+            parent=pid,
+            created=created,
+            modified=modified,
+            user=user,
+            group=group,
+            perms=perms,
+        )
 
         return self.ioc.entries.add(entry)
 
-    def save(self, filename, data, compression=Entry.COMP_NONE, modified=None):
+    async def save(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__save, *args, **kwargs))
+
+    def __save(self, filename, data, compression=Entry.COMP_NONE, modified=None):
         """Update a file with new data."""
         if not modified:
             modified = datetime.datetime.now()
 
-        with self.__lock:
-            ops = self.ioc.operations
-            entries = self.ioc.entries
+        ops = self.ioc.operations
+        entries = self.ioc.entries
 
-            if not entries.find_blank():
-                entries.make_blanks()
+        if not entries.find_blank():
+            entries.make_blanks()
 
-            dirname, name = os.path.split(filename)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(
-                name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK)
+        dirname, name = os.path.split(filename)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(
+            name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK)
+        )
+
+        if entry.type == Entry.TYPE_LINK:
+            entry, idx = ops.follow_link(entry)
+
+        length = len(data)
+        digest = hashlib.sha1(data).digest()
+        if compression and data:
+            data = ops.zip(data, compression)
+        size = len(data)
+
+        osize = entries._sector(entry.size)
+        nsize = entries._sector(size)
+
+        if osize < nsize:
+            empty = Entry.empty(offset=entry.offset, size=osize)
+            last = entries.get_entry(entries.get_thithermost())
+            new_offset = entries._sector(last.offset + last.size)
+            ops.write_data(new_offset, data + ops.filler(data))
+
+            entry = entry._asdict()
+            entry["digest"] = digest
+            entry["offset"] = new_offset
+            entry["size"] = size
+            entry["length"] = length
+            entry["modified"] = modified
+            entry["compression"] = compression
+            entry = Entry(**entry)
+            entries.update(entry, idx)
+
+            bidx = entries.get_blank()
+            entries.update(empty, bidx)
+        elif osize == nsize:
+            ops.write_data(entry.offset, data + ops.filler(data))
+
+            entry = entry._asdict()
+            entry["digest"] = digest
+            entry["size"] = size
+            entry["length"] = length
+            entry["modified"] = modified
+            entry["compression"] = compression
+            entry = Entry(**entry)
+            entries.update(entry, idx)
+        elif osize > nsize:
+            ops.write_data(entry.offset, data + ops.filler(data))
+            old_offset = entry.offset
+
+            entry = entry._asdict()
+            entry["digest"] = digest
+            entry["size"] = size
+            entry["length"] = length
+            entry["modified"] = modified
+            entry["compression"] = compression
+            if not size:  # If data is b''
+                entry["offset"] = 0
+            entry = Entry(**entry)
+            entries.update(entry, idx)
+
+            empty = Entry.empty(
+                offset=entries._sector(old_offset + nsize),
+                size=osize - nsize,
             )
+            bidx = entries.get_blank()
+            entries.update(empty, bidx)
 
-            if entry.type == Entry.TYPE_LINK:
-                entry, idx = ops.follow_link(entry)
+    async def load(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__load, *args, **kwargs))
 
-            length = len(data)
-            digest = hashlib.sha1(data).digest()
-            if compression and data:
-                data = ops.zip(data, compression)
-            size = len(data)
-
-            osize = entries._sector(entry.size)
-            nsize = entries._sector(size)
-
-            if osize < nsize:
-                empty = Entry.empty(offset=entry.offset, size=osize)
-                last = entries.get_entry(entries.get_thithermost())
-                new_offset = entries._sector(last.offset + last.size)
-                ops.write_data(new_offset, data + ops.filler(data))
-
-                entry = entry._asdict()
-                entry["digest"] = digest
-                entry["offset"] = new_offset
-                entry["size"] = size
-                entry["length"] = length
-                entry["modified"] = modified
-                entry["compression"] = compression
-                entry = Entry(**entry)
-                entries.update(entry, idx)
-
-                bidx = entries.get_blank()
-                entries.update(empty, bidx)
-            elif osize == nsize:
-                ops.write_data(entry.offset, data + ops.filler(data))
-
-                entry = entry._asdict()
-                entry["digest"] = digest
-                entry["size"] = size
-                entry["length"] = length
-                entry["modified"] = modified
-                entry["compression"] = compression
-                entry = Entry(**entry)
-                entries.update(entry, idx)
-            elif osize > nsize:
-                ops.write_data(entry.offset, data + ops.filler(data))
-                old_offset = entry.offset
-
-                entry = entry._asdict()
-                entry["digest"] = digest
-                entry["size"] = size
-                entry["length"] = length
-                entry["modified"] = modified
-                entry["compression"] = compression
-                if not size:  # If data is b''
-                    entry["offset"] = 0
-                entry = Entry(**entry)
-                entries.update(entry, idx)
-
-                empty = Entry.empty(
-                    offset=entries._sector(old_offset + nsize),
-                    size=osize - nsize,
-                )
-                bidx = entries.get_blank()
-                entries.update(empty, bidx)
-
-    def load(self, filename):
+    def __load(self, filename):
         """Load data from a file."""
-        with self.__lock:
-            ops = self.ioc.operations
+        ops = self.ioc.operations
 
-            dirname, name = os.path.split(filename)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(
-                name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK)
+        dirname, name = os.path.split(filename)
+        pid = ops.get_pid(dirname)
+        entry, idx = ops.find_entry(
+            name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK)
+        )
+
+        if entry.type == Entry.TYPE_LINK:
+            entry, idx = ops.follow_link(entry)
+
+        data = self.ioc.operations.load_data(entry)
+
+        if entry.compression and data:
+            data = ops.unzip(data, entry.compression)
+
+        if entry.digest != hashlib.sha1(data).digest():
+            raise Util.exception(
+                Error.AR7_DIGEST_INVALID,
+                {"filename": filename, "id": entry.id},
             )
 
-            if entry.type == Entry.TYPE_LINK:
-                entry, idx = ops.follow_link(entry)
-
-            data = self.ioc.operations.load_data(entry)
-
-            if entry.compression and data:
-                data = ops.unzip(data, entry.compression)
-
-            if entry.digest != hashlib.sha1(data).digest():
-                raise Util.exception(
-                    Error.AR7_DIGEST_INVALID,
-                    {"filename": filename, "id": entry.id},
-                )
-
-            return data
+        return data
 
     class Entries(ContainerAware):
         """Entries manager."""

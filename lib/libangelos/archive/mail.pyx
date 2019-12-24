@@ -35,7 +35,7 @@ class MailStorage(StorageFacadeExtension):
         """Save a document at a certian location."""
         created, updated, owner = Glue.doc_save(document)
 
-        return await self._proxy.call(
+        return self._proxy.call(
             self._archive.mkfile,
             filename=filename,
             data=PortfolioPolicy.serialize(document),
@@ -46,15 +46,15 @@ class MailStorage(StorageFacadeExtension):
             compression=Entry.COMP_NONE,
         )
 
-    async def delete(self, filename):
+    def delete(self, filename):
         """Remove a document at a certian location."""
-        return await self._proxy.call(self._archive.remove, filename=filename)
+        return self._proxy.call(self._archive.remove, filename=filename)
 
     async def update(self, filename, document):
         """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
-        return await self._proxy.call(
+        return self._proxy.call(
             self._archive.save,
             filename=filename,
             data=PortfolioPolicy.serialize(document),
@@ -65,8 +65,8 @@ class MailStorage(StorageFacadeExtension):
         """Search a folder for documents by issuer."""
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
-        def callback():
-            result = Globber.owner(self._archive, issuer, path)
+        async def callback():
+            result = await Globber.owner(self._archive, issuer, path)
             result.sort(reverse=True, key=lambda e: e[2])
 
             datalist = []
@@ -82,11 +82,11 @@ class MailStorage(StorageFacadeExtension):
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
 
-        def callback():
+        async def callback():
             if issuer:
-                result = Globber.owner(self._archive, issuer, path)
+                result = await Globber.owner(self._archive, issuer, path)
             else:
-                result = Globber.path(self._archive, path)
+                result = await Globber.path(self._archive, path)
 
             result.sort(reverse=True, key=lambda e: e[2])
 

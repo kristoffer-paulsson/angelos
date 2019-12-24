@@ -506,7 +506,7 @@ class PersonFacade(BaseFacade):
         )
 
     def find_person(self, issuer):
-        res = self.__entity.search("/entities/persons", uuid.UUID(issuer))
+        res = self.__entity.search_docs("/entities/persons", uuid.UUID(issuer))
         output = ""
         for doc in res:
             output += yaml.dump(
@@ -519,7 +519,7 @@ class PersonFacade(BaseFacade):
         return output
 
     def find_keys(self, issuer):
-        res = self.__entity.search("/keys", uuid.UUID(issuer))
+        res = self.__entity.search_docs("/keys", uuid.UUID(issuer))
         output = ""
         for doc in res:
             output += yaml.dump(

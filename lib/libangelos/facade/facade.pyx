@@ -101,9 +101,9 @@ class PersonClientFacade(BaseFacade, ClientFacadeMixin, PersonFacadeMixin):
 
     INFO = (Const.A_TYPE_PERSON_CLIENT,)
 
-    def __init__(self, home_dir: str, secret: bytes, vault: VaultStorage):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade and its mixins."""
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
@@ -113,9 +113,9 @@ class PersonServerFacade(BaseFacade, ServerFacadeMixin, PersonFacadeMixin):
 
     INFO = (Const.A_TYPE_PERSON_SERVER,)
 
-    def __init__(self, home_dir: str, secret: bytes, vault: VaultStorage):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade and its mixins."""
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
         PersonFacadeMixin.__init__(self)
 
@@ -125,9 +125,9 @@ class MinistryClientFacade(BaseFacade, ClientFacadeMixin, MinistryFacadeMixin):
 
     INFO = (Const.A_TYPE_MINISTRY_CLIENT,)
 
-    def __init__(self, home_dir: str, secret: bytes, vault: VaultStorage):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade and its mixins."""
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
@@ -137,9 +137,9 @@ class MinistryServerFacade(BaseFacade, ServerFacadeMixin, MinistryFacadeMixin):
 
     INFO = (Const.A_TYPE_MINISTRY_SERVER,)
 
-    def __init__(self, home_dir: str, secret: bytes, vault: VaultStorage):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade and its mixins."""
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
         MinistryFacadeMixin.__init__(self)
 
@@ -149,9 +149,9 @@ class ChurchClientFacade(BaseFacade, ClientFacadeMixin, ChurchFacadeMixin):
 
     INFO = (Const.A_TYPE_CHURCH_CLIENT,)
 
-    def __init__(self, home_dir: str, secret: bytes, vault: VaultStorage):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade and its mixins."""
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
@@ -161,9 +161,9 @@ class ChurchServerFacade(BaseFacade, ServerFacadeMixin, ChurchFacadeMixin):
 
     INFO = (Const.A_TYPE_CHURCH_SERVER,)
 
-    def __init__(self, home_dir: str, secret: bytes, vault: VaultStorage):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade and its mixins."""
-        BaseFacade.__init__(self, home_dir, secret, vault)
+        BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
         ChurchFacadeMixin.__init__(self)
 
@@ -199,12 +199,12 @@ class Facade:
         vault_role = Facade._check_role(role)
         vault_type = Facade._check_type(portfolio, server)
 
-        vault = VaultStorage.setup(home_dir, secret, portfolio, vault_type, vault_role)
+        vault = await VaultStorage.setup(home_dir, secret, portfolio, vault_type, vault_role)
         await vault.add_portfolio(portfolio)
 
         facade_class = Facade.MAP[0][vault_type]
-        facade = facade_class(home_dir, secret, vault)
-        await facade.post_init()
+        facade = facade_class(home_dir, secret)
+        await facade.post_init(vault)
         return facade
 
     @staticmethod
@@ -213,8 +213,8 @@ class Facade:
         vault = VaultStorage(None, home_dir, secret)
         facade_class = Facade.MAP[0][vault.archive.stats().type]
 
-        facade = facade_class(home_dir, secret, vault)
-        await facade.post_init()
+        facade = facade_class(home_dir, secret)
+        await facade.post_init(vault)
         return facade
 
     @classmethod

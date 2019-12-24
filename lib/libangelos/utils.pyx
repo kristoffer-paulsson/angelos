@@ -14,7 +14,8 @@ import asyncio
 import importlib
 import os
 import sys
-from typing import _GenericAlias
+from asyncio import Task
+from typing import _GenericAlias, Callable, Any
 
 from libangelos.error import ERROR_INFO
 
@@ -270,6 +271,24 @@ class Util:
         return "{0}.{1}".format(
             klass.__class__.__module__, klass.__class__.__name__
         )
+
+    @staticmethod
+    async def coro(callback: Callable, *args, **kwargs) -> Task:
+        """Coroutine wrapper for callbacks.
+
+        Args:
+            callback (Callable):
+                Callback to be wrapped as a coroutine.
+            *args (list):
+                Argument list
+            **kwargs (dict):
+             Keyword argument dictionary.
+
+        Returns (Any):
+            The returned result from the callback.
+
+        """
+        return callback(*args, **kwargs)
 
     @staticmethod
     def hours(seconds):

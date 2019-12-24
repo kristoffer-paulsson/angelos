@@ -4,15 +4,15 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-"""Facade mail API."""
-from typing import List
+"""Facade contact API."""
+import uuid
+from typing import List, Tuple, Set
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.document.entities import Person, Ministry, Church
 from libangelos.document.types import EntityT
 from libangelos.facade.base import BaseFacade
 from libangelos.helper import Glue
-from libangelos.misc import LazyAttribute
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -20,17 +20,266 @@ class ContactAPI(ApiFacadeExtension):
 
     ATTRIBUTE = ("contact",)
 
-    PORTFOLIOS = "/portfolios"
+    PATH_BLOCKED = ("/contacts/blocked/",)
+    PATH_ALL = ("/contacts/all/",)
+    PATH_FRIENDS = ("/contacts/friends/",)
+    PATH_FAVORITES = ("/contacts/favorites/",)
 
     def __init__(self, facade: BaseFacade):
         """Initialize the Contacts."""
         ApiFacadeExtension.__init__(self, facade)
 
+    async def __load_contacts(self, pattern: str) -> Set[Tuple[str, uuid.UUID]]:
+        """Loads all contacts according to pattern.
+
+        Args:
+            pattern (str):
+                Search pattern for specific contact folder
+
+        Returns (Set[Tuple[str, uuid.UUID]]):
+            Result file path and owner ID.
+
+        """
+        return set(await self.facade.api.contact.search(
+            pattern,
+            link=True,
+            limit=None,
+            deleted=False,
+            fields=lambda name, entry: (name, entry.owner)
+        ).values())
+
+    async def __link(self, path: str, eid: uuid.UUID):
+        """Link a contact to a portfolio entity.
+
+        Args:
+            path (str):
+                Path to contact directory.
+            eid (uuid.UUID):
+                Portfolio entity ID
+
+        """
+        await self.facade.storage.vault.link(
+            path + str(eid),
+            self.facade.storage.vault.PATH_PORTFOLIOS[0] + str(eid) + "/" + str(eid) + ".ent"
+        )
+
+    async def __unlink(self, path: str, eid: uuid.UUID):
+        """Remove contact by unlink portfolio entity.
+
+        Args:
+            path (str):
+                Path in contact directory.
+            eid (uuid.UUID):
+                Portfolio entity ID
+
+        """
+        await self.facade.storage.vault.delete(path + str(eid))
+
     async def load_all(self) -> List[EntityT]:
         """Load contacts from portfolios."""
-        doc_list = await self.facade.storage.vault.search(
-            path=ContactAPI.PORTFOLIOS + "/*/*.ent",
+        doc_list = await self.facade.storage.vault.search_docs(
+            path=ContactAPI.PORTFOLIOS[0] + "/*/*.ent",
             limit=1000
         )
         result = Glue.doc_validate_report(doc_list, (Person, Ministry, Church))
         return result
+
+    async def load_all(self) -> Set[Tuple[str, uuid.UUID]]:
+        """Load a list of all contacts, that is not blocked.
+
+        Returns (List[Tuple[str, uuid.UUID]]):
+            List of tuples with portfolio path and ID.
+
+        """
+        pass
+
+    async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
+        """Load a list of all blocked entities.
+
+        Returns (List[Tuple[str, uuid.UUID]]):
+            List of tuples with portfolio path and ID.
+
+        """
+        return await self.__load_contacts(self.PATH_BLOCKED[0] + "*")
+
+    async def block(self, *entities: uuid.UUID) -> bool:
+        """Put entities in the blocked category.
+
+        This method will unfriend and unfavorite the entities.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_block(eid):
+            """Unfavorite, unfriend and block entity.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to block.
+            """
+            if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+                await self.__unlink(self.PATH_FAVORITES[0], eid)
+            if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+                await self.__unlink(self.PATH_FRIENDS[0], eid)
+            if archive.islink(self.PATH_ALL[0] + str(eid)):
+                await self.__unlink(self.PATH_ALL[0], eid)
+            if not archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+                await self.__link(self.PATH_BLOCKED[0], eid)
+
+        return await self.gather([do_block(entity) for entity in entities])
+
+    async def unblock(self, *entities: uuid.UUID) -> bool:
+        """Remove entities in the blocked category.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_unblock(eid):
+            """Unblock entity.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to unblock.
+            """
+            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+                await self.__unlink(self.PATH_BLOCKED[0], eid)
+            if not archive.islink(self.PATH_ALL[0] + str(eid)):
+                await self.__link(self.PATH_ALL[0], eid)
+
+        return await self.gather([do_unblock(entity) for entity in entities])
+
+    async def load_friends(self) -> Set[Tuple[str, uuid.UUID]]:
+        """Load a list of all friends.
+
+        Returns (List[Tuple[str, uuid.UUID]]):
+            List of tuples with portfolio path and ID.
+
+        """
+        return await self.__load_contacts(self.PATH_FRIENDS[0] + "*")
+
+    async def friend(self, *entities: uuid.UUID) -> bool:
+        """Put entities in the friends category.
+
+        This method will unblock.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_friend(eid):
+            """Friend entity.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to friend.
+            """
+            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+                await self.__unlink(self.PATH_BLOCKED[0], eid)
+            if not archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+                await self.__link(self.PATH_FRIENDS[0], eid)
+            if not archive.islink(self.PATH_ALL[0] + str(eid)):
+                await self.__link(self.PATH_ALL[0], eid)
+
+        return await self.gather([do_friend(entity) for entity in entities])
+
+    async def unfriend(self, *entities: uuid.UUID) -> bool:
+        """Remove entities in the friends category.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_unfriend(eid):
+            """Unfriend entity.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to unfriend.
+            """
+            if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+                await self.__unlink(self.PATH_FRIENDS[0], eid)
+
+        return await self.gather([do_unfriend(entity) for entity in entities])
+
+    async def load_favorites(self) -> Set[Tuple[str, uuid.UUID]]:
+        """Load a list of all favorites.
+
+        Returns (List[Tuple[str, uuid.UUID]]):
+            List of tuples with portfolio path and ID.
+
+        """
+        return await self.__load_contacts(self.PATH_FAVORITES[0] + "*")
+
+    async def favorite(self, *entities: uuid.UUID) -> bool:
+        """Put entities in the favorite category.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_favorite(eid):
+            """Favorite entity.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to favorite.
+            """
+            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+                await self.__unlink(self.PATH_BLOCKED[0], eid)
+            if not archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+                await self.__link(self.PATH_FAVORITES[0], eid)
+            if not archive.islink(self.PATH_ALL[0] + str(eid)):
+                await self.__link(self.PATH_ALL[0], eid)
+
+        return await self.gather([do_favorite(entity) for entity in entities])
+
+    async def unfavorite(self, *entities: uuid.UUID) -> bool:
+        """Remove entities in the favorite category.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_unfavorite(eid):
+            """Unfavorite entity.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to unfavorite.
+            """
+            if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+                await self.__unlink(self.PATH_FAVORITES[0], eid)
+
+        return await self.gather([do_unfavorite(entity) for entity in entities])

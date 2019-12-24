@@ -49,7 +49,7 @@ class Indexer(Operation):
         portfolio = await self.__facade.load_portfolio(
             self.__facade.portfolio.entity.id, PGroup.ALL
         )
-        datalist = await self.__facade._vault.search(
+        datalist = await self.__facade._vault.search_docs(
             path="/portfolios/*/*.net", limit=200
         )
         network_list = set()

@@ -53,7 +53,7 @@ class NodePolicy(Policy):
             location = Location(
                 nd={
                     "hostname": [net.domain],
-                    "ip": [ipaddress.ip_address(net.ip)],
+                    "ip": [ipaddress.ip_address(net.ip) if net.ip else ipaddress.ip_address("0.0.0.0")],
                 }
             )
 

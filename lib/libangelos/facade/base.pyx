@@ -70,7 +70,7 @@ class FacadeExtension(FacadeFrozen):
         """Initialize facade extension."""
         FacadeFrozen.__init__(self, facade)
 
-    async def async_gather(self, *aws: Awaitable) -> bool:
+    async def gather(self, *aws: Awaitable) -> bool:
         """Run multiple awaitables in asyncio.gather.
 
         If there is any exceptions they will be printed to the logs.
@@ -86,11 +86,13 @@ class FacadeExtension(FacadeFrozen):
             Success or failure.
 
         """
-        results = await asyncio.shield(asyncio.gather(*aws, return_exceptions=True))
+        awaitable = asyncio.gather(*aws, return_exceptions=True)
+        await asyncio.sleep(0)
+        results = await awaitable
         exceptions = list(filter(lambda element: isinstance(element, Exception), results))
         if exceptions:
             for exc in exceptions:
-                logging.exception(exc, exc_info=True)
+                logging.error(exc, exc_info=True)
             return False
         else:
             return True
@@ -128,9 +130,8 @@ class BaseFacade:
         Description of attribute `__storage`.
 
     """
-    def __init__(self, home_dir: str, secret: bytes, vault: "StorageFacadeExtension"):
+    def __init__(self, home_dir: str, secret: bytes):
         """Initialize the facade."""
-        vault.facade = self
 
         self.__home_dir = home_dir
         self.__secret = secret
@@ -138,12 +139,12 @@ class BaseFacade:
 
         self.__closed = False
 
-        self.__storage = self._load_storages(vault)
-        self.__api = self._load_extensions("APIS")
-        self.__data = self._load_extensions("DATAS")
-        self.__task = self._load_extensions("TASKS")
+        self.__storage = None
+        self.__api = self.__load_extensions("APIS")
+        self.__data = self.__load_extensions("DATAS")
+        self.__task = self.__load_extensions("TASKS")
 
-    def _load_extensions(self, attr: str) -> Container:
+    def __load_extensions(self, attr: str) -> Container:
         """Prepare facade extensions in an ioc container.
 
         Args:
@@ -172,7 +173,7 @@ class BaseFacade:
         else:
             return None
 
-    def _load_storages(self, vault: "StorageFacadeExtension") -> Container:
+    async def __load_storages(self, vault: "StorageFacadeExtension") -> Container:
         """Prepare facade storage extensions in an ioc container.
 
         Args:
@@ -187,10 +188,9 @@ class BaseFacade:
             """Container lambda generator."""
             return lambda x: klass(facade, path, secret)
 
-        def generator_setup(klass, facade, path, secret, owner, node, domain):
+        def generator_setup(instance):
             """Container lambda generator."""
-            return lambda x: storage_cls.setup(
-                self, self.__home_dir, self.__secret, owner=owner, node=node, domain=domain)
+            return lambda x: instance
 
         if hasattr(self, "STORAGES"):
             config = {"vault": lambda x: vault}
@@ -205,18 +205,22 @@ class BaseFacade:
                 if os.path.isfile(storage_cls.filename(storage_cls.CONCEAL[0])):
                     config[attribute] = generator(storage_cls, self.__home_dir, self.__secret)
                 else:
-                    config[attribute] = generator_setup(
-                        storage_cls, self, self.__home_dir, self.__secret,
-                        owner=stats.owner, node=stats.node, domain=stats.domain
-                    )
+                    storage = await storage_cls.setup(
+                        self, self.__home_dir, self.__secret, owner=stats.owner,  node=stats.node, domain=stats.domain)
+                    await asyncio.sleep(0)
+
+                    config[attribute] = generator_setup(storage)
 
             return Container(config)
         else:
             return None
 
-    async def post_init(self) -> None:
+    async def post_init(self, vault: "VaultStorage") -> None:
         """Async post initialization."""
         self._check_post_init()
+
+        vault.facade = self
+        self.__storage = await self.__load_storages(vault)
 
         portfolio = await self.storage.vault.load_portfolio(
             self.storage.vault.archive.stats().owner, PGroup.ALL)

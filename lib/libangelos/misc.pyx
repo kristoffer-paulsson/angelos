@@ -9,7 +9,10 @@ import abc
 import asyncio
 import atexit
 import concurrent
+import functools
+import logging
 import uuid
+from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass, asdict as data_asdict
 from threading import Thread
 from typing import Callable, Awaitable, Any
@@ -23,19 +26,21 @@ class Loop:
     """
 
     __main = None
+    __cnt = 0
 
-    def __init__(self):
-        loop = asyncio.new_event_loop()
-        self.__thread = Thread(target=self.__run, daemon=True)
+    def __init__(self, name=""):
+        self.__cnt += 1
+        self.__loop = asyncio.new_event_loop()
+        self.__thread = Thread(target=self.__run, daemon=True, name=name if name else "LoopThread-%s" % self.__cnt)
         atexit.register(self.__stop)
         self.__thread.start()
 
     @classmethod
-    def main(cls, coro: Awaitable):
+    def main(cls, coro: Awaitable, wait=False) -> Any:
         """Global instance of Loop."""
         if not cls.__main:
-            cls.__main = Loop()
-        cls.__main(coro)
+            cls.__main = Loop("LoopThread-0")
+        return cls.__main(coro, wait=wait)
 
     def __run(self) -> None:
         asyncio.set_event_loop(self.__loop)
@@ -50,19 +55,62 @@ class Loop:
             callback: Callable[[concurrent.futures.Future], None] = None,
             wait=False
     ) -> Any:
-        future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
-        if callback:
-            future.add_done_callback(callback)
-        else:
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
             future.add_done_callback(self.__callback)
 
-        if wait:
-            return future.result()
-        else:
-            return future
+            if callback:
+                future.add_done_callback(callback)
 
-    def __callback(self, future: concurrent.futures.Future = None):
-        pass
+            if wait:
+                return future.result()
+            else:
+                return future
+        except Exception as e:
+            logging.error(e, exc_info=True)
+
+    def __callback(self, future: concurrent.futures.Future):
+        exc = future.exception()
+        if exc:
+            logging.error(exc, exc_info=True)
+
+
+class SharedResource:
+    """
+
+    """
+    def __init__(self):
+        self.__pool = ThreadPoolExecutor(max_workers=1)
+
+    def __del__(self):
+        self.__pool.shutdown()
+
+    async def execute(self, callback, *args, **kwargs):
+        """
+
+        Args:
+            callback:
+            *args:
+            *kwargs:
+
+        Returns:
+
+        """
+        return await self._run(functools.partial(callback, *args, **kwargs))
+
+    async def _run(self, callback):
+        """
+
+        Args:
+            callback:
+            resource:
+            *args:
+            **kwargs:
+
+        Returns:
+
+        """
+        return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
 
 
 @dataclass
@@ -105,6 +153,24 @@ class ThresholdCounter:
         return self.__cnt >= self.__thr
 
 
+class LazyAttribute:
+    """
+    Attribute class that allows lazy loading using a lambda.
+    """
+    def __init__(self, loader: Callable):
+        self.__loader = loader
+        self.__done = False
+        self.__value = None
+
+    def __get__(self, obj, obj_type) -> Any:
+        return self.__value if self.__done else self.__load()
+
+    def __load(self) -> Any:
+        self.__value = self.__loader()
+        self.__done = True
+        return self.__value
+
+
 class Misc:
     """Namespace for miscellanious functions and methods."""
     @staticmethod
@@ -127,21 +193,3 @@ class Misc:
             return serial
         except NotImplementedError:
             return str(uuid.getnode())
-
-
-class LazyAttribute:
-    """
-    Attribute class that allows lazy loading using a lambda.
-    """
-    def __init__(self, loader: Callable):
-        self.__loader = loader
-        self.__done = False
-        self.__value = None
-
-    def __get__(self, obj, obj_type) -> Any:
-        return self.__value if self.__done else self.__load()
-
-    def __load(self) -> Any:
-        self.__value = self.__loader()
-        self.__done = True
-        return self.__value

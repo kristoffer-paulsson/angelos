@@ -5,14 +5,15 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Vault."""
+import datetime
+import io
 import logging
 import uuid
-import io
-from typing import List
+from typing import List, Dict, Any, Optional
 
 from libangelos.archive.portfolio_mixin import PortfolioMixin
 from libangelos.archive.storage import StorageFacadeExtension
-from libangelos.archive7 import Entry
+from libangelos.archive7 import Entry, Archive7
 from libangelos.const import Const
 from libangelos.helper import Glue, Globber
 from libangelos.policy.portfolio import PrivatePortfolio, PortfolioPolicy
@@ -63,15 +64,15 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     )
 
     INIT_FILES = (
-        ("/settings/preferences.ini", b""),
-        ("/settings/networks.csv", b"")
+        ("/settings/preferences.ini", b"# Empty"),
+        ("/settings/networks.csv", b"# Empty")
     )
 
     NODES = "/settings/nodes"
     INBOX = "/messages/inbox/"
 
     @classmethod
-    def setup(
+    async def setup(
             cls,
             home_dir: str,
             secret: bytes,
@@ -80,7 +81,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             vrole=None,
     ) -> object:
         """Create and setup the whole Vault according to policy's."""
-        return super(VaultStorage, cls).setup(
+        return await super(VaultStorage, cls).setup(
             None,
             home_dir,
             secret,
@@ -95,27 +96,37 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """Save a document at a certain location."""
         created, updated, owner = Glue.doc_save(document)
 
-        return await self.proxy.call(
-            self.archive.mkfile,
+        return await self.archive.mkfile(
             filename=filename,
             data=PortfolioPolicy.serialize(document),
             id=document.id,
             owner=owner,
             created=created,
             modified=updated,
-            compression=Entry.COMP_NONE,
+            compression=Entry.COMP_NONE
         )
 
-    async def delete(self, filename):
+    async def delete(self, filename: str):
         """Remove a document at a certain location."""
-        return await self.proxy.call(self.archive.remove, filename=filename)
+        return await self.archive.remove(filename)
+
+    async def link(self, path: str, link_to: str) -> None:
+        """Create a link to file or directory.
+
+        Args:
+            path (str):
+                Path of the link.
+            link_to (str:
+                Path being linked to.
+
+        """
+        await self.archive.link(path, link_to)
 
     async def update(self, filename, document):
         """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
-        return await self.proxy.call(
-            self.archive.save,
+        return await self.archive.save(
             filename=filename,
             data=PortfolioPolicy.serialize(document),
             modified=updated,
@@ -125,51 +136,144 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """Search a folder for documents by issuer."""
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
-        def callback():
-            result = Globber.owner(self.archive, issuer, path)
-            result.sort(reverse=True, key=lambda e: e[2])
+        result = await Globber.owner(self.archive, issuer, path)
+        result.sort(reverse=True, key=lambda e: e[2])
 
-            datalist = []
-            for r in result[:limit]:
-                datalist.append(self.archive.load(r[0]))
+        datalist = []
+        for r in result[:limit]:
+            datalist.append(await self.archive.load(r[0]))
 
-            return datalist
-
-        return await self.proxy.call(callback, 0, 5)
+        return datalist
 
     async def search(
+            self,
+            pattern: str = "/",
+            modified: datetime.datetime = None,
+            created: datetime.datetime = None,
+            owner: uuid.UUID = None,
+            link: bool = False,
+            limit: int = None,
+            deleted: Optional[bool] = None,
+            fields = lambda name, entry: name
+    ) -> Dict[uuid.UUID, Any]:
+        """Searches for a files in the storage.
+
+        Args:
+            pattern (str):
+                Path search pattern.
+            modified (datetime.datetime):
+                Files modified since.
+            created (datetime.datetime):
+                Files created since.
+            owner (uuid.UUID):
+                Files belonging to owner.
+            link (bool):
+                Include links in result.
+            limit (int):
+                Max number of hits (0 is unlimited).
+            deleted (bool):
+                Search for deleted files.
+            fields (lambda):
+                Lambda function that compiles the result row.
+
+        Returns (Dict[uuid.UUID, Any]):
+            Returns a dictionary with a custom resultset indexed by file ID.
+
+        """
+        try:
+            def query(q):
+                q.type((b"f", b"l") if link else b"f").deleted(deleted)
+                if modified:
+                    q.modified(modified)
+                if created:
+                    q.created(created)
+                if owner:
+                    q.owner(owner)
+                return q
+
+            return await self._callback_search(
+                pattern=pattern,
+                query=query,
+                fieldd=fields,
+                limit=limit,
+                follow=link
+            )
+        except Exception as e:
+            logging.exception(e)
+
+    async def _callback_search(
+            self,
+            pattern,
+            query = lambda q: q.type(b"f"),
+            fields = lambda name, entry: name,
+            limit = 0,
+            follow = False
+    ) -> dict:
+        """Internal search function that searches for files.
+
+        Note:
+            Don't access this method directly. you must use a proxy.
+
+        Args:
+            pattern (str):
+                Search pattern for the file path.
+            query (lambda):
+                Lambda function that builds the query after the pattern is set.
+            fields (lambda):
+                Lambda function that formats each row.
+
+        Returns (dict):
+            A dictionary of results indexed by ID.
+
+        """
+        idxs = self.archive.ioc.entries.search(query(Archive7.Query(pattern=pattern)))
+        ids = self.archive.ioc.hierarchy.ids
+        ops = self.ioc.operations
+
+        resultset = dict()
+        count = 0
+        for _, entry in idxs:
+            filename = entry.name.decode()
+            if entry.parent.int == 0:
+                name = "/" + filename
+            else:
+                name = ids[entry.parent] + "/" + filename
+            if follow and entry.type == Entry.TYPE_LINK:
+                entry, _ = ops.follow_link(entry)
+            resultset[entry.id] = fields(name, entry)
+            count += 1
+            if count == limit:
+                break
+
+        return resultset
+
+    async def search_docs(
             self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
 
-        def callback():
-            if issuer:
-                result = Globber.owner(self.archive, issuer, path)
-            else:
-                result = Globber.path(self.archive, path)
+        if issuer:
+            result = await Globber.owner(self.archive, issuer, path)
+        else:
+            result = await Globber.path(self.archive, path)
 
-            result.sort(reverse=True, key=lambda e: e[2])
+        result.sort(reverse=True, key=lambda e: e[2])
 
-            datalist = []
-            for r in result[:limit]:
-                datalist.append(self.archive.load(r[0]))
+        datalist = []
+        for r in result[:limit]:
+            datalist.append(await self.archive.load(r[0]))
 
-            return datalist
-
-        return await self.proxy.call(callback, 0, 5)
+        return datalist
 
     async def save_settings(self, name: str, text: io.StringIO) -> bool:
         """Save or update a text settings file."""
         try:
             filename = "/settings/" + name
-            kwargs = {"filename": filename, "data": text.getvalue().encode()}
-            if self.archive.isfile(filename):
-                kwargs["callback"] = self.archive.save
+            data =  text.getvalue().encode()
+            if self.archive.isfile(filename, data):
+                return await self.archive.save()
             else:
-                kwargs["callback"] = self.archive.mkfile
-                kwargs["owner"] = self.facade.data.portfolio.entity.id
-
-            return await self.proxy.call(**kwargs)
+                return await self.archive.mkfile(filename, data, owner=self.facade.data.portfolio.entity.id)
         except Exception as e:
             logging.exception(e)
 
@@ -179,9 +283,6 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """Load a text settings file."""
         filename = "/settings/" + name
         if self.archive.isfile(filename):
-            data = await self.proxy.call(
-                self.archive.load,
-                filename=filename
-            )
+            data = await self.archive.load(filename)
             return io.StringIO(data.decode())
         return io.StringIO()

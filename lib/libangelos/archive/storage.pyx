@@ -5,13 +5,13 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring"""
+import asyncio
 import atexit
 import os
 import uuid
 
 from libangelos.archive7 import Archive7
 from libangelos.facade.base import BaseFacade, FacadeExtension
-from libangelos.helper import AsyncProxy
 
 
 class StorageFacadeExtension(FacadeExtension):
@@ -30,25 +30,15 @@ class StorageFacadeExtension(FacadeExtension):
         self.__archive = Archive7.open(self.filename(home_dir), secret, delete)
         atexit.register(self.__archive.close)
         self.__closed = False
-        self.__proxy = AsyncProxy(200)
 
     @property
     def archive(self):
-        """
+        """Property access to underlying storage.
 
         Returns:
 
         """
         return self.__archive
-
-    @property
-    def proxy(self):
-        """
-
-        Returns:
-
-        """
-        return self.__proxy
 
     @property
     def closed(self) -> bool:
@@ -58,13 +48,12 @@ class StorageFacadeExtension(FacadeExtension):
     def close(self):
         """Close the Archive."""
         if not self.__closed:
-            self.__proxy.quit()
             atexit.unregister(self.__archive.close)
             self.__archive.close()
             self.__closed = True
 
     @classmethod
-    def setup(
+    async def setup(
         cls,
         facade: BaseFacade,
         home_dir: str,
@@ -76,7 +65,7 @@ class StorageFacadeExtension(FacadeExtension):
         vrole=None,
     ):
         """Create and setup the whole Vault according to policy's."""
-        arch = Archive7.setup(
+        archive = Archive7.setup(
             cls.filename(home_dir),
             secret,
             owner=owner,
@@ -87,9 +76,9 @@ class StorageFacadeExtension(FacadeExtension):
             role=vrole,
             use=cls.USEFLAG[0],
         )
-        cls._hierarchy(arch)
-        cls._files(arch)
-        arch.close()
+        await cls._hierarchy(archive)
+        await cls._files(archive)
+        archive.close()
 
         return cls(facade, home_dir, secret)
 
@@ -106,11 +95,11 @@ class StorageFacadeExtension(FacadeExtension):
         return os.path.join(dir_name, cls.CONCEAL[0])
 
     @classmethod
-    def _hierarchy(cls, archive):
+    async def _hierarchy(cls, archive):
         for i in cls.INIT_HIERARCHY:
-            archive.mkdir(i)
+            await archive.mkdir(i)
 
     @classmethod
-    def _files(cls, archive):
+    async def _files(cls, archive):
         for i in cls.INIT_FILES:
-            archive.mkfile(i[0], i[1])
+            await archive.mkfile(i[0], i[1])

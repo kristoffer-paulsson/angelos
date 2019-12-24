@@ -336,7 +336,7 @@ def run_extract(args, parser):
         else:
             parser.exit(1)
 
-def run_create(args, parser):
+async def run_create(args, parser):
     """Run command extract."""
     archive = args.create.pop(0)
 

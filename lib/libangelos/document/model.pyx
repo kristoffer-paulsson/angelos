@@ -14,7 +14,6 @@ implement validation.
 import base64
 import datetime
 import ipaddress
-import logging
 import re
 import uuid
 from abc import ABC
@@ -365,11 +364,9 @@ class BaseDocument(metaclass=DocumentMeta):
 
         """
         doc = {}
-        logging.debug("Exporting document %s" % type(cls))
 
         for name, field in cls._fields.items():
             value = data[name]
-            logging.debug("%s, %s, %s" % (type(field), name, value))
 
             if not field.multiple:
                 doc[name] = field.from_bytes(value)
@@ -399,11 +396,9 @@ class BaseDocument(metaclass=DocumentMeta):
 
         """
         nd = {}
-        logging.debug("Exporting document %s" % type(self))
 
         for name, field in self._fields.items():
             value = getattr(self, name)
-            logging.debug("%s, %s, %s" % (type(field), name, value))
 
             if not field.multiple:
                 nd[name] = (

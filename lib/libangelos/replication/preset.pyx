@@ -8,14 +8,14 @@
 Replication presets. The presets defines specific replication behavior needed
 for several purposes.
 """
-import uuid
 import datetime
 import pathlib
+import uuid
 
-from ..const import Const
-from ..api.mailbox import MailboxAPI
-from ..ioc import Container
-from ..policy.portfolio import Portfolio
+from libangelos.api.mailbox import MailboxAPI
+from libangelos.const import Const
+from libangelos.ioc import Container
+from libangelos.policy.portfolio import Portfolio
 
 
 class FileSyncInfo:
@@ -110,12 +110,12 @@ class Preset:
         meta = self.files[fileid]
         del self.files[fileid]
 
-        fileinfo = FileSyncInfo()
-        fileinfo.fileid = fileid
-        fileinfo.path = meta[0]
-        fileinfo.modified = meta[1]
-        fileinfo.deleted = meta[2]
-        return fileinfo
+        file_info = FileSyncInfo()
+        file_info.fileid = fileid
+        file_info.path = meta[0]
+        file_info.modified = meta[1]
+        file_info.deleted = meta[2]
+        return file_info
 
     def get_file_meta(self, keys: uuid.UUID) -> FileSyncInfo:
         """Pop meta information off."""
@@ -126,12 +126,12 @@ class Preset:
 
         del self.files[keys]
 
-        fileinfo = FileSyncInfo()
-        fileinfo.fileid = keys
-        fileinfo.path = meta[0]
-        fileinfo.modified = meta[1]
-        fileinfo.deleted = meta[2]
-        return fileinfo
+        file_info = FileSyncInfo()
+        file_info.fileid = keys
+        file_info.path = meta[0]
+        file_info.modified = meta[1]
+        file_info.deleted = meta[2]
+        return file_info
 
     def file_processed(self, fileid: uuid.UUID):
         self.processed.add(fileid)
