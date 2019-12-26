@@ -191,17 +191,18 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
                     q.owner(owner)
                 return q
 
-            return await self._callback_search(
-                pattern=pattern,
-                query=query,
-                fieldd=fields,
-                limit=limit,
-                follow=link
+            return await self.archive.execute(
+                self._callback_search,
+                pattern,
+                query,
+                fields,
+                limit,
+                link
             )
         except Exception as e:
             logging.exception(e)
 
-    async def _callback_search(
+    def _callback_search(
             self,
             pattern,
             query = lambda q: q.type(b"f"),
@@ -228,7 +229,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """
         idxs = self.archive.ioc.entries.search(query(Archive7.Query(pattern=pattern)))
         ids = self.archive.ioc.hierarchy.ids
-        ops = self.ioc.operations
+        ops = self.archive.ioc.operations
 
         resultset = dict()
         count = 0

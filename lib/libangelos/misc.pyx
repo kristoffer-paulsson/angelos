@@ -96,6 +96,7 @@ class SharedResource:
         Returns:
 
         """
+        await asyncio.sleep(0)
         return await self._run(functools.partial(callback, *args, **kwargs))
 
     async def _run(self, callback):
@@ -110,6 +111,7 @@ class SharedResource:
         Returns:
 
         """
+        await asyncio.sleep(0)
         return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
 
 

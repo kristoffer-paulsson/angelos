@@ -24,6 +24,7 @@ from libangelos.facade.facade import Facade, ServerFacadeMixin, ClientFacadeMixi
 from libangelos.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation
 
 from dummy.support import Generate
+from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
 
 def run_async(coro):
@@ -73,6 +74,7 @@ class TestFacade(TestCase):
         self.assertIsInstance(facade.api.settings, SettingsAPI)
         self.assertIsInstance(facade.api.mailbox, MailboxAPI)
         self.assertIsInstance(facade.api.replication, ReplicationAPI)
+        self.assertIsInstance(facade.task.contact_sync, ContactPortfolioSyncTask)
 
         if isinstance(facade, ServerFacadeMixin):
             self.assertIsInstance(facade.storage.routing, RoutingStorage)

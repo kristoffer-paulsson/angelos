@@ -17,13 +17,14 @@ from libangelos.reactive import NotifierMixin
 class TaskFacadeExtension(FacadeExtension, NotifierMixin):
     """Task extension that runs as a background job in the facade."""
 
-    INVOKABLE = (True,)
-    SCHEDULABLE = (True,)
-    PERIODIC = (True,)
+    INVOKABLE = (False,)
+    SCHEDULABLE = (False,)
+    PERIODIC = (False,)
 
     ACTION_START = 1
     ACTION_COMPLETE = 2
     ACTION_CRASH = 3
+    ACTION_PROGRESS = 4
 
     def __init__(self, facade: BaseFacade, loop: asyncio.AbstractEventLoop = None):
         """Initialize the task."""
@@ -33,6 +34,7 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         self.__loop = loop if loop else asyncio.get_event_loop()
         self.__running = False
         self.__task = None
+        self.__handle = None
         self.__period = None
         self.__period_start = None
         self.__timer = None
@@ -49,7 +51,7 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
 
         Returns True if invocation went through. If invoking isn't available returns False."""
         if self.INVOKABLE[0]:
-            self.__loop.call_soon(self.__launch, self.ATTRIBUTE[0])
+            self.__handle = self.__loop.call_soon(self.__launch)
             return True
         return False
 
@@ -59,7 +61,7 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         Tell when you want the task to be executed. Returns false if task scheduling isn't available."""
         if self.SCHEDULABLE[0]:
             delay = (when - datetime.datetime.now()).total_seconds()
-            self.__timer = self.__loop.call_later(delay, self.__launch, self.ATTRIBUTE[0])
+            self.__timer = self.__loop.call_later(delay, self.__launch)
             return True
         return False
 
@@ -91,13 +93,10 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         full_cycle = math.ceil(cycles) * self.__period
         run_in = full_cycle - uptime
         when = self.__loop.time() + run_in
-        self.__timer = self.__loop.call_at(when, self.__launch, self.ATTRIBUTE[0])
+        self.__timer = self.__loop.call_at(when, self.__launch)
 
     def __start(self) -> bool:
         """Standard preparations before execution."""
-        if self.__running:
-            return False
-
         self.__time_end = 0
         self.__running = True
         self.notify_all(self.ACTION_START, {"name": self.ATTRIBUTE[0]})
@@ -111,6 +110,10 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         self.__running = False
         if self.__period:
             self.__next_run()
+
+    def _progress(self, progress: float=0):
+        """Notify observers made progress."""
+        self.notify_all(self.ACTION_PROGRESS, {"name": self.ATTRIBUTE[0], "progress": progress})
 
     async def _run(self) -> None:
         """Actual task logic to be implemented here."""
@@ -129,25 +132,22 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         if self.__running:
             return False
 
-        crash = False
-        try:
-            self.__task = self.__loop.create_task(self.__exe)
-            # self.__task.add_done_callback(self.__done, self.__task)
-        except Exception as e:
-            logging.critical("Facade task \"%w\" crashed!" % self.ATTRIBUTE[0], exc_info=True)
-            self.cancel()
-            # await self.notify_all(self.ACTION_CRASH, {"name": self.ATTRIBUTE[0], "task": self.__task})
-            crash = True
-
-        return not crash
+        self.__task = self.__loop.create_task(self.__exe())
+        self.__task.add_done_callback(self.__done)
 
     def __done(self, task):
-        pass
+        exc = task.exception()
+        if exc:
+            logging.error(exc, exc_info=True)
+            self.notify_all(self.ACTION_CRASH, {
+                "name": self.ATTRIBUTE[0], "task": self.__task, "exception": exc})
+        else:
+            logging.info("Task \"%s\" finished execution" % self.ATTRIBUTE[0])
 
     async def __exe(self) -> None:
         """Task executor that prepares, executes and finalizes."""
         self.__start()
         await self._initialize()
         await self._run()
-        await self._finilize()
+        await self._finalize()
         self.__end()

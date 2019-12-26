@@ -1,8 +1,12 @@
 import asyncio
+import logging
 import os
+import pprint
 import tracemalloc
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+
+from tests.libangelos.common import run_async
 
 from libangelos.const import Const
 from libangelos.facade.facade import Facade
@@ -11,16 +15,10 @@ from libangelos.operation.setup import SetupPersonOperation
 from dummy.support import Generate
 
 
-def run_async(coro):
-    """Decorator for asynchronous test cases."""
-    def wrapper(*args, **kwargs):
-        asyncio.run(coro(*args, **kwargs))
-    return wrapper
-
-
 class TestContactAPI(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        """Setup test class with a facade and ten contacts."""
         tracemalloc.start()
 
         cls.secret = os.urandom(32)
@@ -30,21 +28,21 @@ class TestContactAPI(TestCase):
 
         @run_async
         async def contacts():
+            """Generate a facade and inject random contacts."""
             portfolio = SetupPersonOperation.create(Generate.person_data()[0], server=cls.server)
             cls.facade = None
-            print("Da facade")
             cls.facade = await Facade.setup(
                 cls.home, cls.secret,
                 Const.A_ROLE_PRIMARY, cls.server, portfolio=portfolio
             )
 
             for person in Generate.person_data(10):
-                print("Da person")
-                await cls.facade.storage.vault.add_portfolio(SetupPersonOperation.create(person))
+                await cls.facade.storage.vault.add_portfolio(SetupPersonOperation.create(person, server=False))
         contacts()
 
     @classmethod
     def tearDownClass(cls) -> None:
+        """Clean up after test suite."""
         if not cls.facade.closed:
             cls.facade.close()
         cls.dir.cleanup()
@@ -61,7 +59,9 @@ class TestContactAPI(TestCase):
     @run_async
     async def test_load_all(self):
         try:
-            pass
+            self.facade.task.contact_sync.invoke()
+            await asyncio.sleep(5)
+            print(await self.facade.api.contact.load_all())
         except Exception as e:
             self.fail(e)
 
@@ -109,6 +109,13 @@ class TestContactAPI(TestCase):
 
     @run_async
     async def test_unfavorite(self):
+        try:
+            pass
+        except Exception as e:
+            self.fail(e)
+
+    @run_async
+    async def test_remove(self):
         try:
             pass
         except Exception as e:

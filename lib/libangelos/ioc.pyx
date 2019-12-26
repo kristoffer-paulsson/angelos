@@ -11,8 +11,8 @@ available in the whole application.
  """
 import logging
 from typing import Any
-from .utils import Util
-from .error import Error
+from libangelos.utils import Util
+from libangelos.error import Error
 
 
 class Container:

@@ -297,27 +297,21 @@ class PortfolioMixin:
         result = await self.gather(*ops, return_exceptions=True)
         return rejected, result
 
-    async def list_portfolios(
-        self, query: str = "*"
-    ) -> List[Tuple[bytes, Exception]]:
-        """List all portfolio entities.
+    async def list_portfolios(self) -> Set[Tuple[str, uuid.UUID]]:
+        """Load a list of all portfolios.
 
-        Parameters
-        ----------
-        query : str
-            Search query.
-
-        Returns
-        -------
-        List[Tuple[bytes, Exception]]
-            List with a tuple of bytes and exceptions
+        Returns (List[Tuple[str, uuid.UUID]]):
+            List of tuples with portfolio path and ID.
 
         """
-        doclist = await self.search_docs(
-            path="{0}{1}.ent".format(self.PATH_PORTFOLIOS[0], query), limit=100
+        result = await self.search(
+            self.PATH_PORTFOLIOS[0] + "*/*.ent",
+            link=True,
+            limit=None,
+            deleted=False,
+            fields=lambda name, entry: (name,) # entry.owner)
         )
-        result = Glue.doc_validate_report(doclist, (Entity))
-        return result
+        return set(result.keys())
 
     async def import_portfolio(self, portfolio: Portfolio) -> bool:
         """Save a portfolio for the first time.

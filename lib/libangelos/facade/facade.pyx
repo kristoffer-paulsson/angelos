@@ -17,14 +17,15 @@ from libangelos.archive.pool import PoolStorage
 from libangelos.archive.routing import RoutingStorage
 from libangelos.archive.vault import VaultStorage
 from libangelos.const import Const
+from libangelos.data.client import ClientData
 from libangelos.data.portfolio import PortfolioData
+from libangelos.data.prefs import PreferencesData
+from libangelos.data.server import ServerData
 from libangelos.document.entities import Person, Ministry, Church
 from libangelos.facade.base import BaseFacade
 from libangelos.policy.portfolio import PrivatePortfolio
 
-from libangelos.data.client import ClientData
-from libangelos.data.prefs import PreferencesData
-from libangelos.data.server import ServerData
+from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
 
 class EntityFacadeMixin:
@@ -63,7 +64,7 @@ class TypeFacadeMixin:
     STORAGES = ()
     APIS = (SettingsAPI, MailboxAPI, ContactAPI, ReplicationAPI)
     DATAS = (PortfolioData, PreferencesData)
-    TASKS = ()
+    TASKS = (ContactPortfolioSyncTask,)
 
     def __init__(self):
         """Initialize facade."""

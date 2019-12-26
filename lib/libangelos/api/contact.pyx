@@ -5,14 +5,12 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Facade contact API."""
+import asyncio
 import uuid
-from typing import List, Tuple, Set
+from typing import Tuple, Set
 
 from libangelos.api.api import ApiFacadeExtension
-from libangelos.document.entities import Person, Ministry, Church
-from libangelos.document.types import EntityT
 from libangelos.facade.base import BaseFacade
-from libangelos.helper import Glue
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -40,13 +38,14 @@ class ContactAPI(ApiFacadeExtension):
             Result file path and owner ID.
 
         """
-        return set(await self.facade.api.contact.search(
+        result = await self.facade.storage.vault.search(
             pattern,
             link=True,
             limit=None,
             deleted=False,
-            fields=lambda name, entry: (name, entry.owner)
-        ).values())
+            fields=lambda name, entry: (name,) # entry.owner)
+        )
+        return set(result.keys())
 
     async def __link(self, path: str, eid: uuid.UUID):
         """Link a contact to a portfolio entity.
@@ -75,15 +74,6 @@ class ContactAPI(ApiFacadeExtension):
         """
         await self.facade.storage.vault.delete(path + str(eid))
 
-    async def load_all(self) -> List[EntityT]:
-        """Load contacts from portfolios."""
-        doc_list = await self.facade.storage.vault.search_docs(
-            path=ContactAPI.PORTFOLIOS[0] + "/*/*.ent",
-            limit=1000
-        )
-        result = Glue.doc_validate_report(doc_list, (Person, Ministry, Church))
-        return result
-
     async def load_all(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all contacts, that is not blocked.
 
@@ -91,7 +81,7 @@ class ContactAPI(ApiFacadeExtension):
             List of tuples with portfolio path and ID.
 
         """
-        pass
+        return await self.__load_contacts(self.PATH_ALL[0] + "*")
 
     async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all blocked entities.
@@ -283,3 +273,33 @@ class ContactAPI(ApiFacadeExtension):
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
 
         return await self.gather([do_unfavorite(entity) for entity in entities])
+
+    async def remove(self, *entities: uuid.UUID) -> bool:
+        """Remove all links to old portfolios.
+
+        Args:
+            *entities (uuid.UUID):
+                Argument list of entities.
+
+        Returns (bool):
+            True on success.
+
+        """
+        archive = self.facade.storage.vault.archive
+        async def do_remove(eid):
+            """Totally remove an entity from contacts.
+
+            Args:
+                eid (uuid.UUID):
+                    Entity ID to remove.
+            """
+            if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+                await self.__unlink(self.PATH_FAVORITES[0], eid)
+            if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+                await self.__unlink(self.PATH_FRIENDS[0], eid)
+            if archive.islink(self.PATH_ALL[0] + str(eid)):
+                await self.__unlink(self.PATH_ALL[0], eid)
+            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+                await self.__unlink(self.PATH_BLOCKED[0], eid)
+
+        return await self.gather([do_remove(entity) for entity in entities])
