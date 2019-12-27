@@ -20,26 +20,26 @@ class ContactPortfolioSyncTask(TaskFacadeExtension):
     async def _run(self) -> None:
         contacts = self.facade.api.contact
         portfolios = await self.facade.storage.vault.list_portfolios()
-        all = await contacts.load_all()
+        allc = await contacts.load_all()
         blocked = await contacts.load_blocked()
         await asyncio.sleep(0)
         self._progress(.25)
 
         # Remove the intersection of "blocked" and "all" from all.
-        remove_all_from_blocked = blocked | all
+        remove_all_from_blocked = blocked | allc
         await  asyncio.gather(*[contacts.block(p) for p in remove_all_from_blocked])
         await asyncio.sleep(0)
         self._progress(.50)
 
         # Remove the union of "all" and "blocked" intersected from "portfolios" and remove them.
-        remove_all = (all | blocked) - portfolios
+        remove_all = (allc | blocked) - portfolios
         await asyncio.gather(*[contacts.remove(p)  for p in remove_all])
         await asyncio.sleep(0)
         self._progress(.75)
 
         # Subtract "blocked" from "portfolios", then add missing to "all".
-        add_all = (portfolios - blocked) - all
-        await asyncio.gather(*[self.__link(contacts.PATH_ALL[0], p) for p in portfolios])
+        add_all = (portfolios - blocked) - allc
+        await asyncio.gather(*[self.__link(contacts.PATH_ALL[0], p) for p in add_all])
         await asyncio.sleep(0)
         self._progress(1.0)
         

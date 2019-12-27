@@ -272,7 +272,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             filename = "/settings/" + name
             data =  text.getvalue().encode()
             if self.archive.isfile(filename):
-                return await self.archive.save()
+                return await self.archive.save(filename, data)
             else:
                 return await self.archive.mkfile(filename, data, owner=self.facade.data.portfolio.entity.id)
         except Exception as e:
