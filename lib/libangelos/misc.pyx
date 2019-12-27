@@ -36,11 +36,15 @@ class Loop:
         self.__thread.start()
 
     @classmethod
-    def main(cls, coro: Awaitable, wait=False) -> Any:
+    def main(cls) -> "Loop":
         """Global instance of Loop."""
         if not cls.__main:
             cls.__main = Loop("LoopThread-0")
-        return cls.__main(coro, wait=wait)
+        return cls.__main
+
+    @property
+    def loop(self):
+        return self.__loop
 
     def __run(self) -> None:
         asyncio.set_event_loop(self.__loop)
@@ -49,7 +53,7 @@ class Loop:
     def __stop(self) -> None:
         self.__loop.call_soon_threadsafe(self.__loop.stop)
 
-    def __call__(
+    def run(
             self,
             coro: Awaitable,
             callback: Callable[[concurrent.futures.Future], None] = None,
@@ -195,3 +199,15 @@ class Misc:
             return serial
         except NotImplementedError:
             return str(uuid.getnode())
+
+    @staticmethod
+    def get_loop() -> asyncio.AbstractEventLoop:
+        """Get running loop or Loop main instance.
+
+        Returns (asyncio.AbstractEventLoop):
+            A running loop.
+        """
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            return Loop.main().loop

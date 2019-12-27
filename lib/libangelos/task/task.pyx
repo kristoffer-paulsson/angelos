@@ -5,12 +5,13 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Layout for new Facade framework."""
-import time
 import datetime
-import math
 import logging
-import asyncio
+import math
+import time
+
 from libangelos.facade.base import BaseFacade, FacadeExtension
+from libangelos.misc import Misc
 from libangelos.reactive import NotifierMixin
 
 
@@ -26,12 +27,12 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
     ACTION_CRASH = 3
     ACTION_PROGRESS = 4
 
-    def __init__(self, facade: BaseFacade, loop: asyncio.AbstractEventLoop = None):
+    def __init__(self, facade: BaseFacade):
         """Initialize the task."""
         FacadeExtension.__init__(self, facade)
         NotifierMixin.__init__(self)
 
-        self.__loop = loop if loop else asyncio.get_event_loop()
+        self.__loop = Misc.get_loop()
         self.__running = False
         self.__task = None
         self.__handle = None

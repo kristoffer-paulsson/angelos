@@ -82,8 +82,6 @@ class Const:
 
     OPT_LISTEN = ["localhost", "loopback", "hostname", "domain", "ip", "any"]
 
-    LOOP_SLEEP = 0.05
-
     W_SUPERV_NAME = "Supervisor"  # Server Supervisor worker
     W_ADMIN_NAME = "AdminServer"  # Server Admin worker
     G_CORE_NAME = "Core"

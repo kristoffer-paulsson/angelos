@@ -25,6 +25,7 @@ from libangelos.operation.setup import SetupPersonOperation, SetupMinistryOperat
 
 from dummy.support import Generate
 from libangelos.task.contact_sync import ContactPortfolioSyncTask
+from libangelos.misc import Loop
 
 
 def run_async(coro):
