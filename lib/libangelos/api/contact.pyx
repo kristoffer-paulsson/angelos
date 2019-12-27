@@ -5,11 +5,20 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Facade contact API."""
+import logging
 import uuid
 from typing import Tuple, Set
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.facade.base import BaseFacade
+
+def debug_async(self, coro):
+    async def wrapper(*args, **kwargs):
+        try:
+            return await coro(*args, **kwargs)
+        except Exception as e:
+            logging.error(e, exc_info=True)
+    return wrapper
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -42,7 +51,7 @@ class ContactAPI(ApiFacadeExtension):
             link=True,
             limit=None,
             deleted=False,
-            fields=lambda name, entry: (name,) # entry.owner)
+            fields=lambda name, entry: entry.owner  # (name, entry.owner)
         )
         return set(result.keys())
 
@@ -81,7 +90,7 @@ class ContactAPI(ApiFacadeExtension):
 
         """
         return await self.__load_contacts(self.PATH_ALL[0] + "*")
-
+ 
     async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all blocked entities.
 
@@ -121,7 +130,7 @@ class ContactAPI(ApiFacadeExtension):
             if not archive.islink(self.PATH_BLOCKED[0] + str(eid)):
                 await self.__link(self.PATH_BLOCKED[0], eid)
 
-        return await self.gather([do_block(entity) for entity in entities])
+        return await self.gather(*[do_block(entity) for entity in entities])
 
     async def unblock(self, *entities: uuid.UUID) -> bool:
         """Remove entities in the blocked category.
@@ -147,7 +156,7 @@ class ContactAPI(ApiFacadeExtension):
             if not archive.islink(self.PATH_ALL[0] + str(eid)):
                 await self.__link(self.PATH_ALL[0], eid)
 
-        return await self.gather([do_unblock(entity) for entity in entities])
+        return await self.gather(*[do_unblock(entity) for entity in entities])
 
     async def load_friends(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all friends.
@@ -186,7 +195,7 @@ class ContactAPI(ApiFacadeExtension):
             if not archive.islink(self.PATH_ALL[0] + str(eid)):
                 await self.__link(self.PATH_ALL[0], eid)
 
-        return await self.gather([do_friend(entity) for entity in entities])
+        return await self.gather(*[do_friend(entity) for entity in entities])
 
     async def unfriend(self, *entities: uuid.UUID) -> bool:
         """Remove entities in the friends category.
@@ -210,7 +219,7 @@ class ContactAPI(ApiFacadeExtension):
             if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
 
-        return await self.gather([do_unfriend(entity) for entity in entities])
+        return await self.gather(*[do_unfriend(entity) for entity in entities])
 
     async def load_favorites(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all favorites.
@@ -247,7 +256,7 @@ class ContactAPI(ApiFacadeExtension):
             if not archive.islink(self.PATH_ALL[0] + str(eid)):
                 await self.__link(self.PATH_ALL[0], eid)
 
-        return await self.gather([do_favorite(entity) for entity in entities])
+        return await self.gather(*[do_favorite(entity) for entity in entities])
 
     async def unfavorite(self, *entities: uuid.UUID) -> bool:
         """Remove entities in the favorite category.
@@ -271,7 +280,8 @@ class ContactAPI(ApiFacadeExtension):
             if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
 
-        return await self.gather([do_unfavorite(entity) for entity in entities])
+        return await self.gather(*[do_unfavorite(entity) for entity in entities])
+
 
     async def remove(self, *entities: uuid.UUID) -> bool:
         """Remove all links to old portfolios.
@@ -301,4 +311,4 @@ class ContactAPI(ApiFacadeExtension):
             if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
 
-        return await self.gather([do_remove(entity) for entity in entities])
+        return await self.gather(*[do_remove(entity) for entity in entities])

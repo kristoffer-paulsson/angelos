@@ -5,6 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Layout for new Facade framework."""
+import asyncio
 import datetime
 import logging
 import math
@@ -12,7 +13,7 @@ import time
 
 from libangelos.facade.base import BaseFacade, FacadeExtension
 from libangelos.misc import Misc
-from libangelos.reactive import NotifierMixin
+from libangelos.reactive import NotifierMixin, ObserverMixin, Event
 
 
 class TaskFacadeExtension(FacadeExtension, NotifierMixin):
@@ -152,3 +153,27 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
         await self._run()
         await self._finalize()
         self.__end()
+
+
+class TaskWaitress(ObserverMixin):
+    """Observer that lets you wait for a facade extension task."""
+    def __init__(self):
+        ObserverMixin.__init__(self)
+        self.__waitress = asyncio.Event()
+
+    async def notify(self, event: Event) -> None:
+        """Receive action-complete event."""
+        if event.action == TaskFacadeExtension.ACTION_COMPLETE:
+            self.__waitress.set()
+
+    async def wait(self) -> None:
+        """Halt execution and wait for event to happen."""
+        self.__waitress.clear()
+        await self.__waitress.wait()
+
+    async def wait_for(self, notifier: NotifierMixin) -> None:
+        """Subscribe to, invoke, and wait for notifier."""
+        notifier.subscribe(self)
+        self.__waitress.clear()
+        notifier.invoke()
+        await self.__waitress.wait()

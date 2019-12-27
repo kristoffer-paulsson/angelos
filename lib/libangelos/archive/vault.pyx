@@ -38,7 +38,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         # Contact profiles and links based on directory.
         "/contacts",
         "/contacts/favorites",
-        "/contacts/friend",
+        "/contacts/friends",
         "/contacts/all",
         "/contacts/blocked",
         # Issued statements by the vaults entity
