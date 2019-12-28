@@ -19,7 +19,7 @@ class ContactPortfolioSyncTask(TaskFacadeExtension):
 
     async def _run(self) -> None:
         contacts = self.facade.api.contact
-        portfolios = await self.facade.storage.vault.list_portfolios()
+        portfolios = await self.facade.storage.vault.list_portfolios() - {self.facade.data.portfolio.entity.id}
         every = await contacts.load_all()
         blocked = await contacts.load_blocked()
         await asyncio.sleep(0)
@@ -27,7 +27,7 @@ class ContactPortfolioSyncTask(TaskFacadeExtension):
 
         # Remove the intersection of "blocked" and "all" from all.
         remove_all_from_blocked = blocked | every
-        await  asyncio.gather(*[contacts.block(p) for p in remove_all_from_blocked])
+        await asyncio.gather(*[contacts.block(p) for p in remove_all_from_blocked])
         await asyncio.sleep(0)
         self._progress(.50)
 
@@ -41,6 +41,8 @@ class ContactPortfolioSyncTask(TaskFacadeExtension):
         add_all = (portfolios - blocked) - every
         await asyncio.gather(*[self.__link(contacts.PATH_ALL[0], p) for p in add_all])
         await asyncio.sleep(0)
+
+        # await contacts.remove(self.facade.data.portfolio.entity.id)
         self._progress(1.0)
         
     async def __link(self, path, eid):

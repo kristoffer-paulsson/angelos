@@ -40,9 +40,9 @@ class ContactAPI(ApiFacadeExtension):
         result = await self.facade.storage.vault.search(
             pattern,
             link=True,
-            limit=None,
+            limit=0,
             deleted=False,
-            fields=lambda name, entry: entry.owner  # (name, entry.owner)
+            fields=lambda name, entry: (name, entry.owner)
         )
         return set(result.keys())
 

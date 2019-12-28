@@ -152,7 +152,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             created: datetime.datetime = None,
             owner: uuid.UUID = None,
             link: bool = False,
-            limit: int = None,
+            limit: int = 0,
             deleted: Optional[bool] = None,
             fields = lambda name, entry: name
     ) -> Dict[uuid.UUID, Any]:
@@ -239,9 +239,13 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
                 name = "/" + filename
             else:
                 name = ids[entry.parent] + "/" + filename
+
             if follow and entry.type == Entry.TYPE_LINK:
-                entry, _ = ops.follow_link(entry)
-            resultset[entry.id] = fields(name, entry)
+                link, _ = ops.follow_link(entry)
+                resultset[link.id] = fields(name, link)
+            else:
+                resultset[entry.id] = fields(name, entry)
+
             count += 1
             if count == limit:
                 break

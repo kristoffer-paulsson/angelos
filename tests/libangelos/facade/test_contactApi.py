@@ -1,6 +1,6 @@
 import logging
 import os
-import sys
+import pprint
 import tracemalloc
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -8,13 +8,14 @@ from unittest import TestCase
 from libangelos.const import Const
 from libangelos.facade.facade import Facade
 from libangelos.operation.setup import SetupPersonOperation
+from libangelos.policy.portfolio import PGroup
 
 from dummy.support import Generate
 from task.task import TaskWaitress
 from tests.libangelos.common import run_async
 
 
-def debug_async(self, coro):
+def debug_async(coro):
     async def wrapper(*args, **kwargs):
         try:
             return await coro(*args, **kwargs)
@@ -29,7 +30,7 @@ class TestContactAPI(TestCase):
     def setUpClass(cls) -> None:
         """Setup test class with a facade and ten contacts."""
         tracemalloc.start()
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+        # logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
         cls.secret = os.urandom(32)
         cls.server = False
@@ -73,7 +74,7 @@ class TestContactAPI(TestCase):
     async def test_load_all(self):
         try:
             self.assertEqual(
-                await self.facade.storage.vault.list_portfolios(),
+                await self.facade.storage.vault.list_portfolios() - {self.facade.data.portfolio.entity.id},
                 await self.facade.api.contact.load_all()
             )
         except Exception as e:
@@ -95,8 +96,19 @@ class TestContactAPI(TestCase):
             every = await self.facade.api.contact.load_all()
             dummy = next(iter(every))
             await self.facade.api.contact.block(dummy)
+            self.assertEqual(dummy, (
+                await self.facade.storage.vault.load_portfolio(dummy, PGroup.ALL)
+            ).entity.id)
             self.assertIn(dummy, await self.facade.api.contact.load_blocked())
             self.assertNotIn(dummy, await self.facade.api.contact.load_all())
+
+            """dfei = await self.facade.storage.vault.archive.info(
+                self.facade.storage.vault.PATH_PORTFOLIOS[0] + str(dummy) + "/" + str(dummy) + ".ent")
+            pprint.pprint(dfei)
+
+            dlei = await self.facade.storage.vault.archive.info(
+                self.facade.api.contact.PATH_BLOCKED[0] + str(dummy))
+            pprint.pprint(dlei)"""
         except Exception as e:
             self.fail(e)
 
@@ -118,6 +130,9 @@ class TestContactAPI(TestCase):
             every = await self.facade.api.contact.load_all()
             dummy = next(iter(every))
             await self.facade.api.contact.friend(dummy)
+            self.assertEqual(dummy, (
+                await self.facade.storage.vault.load_portfolio(dummy, PGroup.ALL)
+            ).entity.id)
             self.assertIn(dummy, await self.facade.api.contact.load_all())
             self.assertIn(dummy, await self.facade.api.contact.load_friends())
         except Exception as e:
@@ -141,6 +156,9 @@ class TestContactAPI(TestCase):
             every = await self.facade.api.contact.load_all()
             dummy = next(iter(every))
             await self.facade.api.contact.favorite(dummy)
+            self.assertEqual(dummy, (
+                await self.facade.storage.vault.load_portfolio(dummy, PGroup.ALL)
+            ).entity.id)
             self.assertIn(dummy, await self.facade.api.contact.load_all())
             self.assertIn(dummy, await self.facade.api.contact.load_favorites())
         except Exception as e:

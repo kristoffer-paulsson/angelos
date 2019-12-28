@@ -158,9 +158,6 @@ class NaClKey(asyncssh.SSHKey):
         """Generate a hash for this class."""
         return hash((self.algorithm, self._key.value))
 
-    # def validate(self, key, address):
-    #    print('Validate?')
-
     @staticmethod
     def factory(keys):
         return NaClKey(key=NaClPublicKey.construct(keys.verify))
