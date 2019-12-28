@@ -5,20 +5,11 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Facade contact API."""
-import logging
 import uuid
 from typing import Tuple, Set
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.facade.base import BaseFacade
-
-def debug_async(self, coro):
-    async def wrapper(*args, **kwargs):
-        try:
-            return await coro(*args, **kwargs)
-        except Exception as e:
-            logging.error(e, exc_info=True)
-    return wrapper
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -90,7 +81,7 @@ class ContactAPI(ApiFacadeExtension):
 
         """
         return await self.__load_contacts(self.PATH_ALL[0] + "*")
- 
+
     async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all blocked entities.
 
@@ -281,7 +272,6 @@ class ContactAPI(ApiFacadeExtension):
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
 
         return await self.gather(*[do_unfavorite(entity) for entity in entities])
-
 
     async def remove(self, *entities: uuid.UUID) -> bool:
         """Remove all links to old portfolios.

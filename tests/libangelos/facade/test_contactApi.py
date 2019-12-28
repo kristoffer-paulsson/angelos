@@ -1,4 +1,6 @@
+import logging
 import os
+import sys
 import tracemalloc
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -12,12 +14,22 @@ from task.task import TaskWaitress
 from tests.libangelos.common import run_async
 
 
+def debug_async(self, coro):
+    async def wrapper(*args, **kwargs):
+        try:
+            return await coro(*args, **kwargs)
+        except Exception as e:
+            logging.error(e, exc_info=True)
+    return wrapper
+
+
 class TestContactAPI(TestCase):
     count = 5
     @classmethod
     def setUpClass(cls) -> None:
         """Setup test class with a facade and ten contacts."""
         tracemalloc.start()
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
         cls.secret = os.urandom(32)
         cls.server = False
@@ -70,55 +82,95 @@ class TestContactAPI(TestCase):
     @run_async
     async def test_load_blocked(self):
         try:
-            pass
+            self.assertEqual(
+                await self.facade.api.contact.load_blocked(),
+                set()
+            )
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_block(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.block(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_blocked())
+            self.assertNotIn(dummy, await self.facade.api.contact.load_all())
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_unblock(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.block(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_blocked())
+            await self.facade.api.contact.unblock(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_all())
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_load_friends(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.friend(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_all())
+            self.assertIn(dummy, await self.facade.api.contact.load_friends())
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_unfriend(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.friend(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_friends())
+            await self.facade.api.contact.unfriend(dummy)
+            self.assertNotIn(dummy, await self.facade.api.contact.load_friends())
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_favorite(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.favorite(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_all())
+            self.assertIn(dummy, await self.facade.api.contact.load_favorites())
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_unfavorite(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.favorite(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_favorites())
+            await self.facade.api.contact.unfavorite(dummy)
+            self.assertNotIn(dummy, await self.facade.api.contact.load_favorites())
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_remove(self):
         try:
-            pass
+            every = await self.facade.api.contact.load_all()
+            dummy = next(iter(every))
+            await self.facade.api.contact.favorite(dummy)
+            await self.facade.api.contact.friend(dummy)
+            self.assertIn(dummy, await self.facade.api.contact.load_favorites())
+            self.assertIn(dummy, await self.facade.api.contact.load_friends())
+            self.assertIn(dummy, await self.facade.api.contact.load_all())
+            await self.facade.api.contact.remove(dummy)
+            self.assertNotIn(dummy, await self.facade.api.contact.load_favorites())
+            self.assertNotIn(dummy, await self.facade.api.contact.load_friends())
+            self.assertNotIn(dummy, await self.facade.api.contact.load_all())
         except Exception as e:
             self.fail(e)

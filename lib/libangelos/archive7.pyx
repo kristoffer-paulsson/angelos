@@ -29,7 +29,7 @@ import uuid
 import zlib
 
 from libangelos.conceal import ConcealIO
-from libangelos.error import Error
+from libangelos.error import Error, ArchiveInvalidFile
 from libangelos.ioc import Container, ContainerAware
 from libangelos.misc import SharedResource
 from libangelos.utils import Util
@@ -836,12 +836,15 @@ class Archive7(ContainerAware, SharedResource):
         return dirname in self.ioc.hierarchy.paths.keys()
 
     def __is_type(self, filename, etype):
-        ops = self.ioc.operations
+        try:
+            ops = self.ioc.operations
 
-        dirname, name = os.path.split(filename)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(name, pid)
-        return True if entry.type == etype else False
+            dirname, name = os.path.split(filename)
+            pid = ops.get_pid(dirname)
+            entry, idx = ops.find_entry(name, pid)
+            return True if entry.type == etype else False
+        except (ArchiveInvalidFile,):
+            return False
 
     def isfile(self, filename):
         """Check if a path is a known file."""
