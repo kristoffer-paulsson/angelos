@@ -17,19 +17,10 @@ if sys.platform.startswith('darwin'):
     import macos_keychain
 
     def get_key(realm, name):
-        try:
-            result = macos_keychain.get(name=name)
-        except Exception as e:
-            logging.error(e, exc_info=True)
-            result = None
-
-        return result
+        return macos_keychain.get(name=name)
 
     def set_key(realm, name, key):
-        try:
-            macos_keychain.add(name=name, value=key)
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        macos_keychain.add(name=name, value=key)
 else:
     import plyer
 

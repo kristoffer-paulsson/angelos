@@ -72,6 +72,7 @@ class Loop:
                 return future
         except Exception as e:
             logging.error(e, exc_info=True)
+            return e
 
     def __callback(self, future: concurrent.futures.Future):
         exc = future.exception()
@@ -100,7 +101,6 @@ class SharedResource:
         Returns:
 
         """
-        await asyncio.sleep(0)
         return await self._run(functools.partial(callback, *args, **kwargs))
 
     async def _run(self, callback):

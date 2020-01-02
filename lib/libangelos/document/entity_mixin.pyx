@@ -5,10 +5,10 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Entity mixin for shared fields."""
-from ..utils import Util
-from ..error import Error
+from libangelos.utils import Util
+from libangelos.error import Error
 
-from .model import DocumentMeta, ChoiceField, DateField, StringField
+from libangelos.document.model import DocumentMeta, ChoiceField, DateField, StringField
 
 
 class PersonMixin(metaclass=DocumentMeta):
