@@ -4,16 +4,18 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-""""Docstring"""
-from .entities import Person, Ministry, Church, PrivateKeys, Keys
-from .profiles import PersonProfile, MinistryProfile, ChurchProfile
-from .domain import Domain, Node, Network
-from .statements import Verified, Trusted, Revoked
-from .messages import Note, Instant, Mail, Share, Report
-from .envelope import Envelope
+"""Types supporting python 3 typing.
 
+Don't use these types with isinstance(), only in the method declaration.
+However these types can be used with Utils.is_typing() that wraps isinstance()."""
 from typing import Union
 
+from libangelos.document.domain import Domain, Node, Network
+from libangelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
+from libangelos.document.envelope import Envelope
+from libangelos.document.messages import Note, Instant, Mail, Share, Report
+from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from libangelos.document.statements import Verified, Trusted, Revoked
 
 DocumentT = Union[
     Person,

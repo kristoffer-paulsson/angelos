@@ -5,7 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-from .model import (
+from libangelos.document.document import DocType, Document, UpdatedMixin
+from libangelos.document.entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
+from libangelos.document.model import (
     BaseDocument,
     StringField,
     DateField,
@@ -15,8 +17,6 @@ from .model import (
     DocumentField,
     TypeField,
 )
-from .document import DocType, Document, UpdatedMixin, IssueMixin
-from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 
 
 class Address(BaseDocument):

@@ -5,7 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-from .model import (
+from libangelos.document.document import DocType, Document, OwnerMixin
+from libangelos.document.model import (
     BaseDocument,
     StringField,
     DateField,
@@ -15,7 +16,6 @@ from .model import (
     TypeField,
     DateTimeField,
 )
-from .document import DocType, Document, OwnerMixin, IssueMixin
 
 
 class Attachment(BaseDocument):

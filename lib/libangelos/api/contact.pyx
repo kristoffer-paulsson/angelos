@@ -82,6 +82,27 @@ class ContactAPI(ApiFacadeExtension):
         """
         return await self.__load_contacts(self.PATH_ALL[0] + "*")
 
+    async def status(self, eid: uuid.UUID) -> Tuple[bool, bool, bool]:
+        """Check the status of a contact against the categories if they are favorites and/or friends.
+
+        Args:
+            eid (uuid.UUID):
+                The contact to check status on.
+
+        Returns (Tuple[bool, bool, bool]):
+            Indicates whether a certain state is true, (favorite, friend, blocked
+
+        """
+        archive = self.facade.storage.vault.archive
+        def check():
+            """Check the states."""
+            return (
+                archive.islink(self.PATH_FAVORITES[0] + str(eid)),
+                archive.islink(self.PATH_FRIENDS[0] + str(eid)),
+                archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            )
+        return await archive.execute(check)
+
     async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all blocked entities.
 

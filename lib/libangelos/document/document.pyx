@@ -9,9 +9,9 @@ import datetime
 import uuid
 
 import msgpack
+from libangelos.error import Error
+from libangelos.utils import Util
 
-from ..utils import Util
-from ..error import Error
 from .model import (
     DocumentMeta,
     BaseDocument,

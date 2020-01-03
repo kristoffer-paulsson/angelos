@@ -5,9 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-from .model import BaseDocument, TypeField
-from .document import DocType, Document, OwnerMixin, IssueMixin
-from .model import UuidField
+from libangelos.document.document import DocType, Document, OwnerMixin
+from libangelos.document.model import TypeField
+from libangelos.document.model import UuidField
 
 
 class Statement(Document):

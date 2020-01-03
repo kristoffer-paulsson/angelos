@@ -5,9 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-from .model import BaseDocument, TypeField, BinaryField, SignatureField
-from .document import DocType, Document, UpdatedMixin, IssueMixin
-from .entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
+from libangelos.document.document import DocType, Document, UpdatedMixin
+from libangelos.document.entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
+from libangelos.document.model import TypeField, BinaryField, SignatureField
 
 
 class PrivateKeys(Document):

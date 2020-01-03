@@ -1476,7 +1476,7 @@ class EmailField(RegexField):
 
     Attributes
     ----------
-    REGEX : str
+    REGEX : tuple(str)
         Regular expression for validating email.
 
     """

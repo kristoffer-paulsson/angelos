@@ -5,9 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-from ..utils import Util
-from ..error import Error
-from .model import (
+from libangelos.document.model import (
     BaseDocument,
     StringField,
     IPField,
@@ -16,7 +14,10 @@ from .model import (
     TypeField,
     ChoiceField,
 )
-from .document import DocType, Document, UpdatedMixin, IssueMixin
+from libangelos.error import Error
+from libangelos.utils import Util
+
+from .document import DocType, Document, UpdatedMixin
 
 
 class Host(BaseDocument):

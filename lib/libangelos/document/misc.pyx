@@ -7,13 +7,12 @@
 """Miscellaneous documents."""
 import datetime
 
-from ..error import Error
-from ..utils import Util
-
-from .model import TypeField, DateField, DocumentField, UuidField, BaseDocument
-from .document import Document, DocType, IssueMixin
-from .messages import Message
-from .envelope import Envelope
+from libangelos.document.document import Document, DocType
+from libangelos.document.envelope import Envelope
+from libangelos.document.messages import Message
+from libangelos.document.model import TypeField, DateField, DocumentField, UuidField
+from libangelos.error import Error
+from libangelos.utils import Util
 
 
 class StoredLetter(Document):

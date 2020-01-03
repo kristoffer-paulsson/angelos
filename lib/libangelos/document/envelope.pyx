@@ -7,10 +7,7 @@
 """Module docstring."""
 import datetime
 
-from ..utils import Util
-from ..error import Error
-
-from .model import (
+from libangelos.document.model import (
     BaseDocument,
     DateField,
     StringField,
@@ -21,7 +18,10 @@ from .model import (
     SignatureField,
     DateTimeField,
 )
-from .document import DocType, Document, OwnerMixin, IssueMixin
+from libangelos.error import Error
+from libangelos.utils import Util
+
+from .document import DocType, Document, OwnerMixin
 
 
 class Header(BaseDocument):
