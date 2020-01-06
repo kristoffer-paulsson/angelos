@@ -216,8 +216,8 @@ class Document(IssueMixin, BaseDocument):
         self._check_expiry_period()
         return True
 
-    def _validate(self, exclude=[]):
-        exclude.append(object)
+    def _validate(self, exclude=tuple()):
+        exclude += (object, )
 
         for cls in self.__class__.mro():
             if not isinstance(cls, exclude):
