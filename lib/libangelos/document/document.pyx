@@ -212,7 +212,6 @@ class Document(IssueMixin, BaseDocument):
 
         """
         classes = set(self.__class__.mro()[:-1]) - set([Document, object])
-        print(classes)
         for cls in classes:
             cls.apply_rules(self)
 
