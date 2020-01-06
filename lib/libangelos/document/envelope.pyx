@@ -109,5 +109,5 @@ class Envelope(Document, OwnerMixin):
             True if everything validates.
 
         """
-        self._validate([Document])
+        self._validate((Document,))
         return True
