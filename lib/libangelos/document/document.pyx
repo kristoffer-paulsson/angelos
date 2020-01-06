@@ -216,22 +216,23 @@ class Document(IssueMixin, BaseDocument):
         self._check_expiry_period()
         return True
 
+    def _validate(self, exclude=[]):
+        exclude.append(object)
+
+        for cls in self.__class__.mro():
+            if not isinstance(cls, exclude):
+                cls.apply_rules(self)
+
+        return True
+
     def validate(self) -> bool:
-        """Short summary.
+        """Validate document according to the rules.
 
-        Parameters
-        ----------
-        instance_list : type
-            Description of parameter `_list`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
+        Returns (bool):
+            True if everything validates.
 
         """
-        for cls in self.__class__.mro()[:-1]:
-            cls.apply_rules(self)
+        self._validate()
         return True
 
     def is_expired(self) -> bool:
