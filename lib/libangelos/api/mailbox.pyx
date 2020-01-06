@@ -56,7 +56,7 @@ class MailboxAPI(ApiFacadeExtension):
             pattern,
             limit=0,
             deleted=False,
-            fields=lambda name, entry: (entry.owner, entry.name)
+            fields=lambda name, entry: (entry.owner, entry.name.decode())
         )
         return set(zip(result.keys(), result.values()))
 
@@ -229,7 +229,7 @@ class MailboxAPI(ApiFacadeExtension):
             name (str):
                 File name of message
 
-        Returns (Tuple[bool, str, datetime.datetime]):
+        Returns (Tuple[bool, uuid.UUID, str, datetime.datetime, bool, bool, bool]):
             Information about the message.
                 error (int):
                     Was any errors encountered?
