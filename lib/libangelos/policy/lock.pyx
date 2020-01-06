@@ -5,9 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module string"""
-import sys
 import base64
-import logging
+import sys
 
 import libnacl
 

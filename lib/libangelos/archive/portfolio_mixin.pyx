@@ -13,6 +13,7 @@ import uuid
 from typing import Tuple, List, Set, Any
 
 import msgpack
+from libangelos.error import Error
 from libangelos.archive7 import Entry
 from libangelos.document.entities import Entity
 from libangelos.document.types import EntityT, StatementT, DocumentT
@@ -280,7 +281,8 @@ class PortfolioMixin:
             )
             for document in documents.get_issuer(issuer_id):
                 if not Util.is_typing(document, StatementT):
-                    raise TypeError("Document must be subtype of Statement")
+                    raise Util.exception(Error.PORTFOLIO_NOT_STATEMENT, {
+                        "document": document.id, "issuer": document.issuer})
                 if policy.issued_document(document):
                     ops.append(
                         self.save(
@@ -331,7 +333,8 @@ class PortfolioMixin:
         """
         dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], portfolio.entity.id)
         if self.archive.isdir(dirname):
-            raise OSError("Portfolio already exists: %s" % portfolio.entity.id)
+            raise Util.exception(Error.PORTFOLIO_ALREADY_EXISTS, {
+                "portfolio": portfolio.entity.id})
 
         await self.archive.mkdir(dirname)
 
@@ -378,7 +381,8 @@ class PortfolioMixin:
         """
         dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
         if not self.archive.isdir(dirname):
-            raise OSError("Portfolio doesn't exists: %s" % eid)
+            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
+                "portfolio": eid})
 
         result = await self.archive.glob(name="{0}/*".format(dirname), owner=eid)
 
@@ -439,7 +443,8 @@ class PortfolioMixin:
         """
         dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], portfolio.entity.id)
         if not self.archive.isdir(dirname):
-            raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
+            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
+                "portfolio": portfolio.entity.id})
 
         result = await self.archive.glob(
             name="{dir}/*".format(dirname), owner=portfolio.entity.id
@@ -498,7 +503,8 @@ class PortfolioMixin:
         This method expects policies to be applied."""
         dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], portfolio.entity.id)
         if not self.archive.isdir(dirname):
-            raise OSError("Portfolio doesn't exists: %s" % portfolio.entity.id)
+            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
+                "portfolio": portfolio.entity.id})
 
         files = await self.archive.glob(
             name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id

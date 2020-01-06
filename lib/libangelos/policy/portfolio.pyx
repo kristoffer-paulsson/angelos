@@ -153,7 +153,7 @@ PORTFOLIO_TEMPLATE = {
 
 PORTFOLIO_PATTERN = {
     PField.ENTITY: ".ent",
-    PField.PROFILE: "pfl",
+    PField.PROFILE: ".pfl",
     PField.PRIVKEYS: ".pky",
     PField.KEYS: ".key",
     PField.DOMAIN: ".dmn",

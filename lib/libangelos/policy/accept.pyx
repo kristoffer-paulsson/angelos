@@ -11,31 +11,31 @@ import logging
 
 from typing import Set
 
-from ..utils import Util
-from ..document.types import EntityT, DocumentT, StatementT, MessageT
-from ..document.entities import Person, Ministry, Church, PrivateKeys, Keys
-from ..document.profiles import PersonProfile, MinistryProfile, ChurchProfile
-from ..document.domain import Domain, Node, Network
-from ..document.statements import Verified, Trusted, Revoked
-from ..document.messages import Note, Instant, Mail
-from ..document.envelope import Envelope
-from .entity import PersonPolicy, MinistryPolicy, ChurchPolicy
-from .crypto import Crypto
-from .portfolio import Portfolio
-from .policy import Policy
+from libangelos.utils import Util
+from libangelos.document.types import EntityT, DocumentT, StatementT, MessageT
+from libangelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
+from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from libangelos.document.domain import Domain, Node, Network
+from libangelos.document.statements import Verified, Trusted, Revoked
+from libangelos.document.messages import Note, Instant, Mail
+from libangelos.document.envelope import Envelope
+from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.portfolio import Portfolio
+from libangelos.policy.policy import Policy
 
 
 class ImportPolicy(Policy):
     """Validate documents before import to facade."""
 
     def __init__(self, portfolio: Portfolio):
-        self._portfolio = portfolio
+        self.__portfolio = portfolio
 
     def entity(self) -> (EntityT, Keys):
         """Validate entity for import, use internal portfolio."""
         valid = True
-        entity = self._portfolio.entity
-        keys = Crypto._latestkeys(self._portfolio.keys)
+        entity = self.__portfolio.entity
+        keys = Crypto._latestkeys(self.__portfolio.keys)
 
         today = datetime.date.today()
         valid = False if entity.expires < today else valid
@@ -50,8 +50,8 @@ class ImportPolicy(Policy):
             logging.info("%s" % str(e))
             valid = False
 
-        valid = False if not Crypto.verify(keys, self._portfolio) else valid
-        valid = False if not Crypto.verify(entity, self._portfolio) else valid
+        valid = False if not Crypto.verify(keys, self.__portfolio) else valid
+        valid = False if not Crypto.verify(entity, self.__portfolio) else valid
 
         if valid:
             return entity, keys
@@ -80,14 +80,14 @@ class ImportPolicy(Policy):
 
         valid = True
         try:
-            if document.issuer != self._portfolio.entity.id:
+            if document.issuer != self.__portfolio.entity.id:
                 valid = False
             if datetime.date.today() > document.expires:
                 valid = False
             valid = False if not document.validate() else valid
             valid = (
                 False
-                if not Crypto.verify(document, self._portfolio)
+                if not Crypto.verify(document, self.__portfolio)
                 else valid
             )
         except Exception as e:
@@ -115,15 +115,15 @@ class ImportPolicy(Policy):
 
         valid = True
         try:
-            if node.issuer != self._portfolio.entity.id:
+            if node.issuer != self.__portfolio.entity.id:
                 valid = False
-            if node.domain != self._portfolio.domain.id:
+            if node.domain != self.__portfolio.domain.id:
                 valid = False
             if datetime.date.today() > node.expires:
                 valid = False
             valid = False if not node.validate() else valid
             valid = (
-                False if not Crypto.verify(node, self._portfolio) else valid
+                False if not Crypto.verify(node, self.__portfolio) else valid
             )
         except Exception as e:
             logging.info("%s" % str(e))
@@ -144,7 +144,7 @@ class ImportPolicy(Policy):
 
         valid = True
         try:
-            if document.owner != self._portfolio.entity.id:
+            if document.owner != self.__portfolio.entity.id:
                 valid = False
             if document.issuer != issuer.entity.id:
                 valid = False
@@ -170,7 +170,7 @@ class ImportPolicy(Policy):
         Util.is_type(envelope, Envelope)
         valid = True
         try:
-            if envelope.owner != self._portfolio.entity.id:
+            if envelope.owner != self.__portfolio.entity.id:
                 valid = False
             if envelope.issuer != sender.entity.id:
                 valid = False
@@ -196,7 +196,7 @@ class ImportPolicy(Policy):
         Util.is_type(message, (Note, Instant, Mail))
         valid = True
         try:
-            if message.owner != self._portfolio.entity.id:
+            if message.owner != self.__portfolio.entity.id:
                 valid = False
             if message.issuer != sender.entity.id:
                 valid = False
@@ -218,14 +218,14 @@ class ImportUpdatePolicy(Policy):
     """Policy for accepting updateable documents."""
 
     def __init__(self, portfolio: Portfolio):
-        self._portfolio = portfolio
+        self.__portfolio = portfolio
 
     def keys(self, newkeys: Keys):
-        """Validate newky generated keys."""
+        """Validate newkey generated keys."""
         valid = True
 
         try:
-            if newkeys.issuer != self._portfolio.entity.id:
+            if newkeys.issuer != self.__portfolio.entity.id:
                 valid = False
             if datetime.date.today() > newkeys.expires:
                 valid = False
@@ -233,11 +233,11 @@ class ImportUpdatePolicy(Policy):
 
             # Validate new key with old keys
             valid = (
-                False if not Crypto.verify(newkeys, self._portfolio) else valid
+                False if not Crypto.verify(newkeys, self.__portfolio) else valid
             )
 
             # Validate new key with itself
-            portfolio = copy.deepcopy(self._portfolio)
+            portfolio = copy.deepcopy(self.__portfolio)
             portfolio.keys = set(newkeys)
             valid = False if not Crypto.verify(newkeys, portfolio) else valid
 
@@ -252,11 +252,11 @@ class ImportUpdatePolicy(Policy):
 
         valid = False if datetime.date.today() > entity.expires else valid
         valid = False if not entity.validate() else valid
-        valid = False if not Crypto.verify(entity, self._portfolio) else valid
+        valid = False if not Crypto.verify(entity, self.__portfolio) else valid
 
         diff = []
         new_exp = entity.export()
-        old_exp = self._portfolio.entity.export()
+        old_exp = self.__portfolio.entity.export()
 
         for item in new_exp.keys():
             if new_exp[item] != old_exp[item]:

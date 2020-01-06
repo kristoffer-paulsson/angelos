@@ -276,6 +276,18 @@ class PolicyBreach(AngelosException):
     pass  # noqa E302
 
 
+class PortfolioNotStatement(AngelosException):
+    pass
+
+
+class PortfolioAlreadyExists(AngelosException):
+    pass
+
+
+class PortfolioExistsNot(AngelosException):
+    pass
+
+
 ERROR_INFO = {
     500: (
         ContainerServiceNotConfigured,
@@ -407,6 +419,10 @@ ERROR_INFO = {
     735: (ArchiveOperandInvalid, "Invalid or unsupported operand"),
     736: (ArchiveNameTaken, "Name is taken in directory"),
     737: (ArchiveNotEmpty, "Directory is not empty."),
+
+    740: (PortfolioNotStatement, "Document must be subtype of Statement"),
+    741: (PortfolioAlreadyExists, "Portfolio already exists."),
+    742: (PortfolioExistsNot, "Portfolio doesn't exists"),
 }
 
 
@@ -480,3 +496,8 @@ class Error(IntEnum):
     AR7_OPERAND_INVALID = 735
     AR7_NAME_TAKEN = 736
     AR7_NOT_EMPTY = 737
+
+    # 40 error codes for portfolio mixin
+    PORTFOLIO_NOT_STATEMENT = 740
+    PORTFOLIO_ALREADY_EXISTS = 741
+    PORTFOLIO_EXISTS_NOT = 742

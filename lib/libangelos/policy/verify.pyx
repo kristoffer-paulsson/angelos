@@ -5,11 +5,11 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Verify entities by issuing statements."""
-from .policy import Policy
-from .crypto import Crypto
-from .portfolio import Portfolio, PrivatePortfolio
-from ..document.types import StatementT
-from ..document.statements import Verified, Trusted, Revoked
+from libangelos.policy.policy import Policy
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.portfolio import Portfolio, PrivatePortfolio
+from libangelos.document.types import StatementT
+from libangelos.document.statements import Verified, Trusted, Revoked
 
 
 class StatementPolicy(Policy):

@@ -119,9 +119,9 @@ class Crypto:
         if today > keys.expires:
             raise RuntimeError("The receiving keys has expired")
 
-        return libnacl.public.Box(sender.privkeys.secret, keys.public).encrypt(
-            data
-        )
+        return libnacl.public.Box(
+            sender.privkeys.secret, keys.public
+        ).encrypt(data)
 
     @staticmethod
     def unveil(

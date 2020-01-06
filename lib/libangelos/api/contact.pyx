@@ -26,7 +26,7 @@ class ContactAPI(ApiFacadeExtension):
         """Initialize the Contacts."""
         ApiFacadeExtension.__init__(self, facade)
 
-    async def __load_contacts(self, pattern: str) -> Set[Tuple[str, uuid.UUID]]:
+    async def __load_contacts(self, pattern: str) -> Set[Tuple[uuid.UUID]]:
         """Loads all contacts according to pattern.
 
         Args:
@@ -90,7 +90,7 @@ class ContactAPI(ApiFacadeExtension):
                 The contact to check status on.
 
         Returns (Tuple[bool, bool, bool]):
-            Indicates whether a certain state is true, (favorite, friend, blocked
+            Indicates whether a certain state is true, (favorite, friend, blocked)
 
         """
         archive = self.facade.storage.vault.archive

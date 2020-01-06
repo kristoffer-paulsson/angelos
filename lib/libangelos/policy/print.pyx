@@ -5,9 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Print formatting strings."""
-from ..document.types import EntityT
-from ..document.document import DocType
-from .portfolio import Portfolio
+from libangelos.document.types import EntityT
+from libangelos.document.document import DocType
+from libangelos.policy.portfolio import Portfolio
 
 
 class PrintPolicy:

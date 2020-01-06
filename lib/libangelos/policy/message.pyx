@@ -10,17 +10,17 @@ import datetime
 
 from typing import List
 
-from .crypto import Crypto
-from .policy import Policy
-from .portfolio import PrivatePortfolio, Portfolio, PortfolioPolicy
-from ..document.types import MessageT
-from ..document.messages import Instant, Note, Mail, Report, Share, Attachment
-from ..document.envelope import Envelope, Header
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.policy import Policy
+from libangelos.policy.portfolio import PrivatePortfolio, Portfolio, PortfolioPolicy
+from libangelos.document.types import MessageT
+from libangelos.document.messages import Instant, Note, Mail, Report, Share, Attachment
+from libangelos.document.envelope import Envelope, Header
 
 
 REPORT_TEXT = {
     "Unsolicited": "Unwanted messages you do not wish to receive.",
-    "Spam": "Unsolicited advertisment.",
+    "Spam": "Unsolicited advertisement.",
     "Suspicious": "Professional messages that seem to be deceptive or fraudulent.",  # noqa E501
     "Harmful": "Promotion of behaviors or actions which harmful if carried out.",  # noqa E501
     "Defamation": "A message which content is defaming or slanderous towards someone.",  # noqa E501
@@ -143,6 +143,8 @@ class ShareBuilder(MailBuilder):
 
 
 class ReportBuilder(MailBuilder):
+    """Build a report message."""
+
     def report(
         self, message: MessageT, envelope: Envelope,
         claims: List[str], msg: str
@@ -209,7 +211,7 @@ class MessagePolicy(Policy):
         body: str,
         reply: Note = None,
     ) -> Note:
-        """Issue an instant message."""
+        """Issue a note."""
         note = Note(
             nd={
                 "owner": recipient.entity.id,
@@ -323,6 +325,7 @@ class EnvelopePolicy(Policy):
 
         return message
 
+    @staticmethod
     def receive(recipient: PrivatePortfolio, envelope: Envelope) -> Envelope:
         """Receive the envelope when it reaches its final domain."""
         if not envelope.validate():
@@ -334,6 +337,7 @@ class EnvelopePolicy(Policy):
         EnvelopePolicy._add_header(recipient, envelope, Header.Op.RECEIVE)
         return envelope
 
+    @staticmethod
     def _add_header(
         handler: PrivatePortfolio, envelope: Envelope, operation: str
     ):
