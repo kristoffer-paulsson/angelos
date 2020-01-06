@@ -217,10 +217,11 @@ class Document(IssueMixin, BaseDocument):
         return True
 
     def _validate(self, exclude=tuple()):
-        exclude += (object, )
 
-        for cls in self.__class__.mro():
-            if not isinstance(cls, exclude):
+        # Remove duplicate inheritance
+        for cls in set(self.__class__.mro()[:-1]):
+            # Don't apply rules to excluded classes.
+            if not cls in exclude:
                 cls.apply_rules(self)
 
         return True
