@@ -70,6 +70,7 @@ class Domain(Document, UpdatedMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.NET_DOMAIN)
         return True
 
@@ -113,6 +114,7 @@ class Node(Document, UpdatedMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.NET_NODE)
         self._check_location()
         return True
@@ -148,6 +150,7 @@ class Network(Document, UpdatedMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.NET_NETWORK)
         self._check_host()
         return True

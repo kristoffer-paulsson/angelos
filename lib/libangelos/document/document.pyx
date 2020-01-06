@@ -204,28 +204,6 @@ class Document(IssueMixin, BaseDocument):
         """Correct owner of document."""
         return self.owner if getattr(self, "owner", None) else self.issuer
 
-    def apply_rules(self) -> bool:
-        """Short summary.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
-        """
-        self._check_expiry_period()
-        return True
-
-    def _validate(self, exclude=tuple()):
-
-        # Remove duplicate inheritance
-        for cls in set(self.__class__.mro()[:-1]):
-            # Don't apply rules to excluded classes.
-            if not cls in exclude:
-                cls.apply_rules(self)
-
-        return True
-
     def validate(self) -> bool:
         """Validate document according to the rules.
 
@@ -233,7 +211,11 @@ class Document(IssueMixin, BaseDocument):
             True if everything validates.
 
         """
-        self._validate()
+        classes = set(self.__class__.mro()[:-1]) - set([Document, object])
+        print(classes)
+        for cls in classes:
+            cls.apply_rules(self)
+
         return True
 
     def is_expired(self) -> bool:

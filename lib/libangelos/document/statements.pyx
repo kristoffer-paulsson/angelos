@@ -43,6 +43,7 @@ class Verified(Statement, OwnerMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.STAT_VERIFIED)
         return True
 
@@ -66,6 +67,7 @@ class Trusted(Statement, OwnerMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.STAT_TRUSTED)
         return True
 
@@ -92,5 +94,6 @@ class Revoked(Statement):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.STAT_REVOKED)
         return True

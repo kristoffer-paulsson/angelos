@@ -98,16 +98,6 @@ class Envelope(Document, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_doc_type(DocType.COM_ENVELOPE)
         self._check_expiry_period()
-        return True
-
-    def validate(self) -> bool:
-        """Validate document according to the rules.
-
-        Returns (bool):
-            True if everything validates.
-
-        """
-        self._validate((Document,))
+        self._check_doc_type(DocType.COM_ENVELOPE)
         return True

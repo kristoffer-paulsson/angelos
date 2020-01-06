@@ -65,6 +65,7 @@ class StoredLetter(Document):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.CACHED_MSG)
         self._check_document_id()
         return True

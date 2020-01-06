@@ -119,6 +119,7 @@ class PersonProfile(Profile, PersonMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.PROF_PERSON)
         return True
 
@@ -142,6 +143,7 @@ class MinistryProfile(Profile, MinistryMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.PROF_MINISTRY)
         return True
 
@@ -165,5 +167,6 @@ class ChurchProfile(Profile, ChurchMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.PROF_CHURCH)
         return True

@@ -5,6 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
+import datetime
+
 from libangelos.document.document import DocType, Document, OwnerMixin
 from libangelos.document.model import (
     BaseDocument,
@@ -16,6 +18,8 @@ from libangelos.document.model import (
     TypeField,
     DateTimeField,
 )
+from libangelos.utils import Util
+from libangelos.error import Error
 
 
 class Attachment(BaseDocument):
@@ -54,6 +58,22 @@ class Message(Document, OwnerMixin):
     body = StringField(required=False)
     posted = DateTimeField()
 
+    def _check_expiry_period(self):
+        """Checks the expiry time period.
+
+        The time period between update date and
+        expiry date should not be less than 31 days.
+        """
+        if self.expires:
+            if (self.expires - self.created) < datetime.timedelta(31 - 1):
+                raise Util.exception(
+                    Error.DOCUMENT_SHORT_EXPIREY,
+                    {
+                        "expected": datetime.timedelta(31),
+                        "current": self.expires - self.created,
+                    },
+                )
+
 
 class Note(Message):
     """Short summary.
@@ -74,6 +94,7 @@ class Note(Message):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.COM_NOTE)
         return True
 
@@ -103,6 +124,7 @@ class Instant(Message):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.COM_INSTANT)
         return True
 
@@ -132,6 +154,7 @@ class Mail(Message):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.COM_MAIL)
         return True
 

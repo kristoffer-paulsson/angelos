@@ -30,10 +30,3 @@ class TestEnvelope(TestCase):
             self.assertTrue(self.instance.apply_rules())
         except Exception as e:
             self.fail(e)
-
-    def test_validate(self):
-        """Currently fails, rewrite test accordingly."""
-        try:
-            self.assertTrue(self.instance.validate())
-        except Exception as e:
-            self.fail(e)

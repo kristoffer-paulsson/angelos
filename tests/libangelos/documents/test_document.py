@@ -62,13 +62,6 @@ class TestDocument(TestCase):
         except Exception as e:
             self.fail(e)
 
-    def test_apply_rules(self):
-        try:
-            stub = StubDocument()
-            self.assertTrue(stub.apply_rules())
-        except Exception as e:
-            self.fail(e)
-
     def test_validate(self):
         try:
             stub = StubDocument(nd={

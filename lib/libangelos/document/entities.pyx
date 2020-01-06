@@ -38,6 +38,7 @@ class PrivateKeys(Document):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.KEYS_PRIVATE)
         return True
 
@@ -70,6 +71,7 @@ class Keys(Document):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.KEYS)
         return True
 
@@ -99,6 +101,7 @@ class Person(Entity, PersonMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.ENTITY_PERSON)
         return True
 
@@ -122,6 +125,7 @@ class Ministry(Entity, MinistryMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.ENTITY_MINISTRY)
         return True
 
@@ -145,5 +149,6 @@ class Church(Entity, ChurchMixin):
             Description of returned object.
 
         """
+        self._check_expiry_period()
         self._check_doc_type(DocType.ENTITY_CHURCH)
         return True
