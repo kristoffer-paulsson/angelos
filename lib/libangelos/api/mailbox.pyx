@@ -66,68 +66,26 @@ class MailboxAPI(ApiFacadeExtension):
     async def load_inbox(self) -> Set[uuid.UUID]:
         """Load envelopes from the inbox."""
         return await self.__load_letters(self.PATH_INBOX[0] + "*")
-        """
-        doc_list = await self.facade.storage.vault.search_docs(
-            self.facade.data.portfolio.entity.id, MailboxAPI.INBOX + "/*", limit=200
-        )
-        result = Glue.doc_validate_report(doc_list, Envelope)
-        return result
-        """
 
     async def load_outbox(self) -> Set[uuid.UUID]:
         """Load letters from outbox folder."""
         return await self.__load_letters(self.PATH_OUTBOX[0] + "*")
-        """
-        doclist = await self.facade.storage.vault.search_docs(
-            path=MailboxAPI.OUTBOX + "/*", limit=100
-        )
-        result = Glue.doc_validate_report(doclist, Envelope)
-        return result
-        """
 
     async def load_read(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_READ[0] + "*")
-        """
-        doclist = await self.facade.storage.vault.search_docs(
-            self.facade.data.portfolio.entity.id, MailboxAPI.READ + "/*", limit=100
-        )
-        result = Glue.doc_validate_report(doclist, Mail)
-        return result
-        """
 
     async def load_drafts(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_DRAFT[0] + "*")
-        """
-        doclist = await self.facade.storage.vault.search_docs(
-            path=MailboxAPI.DRAFT + "/*", limit=100
-        )
-        result = Glue.doc_validate_report(doclist, Mail, False)
-        return result
-        """
 
     async def load_trash(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_TRASH[0] + "*")
-        """
-        doclist = await self.facade.storage.vault.search_docs(
-            path=MailboxAPI.DRAFT + "/*", limit=100
-        )
-        result = Glue.doc_validate_report(doclist, Mail, False)
-        return result
-        """
 
     async def load_sent(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_SENT[0] + "*")
-        """
-        doclist = await self.facade.storage.vault.search_docs(
-            path=MailboxAPI.DRAFT + "/*", limit=100
-        )
-        result = Glue.doc_validate_report(doclist, Mail, False)
-        return result
-        """
 
     async def __info_mail(self, filename: str) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
@@ -320,7 +278,7 @@ class MailboxAPI(ApiFacadeExtension):
     async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_OUTBOX[0], file=message_id
+            dir=MailboxAPI.PATH_READ[0], file=message_id
         )
         return await self.__info_mail(filename)
 
@@ -334,9 +292,57 @@ class MailboxAPI(ApiFacadeExtension):
     async def get_info_trash(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
+            dir=MailboxAPI.PATH_TRASH[0], file=message_id
         )
         return await self.__info_mail(filename)
+
+    async def get_info_sent(self, message_id: uuid.UUID) -> Tuple[
+        bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_SENT[0], file=message_id
+        )
+        return await self.__info_mail(filename)
+
+    async def __simple_load(self, filename) -> MessageT:
+        """Loads messages without policy checks.
+
+        Only use on messages you trust have been validated and
+        verified before.
+
+        Args:
+            filename (str):
+                The filename of the message
+
+        Returns (MessageT):
+            Loaded and deserialized message
+
+        """
+        letter = await self.facade.storage.vault.archive.load(filename)
+        mail = PortfolioPolicy.deserialize(letter)
+
+    async def load_read(self, message_id: uuid.UUID) -> MessageT:
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_READ[0], file=message_id
+        )
+        return await self.__simple_load(filename)
+
+    async def load_draft(self, message_id: uuid.UUID) -> MessageT:
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
+        )
+        return await self.__simple_load(filename)
+
+    async def load_trash(self, message_id: uuid.UUID) -> MessageT:
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_TRASH[0], file=message_id
+        )
+        return await self.__simple_load(filename)
+
+    async def load_sent(self, message_id: uuid.UUID) -> MessageT:
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_SENT[0], file=message_id
+        )
+        return await self.__simple_load(filename)
 
     async def mail_to_inbox(
         self, envelopes: Envelope
