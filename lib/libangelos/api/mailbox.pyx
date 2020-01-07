@@ -412,7 +412,7 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def save_draft(self, message: Mail):
         """Save a message to draft folder for archiving."""
-         await self.facade.storage.vault.save(
+        await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_DRAFT[0], file=message.id
             ),
