@@ -354,7 +354,7 @@ class MailboxAPI(ApiFacadeExtension):
             save_list.append(
                 self.facade.storage.vault.save(
                     DOCUMENT_PATH[envelope.type].format(
-                        dir=MailboxAPI.INBOX, file=envelope.id
+                        dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
                     ),
                     envelope,
                 )
@@ -365,11 +365,11 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_envelope(self, envelope_id: uuid.UUID) -> Envelope:
         """Load specific envelope from the inbox."""
-        return await self._load_doc(envelope_id, DocType.COM_ENVELOPE, MailboxAPI.INBOX, Envelope)
+        return await self._load_doc(envelope_id, DocType.COM_ENVELOPE, MailboxAPI.PATH_INBOX[0], Envelope)
 
     async def load_message(self, message_id: uuid.UUID) -> Mail:
         """Load specific message from the read folder."""
-        return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.READ, Mail)
+        return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.PATH_READ[0], Mail)
 
     async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
         doc_list = await self.facade.storage.vault.search_docs(
@@ -388,9 +388,9 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def save_outbox(self, envelope: Envelope):
         """Save a message to outbox folder to be sent."""
-        result = await self.__vault.save(
+        result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailboxAPI.OUTBOX, file=envelope.id
+                dir=MailboxAPI.PATH_OUTBOX[0], file=envelope.id
             ),
             envelope,
         )
@@ -402,7 +402,7 @@ class MailboxAPI(ApiFacadeExtension):
         """Save a message to sent folder for archiving."""
         result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.SENT, file=message.id
+                dir=MailboxAPI.PATH_SENT[0], file=message.id
             ),
             message,
         )
@@ -414,7 +414,7 @@ class MailboxAPI(ApiFacadeExtension):
         """Save a message to draft folder for archiving."""
         result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.DRAFT, file=message.id
+                dir=MailboxAPI.PATH_DRAFT[0], file=message.id
             ),
             message,
         )
