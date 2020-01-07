@@ -117,6 +117,8 @@ class MailBuilder:
 
     def done(self) -> Mail:
         """Finalize the mail message."""
+        self.__mail._fields["signature"].redo = True
+        self.__mail.signature = None
         self.__mail.expires = datetime.date.today() + datetime.timedelta(30)
         self.__mail.posted = datetime.datetime.utcnow()
 
@@ -127,7 +129,14 @@ class MailBuilder:
 
     def draft(self) -> Mail:
         """Export draft mail document"""
-        return self.__mail
+        self.__mail._fields["signature"].redo = True
+        self.__mail.signature = None
+        self.__mail.expires = datetime.date.today() + datetime.timedelta(365)
+        self.__mail.posted = datetime.datetime(1, 1, 1, 1, 1, 1)
+
+        mail = Crypto.sign(self.__mail, self.__sender)
+
+        return mail
 
 
 class ShareBuilder(MailBuilder):
