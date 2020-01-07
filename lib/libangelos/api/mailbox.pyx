@@ -320,25 +320,25 @@ class MailboxAPI(ApiFacadeExtension):
         letter = await self.facade.storage.vault.archive.load(filename)
         mail = PortfolioPolicy.deserialize(letter)
 
-    async def load_read(self, message_id: uuid.UUID) -> MessageT:
+    async def get_read(self, message_id: uuid.UUID) -> MessageT:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_READ[0], file=message_id
         )
         return await self.__simple_load(filename)
 
-    async def load_draft(self, message_id: uuid.UUID) -> MessageT:
+    async def get_draft(self, message_id: uuid.UUID) -> MessageT:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
         )
         return await self.__simple_load(filename)
 
-    async def load_trash(self, message_id: uuid.UUID) -> MessageT:
+    async def get_trash(self, message_id: uuid.UUID) -> MessageT:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_TRASH[0], file=message_id
         )
         return await self.__simple_load(filename)
 
-    async def load_sent(self, message_id: uuid.UUID) -> MessageT:
+    async def get_sent(self, message_id: uuid.UUID) -> MessageT:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_SENT[0], file=message_id
         )
