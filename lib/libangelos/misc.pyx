@@ -72,7 +72,7 @@ class Loop:
                 return future
         except Exception as e:
             logging.error(e, exc_info=True)
-            return e
+            raise e
 
     def __callback(self, future: concurrent.futures.Future):
         exc = future.exception()
