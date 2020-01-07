@@ -34,10 +34,26 @@ class StoredLetter(Document):
     id = UuidField()
     type = TypeField(value=int(DocType.CACHED_MSG))
     expires = DateField(
-        init=lambda: (datetime.date.today() + datetime.timedelta(365 / 12 * 3))
+        init=lambda: (datetime.date.today() + datetime.timedelta(3 * 365 / 12))
     )
     envelope = DocumentField(doc_class=Envelope)
     message = DocumentField(doc_class=Message)
+
+    def _check_expiry_period(self):
+        """Checks the expiry time period.
+
+        The time period between update date and
+        expiry date should not be less than 90 days.
+        """
+        if self.expires:
+            if (self.expires - self.created) < datetime.timedelta(3 * 365 / 12 - 1):
+                raise Util.exception(
+                    Error.DOCUMENT_SHORT_EXPIREY,
+                    {
+                        "expected": datetime.timedelta(91),
+                        "current": self.expires - self.created,
+                    },
+                )
 
     def _check_document_id(self):
         # if not self.message and self.id:

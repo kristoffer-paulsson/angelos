@@ -16,7 +16,8 @@ from libangelos.policy.portfolio import PrivatePortfolio, Portfolio, PortfolioPo
 from libangelos.document.types import MessageT
 from libangelos.document.messages import Instant, Note, Mail, Report, Share, Attachment
 from libangelos.document.envelope import Envelope, Header
-
+from libangelos.utils import Util
+from libangelos.error import Error
 
 REPORT_TEXT = {
     "Unsolicited": "Unwanted messages you do not wish to receive.",
@@ -310,18 +311,32 @@ class EnvelopePolicy(Policy):
         """Open an envelope and unveil the message."""
 
         if not Crypto.verify(envelope, sender, exclude=["header"]):
-            return None
+            raise Util.exception(
+                Error.POLICY_ENVELOPE_OPEN_VERIFICATION_FAILED, {
+                    "envelope": envelope.id, "recipient": recipient.entity.id,
+                    "sender": recipient.entity.id})
+
         if not envelope.validate():
-            return None
+            raise Util.exception(
+                Error.POLICY_ENVELOPE_OPEN_VALIDATION_FAILED, {
+                    "envelope": envelope.id, "recipient": recipient.entity.id,
+                    "sender": recipient.entity.id})
 
         message = PortfolioPolicy.deserialize(
             Crypto.unveil(envelope.message, recipient, sender)
         )
 
         if not Crypto.verify(message, sender):
-            return None
+            raise Util.exception(
+                Error.POLICY_ENVELOPE_OPEN_MESSAGE_VERIFICATION_FAILED, {
+                    "envelope": envelope.id, "message": message.id,
+                    "recipient": recipient.entity.id, "sender": recipient.entity.id})
+
         if not message.validate():
-            return None
+            raise Util.exception(
+                Error.POLICY_ENVELOPE_OPEN_MESSAGE_VALIDATION_FAILED, {
+                    "envelope": envelope.id, "message": message.id,
+                    "recipient": recipient.entity.id, "sender": recipient.entity.id})
 
         return message
 

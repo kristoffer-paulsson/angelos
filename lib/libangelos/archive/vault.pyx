@@ -92,14 +92,19 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             vrole=vrole
         )
 
-    async def save(self, filename, document):
+    async def save(self, filename, document, document_file_id_match=True):
         """Save a document at a certain location."""
         created, updated, owner = Glue.doc_save(document)
+
+        if document_file_id_match:
+            file_id = document.id
+        else:
+            file_id = uuid.uuid4()
 
         return await self.archive.mkfile(
             filename=filename,
             data=PortfolioPolicy.serialize(document),
-            id=document.id,
+            id=file_id,
             owner=owner,
             created=created,
             modified=updated,

@@ -11,6 +11,9 @@ import os
 import uuid
 from typing import Set, Any, Tuple
 
+from libangelos.error import Error
+from libangelos.document.types import MessageT
+from libangelos.utils import Util
 from libangelos.policy.print import PrintPolicy
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.document.document import DocType
@@ -41,7 +44,7 @@ class MailboxAPI(ApiFacadeExtension):
         """Initialize the Mail."""
         ApiFacadeExtension.__init__(self, facade)
 
-    async def __load_letters(self, pattern: str) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def __load_letters(self, pattern: str) -> Set[uuid.UUID]:
         """Loads all letters according to pattern.
 
         Args:
@@ -58,9 +61,9 @@ class MailboxAPI(ApiFacadeExtension):
             deleted=False,
             fields=lambda name, entry: (entry.owner, entry.name.decode())
         )
-        return set(zip(result.keys(), result.values()))
+        return set(result.keys())
 
-    async def load_inbox(self) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def load_inbox(self) -> Set[uuid.UUID]:
         """Load envelopes from the inbox."""
         return await self.__load_letters(self.PATH_INBOX[0] + "*")
         """
@@ -71,7 +74,7 @@ class MailboxAPI(ApiFacadeExtension):
         return result
         """
 
-    async def load_outbox(self) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def load_outbox(self) -> Set[uuid.UUID]:
         """Load letters from outbox folder."""
         return await self.__load_letters(self.PATH_OUTBOX[0] + "*")
         """
@@ -82,7 +85,7 @@ class MailboxAPI(ApiFacadeExtension):
         return result
         """
 
-    async def load_read(self) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def load_read(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_READ[0] + "*")
         """
@@ -93,7 +96,7 @@ class MailboxAPI(ApiFacadeExtension):
         return result
         """
 
-    async def load_drafts(self) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def load_drafts(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_DRAFT[0] + "*")
         """
@@ -104,7 +107,7 @@ class MailboxAPI(ApiFacadeExtension):
         return result
         """
 
-    async def load_trash(self) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def load_trash(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_TRASH[0] + "*")
         """
@@ -115,7 +118,7 @@ class MailboxAPI(ApiFacadeExtension):
         return result
         """
 
-    async def load_sent(self) -> Set[Tuple[uuid.UUID, uuid.UUID, str]]:
+    async def load_sent(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
         return await self.__load_letters(self.PATH_SENT[0] + "*")
         """
@@ -126,14 +129,12 @@ class MailboxAPI(ApiFacadeExtension):
         return result
         """
 
-    async def __info_mail(self, dirname: str, name: str) -> Tuple[
+    async def __info_mail(self, filename: str) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
         """Get info about a mail.
 
         Args:
-            dirname (str):
-                Which folder in the mailbox
-            name (str):
+            filename (str):
                 File name of message
 
         Returns (Tuple[bool, str, str, datetime.datetime, uuid.UUID, int]):
@@ -156,7 +157,7 @@ class MailboxAPI(ApiFacadeExtension):
         """
         error = False
 
-        letter = await self.facade.storage.vault.archive.load(os.path.join(dirname, name))
+        letter = await self.facade.storage.vault.archive.load(filename)
         mail = PortfolioPolicy.deserialize(letter)
         if not isinstance(mail, Mail):
             error = True
@@ -176,14 +177,12 @@ class MailboxAPI(ApiFacadeExtension):
             len(mail.attachments) if mail.attachments is list else int(bool(mail.attachments))
         )
 
-    async def __info_draft(self, dirname: str, name: str) -> Tuple[
+    async def __info_draft(self, filename: str) -> Tuple[
         bool, uuid.UUID, str, str, uuid.UUID, int]:
         """Get info about a draft.
 
         Args:
-            dirname (str):
-                Which folder in the mailbox
-            name (str):
+            filename (str):
                 File name of message
 
         Returns (Tuple[bool, str, str, datetime.datetime, uuid.UUID, int]):
@@ -204,7 +203,7 @@ class MailboxAPI(ApiFacadeExtension):
         """
         error = False
 
-        letter = await self.facade.storage.vault.archive.load(os.path.join(dirname, name))
+        letter = await self.facade.storage.vault.archive.load(filename)
         mail = PortfolioPolicy.deserialize(letter)
         if not isinstance(mail, Mail):
             error = True
@@ -219,14 +218,12 @@ class MailboxAPI(ApiFacadeExtension):
             len(mail.attachments) if mail.attachments is list else int(bool(mail.attachments))
         )
 
-    async def __info_inbox_envelope(self, dirname: str, name: str) -> Tuple[
+    async def __info_inbox_envelope(self, filename: str) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime, bool, bool, bool]:
         """Get info about an envelope.
 
         Args:
-            dirname (str):
-                Which folder in the mailbox
-            name (str):
+            filename (str):
                 File name of message
 
         Returns (Tuple[bool, uuid.UUID, str, datetime.datetime, bool, bool, bool]):
@@ -249,7 +246,7 @@ class MailboxAPI(ApiFacadeExtension):
         """
         error = False
 
-        letter = await self.facade.storage.vault.archive.load(os.path.join(dirname, name))
+        letter = await self.facade.storage.vault.archive.load(filename)
         envelope = PortfolioPolicy.deserialize(letter)
         if not isinstance(envelope, Envelope):
             error = True
@@ -268,14 +265,12 @@ class MailboxAPI(ApiFacadeExtension):
             envelope.posted,
         ) + status
 
-    async def __info_outbox_envelope(self, dirname: str, name: str) -> Tuple[
+    async def __info_outbox_envelope(self, filename: str) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime]:
         """Get info about an envelope.
 
         Args:
-            dirname (str):
-                Which folder in the mailbox
-            name (str):
+            filename (str):
                 File name of message
 
         Returns (Tuple[bool, str, datetime.datetime]):
@@ -291,8 +286,9 @@ class MailboxAPI(ApiFacadeExtension):
 
         """
         error = False
+        
 
-        letter = await self.facade.storage.vault.archive.load(os.path.join(dirname, name))
+        letter = await self.facade.storage.vault.archive.load(filename)
         envelope = PortfolioPolicy.deserialize(letter)
         if not isinstance(envelope, Envelope):
             error = True
@@ -307,25 +303,40 @@ class MailboxAPI(ApiFacadeExtension):
             envelope.posted,
         )
 
-    async def get_info_inbox(self, name: str) -> Tuple[
+    async def get_info_inbox(self, envelope_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime, bool, bool, bool]:
-        return await self.__info_inbox_envelope(self.PATH_INBOX[0], name)
+        filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+            dir=MailboxAPI.PATH_INBOX[0], file=envelope_id
+        )
+        return await self.__info_inbox_envelope(filename)
 
-    async def get_info_outbox(self, name: str) -> Tuple[
+    async def get_info_outbox(self,  envelope_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime]:
-        return await self.__info_outbox_envelope(self.PATH_INBOX[0], name)
+        filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+            dir=MailboxAPI.PATH_OUTBOX[0], file=envelope_id
+        )
+        return await self.__info_outbox_envelope(filename)
 
-    async def get_info_read(self, name: str) -> Tuple[
+    async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
-        return await self.__info_mail(self.PATH_READ[0], name)
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_OUTBOX[0], file=message_id
+        )
+        return await self.__info_mail(filename)
 
-    async def get_info_draft(self, name: str) -> Tuple[
+    async def get_info_draft(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, uuid.UUID, int]:
-        return await self.__info_draft(self.PATH_DRAFT[0], name)
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
+        )
+        return await self.__info_draft(filename)
 
-    async def get_info_trash(self, name: str) -> Tuple[
+    async def get_info_trash(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
-        return await self.__info_mail(self.PATH_TRASH[0], name)
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
+        )
+        return await self.__info_mail(filename)
 
     async def mail_to_inbox(
         self, envelopes: Envelope
@@ -375,64 +386,6 @@ class MailboxAPI(ApiFacadeExtension):
 
         return result[0][0]
 
-    async def store_letter(self, envelope: Envelope, message: Message) -> bool:
-        """
-        Save a related envelope and message for later complaint.
-
-        The calling function is responsible for opening the envelope and
-        applying the necessary policies.
-        """
-        if envelope.issuer != message.issuer:
-            raise ValueError("Issuer mismatch between Envelope and Message")
-        if envelope.owner != message.owner:
-            raise ValueError("Owner mismatch between Envelope and Message")
-        if abs(envelope.posted - message.posted) > datetime.timedelta(
-            seconds=60
-        ):
-            raise ValueError("Envelope and message timestamp mismatch.")
-
-        letter = StoredLetter(
-            nd={
-                "id": message.id,
-                "issuer": self.facade.data.portfolio.entity.id,
-                "envelope": envelope,
-                "message": message,
-            }
-        )
-        letter = Crypto.sign(letter, self.facade.data.portfolio)
-        letter.validate()
-
-        result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.CACHED_MSG].format(
-                dir=MailboxAPI.CACHE, file=letter.id
-            ),
-            letter,
-        )
-        if isinstance(result, Exception):
-            raise result
-
-        result = await self.facade.storage.vault.delete(
-            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailboxAPI.INBOX, file=envelope.id
-            )
-        )
-        if isinstance(result, Exception):
-            raise result
-
-        return True
-
-    async def save_read(self, message: Mail):
-        """Save a message as read in the read message folder."""
-        result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.READ, file=message.id
-            ),
-            message,
-        )
-        if isinstance(result, Exception):
-            raise result
-        return True
-
     async def save_outbox(self, envelope: Envelope):
         """Save a message to outbox folder to be sent."""
         result = await self.__vault.save(
@@ -480,3 +433,97 @@ class MailboxAPI(ApiFacadeExtension):
         if isinstance(result, Exception):
             raise result
         return True
+
+    async def open_envelope(self, envelope_id: uuid.UUID) -> MessageT:
+        """Open an envelope and verify its content according to policies.
+
+        Args:
+            envelope_id (uuid.UUID):
+                The envelope filename within the inbox folder.
+
+        Returns (MessageT):
+            Verified message document
+
+        """
+        vault = self.facade.storage.vault
+
+        # Load and deserialize file into envelope document based on document ID.
+        path = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(dir=MailboxAPI.PATH_INBOX[0], file=envelope_id)
+        envelope = PortfolioPolicy.deserialize(await vault.archive.load(path))
+
+        # Load sender portfolio.
+        sender = await vault.load_portfolio(envelope.issuer, PGroup.VERIFIER)
+        message = EnvelopePolicy.open(self.facade.data.portfolio, sender, envelope)
+
+        # move mail to read, and make complaint backup
+        await self.store_letter(envelope, message)
+        await self.save_read(message)
+
+        return message
+
+    async def store_letter(self, envelope: Envelope, message: Message):
+        """Save a related envelope and message for later complaint.
+
+        The calling function is responsible for opening the envelope and
+        applying the necessary policies.
+
+        Args:
+            envelope (Envelope):
+            message (Message):
+
+        Returns:
+
+        """
+        if envelope.issuer != message.issuer:
+            raise Util.exception(Error.MAILBOX_STORE_ISSUER_MISSMATCH, {
+                "envelope": envelope.id, "message": message.id,
+                "envelope_issuer": envelope.issuer, "message_issuer": message.issuer})
+
+        if envelope.owner != message.owner:
+            raise Util.exception(Error.MAILBOX_STORE_OWNER_MISSMATCH, {
+                "envelope": envelope.id, "message": message.id,
+                "envelope_owner": envelope.owner, "message_owner": message.owner})
+
+        if abs(envelope.posted - message.posted) > datetime.timedelta(seconds=60):
+            raise Util.exception(Error.MAILBOX_STORE_TIMESTMP_MISSMATCH, {
+                "envelope": envelope.id, "message": message.id,
+                "envelope_owner": envelope.owner, "message_owner": message.owner})
+
+        letter = StoredLetter(nd={
+            "id": message.id,
+            "issuer": self.facade.data.portfolio.entity.id,
+            "envelope": envelope,
+            "message": message,
+        })
+        letter = Crypto.sign(letter, self.facade.data.portfolio)
+        letter.validate()
+
+        await self.facade.storage.vault.save(
+            DOCUMENT_PATH[DocType.CACHED_MSG].format(
+                dir=MailboxAPI.PATH_CACHE[0], file=letter.id),
+            letter,
+            document_file_id_match=False
+        )
+
+        await self.facade.storage.vault.delete(
+            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+                dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
+            )
+        )
+
+    async def save_read(self, message: Mail):
+        """Save a message as read in the read message folder.
+
+        Args:
+            message (Mail):
+                Message to be saved as read.
+
+        Returns:
+
+        """
+        await self.facade.storage.vault.save(
+            DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailboxAPI.PATH_READ[0], file=message.id
+            ),
+            message
+        )

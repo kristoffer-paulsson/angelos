@@ -909,8 +909,6 @@ class Archive7(ContainerAware, SharedResource):
         dirname, name = os.path.split(filename)
         pid = None
 
-        logging.info("archive.mkfile %s" % filename)
-
         if parent:
             ids = self.ioc.hierarchy.ids
             if parent not in ids.keys():

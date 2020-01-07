@@ -288,6 +288,38 @@ class PortfolioExistsNot(AngelosException):
     pass
 
 
+class MailboxStoreIssuerMissmatch(AngelosException):
+    pass
+
+
+class MailboxStoreOwnerMissmatch(AngelosException):
+    pass
+
+
+class MailboxStoreTimestampMissmatch(AngelosException):
+    pass
+
+
+class PolicyException(AngelosException):
+    pass
+
+
+class PolicyEnvelopeOpenVerificationFailed(PolicyException):
+    pass
+
+
+class PolicyEnvelopeOpenValidationFailed(PolicyException):
+    pass
+
+
+class PolicyEnvelopeOpenMessageVerificationFailed(PolicyException):
+    pass
+
+
+class PolicyEnvelopeOpenMessageValidationFailed(PolicyException):
+    pass
+
+
 ERROR_INFO = {
     500: (
         ContainerServiceNotConfigured,
@@ -423,6 +455,15 @@ ERROR_INFO = {
     740: (PortfolioNotStatement, "Document must be subtype of Statement"),
     741: (PortfolioAlreadyExists, "Portfolio already exists."),
     742: (PortfolioExistsNot, "Portfolio doesn't exists"),
+
+    780: (MailboxStoreIssuerMissmatch, "Issuer mismatch between Envelope and Message"),
+    781: (MailboxStoreOwnerMissmatch, "Owner mismatch between Envelope and Message"),
+    782: (MailboxStoreTimestampMissmatch, "Envelope and message timestamp mismatch"),
+
+    800: (PolicyEnvelopeOpenVerificationFailed, "Envelope failed cryptographic verification"),
+    801: (PolicyEnvelopeOpenValidationFailed, "Envelope document failed validation"),
+    802: (PolicyEnvelopeOpenMessageVerificationFailed, "Message in envelope failed cryptographic verification"),
+    803: (PolicyEnvelopeOpenMessageValidationFailed, "Message document in envelope failed validation")
 }
 
 
@@ -501,3 +542,14 @@ class Error(IntEnum):
     PORTFOLIO_NOT_STATEMENT = 740
     PORTFOLIO_ALREADY_EXISTS = 741
     PORTFOLIO_EXISTS_NOT = 742
+
+    # 20 error codes for mailbox
+    MAILBOX_STORE_ISSUER_MISSMATCH = 780
+    MAILBOX_STORE_OWNER_MISSMATCH = 781
+    MAILBOX_STORE_TIMESTMP_MISSMATCH = 782
+
+    # 100 error codes for policies
+    POLICY_ENVELOPE_OPEN_VERIFICATION_FAILED = 800
+    POLICY_ENVELOPE_OPEN_VALIDATION_FAILED = 801
+    POLICY_ENVELOPE_OPEN_MESSAGE_VERIFICATION_FAILED = 802
+    POLICY_ENVELOPE_OPEN_MESSAGE_VALIDATION_FAILED = 803

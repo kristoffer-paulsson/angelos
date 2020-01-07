@@ -10,12 +10,12 @@ import datetime
 
 from typing import Set
 
-from ..utils import Util
-from ..document.types import DocumentT
-from ..document.entities import Keys
-from ..document.envelope import Envelope, Header
-from ..document.document import UpdatedMixin
-from .portfolio import Portfolio, PrivatePortfolio
+from libangelos.utils import Util
+from libangelos.document.types import DocumentT
+from libangelos.document.entities import Keys
+from libangelos.document.envelope import Envelope, Header
+from libangelos.document.document import UpdatedMixin
+from libangelos.policy.portfolio import Portfolio, PrivatePortfolio
 
 
 class Crypto:
