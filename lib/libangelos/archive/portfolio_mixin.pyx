@@ -543,3 +543,32 @@ class PortfolioMixin:
                 )
 
         return await self.gather(*ops)
+
+    async def delete_portfolio(self, eid: uuid.UUID) -> bool:
+        """Delete an existing portfolio, except the owner.
+
+        Args:
+            eid (uuid.UUID):
+                The portfolio entity ID.
+
+        Returns (bool):
+            True upon success.
+
+        """
+        if eid == self.facade.data.portfolio.entity.id:
+            raise RuntimeError("Illegal operation, trying to delete owning entity!")
+
+        dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
+        if not self.archive.isdir(dirname):
+            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
+                "portfolio": eid})
+
+        files = await self.archive.glob(name="{dir}/*".format(dir=dirname))
+
+        result = True
+        ops = list()
+        for filename in files:
+            ops.append(self.archive.remove(filename=filename, mode=3))
+        result = result if await self.gather(*ops) else False
+        result = result if await self.archive.remove(filename=dirname, mode=3) else False
+        return result
