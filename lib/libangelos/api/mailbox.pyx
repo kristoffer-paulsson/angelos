@@ -27,6 +27,7 @@ from libangelos.policy.crypto import Crypto
 from libangelos.policy.message import EnvelopePolicy
 from libangelos.policy.portfolio import DOCUMENT_PATH, PortfolioPolicy, PGroup
 
+
 class MailboxAPI(ApiFacadeExtension):
     """An interface class to be placed on the facade."""
 
@@ -275,19 +276,19 @@ class MailboxAPI(ApiFacadeExtension):
         )
         return await self.__info_outbox_envelope(filename)
 
-    async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
-        bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_READ[0], file=message_id
-        )
-        return await self.__info_mail(filename)
-
     async def get_info_draft(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, uuid.UUID, int]:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
         )
         return await self.__info_draft(filename)
+
+    async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
+        bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_READ[0], file=message_id
+        )
+        return await self.__info_mail(filename)
 
     async def get_info_trash(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
@@ -317,8 +318,7 @@ class MailboxAPI(ApiFacadeExtension):
             Loaded and deserialized message
 
         """
-        letter = await self.facade.storage.vault.archive.load(filename)
-        mail = PortfolioPolicy.deserialize(letter)
+        return PortfolioPolicy.deserialize(await self.facade.storage.vault.archive.load(filename))
 
     async def get_read(self, message_id: uuid.UUID) -> MessageT:
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
