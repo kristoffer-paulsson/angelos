@@ -344,6 +344,14 @@ class MailboxAPI(ApiFacadeExtension):
         )
         return await self.__simple_load(filename)
 
+    async def remove_draft(self, message_id: uuid.UUID):
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
+        )
+        archive = self.facade.storage.vault.archive
+        if archive.isfile(filename):
+            await archive.remove(filename)
+
     async def mail_to_inbox(
         self, envelopes: Envelope
     ) -> (bool, Set[Envelope], bool):
