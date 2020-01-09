@@ -110,7 +110,7 @@ class MailBuilder:
         elif isinstance(reply, uuid.UUID):
             self.__mail.reply = reply
         else:
-            self.__mail = None
+            self.__mail.reply = None
 
         return self
 
