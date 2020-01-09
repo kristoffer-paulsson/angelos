@@ -7,8 +7,9 @@
 """Generate and verify messages."""
 import enum
 import datetime
+import uuid
 
-from typing import List
+from typing import List, Union
 
 from libangelos.policy.crypto import Crypto
 from libangelos.policy.policy import Policy
@@ -98,18 +99,24 @@ class MailBuilder:
         self.__mail = mail
 
     def message(
-        self, subject: str, body: str, reply: Mail = None
+        self, subject: str, body: str, reply: Union[Mail, uuid.UUID] = None
     ):  # -> MailBuilder:
         """Add mail body, subject and reply-to."""
-        self.__mail.subject = subject
-        self.__mail.body = body
-        self.__mail.reply = None if not reply else reply.id
+        self.__mail.subject = subject if subject else ""
+        self.__mail.body = body if body else ""
+
+        if isinstance(reply, Mail):
+            self.__mail.reply = reply.id
+        elif isinstance(reply, uuid.UUID):
+            self.__mail.reply = reply
+        else:
+            self.__mail = None
 
         return self
 
     def add(self, name: str, data: bytes, mime: str):  # -> MailBuilder:
         """Add an attachment to the mail."""
-        attachement = Attachment(nd={"name": name, "mime": mime, "data": data})
+        attachement = Attachment(nd={"name": name if name else "Unnamed", "mime": mime, "data": data})
         attachement.validate()
         self.__mail.attachments.append(attachement)
 
@@ -202,7 +209,7 @@ class MessagePolicy(Policy):
                 "owner": recipient.entity.id,
                 "issuer": sender.entity.id,
                 "mime": mime,
-                "body": data,
+                "body": data if data else b"",
                 "reply": None if not reply else reply.id,
                 "expires": datetime.date.today() + datetime.timedelta(30),
                 "posted": datetime.datetime.now(),
@@ -226,7 +233,7 @@ class MessagePolicy(Policy):
             nd={
                 "owner": recipient.entity.id,
                 "issuer": sender.entity.id,
-                "body": body,
+                "body": body if body else "",
                 "reply": None if not reply else reply.id,
                 "expires": datetime.date.today() + datetime.timedelta(30),
                 "posted": datetime.datetime.now(),
