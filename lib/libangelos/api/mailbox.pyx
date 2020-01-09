@@ -352,6 +352,30 @@ class MailboxAPI(ApiFacadeExtension):
         if archive.isfile(filename):
             await archive.remove(filename)
 
+    async def move_trash(self, message_id: uuid.UUID):
+        for path in (
+                MailboxAPI.PATH_READ[0],
+                MailboxAPI.PATH_DRAFT[0],
+                MailboxAPI.PATH_SENT[0]
+        ):
+            filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=path, file=message_id
+            )
+            archive = self.facade.storage.vault.archive
+            if archive.isfile(filename):
+                await archive.move(filename, MailboxAPI.PATH_TRASH[0])
+                break
+
+    async def empty_trash(self):
+        trash = await self.load_trash()
+        archive = self.facade.storage.vault.archive
+        for message_id in trash:
+            filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailboxAPI.PATH_TRASH[0], file=message_id
+            )
+            if archive.isfile(filename):
+                archive.remove(filename)
+
     async def mail_to_inbox(
         self, envelopes: Envelope
     ) -> (bool, Set[Envelope], bool):
