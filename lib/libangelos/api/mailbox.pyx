@@ -24,7 +24,7 @@ from libangelos.facade.base import BaseFacade
 from libangelos.helper import Glue
 from libangelos.policy.accept import ImportPolicy
 from libangelos.policy.crypto import Crypto
-from libangelos.policy.message import EnvelopePolicy
+from libangelos.policy.message import EnvelopePolicy, MessagePolicy
 from libangelos.policy.portfolio import DOCUMENT_PATH, PortfolioPolicy, PGroup
 
 
@@ -344,14 +344,6 @@ class MailboxAPI(ApiFacadeExtension):
         )
         return await self.__simple_load(filename)
 
-    async def remove_draft(self, message_id: uuid.UUID):
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        )
-        archive = self.facade.storage.vault.archive
-        if archive.isfile(filename):
-            await archive.remove(filename)
-
     async def move_trash(self, message_id: uuid.UUID):
         for path in (
                 MailboxAPI.PATH_READ[0],
@@ -423,39 +415,6 @@ class MailboxAPI(ApiFacadeExtension):
             return None
 
         return result[0][0]
-
-    async def save_outbox(self, envelope: Envelope):
-        """Save a message to outbox folder to be sent."""
-        result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailboxAPI.PATH_OUTBOX[0], file=envelope.id
-            ),
-            envelope,
-        )
-        if isinstance(result, Exception):
-            raise result
-        return True
-
-    async def save_sent(self, message: Mail):
-        """Save a message to sent folder for archiving."""
-        result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_SENT[0], file=message.id
-            ),
-            message,
-        )
-        if isinstance(result, Exception):
-            raise result
-        return True
-
-    async def save_draft(self, message: Mail):
-        """Save a message to draft folder for archiving."""
-        await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_DRAFT[0], file=message.id
-            ),
-            message,
-        )
 
     async def import_envelope(self, envelope: Envelope):
         """Imports an envelope to inbox."""
@@ -561,4 +520,64 @@ class MailboxAPI(ApiFacadeExtension):
                 dir=MailboxAPI.PATH_READ[0], file=message.id
             ),
             message
+        )
+
+    async def send_mail(self, mail: Mail, subject: str, body: str, recipient: uuid.UUID=None, reply: uuid.UUID=None):
+        recipient = await self.facade.storage.vault.load_portfolio(
+            recipient if recipient else mail.owner, PGroup.VERIFIER)
+        builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
+        message = builder.message(subject, body, reply).done()
+        envelope = EnvelopePolicy.wrap(self.facade.data.portfolio, recipient, message)
+        await self.gather(
+            self.remove_draft(mail.id),
+            self.save_outbox(envelope),
+            self.save_sent(message)
+        )
+
+    async def remove_draft(self, message_id: uuid.UUID):
+        """Remove a mail from the draft folder.
+
+        Args:
+            message_id (uuid.UUID):
+                The message ID of the draft.
+
+        Returns:
+
+        """
+        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
+        )
+        archive = self.facade.storage.vault.archive
+        if archive.isfile(filename):
+            await archive.remove(filename)
+
+    async def save_outbox(self, envelope: Envelope):
+        """Save a message to outbox folder to be sent."""
+        result = await self.facade.storage.vault.save(
+            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+                dir=MailboxAPI.PATH_OUTBOX[0], file=envelope.id
+            ),
+            envelope,
+        )
+
+    async def save_sent(self, message: Mail):
+        """Save a message to sent folder for archiving."""
+        result = await self.facade.storage.vault.save(
+            DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailboxAPI.PATH_SENT[0], file=message.id
+            ),
+            message,
+        )
+
+    async def save_draft(self, draft: Mail, subject: str, body: str, reply: uuid.UUID=None):
+        """Save a message to draft folder for archiving."""
+        recipient = await self.facade.storage.vault.load_portfolio(draft.owner, PGroup.VERIFIER)
+        builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
+        draft = builder.message(subject, body, reply).draft()
+
+        await self.facade.storage.vault.save(
+            DOCUMENT_PATH[DocType.COM_MAIL].format(
+                dir=MailboxAPI.PATH_DRAFT[0], file=draft.id
+            ),
+            draft,
         )
