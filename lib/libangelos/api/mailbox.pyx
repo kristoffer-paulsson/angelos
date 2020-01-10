@@ -359,7 +359,7 @@ class MailboxAPI(ApiFacadeExtension):
                 MailboxAPI.PATH_SENT[0]
         ):
             filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=path, file=message_id
+                dir=path.rsplit("/"), file=message_id
             )
             archive = self.facade.storage.vault.archive
             if archive.isfile(filename):
