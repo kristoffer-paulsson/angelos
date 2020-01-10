@@ -573,11 +573,12 @@ class MailboxAPI(ApiFacadeExtension):
         """Save a message to draft folder for archiving."""
         recipient = await self.facade.storage.vault.load_portfolio(draft.owner, PGroup.VERIFIER)
         builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
-        draft = builder.message(subject, body, reply).draft()
+        new_draft = builder.message(subject, body, reply).draft()
 
         await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_DRAFT[0], file=draft.id
+                dir=MailboxAPI.PATH_DRAFT[0], file=new_draft.id
             ),
-            draft,
+            new_draft,
         )
+        await self.remove_draft(new_draft.id)
