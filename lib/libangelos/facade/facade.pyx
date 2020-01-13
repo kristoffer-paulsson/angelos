@@ -8,6 +8,7 @@
 
 from libangelos.api.contact import ContactAPI
 from libangelos.api.mailbox import MailboxAPI
+from libangelos.api.crud import CrudAPI
 from libangelos.api.replication import ReplicationAPI
 from libangelos.api.settings import SettingsAPI
 from libangelos.archive.ftp import FtpStorage
@@ -24,7 +25,6 @@ from libangelos.data.server import ServerData
 from libangelos.document.entities import Person, Ministry, Church
 from libangelos.facade.base import BaseFacade
 from libangelos.policy.portfolio import PrivatePortfolio
-
 from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
 
@@ -75,7 +75,7 @@ class ServerFacadeMixin(TypeFacadeMixin):
     """Mixin for a Server Facade."""
 
     STORAGES = (MailStorage, PoolStorage, RoutingStorage, FtpStorage) + TypeFacadeMixin.STORAGES
-    APIS = () + TypeFacadeMixin.APIS
+    APIS = (CrudAPI,) + TypeFacadeMixin.APIS
     DATAS = (ServerData, ) + TypeFacadeMixin.DATAS
     TASKS = () + TypeFacadeMixin.TASKS
 

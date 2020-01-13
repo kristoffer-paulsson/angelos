@@ -2,6 +2,7 @@ import asyncio
 import tracemalloc
 from unittest import TestCase
 
+from libangelos.misc import Misc
 from libangelos.reactive import Event, NotifierMixin, ObserverMixin
 
 

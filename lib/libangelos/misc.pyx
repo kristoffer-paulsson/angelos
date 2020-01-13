@@ -11,11 +11,13 @@ import atexit
 import concurrent
 import functools
 import logging
+import re
 import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass, asdict as data_asdict
 from threading import Thread
 from typing import Callable, Awaitable, Any
+from urllib.parse import urlparse
 
 import plyer
 
@@ -179,6 +181,9 @@ class LazyAttribute:
 
 class Misc:
     """Namespace for miscellanious functions and methods."""
+
+    REGEX = r"""(?:(?P<username>[\w\-\.]+)(?::(?P<password>[\w\-\.]+))?@)?(?P<hostname>[\w\-\.]+)(?::(?P<port>\d+))?"""
+
     @staticmethod
     def unique() -> str:
         """Get the hardware ID.
@@ -211,3 +216,41 @@ class Misc:
             return asyncio.get_running_loop()
         except RuntimeError:
             return Loop.main().loop
+
+    @staticmethod
+    def urlparse(urlstring: str) -> dict:
+        """Parse an angelos url.
+
+        Args:
+            urlstring:
+
+        Returns:
+
+        """
+        tmp = urlparse(urlstring, scheme="angelos", allow_fragments=False)
+        regex = re.match(Misc.REGEX, tmp.netloc).groupdict()
+        merged = {**regex, **tmp._asdict()}
+        return {k: merged[k] for k in {"scheme", "hostname", "path", "username", "password", "port"}}
+
+    @staticmethod
+    def urlunparse(parts: dict) -> str:
+        """Build url from parts
+
+        Returns (str):
+            Built angelos url.
+
+        """
+        netloc = parts["hostname"]
+        if parts["username"]:
+            if parts["password"]:
+                netloc = "{username}:{password}@".format(
+                    username=parts["username"], password=parts["password"]) + netloc
+            else:
+                netloc = "{username}@".format(
+                    username=parts["username"]) + netloc
+
+        if parts["port"]:
+            netloc += ":{port}".format(port=parts["port"])
+
+        return "{scheme}://{netloc}{path}".format(
+            scheme=parts["scheme"], netloc=netloc, path=parts["path"])

@@ -366,7 +366,7 @@ class MailboxAPI(ApiFacadeExtension):
                 dir=MailboxAPI.PATH_TRASH[0], file=message_id
             )
             if archive.isfile(filename):
-                archive.remove(filename)
+                await archive.remove(filename)
 
     async def mail_to_inbox(
         self, envelopes: Envelope
