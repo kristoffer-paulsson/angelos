@@ -102,14 +102,14 @@ class CrudAPI(ApiFacadeExtension):
         await storage.archive.remove(parts["path"])
         return True
 
-    async def list(self, url: str) -> Set[str, ...]:
+    async def list(self, url: str) -> Set[str]:
         """Index list of a directory.
 
         Args:
             url (str):
                 Angelos url
 
-        Returns (Set[str, ...]):
+        Returns (Set[str]):
             A set of filenames
 
         """
