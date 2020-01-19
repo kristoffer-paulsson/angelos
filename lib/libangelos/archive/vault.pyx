@@ -277,17 +277,12 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
 
     async def save_settings(self, name: str, text: io.StringIO) -> bool:
         """Save or update a text settings file."""
-        try:
-            filename = "/settings/" + name
-            data =  text.getvalue().encode()
-            if self.archive.isfile(filename):
-                return await self.archive.save(filename, data)
-            else:
-                return await self.archive.mkfile(filename, data, owner=self.facade.data.portfolio.entity.id)
-        except Exception as e:
-            logging.exception(e)
-
-        return False
+        filename = "/settings/" + name
+        data =  text.getvalue().encode()
+        if self.archive.isfile(filename):
+            return await self.archive.save(filename, data)
+        else:
+            return await self.archive.mkfile(filename, data, owner=self.facade.data.portfolio.entity.id)
 
     async def load_settings(self, name: str) -> io.StringIO:
         """Load a text settings file."""

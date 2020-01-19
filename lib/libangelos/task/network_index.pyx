@@ -99,4 +99,4 @@ class NetworkIndexerTask(TaskFacadeExtension):
         writer.writerows(self.__network_list)
         self.__network_list = None
 
-        await vault.save_settings("networks.csv", csv_data.getvalue().encode())
+        await vault.save_settings("networks.csv", csv_data)
