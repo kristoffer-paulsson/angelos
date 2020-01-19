@@ -9,11 +9,11 @@ import csv
 import io
 import logging
 
-from .operation import Operation
-from ..facade.facade import Facade
-from ..worker import Worker
-from ..policy.portfolio import PortfolioPolicy, PGroup
-from ..policy.crypto import Crypto
+from libangelos.operation.operation import Operation
+from libangelos.operation.facade.facade import Facade
+from libangelos.operation.worker import Worker
+from libangelos.operation.policy.portfolio import PortfolioPolicy, PGroup
+from libangelos.operation.policy.crypto import Crypto
 
 
 _networks_run = False

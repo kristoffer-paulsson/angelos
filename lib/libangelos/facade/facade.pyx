@@ -27,6 +27,8 @@ from libangelos.facade.base import BaseFacade
 from libangelos.policy.portfolio import PrivatePortfolio
 from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
+from task.network_index import NetworkIndexerTask
+
 
 class EntityFacadeMixin:
     """Abstract baseclass for Entities FacadeMixin's."""
@@ -64,7 +66,7 @@ class TypeFacadeMixin:
     STORAGES = ()
     APIS = (SettingsAPI, MailboxAPI, ContactAPI, ReplicationAPI)
     DATAS = (PortfolioData, PreferencesData)
-    TASKS = (ContactPortfolioSyncTask,)
+    TASKS = (ContactPortfolioSyncTask, NetworkIndexerTask)
 
     def __init__(self):
         """Initialize facade."""
