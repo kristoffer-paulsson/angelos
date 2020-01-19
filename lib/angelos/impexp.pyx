@@ -34,7 +34,8 @@ class PortfolioCommand(Command):
         elif opts["view"]:
             await self.__view(opts["view"], opts["group"])
         elif opts["list"]:
-            await self.__list(opts["list"])
+            await self.__list()
+            # await self.__list(opts["list"])
         else:
             pass
 
@@ -113,8 +114,8 @@ class PortfolioCommand(Command):
             if trusted.expires_soon():
                 t_renewable = True
 
-        s1 = "Create verified statement."
-        s2 = "Renew verified statement."
+        s1 = "Create verified statement"
+        s2 = "Renew verified statement"
         s3 = "Revoke verified statement"
         s4 = "Create trusted statement"
         s5 = "Renew trusted statement"
@@ -160,19 +161,20 @@ class PortfolioCommand(Command):
             )
 
         if statement:
-            await self.__facade.storage.vault.docs_to_portfolios(set([statement]))
+            await self.__facade.storage.vault.docs_to_portfolio(set([statement]))
             self._io << "\nSaved statement changes to portfolio.\n"
 
-    async def __list(self, search="*"):
+    async def __list(self):
         self._io << "\n"
-        for doc in await self.__facade.storage.vault.list_portfolios(query=search):
-            if not doc[1]:
-                self._io << (
-                    PrintPolicy.entity_title(doc[0])
-                    + "; "
-                    + str(doc[0].id)
-                    + "\n"
-                )
+        for eid in await self.__facade.storage.vault.list_portfolios():
+            portfolio = await self.__facade.storage.vault.load_portfolio(eid, PGroup.VERIFIER)
+            print(portfolio)
+            self._io << (
+                PrintPolicy.title(portfolio)
+                + "; "
+                + str(portfolio.entity.id)
+                + "\n"
+            )
         self._io << "\n"
 
     def __group(self, group):

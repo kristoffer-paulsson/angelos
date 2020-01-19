@@ -17,7 +17,7 @@ from libangelos.document.model import (
 from libangelos.error import Error
 from libangelos.utils import Util
 
-from .document import DocType, Document, UpdatedMixin
+from libangelos.document.document import DocType, Document, UpdatedMixin
 
 
 class Host(BaseDocument):

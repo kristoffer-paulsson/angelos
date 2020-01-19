@@ -82,34 +82,6 @@ class Const:
 
     OPT_LISTEN = ["localhost", "loopback", "hostname", "domain", "ip", "any"]
 
-    W_SUPERV_NAME = "Supervisor"  # Server Supervisor worker
-    W_ADMIN_NAME = "AdminServer"  # Server Admin worker
-    G_CORE_NAME = "Core"
-    W_CLIENT_NAME = "Client"  # Client main worker
-    W_BACKEND_NAME = "Backend"  # Client backend worker
-
-    # Runtime nodes
-    R_MODE_DEV = "dev"
-    R_MODE_PRODUCTION = "prod"
-
-    R_TYPE_SERVER = "server"
-    R_TYPE_CLIENT = "client"
-
-    R_ROLE_NORMAL = "normal"
-    R_ROLE_BACKUP = "backup"
-
-    R_PLATFORM_NIX = "nix"
-    R_PLATFORM_WIN = "win"
-    R_PLATFORM_MACOS = "osx"
-    R_PLATFORM_ANDROID = "android"
-    R_PLATFORM_IOS = "ios"
-
-    I_SPLASH = "splash"
-    I_DEFAULT = "default"
-    I_SETUP = "setup"
-    I_SPINNER = "spinner"
-    I_FLASH = "flash"
-
     ARCH_BLK_1 = 227
     ARCH_BLK_2 = 454
     ARCH_BLK_4 = 908

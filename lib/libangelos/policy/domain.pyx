@@ -5,19 +5,16 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Policy classes for Domain and Nodes."""
-import platform
 import ipaddress
+import platform
 
-from typing import Union
-
-from ..misc import Misc
-from .types import PrivatePortfolioABC
-from .policy import Policy
-from .crypto import Crypto
-
-from ..const import Const
-from ..document.domain import Domain, Node, Location, Network, Host
-from ..automatic import Net
+from libangelos.automatic import Net
+from libangelos.const import Const
+from libangelos.document.domain import Domain, Node, Location, Network, Host
+from libangelos.misc import Misc
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.policy import Policy
+from libangelos.policy.types import PrivatePortfolioABC
 
 
 class NodePolicy(Policy):
@@ -28,19 +25,18 @@ class NodePolicy(Policy):
     @staticmethod
     def current(
         portfolio: PrivatePortfolioABC,
-        role: Union[str, int] = "client",
+        role: int = Const.A_ROLE_PRIMARY,
         server: bool = False,
     ):
         """Generate node document from the current node."""
 
-        if isinstance(role, int):
-            if role == Const.A_ROLE_PRIMARY:
+        if role == Const.A_ROLE_BACKUP:
+            role = "backup"
+        else:
+            if server:
                 role = "server"
-            elif role == Const.A_ROLE_BACKUP:
-                role = "backup"
-
-        if role not in NodePolicy.ROLE:
-            raise ValueError("Unsupported node role")
+            else:
+                role = "client"
 
         if portfolio.domain.issuer != portfolio.entity.issuer:
             raise RuntimeError(
@@ -53,7 +49,7 @@ class NodePolicy(Policy):
             location = Location(
                 nd={
                     "hostname": [net.domain],
-                    "ip": [ipaddress.ip_address(net.ip) if net.ip else ipaddress.ip_address("0.0.0.0")],
+                    "ip": [ipaddress.ip_address(net.ip) if net.ip else None],
                 }
             )
 
@@ -127,15 +123,16 @@ class NetworkPolicy(Policy):
 
         hosts = []
         for node in portfolio.nodes:
-            hosts.append(
-                Host(
-                    nd={
-                        "node": node.id,
-                        "ip": node.location.ip,
-                        "hostname": node.location.hostname,
-                    }
+            if node.role == "server":
+                hosts.append(
+                    Host(
+                        nd={
+                            "node": node.id,
+                            "ip": node.location.ip,
+                            "hostname": node.location.hostname,
+                        }
+                    )
                 )
-            )
 
         network = Network(
             nd={

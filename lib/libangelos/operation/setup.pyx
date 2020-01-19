@@ -4,13 +4,14 @@
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
-"Module docstring."""
-from .operation import Operation
-from ..policy.types import PersonData, MinistryData, ChurchData
-from ..policy.portfolio import PrivatePortfolio
-from ..policy.crypto import Crypto
-from ..policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
-from ..policy.domain import DomainPolicy, NodePolicy
+"""Module docstring."""
+from libangelos.const import Const
+from libangelos.operation.operation import Operation
+from libangelos.policy.types import PersonData, MinistryData, ChurchData
+from libangelos.policy.portfolio import PrivatePortfolio
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from libangelos.policy.domain import DomainPolicy, NodePolicy, NetworkPolicy
 
 
 class BaseSetupOperation(Operation):
@@ -18,7 +19,7 @@ class BaseSetupOperation(Operation):
 
     @staticmethod
     def _generate(
-        portfolio: PrivatePortfolio, role: str = "client", server: bool = False
+        portfolio: PrivatePortfolio, role: int=Const.A_ROLE_PRIMARY, server: bool = False
     ) -> bool:
         """
         Issue a new set of documents from entity data.
@@ -33,21 +34,32 @@ class BaseSetupOperation(Operation):
         if not NodePolicy.current(portfolio, role, server):
             raise RuntimeError("Node document not generated")
 
+        if server:
+            if not NetworkPolicy.generate(portfolio):
+                raise RuntimeError("Node document not generated")
+
         return True
 
     @staticmethod
     def import_ext(
-        portfolio: PrivatePortfolio, role: str = "client", server: bool = False
+        portfolio: PrivatePortfolio, role: int=Const.A_ROLE_PRIMARY, server: bool = False
     ) -> bool:
         """Validate a set of documents related to an entity for import."""
 
         if not portfolio.nodes:
             NodePolicy.current(portfolio, role=role, server=server)
+            if server:
+                NetworkPolicy.generate(portfolio, role=role, server=server)
 
         valid = True
         for node in portfolio.nodes:
             if not node.domain == portfolio.domain.id:
                 raise RuntimeError("Node and Domain document mismatch")
+                valid = False
+
+        if server:
+            if not portfolio.network.validate():
+                raise RuntimeError("Network document invalid")
                 valid = False
 
         if not portfolio.entity.validate():
@@ -94,6 +106,11 @@ class BaseSetupOperation(Operation):
                 raise RuntimeError("Node document verification failed")
                 valid = False
 
+        if server:
+            if not Crypto.verify(portfolio.network, portfolio):
+                raise RuntimeError("Network document verification failed")
+                valid = False
+
         return valid
 
 
@@ -102,7 +119,7 @@ class SetupPersonOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-        cls, data: PersonData, role: str = "client", server: bool = False
+        cls, data: PersonData, role: int=Const.A_ROLE_PRIMARY, server: bool = False
     ) -> PrivatePortfolio:
         portfolio = PersonPolicy.generate(data)
         BaseSetupOperation._generate(portfolio, role, server)
@@ -114,7 +131,7 @@ class SetupMinistryOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-        cls, data: MinistryData, role: str = "client", server: bool = False
+        cls, data: MinistryData, role: int=Const.A_ROLE_PRIMARY, server: bool = False
     ) -> PrivatePortfolio:
         portfolio = MinistryPolicy.generate(data)
         BaseSetupOperation._generate(portfolio, role, server)
@@ -126,7 +143,7 @@ class SetupChurchOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-        cls, data: ChurchData, role: str = "client", server: bool = False
+        cls, data: ChurchData, role: int=Const.A_ROLE_PRIMARY, server: bool = False
     ) -> PrivatePortfolio:
         portfolio = ChurchPolicy.generate(data)
         BaseSetupOperation._generate(portfolio, role, server)

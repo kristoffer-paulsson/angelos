@@ -296,7 +296,7 @@ class PortfolioMixin:
                 else:
                     rejected.add(document)
 
-        result = await self.gather(*ops, return_exceptions=True)
+        result = await self.gather(*ops)
         return rejected, result
 
     async def list_portfolios(self) -> Set[Tuple[str, uuid.UUID]]:
