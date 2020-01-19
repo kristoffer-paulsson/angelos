@@ -8,7 +8,6 @@
 
 from libangelos.api.contact import ContactAPI
 from libangelos.api.mailbox import MailboxAPI
-from libangelos.api.crud import CrudAPI
 from libangelos.api.replication import ReplicationAPI
 from libangelos.api.settings import SettingsAPI
 from libangelos.archive.ftp import FtpStorage
@@ -27,7 +26,8 @@ from libangelos.facade.base import BaseFacade
 from libangelos.policy.portfolio import PrivatePortfolio
 from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
-from task.network_index import NetworkIndexerTask
+from libangelos.api.crud import CrudAPI
+from libangelos.task.network_index import NetworkIndexerTask
 
 
 class EntityFacadeMixin:
