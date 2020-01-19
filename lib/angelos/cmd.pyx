@@ -62,7 +62,7 @@ class ConsoleIO:
         """Update terminal size at event."""
         self._size = self._process.get_terminal_size()
 
-    def __lshift__(self, other: str) -> ConsoleIO:
+    def __lshift__(self, other: str) -> "ConsoleIO":
         """Print to stdout C++ - style.
 
         Args:
@@ -851,7 +851,7 @@ class Terminal(Shell):
                     except CmdShellException as e:
                         self._io << ("%s \n" % e)
                     except Exception as e:
-                        logging.exception(e, exc_info=True)
+                        logging.error(e, exc_info=True)
                         self._io << ("%s: %s \n" % (type(e), e))
 
                     self._io << self._config["prompt"]

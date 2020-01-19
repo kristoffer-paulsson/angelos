@@ -8,8 +8,10 @@
 
 PREFERENCES_INI = b"""
 [Preferences]
-CurrentNetwork=None
 NightMode=True
+[Client]
+CurrentNetwork=None
+[Server]
 ; The preselected network to connect to.
 """
 

@@ -23,7 +23,7 @@ class Application:
 
     def run(self):
         """Start and run application."""
-        from .server import Server
+        from angelos.server import Server
 
         Server().run()
 
