@@ -7,7 +7,6 @@
 """Facade mail API."""
 import asyncio
 import datetime
-import os
 import uuid
 from typing import Set, Any, Tuple
 
@@ -42,7 +41,11 @@ class MailboxAPI(ApiFacadeExtension):
     PATH_CACHE = ("/cache/msg/",)
 
     def __init__(self, facade: BaseFacade):
-        """Initialize the Mail."""
+        """Initialize the Mail.
+
+        Args:
+            facade:
+        """
         ApiFacadeExtension.__init__(self, facade)
 
     async def __load_letters(self, pattern: str) -> Set[uuid.UUID]:
@@ -65,27 +68,51 @@ class MailboxAPI(ApiFacadeExtension):
         return set(result.keys())
 
     async def load_inbox(self) -> Set[uuid.UUID]:
-        """Load envelopes from the inbox."""
+        """Load envelopes from the inbox.
+
+        Returns:
+
+        """
         return await self.__load_letters(self.PATH_INBOX[0] + "*")
 
     async def load_outbox(self) -> Set[uuid.UUID]:
-        """Load letters from outbox folder."""
+        """Load letters from outbox folder.
+
+        Returns:
+
+        """
         return await self.__load_letters(self.PATH_OUTBOX[0] + "*")
 
     async def load_read(self) -> Set[uuid.UUID]:
-        """Load read folder from the messages store."""
+        """Load read folder from the messages store.
+
+        Returns:
+
+        """
         return await self.__load_letters(self.PATH_READ[0] + "*")
 
     async def load_drafts(self) -> Set[uuid.UUID]:
-        """Load read folder from the messages store."""
+        """Load read folder from the messages store.
+
+        Returns:
+
+        """
         return await self.__load_letters(self.PATH_DRAFT[0] + "*")
 
     async def load_trash(self) -> Set[uuid.UUID]:
-        """Load read folder from the messages store."""
+        """Load read folder from the messages store.
+
+        Returns:
+
+        """
         return await self.__load_letters(self.PATH_TRASH[0] + "*")
 
     async def load_sent(self) -> Set[uuid.UUID]:
-        """Load read folder from the messages store."""
+        """Load read folder from the messages store.
+
+        Returns:
+
+        """
         return await self.__load_letters(self.PATH_SENT[0] + "*")
 
     async def __info_mail(self, filename: str) -> Tuple[
@@ -264,6 +291,14 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def get_info_inbox(self, envelope_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime, bool, bool, bool]:
+        """
+
+        Args:
+            envelope_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
             dir=MailboxAPI.PATH_INBOX[0], file=envelope_id
         )
@@ -271,6 +306,14 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def get_info_outbox(self,  envelope_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime]:
+        """
+
+        Args:
+            envelope_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
             dir=MailboxAPI.PATH_OUTBOX[0], file=envelope_id
         )
@@ -278,6 +321,14 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def get_info_draft(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, uuid.UUID, int]:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
         )
@@ -285,6 +336,14 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_READ[0], file=message_id
         )
@@ -292,6 +351,14 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def get_info_trash(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_TRASH[0], file=message_id
         )
@@ -299,6 +366,14 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def get_info_sent(self, message_id: uuid.UUID) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_SENT[0], file=message_id
         )
@@ -321,30 +396,70 @@ class MailboxAPI(ApiFacadeExtension):
         return PortfolioPolicy.deserialize(await self.facade.storage.vault.archive.load(filename))
 
     async def get_read(self, message_id: uuid.UUID) -> MessageT:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_READ[0], file=message_id
         )
         return await self.__simple_load(filename)
 
     async def get_draft(self, message_id: uuid.UUID) -> MessageT:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
         )
         return await self.__simple_load(filename)
 
     async def get_trash(self, message_id: uuid.UUID) -> MessageT:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_TRASH[0], file=message_id
         )
         return await self.__simple_load(filename)
 
     async def get_sent(self, message_id: uuid.UUID) -> MessageT:
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_SENT[0], file=message_id
         )
         return await self.__simple_load(filename)
 
     async def move_trash(self, message_id: uuid.UUID):
+        """
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         for path in (
                 MailboxAPI.PATH_READ[0],
                 MailboxAPI.PATH_DRAFT[0],
@@ -359,6 +474,11 @@ class MailboxAPI(ApiFacadeExtension):
                 break
 
     async def empty_trash(self):
+        """
+
+        Returns:
+
+        """
         trash = await self.load_trash()
         archive = self.facade.storage.vault.archive
         for message_id in trash:
@@ -371,7 +491,14 @@ class MailboxAPI(ApiFacadeExtension):
     async def mail_to_inbox(
         self, envelopes: Envelope
     ) -> (bool, Set[Envelope], bool):
-        """Import envelope to inbox. Check owner and then validate."""
+        """Import envelope to inbox. Check owner and then validate.
+
+        Args:
+            envelopes:
+
+        Returns:
+
+        """
         reject = set()
         save_list = list()
 
@@ -394,11 +521,25 @@ class MailboxAPI(ApiFacadeExtension):
         return True, reject, result
 
     async def load_envelope(self, envelope_id: uuid.UUID) -> Envelope:
-        """Load specific envelope from the inbox."""
+        """Load specific envelope from the inbox.
+
+        Args:
+            envelope_id:
+
+        Returns:
+
+        """
         return await self._load_doc(envelope_id, DocType.COM_ENVELOPE, MailboxAPI.PATH_INBOX[0], Envelope)
 
     async def load_message(self, message_id: uuid.UUID) -> Mail:
-        """Load specific message from the read folder."""
+        """Load specific message from the read folder.
+
+        Args:
+            message_id:
+
+        Returns:
+
+        """
         return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.PATH_READ[0], Mail)
 
     async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
@@ -417,7 +558,14 @@ class MailboxAPI(ApiFacadeExtension):
         return result[0][0]
 
     async def import_envelope(self, envelope: Envelope):
-        """Imports an envelope to inbox."""
+        """Imports an envelope to inbox.
+
+        Args:
+            envelope:
+
+        Returns:
+
+        """
         result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
@@ -523,6 +671,18 @@ class MailboxAPI(ApiFacadeExtension):
         )
 
     async def send_mail(self, mail: Mail, subject: str, body: str, recipient: uuid.UUID=None, reply: uuid.UUID=None):
+        """
+
+        Args:
+            mail:
+            subject:
+            body:
+            recipient:
+            reply:
+
+        Returns:
+
+        """
         recipient = await self.facade.storage.vault.load_portfolio(
             recipient if recipient else mail.owner, PGroup.VERIFIER)
         builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
@@ -552,7 +712,14 @@ class MailboxAPI(ApiFacadeExtension):
             await archive.remove(filename)
 
     async def save_outbox(self, envelope: Envelope):
-        """Save a message to outbox folder to be sent."""
+        """Save a message to outbox folder to be sent.
+
+        Args:
+            envelope:
+
+        Returns:
+
+        """
         result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.PATH_OUTBOX[0], file=envelope.id
@@ -561,7 +728,14 @@ class MailboxAPI(ApiFacadeExtension):
         )
 
     async def save_sent(self, message: Mail):
-        """Save a message to sent folder for archiving."""
+        """Save a message to sent folder for archiving.
+
+        Args:
+            message:
+
+        Returns:
+
+        """
         result = await self.facade.storage.vault.save(
             DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_SENT[0], file=message.id
@@ -570,7 +744,17 @@ class MailboxAPI(ApiFacadeExtension):
         )
 
     async def save_draft(self, draft: Mail, subject: str, body: str, reply: uuid.UUID=None):
-        """Save a message to draft folder for archiving."""
+        """Save a message to draft folder for archiving.
+
+        Args:
+            draft:
+            subject:
+            body:
+            reply:
+
+        Returns:
+
+        """
         recipient = await self.facade.storage.vault.load_portfolio(draft.owner, PGroup.VERIFIER)
         builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
         new_draft = builder.message(subject, body, reply).draft()

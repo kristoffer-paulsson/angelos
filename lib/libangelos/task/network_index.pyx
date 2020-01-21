@@ -25,11 +25,10 @@ class NetworkIndexerTask(TaskFacadeExtension):
 
     __network_list = None
 
-    async def __validate_trust(self, nid: uuid.UUID, portfolio: PrivatePortfolio):
+    async def __validate_trust(self, filename: str, portfolio: PrivatePortfolio):
         vault = self.facade.storage.vault
-        filename = DOCUMENT_PATH[DocType.NET_NETWORK].format(dir="/portfolios", file=str(nid))
-        network = PortfolioPolicy.deserialize(vault.archive.load(filename))
-        network_portfolio = await self.facade.storage.vault.load_portfolio(
+        network = PortfolioPolicy.deserialize(await vault.archive.load(filename))
+        network_portfolio = await vault.load_portfolio(
             network.issuer, PGroup.ALL
         )
 
@@ -88,11 +87,11 @@ class NetworkIndexerTask(TaskFacadeExtension):
         vault = self.facade.storage.vault
         portfolio = await vault.load_portfolio(self.facade.data.portfolio.entity.id, PGroup.ALL)
         pattern = DOCUMENT_PATH[DocType.NET_NETWORK].format(dir="/portfolios", file="*")
-        networks = (await vault.search(pattern)).keys()
+        networks = await vault.search(pattern)
 
         self.__network_list = set()
-        for network in networks:
-            await self.__validate_trust(network, portfolio)
+        for network in networks.items():
+            await self.__validate_trust(network[1], portfolio)
 
         csv_data = io.StringIO()
         writer = csv.writer(csv_data)

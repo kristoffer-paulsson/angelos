@@ -7,8 +7,8 @@
 """Module docstring."""
 import logging
 
-from .ssh import SSHServer
-from .nacl import NaClKey
+from libangelos.ssh.ssh import SSHServer
+from libangelos.ssh.nacl import NaClKey
 
 
 class HostsServer(SSHServer):

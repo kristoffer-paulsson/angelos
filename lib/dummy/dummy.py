@@ -5,208 +5,132 @@
 #
 """Dummy data generation utilities."""
 import random
-import binascii
-import os
-
-from libangelos.const import Const
-from libangelos.facade.facade import Facade
-from libangelos.archive.helper import Glue
-from .support import Generate
-from libangelos.operation.setup import SetupChurchOperation
-from libangelos.policy.verify import StatementPolicy
-from libangelos.policy.domain import NetworkPolicy
-from libangelos.policy.message import MessagePolicy, EnvelopePolicy
-from libangelos.facade.facade import (
-    PersonClientFacade, MinistryClientFacade, ChurchClientFacade,
-    PersonServerFacade, MinistryServerFacade, ChurchServerFacade)
-from libangelos.operation.setup import SetupPersonOperation
 
 import libnacl
+from libangelos.const import Const
+from libangelos.document.document import DocType
+from libangelos.facade.facade import Facade
+from libangelos.operation.setup import SetupChurchOperation, SetupMinistryOperation
+from libangelos.operation.setup import SetupPersonOperation
+from libangelos.policy.domain import NetworkPolicy
+from libangelos.policy.message import MessagePolicy, EnvelopePolicy
+from libangelos.policy.portfolio import Portfolio, DOCUMENT_PATH
+from libangelos.policy.verify import StatementPolicy
+
+from .support import Generate, run_async
 
 
 class DummyPolicy:
     """Policy to generate dummy data according to scenarios."""
 
-    def __create_generic_facace(
-        self,
-        homedir: str,
-        entity_data: dict,
-        cls: type,
-    ) -> bytes:
-        """Generic entity facade generator."""
-        secret = libnacl.secret.SecretBox().sk
-        facade = Glue.run_async(cls.setup(
-            homedir, secret, Const.A_ROLE_PRIMARY, entity_data))
-        facade.archive(Const.CNL_VAULT).close()
-        with open(os.path.join(homedir, 'secret.key'), 'w') as key:
-            key.write(binascii.hexlify(secret).decode())
-        return secret
+    TYPES = (
+        (SetupPersonOperation, Generate.person_data),
+        (SetupMinistryOperation, Generate.ministry_data),
+        (SetupChurchOperation, Generate.church_data)
+    )
 
-    def create_person_facace(
-        self,
-        homedir: str,
-        server: bool = False
-    ) -> bytes:
+    @run_async
+    async def __setup(self, operation, generator, home, secret, server):
+        return await Facade.setup(
+            home,
+            secret,
+            Const.A_ROLE_PRIMARY,
+            server,
+            portfolio=operation.create(
+                generator()[0],
+                server=server)
+        )
+
+    def new_secret(self) -> bytes:
+        """Generate encryption key.
+
+        Returns (bytes):
+            Encryption key
+
+        """
+        return  libnacl.secret.SecretBox().sk
+
+    def create_person_facace(self, homedir: str, secret: bytes, server: bool = False) -> Facade:
         """Generate random person facade.
 
-        Parameters
-        ----------
-        homedir : str
-            The destination of the encrypted archives.
-        server : bool
-            Generate a server of client, dedaults to client.
+        Args:
+            homedir (str):
+                The destination of the encrypted archives.
+            secret (bytes):
+                 Encryption key.
+            server (bool):
+                Generate a server of client, defaults to client.
 
-        Returns
-        -------
-        bytes
-            NaCl symmetric encryption key used.
+        Returns (Facade):
+            The generated facade instance.
 
         """
-        entity_data = Generate.person_data()[0]
-        return self.__create_generic_facace(
-            homedir, entity_data,
-            PersonServerFacade if server else PersonClientFacade)
+        return self.__setup(
+            SetupPersonOperation, Generate.person_data, homedir, secret, server)
 
-    def create_ministry_facade(
-        self,
-        homedir: str,
-        server: bool = False
-    ) -> bytes:
+
+    def create_ministry_facade(self, homedir: str, secret: bytes, server: bool = False) -> Facade:
         """Generate random ministry facade.
 
-        Parameters
-        ----------
-        homedir : str
-            The destination of the encrypted archives.
-        server : bool
-            Generate a server of client, dedaults to client.
+        Args:
+            homedir (str):
+                The destination of the encrypted archives.
+            secret (bytes):
+                 Encryption key.
+            server (bool):
+                Generate a server of client, defaults to client.
 
-        Returns
-        -------
-        bytes
-            NaCl symmetric encryption key used.
+        Returns (Facade):
+            The generated facade instance.
 
         """
-        entity_data = Generate.ministry_data()[0]
-        return self.__create_generic_facace(
-            homedir, entity_data,
-            MinistryServerFacade if server else MinistryClientFacade)
+        return self.__setup(
+            SetupMinistryOperation, Generate.ministry_data, homedir, secret, server)
 
-    def create_church_facade(
-        self,
-        homedir: str,
-        server: bool = True
-    ) -> bytes:
+    def create_church_facade(self, homedir: str, secret: bytes, server: bool = True) -> bytes:
         """Generate random church facade.
 
-        Parameters
-        ----------
-        homedir : str
-            The destination of the encrypted archives.
-        server : bool
-            Generate a server of client, dedaults to server.
+        Args:
+            homedir (str):
+                The destination of the encrypted archives.
+            secret (bytes):
+                 Encryption key.
+            server (bool):
+                Generate a server of client, defaults to client.
 
-        Returns
-        -------
-        bytes
-            NaCl symmetric encryption key used.
+        Returns (Facade):
+            The generated facade instance.
 
         """
-        entity_data = Generate.church_data()[0]
-        return self.__create_generic_facace(
-            homedir, entity_data,
-            ChurchServerFacade if server else ChurchClientFacade)
+        return self.__setup(
+            SetupChurchOperation, Generate.church_data, homedir, secret, server)
 
-    def make_friends(self, facade, num):
-        """Generate X number of friends and import to vault."""
-        pass
+    @run_async
+    async def make_mail(self, facade: Facade, sender: Portfolio, inbox: bool=True, num: int=1):
+        """Generate X number of mails from sender within facade.
 
-    def make_churches(self, facade):
-        """Generate 5-10 church communitys and import to vault."""
-        churches = random_church_entity_data(random.randrange(5, 10))
+        Args:
+            facade (Facade):
+                Facade to send random dummy mails to .
+            sender (Portfolio):
+                Senders portfolio.
+            num (int):
+                Numbers of mail to generate.
 
-        sets = []
-        for church_data in churches:
-            cur_set = SetupChurchOperation.create_new(
-                church_data, "server", True
+        """
+        for _ in range(num):
+            envelope = EnvelopePolicy.wrap(
+                sender,
+                facade.data.portfolio,
+                MessagePolicy.mail(sender, facade.data.portfolio).message(
+                    Generate.filename(postfix="."),
+                    Generate.lipsum_sentence().decode(),
+                ).done(),
             )
-            net = NetworkPolicy(cur_set[0], cur_set[1], cur_set[2])
-            net.generate(cur_set[3], cur_set[4])
-            cur_set += net.network
-            sets.append(cur_set)
-
-        facade.import_entity()
-
-        return sets
-
-    async def make_community(self, facade: Facade):
-        """
-        Creates a community with entities that sends a mail to the given
-        facade.
-
-        Parameters
-        ----------
-        facade : Facade
-            The facade to be treated.
-
-        Returns
-        -------
-        None
-            Returns nothing.
-
-        """
-        person_datas = random_person_entity_data(201)
-        persons = []
-        for person_data in person_datas:
-            persons.append(SetupPersonOperation.create(person_data))
-
-        # Generate a church
-        church = SetupChurchOperation.create(
-            random_church_entity_data(1)[0], "server", True
-        )
-        NetworkPolicy.generate(church)
-
-        mail = set()
-        for person in persons:
-            StatementPolicy.verified(church, person)
-            StatementPolicy.trusted(church, person)
-            StatementPolicy.trusted(person, church)
-            mail.add(
-                EnvelopePolicy.wrap(
-                    person,
-                    facade.portfolio,
-                    MessagePolicy.mail(person, facade.portfolio)
-                    .message(
-                        generate_filename(postfix="."),
-                        generate_data().decode(),
-                    )
-                    .done(),
+            if inbox:
+                await facade.api.mailbox.import_envelope(envelope)
+            else:
+                filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+                    dir="/", file=envelope.id
                 )
-            )
-
-        for triad in range(67):
-            offset = triad * 3
-            triple = persons[offset:offset + 3]
-
-            StatementPolicy.trusted(triple[0], triple[1])
-            StatementPolicy.trusted(triple[0], triple[2])
-
-            StatementPolicy.trusted(triple[1], triple[0])
-            StatementPolicy.trusted(triple[1], triple[2])
-
-            StatementPolicy.trusted(triple[2], triple[0])
-            StatementPolicy.trusted(triple[2], triple[1])
-
-        # Connect between facade and church
-        StatementPolicy.verified(church, facade.portfolio)
-        StatementPolicy.trusted(church, facade.portfolio)
-        StatementPolicy.trusted(facade.portfolio, church)
-
-        ownjected = set()
-        for person in persons:
-            _, _, owner = await facade.import_portfolio(person)
-            ownjected |= owner
-        _, _, owner = await facade.import_portfolio(church)
-        ownjected |= owner
-        rejected = await facade.docs_to_portfolios(ownjected)  # noqa f841
-        inboxed = await facade.mail.mail_to_inbox(mail)  # noqa f841
+                await facade.api.mail.save(filename, envelope)

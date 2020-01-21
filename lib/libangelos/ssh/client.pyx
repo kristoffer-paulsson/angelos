@@ -9,14 +9,14 @@ import logging
 import uuid
 import asyncio
 
-from ..policy.portfolio import PGroup
-from ..policy.verify import StatementPolicy
-from ..replication.handler import (
+from libangelos.policy.portfolio import PGroup
+from libangelos.policy.verify import StatementPolicy
+from libangelos.replication.handler import (
     ReplicatorServerHandler, ReplicatorClientHandler)
-from ..replication.endpoint import ReplicatorServer, ReplicatorClient
-from ..replication.preset import Preset
-from .ssh import SSHServer, SSHClient
-from .nacl import NaClKey
+from libangelos.replication.endpoint import ReplicatorServer, ReplicatorClient
+from libangelos.replication.preset import Preset
+from libangelos.ssh.ssh import SSHServer, SSHClient
+from libangelos.ssh.nacl import NaClKey
 
 from asyncssh import (
     SSHServerSession,

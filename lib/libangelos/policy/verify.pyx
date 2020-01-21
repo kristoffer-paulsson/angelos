@@ -17,7 +17,18 @@ class StatementPolicy(Policy):
 
     @staticmethod
     def verified(issuer: PrivatePortfolio, owner: Portfolio) -> Verified:
-        """Issue a verified statement."""
+        """Issue a verified statement.
+
+        Args:
+            issuer (PrivatePortfolio):
+                The issuer portfolio
+            owner (Portfolio):
+                The subject portfolio
+
+        Returns (Verified):
+            The verified statement
+
+        """
 
         verified = Verified(
             nd={"issuer": issuer.entity.id, "owner": owner.entity.id}
@@ -33,7 +44,18 @@ class StatementPolicy(Policy):
 
     @staticmethod
     def trusted(issuer: PrivatePortfolio, owner: Portfolio) -> Trusted:
-        """Issue a trusted statement."""
+        """Issue a trusted statement.
+
+        Args:
+            issuer (PrivatePortfolio):
+                The issuer portfolio
+            owner (Portfolio):
+                The subject portfolio
+
+        Returns (Trusted):
+            The trusted statement
+
+        """
 
         trusted = Trusted(
             nd={"issuer": issuer.entity.id, "owner": owner.entity.id}
@@ -49,7 +71,18 @@ class StatementPolicy(Policy):
 
     @staticmethod
     def revoked(issuer: PrivatePortfolio, statement: StatementT) -> Revoked:
-        """Revoke earlier statement."""
+        """Revoke earlier statement.
+
+        Args:
+            issuer (PrivatePortfolio):
+                The issuer portfolio
+            statement (StatementT):
+                statement that is subject for revoke
+
+        Returns (Revoked):
+            The revoking statement
+
+        """
 
         if isinstance(statement, Revoked):
             return False

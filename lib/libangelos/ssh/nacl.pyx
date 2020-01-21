@@ -12,7 +12,7 @@ import asyncssh
 
 from asyncssh.public_key import register_public_key_alg
 
-from ..utils import Util
+from libangelos.utils import Util
 
 _algorithm = b"angelos-tongues"
 

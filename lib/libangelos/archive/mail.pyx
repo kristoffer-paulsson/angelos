@@ -31,21 +31,33 @@ class MailStorage(StorageFacadeExtension):
     INIT_HIERARCHY = (
         "/",)
 
-    async def save(self, filename, document):
-        """Save a document at a certian location."""
+    async def save(self, filename, document, document_file_id_match=True):
+        """Save a document at a certain location.
+
+        Args:
+            filename:
+            document:
+            document_file_id_match:
+
+        Returns:
+
+        """
         created, updated, owner = Glue.doc_save(document)
 
-        return self._proxy.call(
-            self._archive.mkfile,
+        if document_file_id_match:
+            file_id = document.id
+        else:
+            file_id = uuid.uuid4()
+
+        return await self.archive.mkfile(
             filename=filename,
             data=PortfolioPolicy.serialize(document),
-            id=document.id,
+            id=file_id,
             owner=owner,
             created=created,
             modified=updated,
-            compression=Entry.COMP_NONE,
+            compression=Entry.COMP_NONE
         )
-
     def delete(self, filename):
         """Remove a document at a certian location."""
         return self._proxy.call(self._archive.remove, filename=filename)

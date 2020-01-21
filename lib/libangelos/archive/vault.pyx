@@ -72,15 +72,19 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     INBOX = "/messages/inbox/"
 
     @classmethod
-    async def setup(
-            cls,
-            home_dir: str,
-            secret: bytes,
-            portfolio: PrivatePortfolio,
-            vtype=None,
-            vrole=None,
-    ) -> object:
-        """Create and setup the whole Vault according to policy's."""
+    async def setup(cls, home_dir: str, secret: bytes, portfolio: PrivatePortfolio, vtype=None, vrole=None) -> object:
+        """Create and setup the whole Vault according to policy's.
+
+        Args:
+            home_dir (str):
+            secret (bytes):
+            portfolio (PrivatePortfolio):
+            vtype:
+            vrole:
+
+        Returns:
+
+        """
         return await super(VaultStorage, cls).setup(
             None,
             home_dir,
@@ -93,7 +97,16 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         )
 
     async def save(self, filename, document, document_file_id_match=True):
-        """Save a document at a certain location."""
+        """Save a document at a certain location.
+
+        Args:
+            filename:
+            document:
+            document_file_id_match:
+
+        Returns:
+
+        """
         created, updated, owner = Glue.doc_save(document)
 
         if document_file_id_match:
@@ -112,7 +125,14 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         )
 
     async def delete(self, filename: str):
-        """Remove a document at a certain location."""
+        """Remove a document at a certain location.
+
+        Args:
+            filename:
+
+        Returns:
+
+        """
         return await self.archive.remove(filename)
 
     async def link(self, path: str, link_to: str) -> None:
@@ -128,7 +148,15 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         await self.archive.link(path, link_to)
 
     async def update(self, filename, document):
-        """Update a document on file."""
+        """Update a document on file.
+
+        Args:
+            filename:
+            document:
+
+        Returns:
+
+        """
         created, updated, owner = Glue.doc_save(document)
 
         return await self.archive.save(
@@ -187,6 +215,14 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """
         try:
             def query(q):
+                """
+
+                Args:
+                    q:
+
+                Returns:
+
+                """
                 q.type((b"f", b"l") if link else b"f").deleted(deleted)
                 if modified:
                     q.modified(modified)
@@ -276,16 +312,31 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         return datalist
 
     async def save_settings(self, name: str, text: io.StringIO) -> bool:
-        """Save or update a text settings file."""
+        """Save or update a text settings file.
+
+        Args:
+            name:
+            text:
+
+        Returns:
+
+        """
         filename = "/settings/" + name
-        data =  text.getvalue().encode()
+        data = text.getvalue().encode()
         if self.archive.isfile(filename):
             return await self.archive.save(filename, data)
         else:
             return await self.archive.mkfile(filename, data, owner=self.facade.data.portfolio.entity.id)
 
     async def load_settings(self, name: str) -> io.StringIO:
-        """Load a text settings file."""
+        """Load a text settings file.
+
+        Args:
+            name:
+
+        Returns:
+
+        """
         filename = "/settings/" + name
         if self.archive.isfile(filename):
             data = await self.archive.load(filename)

@@ -4,13 +4,16 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Random dummy data generators."""
-import os
+import asyncio
+import datetime
 import io
+import ipaddress
+import os
 import random
 import string
-import datetime
 import uuid
-import ipaddress
+
+from libangelos.policy.types import PersonData, MinistryData, ChurchData
 
 from .lipsum import (
     SURNAMES,
@@ -21,7 +24,15 @@ from .lipsum import (
     CHURCHES,
 )
 
-from libangelos.policy.types import PersonData, MinistryData, ChurchData
+
+def run_async(coro):
+    """Decorator for asynchronous test cases."""
+
+    def wrapper(*args, **kwargs):
+        """Execute the coroutine with asyncio.run()"""
+        return asyncio.run(coro(*args, **kwargs))
+
+    return wrapper
 
 
 def filesize(file):
@@ -110,16 +121,23 @@ class Generate:
         ).encode("utf-8")
 
     @staticmethod
+    def lipsum_sentence():
+        """Random sentence"""
+        return (
+            " ".join(random.choices(LIPSUM_WORDS, k=random.randrange(3, 10)))
+        ).encode("utf-8").capitalize()
+
+    @staticmethod
     def filename(postfix=".txt"):
         """Random file name generator."""
         return (
-            "".join(
-                random.choices(
-                    string.ascii_lowercase + string.digits,
-                    k=random.randrange(5, 10),
+                "".join(
+                    random.choices(
+                        string.ascii_lowercase + string.digits,
+                        k=random.randrange(5, 10),
+                    )
                 )
-            )
-            + postfix
+                + postfix
         )
 
     @staticmethod

@@ -11,8 +11,8 @@ import logging
 
 import asyncssh
 
-from ..utils import Util
-from ..ioc import ContainerAware
+from libangelos.utils import Util
+from libangelos.ioc import ContainerAware
 
 
 class SSHServer(ContainerAware, asyncssh.SSHServer):

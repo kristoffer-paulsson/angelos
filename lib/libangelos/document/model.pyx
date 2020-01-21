@@ -62,7 +62,11 @@ class Field(ABC):
             multiple: bool = False,
             init: Callable = None,
     ):
-        """Initialize basic field functionality."""
+        """Initialize basic field functionality.
+
+        Returns:
+            :
+        """
         self.value = value
         self.required = required
         self.multiple = multiple
