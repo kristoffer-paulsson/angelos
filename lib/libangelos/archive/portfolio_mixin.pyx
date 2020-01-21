@@ -75,6 +75,9 @@ class PortfolioMixin:
                 upddoc.add(ndoc)
 
         new = Portfolio()
+        # Setting entity manually is required in case it is the same document
+        # Old entity will be overridden if there is a newer
+        new.entity = old.entity
         new.from_sets(newdoc | upddoc, newdoc | upddoc)
         rejected = set()
 
