@@ -9,7 +9,7 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import base64
 import datetime
 import uuid
@@ -45,7 +45,7 @@ class DummyDocument(Document, IssueMixin):
     document = DocumentField(t=DummySubDocument)
 
 
-class TestEntities(unittest.TestCase):
+class TestEntities(testing.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -220,4 +220,4 @@ class TestEntities(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

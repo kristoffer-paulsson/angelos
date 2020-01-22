@@ -16,6 +16,7 @@ from typing import Set, Tuple, Any
 
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.facade.base import BaseFacade
+from libangelos.misc import Misc
 
 
 class SettingsAPI(ApiFacadeExtension):
@@ -69,7 +70,7 @@ class SettingsAPI(ApiFacadeExtension):
         """
         data = set()
         for row in csv.reader(await self.facade.storage.vault.load_settings(name)):
-            data.add(tuple(row))
+            data.add(tuple([Misc.from_ini(value) for value in row]))
         return data
 
     async def save_set(self, name: str, data: Set[Tuple[Any, ...]]) -> bool:
@@ -86,8 +87,7 @@ class SettingsAPI(ApiFacadeExtension):
         output = io.StringIO()
         writer  = csv.writer(output)
         for row in data:
-            writer.writerow(row)
-        output.close()
+            writer.writerow([Misc.to_ini(value) for value in row])
         return await self.facade.storage.vault.save_settings(name, output)
 
     async def networks(self) -> Set[Tuple[uuid.UUID, bool]]:
@@ -97,4 +97,4 @@ class SettingsAPI(ApiFacadeExtension):
         Returns:
             set of tuples width network UUID's
         """
-        return await self.load_set("network.csv")
+        return await self.load_set("networks.csv")

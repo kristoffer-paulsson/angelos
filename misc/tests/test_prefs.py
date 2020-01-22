@@ -11,7 +11,7 @@ sys.path.append('../lib')  # noqa
 import pyximport # noqa E402
 pyximport.install()  # noqa
 
-import unittest
+import testing
 import tempfile
 import logging
 import collections
@@ -60,7 +60,7 @@ class App(Stub):
         return Configuration()
 
 
-class TestPreferences(unittest.TestCase):
+class TestPreferences(testing.TestCase):
     """Testing the preferences class."""
 
     @classmethod
@@ -89,4 +89,4 @@ class TestPreferences(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

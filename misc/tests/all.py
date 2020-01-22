@@ -6,7 +6,7 @@ This file is distributed under the terms of the MIT license.
 
 
 """
-from unittest import TestLoader, TextTestRunner, TestSuite
+from testing import TestLoader, TextTestRunner, TestSuite
 
 from test_model import TestModel
 from test_conceal import TestConceal

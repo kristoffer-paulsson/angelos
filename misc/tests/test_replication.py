@@ -9,7 +9,7 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import tempfile
 import shutil
 import os
@@ -140,7 +140,7 @@ FILES = [
 ]
 
 
-class TestReplication(unittest.TestCase):
+class TestReplication(testing.TestCase):
     @classmethod
     def setUp(self):
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -222,4 +222,4 @@ class TestReplication(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

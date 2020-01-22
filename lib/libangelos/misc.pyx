@@ -254,3 +254,81 @@ class Misc:
 
         return "{scheme}://{netloc}{path}".format(
             scheme=parts["scheme"], netloc=netloc, path=parts["path"])
+
+    @staticmethod
+    async def sleep():
+        """Sleep one async tick."""
+        await asyncio.sleep(0)
+
+    @staticmethod
+    def to_ini(value: Any) -> str:
+        """Convert python value to INI string.
+
+        Args:
+            value (Any):
+                Value to stringify.
+        Returns(str):
+            INI string.
+
+        """
+        if type(value) in (bool, type(None)):
+            return str(value).lower()
+        else:
+            return str(value)
+
+    @staticmethod
+    def from_ini(value: str) -> Any:
+        """Convert INI string to python value.
+
+        Args:
+            value (str):
+                INI string to pythonize.
+        Returns (Any):
+            Python value.
+
+        """
+        if is_int(value):
+            return int(value)
+        elif is_float(value):
+            return float(value)
+        elif is_bool(value):
+            return to_bool(value)
+        elif is_none(value):
+            return None
+        else:
+            return value
+
+
+# ATTRIBUTION
+#
+# The following section is copied from the "localconfig" project:
+# https://github.com/maxzheng/localconfig.git
+# Copyright (c) 2014 maxzheng
+# Licensed under the MIT license
+
+def is_float(value):
+    """Checks if the value is a float """
+    return _is_type(value, float)
+
+def is_int(value):
+    """Checks if the value is an int """
+    return _is_type(value, int)
+
+def is_bool(value):
+    """Checks if the value is a bool """
+    return value.lower() in ['true', 'false', 'yes', 'no', 'on', 'off']
+
+def is_none(value):
+    """Checks if the value is a None """
+    return value.lower() == str(None).lower()
+
+def to_bool(value):
+    """Converts value to a bool """
+    return value.lower() in ['true', 'yes', 'on']
+
+def _is_type(value, t):
+    try:
+        t(value)
+        return True
+    except Exception:
+        return False

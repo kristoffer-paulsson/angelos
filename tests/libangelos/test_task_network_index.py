@@ -79,6 +79,9 @@ class TestNetworkIndexerTask(TestCase):
             docs.add(StatementPolicy.trusted(self.portfolios[2], self.portfolio))
             print(self.portfolios[2].entity.id)
 
+            # for portfolio in self.portfolios:
+            #    await self.facade.storage.vault.update_portfolio(portfolio)
+
             await self.facade.storage.vault.docs_to_portfolio(docs)
             await TaskWaitress().wait_for(self.facade.task.network_index)
 

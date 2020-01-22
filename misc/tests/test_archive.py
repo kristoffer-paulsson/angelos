@@ -9,7 +9,7 @@ Tests for Archive7."""
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import tempfile
 import os
 import random
@@ -33,7 +33,7 @@ Tests for query deleted
 """
 
 
-class TestArchive(unittest.TestCase):
+class TestArchive(testing.TestCase):
     """Testsuite for archive7."""
 
     files1 = None
@@ -237,4 +237,4 @@ class TestArchive(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

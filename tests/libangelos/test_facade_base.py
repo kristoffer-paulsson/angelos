@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from libangelos.facade.base import BaseFacade
 
-from .common import run_async
+from dummy.support import run_async
 
 
 class TestBaseFacade(TestCase):

@@ -47,7 +47,7 @@ class ImportPolicy(Policy):
             if datetime.date.today() > entity.expires:
                 valid = False
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         valid = False if not Crypto.verify(keys, self.__portfolio) else valid
@@ -91,7 +91,7 @@ class ImportPolicy(Policy):
                 else valid
             )
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         if valid:
@@ -126,7 +126,7 @@ class ImportPolicy(Policy):
                 False if not Crypto.verify(node, self.__portfolio) else valid
             )
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         if valid:
@@ -157,7 +157,7 @@ class ImportPolicy(Policy):
                 else valid
             )
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         if valid:
@@ -183,7 +183,7 @@ class ImportPolicy(Policy):
                 else valid
             )
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         if valid:
@@ -205,7 +205,7 @@ class ImportPolicy(Policy):
             valid = False if not message.validate() else valid
             valid = False if not Crypto.verify(message, sender) else valid
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         if valid:
@@ -242,7 +242,7 @@ class ImportUpdatePolicy(Policy):
             valid = False if not Crypto.verify(newkeys, portfolio) else valid
 
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         return valid
@@ -262,7 +262,7 @@ class ImportUpdatePolicy(Policy):
             if new_exp[item] != old_exp[item]:
                 diff.append(item)
 
-        if len(set(diff) - set(fields + ["signature", "updated"])):
+        if len(set(diff) - set(fields + ("signature", "updated"))):
             valid = False
 
         return valid
@@ -279,7 +279,7 @@ class ImportUpdatePolicy(Policy):
         try:
             valid = self.__dict_cmp(entity, fields)
         except Exception as e:
-            logging.info("%s" % str(e))
+            logging.error(e, exc_info=True)
             valid = False
 
         return valid

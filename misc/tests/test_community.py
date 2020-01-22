@@ -10,7 +10,7 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import argparse
 import logging
 import tempfile
@@ -29,7 +29,7 @@ from angelos.archive.helper import Glue
 from angelos.operation.setup import SetupPersonOperation, SetupChurchOperation
 
 
-class TestCommunity(unittest.TestCase):
+class TestCommunity(testing.TestCase):
     """Testcase to generate a fake community."""
 
     @classmethod
@@ -114,4 +114,4 @@ if __name__ == '__main__':
     if args.debug:
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

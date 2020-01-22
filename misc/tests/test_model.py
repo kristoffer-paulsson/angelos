@@ -9,7 +9,7 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import uuid
 import ipaddress
 import datetime
@@ -74,7 +74,7 @@ class DummyDocumentField(BaseDocument):
     field = DocumentField(required=False, t=DummySubDocument)
 
 
-class TestModel(unittest.TestCase):
+class TestModel(testing.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -336,4 +336,4 @@ class TestModel(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

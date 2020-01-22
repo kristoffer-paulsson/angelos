@@ -11,8 +11,7 @@ from libangelos.operation.setup import SetupPersonOperation
 from libangelos.policy.message import EnvelopePolicy, MessagePolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import Generate
-from .common import run_async
+from dummy.support import Generate, run_async
 
 
 class TestMailboxAPI(TestCase):

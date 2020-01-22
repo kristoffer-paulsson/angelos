@@ -1,39 +1,51 @@
+# cython: language_level=3
+#
+# Copyright (c) 2020 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
+"""Testcase base classes for simplified unit testing."""
+import logging
 import os
+import sys
 import tracemalloc
 from tempfile import TemporaryDirectory
-from unittest import TestCase
 
 from libangelos.const import Const
 from libangelos.facade.facade import Facade
 from libangelos.operation.setup import SetupPersonOperation
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import Generate, run_async
+from dummy.support import run_async, Generate
+from unittest import TestCase
 
 
-class TestPortfolioMixin(TestCase):
-    count = 5
+class BaseTestFacade(TestCase):
+    """Base test for facade based unit testing."""
+
+    secret = b""
+    server = False
+    count = 0
+    portfolios = list()
+    portfolio = None
 
     @classmethod
     def setUpClass(cls) -> None:
         """Setup test class with a facade and ten contacts."""
         tracemalloc.start()
-        # logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
         cls.secret = os.urandom(32)
-        cls.server = False
-        cls.portfolios = list()
-        cls.portfolio = None
 
         @run_async
-        async def portfolios():
+        async def setup():
             """Generate a facade and inject random contacts."""
             cls.portfolio = SetupPersonOperation.create(Generate.person_data()[0], server=cls.server)
 
-            for person in Generate.person_data(cls.count):
-                cls.portfolios.append(SetupPersonOperation.create(person, server=cls.server))
+            for entity in range(cls.count):
+                cls.portfolios.append(SetupPersonOperation.create(Generate.person_data()[0], server=False))
 
-        portfolios()
+        setup()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -57,36 +69,3 @@ class TestPortfolioMixin(TestCase):
         if not self.facade.closed:
             self.facade.close()
         self.dir.cleanup()
-
-    def test_update_portfolio(self):
-        self.fail()
-
-    def test_add_portfolio(self):
-        self.fail()
-
-    def test_docs_to_portfolio(self):
-        self.fail()
-
-    def test_list_portfolios(self):
-        self.fail()
-
-    def test_import_portfolio(self):
-        self.fail()
-
-    def test_load_portfolio(self):
-        self.fail()
-
-    def test_reload_portfolio(self):
-        self.fail()
-
-    def test_save_portfolio(self):
-        self.fail()
-
-    @run_async
-    async def test_delete_portfolio(self):
-        try:
-            eids = await self.facade.storage.vault.list_portfolios()
-            eids -= set([self.portfolio.entity.id])
-            await self.facade.storage.vault.delete_portfolio(eids.pop())
-        except Exception as e:
-            self.fail(e)

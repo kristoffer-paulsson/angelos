@@ -12,7 +12,7 @@ sys.path.append('../angelos')  # noqa
 import asyncio
 import argparse
 import logging
-import unittest
+import testing
 
 import asyncssh
 
@@ -21,7 +21,7 @@ from angelos.policy.entity import PersonGeneratePolicy, ChurchGeneratePolicy
 from support import random_person_entity_data, random_church_entity_data
 
 
-class TestPortal(unittest.TestCase):
+class TestPortal(testing.TestCase):
     def setUp(self):
         self.c_ent = PersonGeneratePolicy()
         self.c_ent.generate(**random_person_entity_data(1)[0])
@@ -55,4 +55,4 @@ if __name__ == '__main__':
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
     asyncssh.logging.set_debug_level(3)
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

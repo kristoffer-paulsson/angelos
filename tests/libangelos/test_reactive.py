@@ -1,19 +1,10 @@
 import tracemalloc
+
+from dummy.stub import StubObserver, StubNotifier
 from unittest import TestCase
 
-from .common import run_async
-from libangelos.reactive import NotifierMixin, ObserverMixin, Event
-
-
-class Notifier(NotifierMixin):
-    pass
-
-
-class Observer(ObserverMixin):
-    event = None
-
-    async def notify(self, event: Event):
-        self.event = event
+from dummy.support import run_async
+from libangelos.reactive import Event
 
 
 class TestEvent(TestCase):
@@ -22,8 +13,8 @@ class TestEvent(TestCase):
         tracemalloc.start()
 
     def setUp(self) -> None:
-        self.observer = Observer()
-        self.notifier = Notifier()
+        self.observer = StubObserver()
+        self.notifier = StubNotifier()
         self.notifier.subscribe(self.observer)
 
     def tearDown(self) -> None:
@@ -61,8 +52,8 @@ class TestNotifierMixin(TestCase):
         tracemalloc.start()
 
     def setUp(self) -> None:
-        self.observer = Observer()
-        self.notifier = Notifier()
+        self.observer = StubObserver()
+        self.notifier = StubNotifier()
 
     def tearDown(self) -> None:
         del self.observer
@@ -97,8 +88,8 @@ class TestObserverMixin(TestCase):
         tracemalloc.start()
 
     def setUp(self) -> None:
-        self.observer = Observer()
-        self.notifier = Notifier()
+        self.observer = StubObserver()
+        self.notifier = StubNotifier()
         self.notifier.subscribe(self.observer)
 
     def tearDown(self) -> None:

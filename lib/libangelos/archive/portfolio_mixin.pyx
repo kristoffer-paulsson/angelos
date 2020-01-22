@@ -88,7 +88,7 @@ class PortfolioMixin:
             for key in new.keys:
                 reject = set()
                 if not upd_policy.keys(key):
-                    rejected.add(key)
+                    reject.add(key)
             new.keys -= reject
             old.keys += new.keys  # Adding new keys to old portfolio,
             # this way the old portfolio can verify documents signed with
@@ -117,7 +117,7 @@ class PortfolioMixin:
 
         if new.issuer.verified:
             for verified in new.issuer.verified:
-                rejected = set()
+                reject = set()
                 if not imp_policy.issued_document(verified):
                     reject.add(verified)
             new.issuer.verified -= reject
@@ -126,14 +126,14 @@ class PortfolioMixin:
             for trusted in new.issuer.trusted:
                 reject = set()
                 if not imp_policy.issued_document(trusted):
-                    rejected.add(trusted)
+                    reject.add(trusted)
             new.issuer.trusted -= reject
             rejected |= reject
         if new.issuer.revoked:
             for revoked in new.issuer.revoked:
                 reject = set()
                 if not imp_policy.issued_document(revoked):
-                    rejected.add(revoked)
+                    reject.add(revoked)
             new.issuer.revoked -= reject
             rejected |= reject
 
@@ -539,7 +539,7 @@ class PortfolioMixin:
                         data=PortfolioPolicy.serialize(doc),
                         id=doc.id,
                         created=created,
-                        updated=updated,
+                        modified=updated,
                         owner=owner,
                         compression=Entry.COMP_NONE,
                     )

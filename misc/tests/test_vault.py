@@ -9,7 +9,7 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import argparse
 import tempfile
 import logging
@@ -24,7 +24,7 @@ from angelos.archive.vault import Vault
 import libnacl
 
 
-class TestVault(unittest.TestCase):
+class TestVault(testing.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.home = self.dir.name
@@ -67,4 +67,4 @@ if __name__ == '__main__':
     if args.debug:
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])

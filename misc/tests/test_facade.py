@@ -9,13 +9,13 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import tempfile
 
 from dummy.dummy import DummyPolicy
 
 
-class TestFacade(unittest.TestCase):
+class TestFacade(testing.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.TemporaryDirectory()
         self.home = self.dir.name

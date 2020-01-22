@@ -13,6 +13,7 @@ import random
 import string
 import uuid
 
+from libangelos.misc import Loop
 from libangelos.policy.types import PersonData, MinistryData, ChurchData
 
 from .lipsum import (

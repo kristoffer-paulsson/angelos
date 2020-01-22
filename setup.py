@@ -86,14 +86,3 @@ setup(
         build_dir="build", compiler_directives={
             'language_level': 3, 'embedsignature': True})
 )
-
-# cython
-# pyinstaller
-# kivy
-# kivymd
-# libnacl
-# plyer
-# asyncssh
-# keyring
-# msgpack
-# pyyaml

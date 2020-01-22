@@ -8,6 +8,8 @@
 import asyncio
 from typing import Set, Any
 
+from libangelos.misc import Loop
+
 
 class Event:
     """Event used to notify the observer.

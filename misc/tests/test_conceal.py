@@ -9,7 +9,7 @@ This file is distributed under the terms of the MIT license.
 import sys
 sys.path.append('../angelos')  # noqa
 
-import unittest
+import testing
 import tempfile
 import os
 import random
@@ -22,7 +22,7 @@ from support import filesize
 from angelos.archive.conceal import ConcealIO
 
 
-class TestConceal(unittest.TestCase):
+class TestConceal(testing.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -96,4 +96,4 @@ class TestConceal(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'])
+    testing.main(argv=['first-arg-is-ignored'])
