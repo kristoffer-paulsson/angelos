@@ -10,13 +10,15 @@ import asyncio
 import atexit
 import concurrent
 import functools
+import ipaddress
 import logging
 import re
+import socket
 import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass, asdict as data_asdict
 from threading import Thread
-from typing import Callable, Awaitable, Any
+from typing import Callable, Awaitable, Any, Union, List
 from urllib.parse import urlparse
 
 import plyer
@@ -259,6 +261,38 @@ class Misc:
     async def sleep():
         """Sleep one async tick."""
         await asyncio.sleep(0)
+
+    @staticmethod
+    def ip() -> List[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]:
+        """Get external, internal and loopback ip address."""
+        address = set()
+        try:
+            for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
+                if not ip.startswith("127."):
+                    try:
+                        address.add(ipaddress.ip_address(ip))
+                    except ValueError:
+                        continue
+                    else:
+                        break
+        except socket.gaierror:
+            pass
+
+        for sock in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]:
+            try:
+                sock.connect(("1.1.1.1", 1))
+                address.add(ipaddress.ip_address(sock.getsockname()[0]))
+                sock.close()
+            except ValueError:
+                continue
+            else:
+                break
+
+        address.add(ipaddress.ip_address("127.0.0.1"))
+
+        address = list(address)
+        # address.reverse()
+        return address
 
     @staticmethod
     def to_ini(value: Any) -> str:

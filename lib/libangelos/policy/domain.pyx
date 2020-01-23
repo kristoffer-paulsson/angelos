@@ -14,7 +14,7 @@ from libangelos.document.domain import Domain, Node, Location, Network, Host
 from libangelos.misc import Misc
 from libangelos.policy.crypto import Crypto
 from libangelos.policy.policy import Policy
-from libangelos.policy.types import PrivatePortfolioABC
+from libangelos.policy.types import PrivatePortfolioABC, Union
 
 
 class NodePolicy(Policy):
@@ -27,6 +27,7 @@ class NodePolicy(Policy):
         portfolio: PrivatePortfolioABC,
         role: int = Const.A_ROLE_PRIMARY,
         server: bool = False,
+        ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ):
         """Generate node document from the current node."""
 
@@ -49,7 +50,7 @@ class NodePolicy(Policy):
             location = Location(
                 nd={
                     "hostname": [net.domain],
-                    "ip": [ipaddress.ip_address(net.ip) if net.ip else None],
+                    "ip": [ip if ip else ipaddress.ip_address(net.ip) if net.ip else None],
                 }
             )
 

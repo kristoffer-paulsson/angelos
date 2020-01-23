@@ -5,6 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
+import ipaddress
+from typing import Union
+
 from libangelos.const import Const
 from libangelos.operation.operation import Operation
 from libangelos.policy.types import PersonData, MinistryData, ChurchData
@@ -19,7 +22,10 @@ class BaseSetupOperation(Operation):
 
     @staticmethod
     def _generate(
-        portfolio: PrivatePortfolio, role: int=Const.A_ROLE_PRIMARY, server: bool = False
+        portfolio: PrivatePortfolio,
+        role: int=Const.A_ROLE_PRIMARY,
+        server: bool = False,
+        ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ) -> bool:
         """
         Issue a new set of documents from entity data.
@@ -31,7 +37,7 @@ class BaseSetupOperation(Operation):
         if not DomainPolicy.generate(portfolio):
             raise RuntimeError("Domain document not generated")
 
-        if not NodePolicy.current(portfolio, role, server):
+        if not NodePolicy.current(portfolio, role, server, ip):
             raise RuntimeError("Node document not generated")
 
         if server:
@@ -119,10 +125,14 @@ class SetupPersonOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-        cls, data: PersonData, role: int=Const.A_ROLE_PRIMARY, server: bool = False
+        cls,
+            data: PersonData,
+            role: int=Const.A_ROLE_PRIMARY,
+            server: bool = False,
+            ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ) -> PrivatePortfolio:
         portfolio = PersonPolicy.generate(data)
-        BaseSetupOperation._generate(portfolio, role, server)
+        BaseSetupOperation._generate(portfolio, role, server, ip)
         return portfolio
 
 
@@ -131,10 +141,14 @@ class SetupMinistryOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-        cls, data: MinistryData, role: int=Const.A_ROLE_PRIMARY, server: bool = False
+        cls,
+        data: MinistryData,
+        role: int=Const.A_ROLE_PRIMARY,
+        server: bool = False,
+        ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ) -> PrivatePortfolio:
         portfolio = MinistryPolicy.generate(data)
-        BaseSetupOperation._generate(portfolio, role, server)
+        BaseSetupOperation._generate(portfolio, role, server, ip)
         return portfolio
 
 
@@ -143,8 +157,12 @@ class SetupChurchOperation(BaseSetupOperation):
 
     @classmethod
     def create(
-        cls, data: ChurchData, role: int=Const.A_ROLE_PRIMARY, server: bool = False
+        cls,
+        data: ChurchData,
+        role: int=Const.A_ROLE_PRIMARY,
+        server: bool = False,
+        ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ) -> PrivatePortfolio:
         portfolio = ChurchPolicy.generate(data)
-        BaseSetupOperation._generate(portfolio, role, server)
+        BaseSetupOperation._generate(portfolio, role, server, ip)
         return portfolio

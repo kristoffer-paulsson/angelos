@@ -56,9 +56,9 @@ class ReplicationAPI(ApiFacadeExtension):
 
         preset.files[name] = (entry.id, entry.deleted, entry.modified)
         """
-        archive = self._facade.archive(preset.archive)
+        storage = getattr(self._facade.storage, preset.archive)
         preset._files = await Globber.syncro(
-            archive.archive,
+            storage.archive,
             preset.path,
             preset.owner if preset.owner.int else None,
             preset.modified,
@@ -68,11 +68,11 @@ class ReplicationAPI(ApiFacadeExtension):
     async def save_file(
             self, preset: Preset, file_info: FileSyncInfo, action: str) -> bool:
         """Create or update file in archive."""
-        archive = self._facade.archive(preset.archive)
+        storage = getattr(self._facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
 
         if action in (Actions.CLI_CREATE, Actions.SER_CREATE):
-            return archive.archive.mkfile(
+            return storage.archive.mkfile(
                 full_path,
                 file_info.data,
                 created=file_info.created,
@@ -84,10 +84,10 @@ class ReplicationAPI(ApiFacadeExtension):
                 perms=file_info.perms,
             )
         elif action in (Actions.CLI_UPDATE, Actions.SER_UPDATE):
-            archive.archive.save(
+            storage.archive.save(
                 full_path, file_info.data, modified=file_info.modified
             )
-            archive.archive.chmod(
+            storage.archive.chmod(
                 full_path,
                 id=file_info.fileid,
                 owner=file_info.owner,
@@ -102,10 +102,10 @@ class ReplicationAPI(ApiFacadeExtension):
 
     async def load_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Load file and meta from archive."""
-        archive = self._facade.archive(preset.archive)
+        storage = getattr(self._facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
 
-        entry = archive.archive.info(full_path)
+        entry = storage.archive.info(full_path)
 
         file_info.pieces = int(math.ceil(entry.length / CHUNK_SIZE))
         file_info.size = entry.length
@@ -120,11 +120,11 @@ class ReplicationAPI(ApiFacadeExtension):
         file_info.group = entry.group if entry.group else file_info.group
         file_info.perms = entry.perms if entry.perms else file_info.perms
 
-        file_info.data = archive.archive.load(full_path)
+        file_info.data = storage.archive.load(full_path)
         return True
 
     async def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Remove file from archive"""
-        archive = self._facade.archive(preset.archive)
+        storage = getattr(self._facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
-        return archive.archive.remove(full_path)
+        return storage.archive.remove(full_path)

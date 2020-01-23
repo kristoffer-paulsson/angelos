@@ -14,6 +14,8 @@ import signal
 import time
 
 import libnacl
+from libangelos.misc import Misc
+
 from angelos.cmd import Command, Option
 from libangelos.automatic import BaseAuto
 from libangelos.const import Const
@@ -188,6 +190,8 @@ documents and connect to the nodes on the current domain network.
                 elif r == 1:
                     role = Const.A_ROLE_BACKUP
 
+                ip = await self.do_ip()
+
                 # Generate master key
                 secret = libnacl.secret.SecretBox().sk
                 self._io << (
@@ -207,13 +211,13 @@ documents and connect to the nodes on the current domain network.
 
                 os.makedirs(self._root, exist_ok=True)
                 if subdo == 0:
-                    portfolio = SetupPersonOperation.create(entity_data, server=True)
+                    portfolio = SetupPersonOperation.create(entity_data, server=True, ip=ip)
                     facade = await Facade.setup(self._root, secret, role, True, portfolio=portfolio)
                 elif subdo == 1:
-                    portfolio = SetupMinistryOperation.create(entity_data, server=True)
+                    portfolio = SetupMinistryOperation.create(entity_data, server=True, ip=ip)
                     facade = await Facade.setup(self._root, secret, role, True, portfolio=portfolio)
                 elif subdo == 2:
-                    portfolio = SetupChurchOperation.create(entity_data, server=True)
+                    portfolio = SetupChurchOperation.create(entity_data, server=True, ip=ip)
                     facade = await Facade.setup(self._root, secret, role, True, portfolio=portfolio)
 
                 self._ioc.facade = facade
@@ -473,6 +477,27 @@ documents and connect to the nodes on the current domain network.
                 valid = False
 
         return data
+
+    async def do_ip(self):
+        """Choose a public IP-address"""
+        ips = Misc.ip()
+
+        while True:
+            do = await self._io.menu(
+                "Chose public IP-address",
+                [" {i:16}".format(i=str(ip)) for ip in ips]
+            )
+
+            if do < len(ips):
+                confirmation = await self._io.confirm("Use %s as public IP-address." % ips[do])
+                if confirmation is True:
+                    break
+                else:
+                    continue
+            else:
+                self._io << ("Choice out of range.\n")
+
+        return ips[do]
 
     async def do_import(self):
         """Import entity from seed vault."""

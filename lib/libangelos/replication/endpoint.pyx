@@ -9,7 +9,7 @@ Replication endpoints. The endpoints binds the handlers and the business logic
 of the clients and servers.
 """
 
-from ..ioc import ContainerAware
+from libangelos.ioc import ContainerAware
 
 
 class ReplicatorClient(ContainerAware):

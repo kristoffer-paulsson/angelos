@@ -5,7 +5,6 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Automatic values about the digital environment."""
-import logging
 import os
 import platform
 import socket
@@ -75,14 +74,7 @@ class Net(BaseAuto):
     def __init__(self):
         name = socket.gethostname()
         self.hostname = name.lower()
-        try:
-            self.ip = \
-            (([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")] or [
-                [(s.connect(("1.1.1.1", 1)), s.getsockname()[0], s.close()) for s in
-                 [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) + ["127.0.0.1"])[0]
-        except socket.gaierror as e:
-            logging.warning("Unknown server name")
-            self.ip = None
+        self.ip = Misc.ip()[0]
         self.domain = socket.getfqdn()
 
 

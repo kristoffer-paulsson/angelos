@@ -13,7 +13,8 @@ import pathlib
 import uuid
 
 from libangelos.api.mailbox import MailboxAPI
-from libangelos.const import Const
+from libangelos.archive.mail import MailStorage
+from libangelos.archive.vault import VaultStorage
 from libangelos.ioc import Container
 from libangelos.policy.portfolio import Portfolio
 
@@ -222,19 +223,19 @@ class CustomPreset(Preset):
 class MailClientPreset(Preset):
     def __init__(self, modified: datetime.datetime = None):
         Preset.__init__(
-            self, Const.CNL_VAULT, Preset.T_MAIL, modified, MailboxAPI.OUTBOX
+            self, VaultStorage.ATTRIBUTE[0], Preset.T_MAIL, modified, MailboxAPI.PATH_OUTBOX[0]
         )
 
     def to_absolute(self, path: str) -> str:
         """Convert relative path to absolute."""
-        return str(pathlib.PurePath(MailboxAPI.INBOX).joinpath(path))
+        return str(pathlib.PurePath(MailboxAPI.PATH_INBOX[0]).joinpath(path))
 
     def on_after_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Remove sent and uploaded envelopes."""
         if not crash:
-            ioc.facade.replication.del_file(self, clientfile)
+            ioc.facade.api.replication.del_file(self, clientfile)
 
 
 class MailServerPreset(Preset):
@@ -242,7 +243,7 @@ class MailServerPreset(Preset):
         self, modified: datetime.datetime = None, owner: uuid.UUID = None
     ):
         Preset.__init__(
-            self, Const.CNL_MAIL, Preset.T_MAIL, modified, "/", owner=owner
+            self, MailStorage.ATTRIBUTE[0], Preset.T_MAIL, modified, "/", owner=owner
         )
 
     def on_after_download(
@@ -250,4 +251,4 @@ class MailServerPreset(Preset):
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Remove received and downloaded envelopes."""
         if not crash:
-            ioc.facade.replication.del_file(self, serverfile)
+            ioc.facade.replication.api.del_file(self, serverfile)

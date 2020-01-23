@@ -28,9 +28,9 @@ from asyncssh.packet import (
     String,
     Boolean,
 )
-from ..misc import ThresholdCounter
-from ..error import AngelosException
-from .preset import Preset, FileSyncInfo
+from libangelos.misc import ThresholdCounter
+from libangelos.error import AngelosException
+from libangelos.replication.preset import Preset, FileSyncInfo
 
 
 VERSION = 1
@@ -108,7 +108,7 @@ class ReplicatorHandler(SSHPacketHandler):
 
     async def _process_packet(self, pkttype, pktid, packet):
         """Abstract method for processing Replicator packets."""
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def send_packet(self, pkttype, pktid, *args):
         """Send a Replicator packet."""
