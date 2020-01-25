@@ -22,6 +22,7 @@ from typing import Callable, Awaitable, Any, Union, List
 from urllib.parse import urlparse
 
 import plyer
+from libangelos.document.domain import Node, Network
 
 
 class Loop:
@@ -190,7 +191,7 @@ class Misc:
     def unique() -> str:
         """Get the hardware ID.
 
-        Tries to find the uniqueid of the hardware, otherwise returns MAC
+        Tries to find the unique id of the hardware, otherwise returns MAC
         address.
 
         Returns
@@ -293,6 +294,14 @@ class Misc:
         address = list(address)
         # address.reverse()
         return address
+
+    @staticmethod
+    def iploc(doc: Union[Node, Network]) -> Union[ipaddress.IPv4Address, ipaddress.IPv6Address]:
+        """IP address for a location from a Node or Network document."""
+        if isinstance(doc, Network):
+            return [ip for host in doc.hosts for ip in host if ip]
+        else:
+            return [ip for ip in (doc.location.ip if doc.location else []) if ip]
 
     @staticmethod
     def to_ini(value: Any) -> str:

@@ -116,18 +116,16 @@ class ReplicatorHandler(SSHPacketHandler):
 
         try:
             self._writer.write(UInt32(len(payload)) + payload)
-        except ConnectionError:
-            logging.exception("Connection lost")
-            raise
-            # raise Error(reason='Connection lost', code=1) from None
+        except ConnectionError as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Connection lost")
+            raise Error(reason='Connection lost', code=1) from None
 
         self.log_sent_packet(pkttype, pktid, payload)
 
     async def recv_packet(self):
         """Receive a Replicator packet."""
-        pktlen = await self._reader.readexactly(4)
-        pktlen = int.from_bytes(pktlen, "big")
-
+        pktlen = int.from_bytes(await self._reader.readexactly(4), "big")
         packet = await self._reader.readexactly(pktlen)
         return SSHPacket(packet)
 
@@ -143,12 +141,15 @@ class ReplicatorHandler(SSHPacketHandler):
                 self.log_received_packet(pkttype, pktid, packet)
 
                 await self._process_packet(pkttype, pktid, packet)
-        except PacketDecodeError as exc:
-            await self._cleanup(Error("Bad packet.", str(exc)))
-        except EOFError:
+        except PacketDecodeError as e:
+            logging.error(e, exc_info=True)
+            await self._cleanup(Error("Bad packet.", str(e)))
+        except EOFError as e:
+            logging.error(e, exc_info=True)
             await self._cleanup(None)
-        except (OSError, Error) as exc:
-            await self._cleanup(exc)
+        except (OSError, Error) as e:
+            logging.error(e, exc_info=True)
+            await self._cleanup(e)
 
     async def handle_packet(self, handlers: dict) -> (Any, int):
         packet = await self.recv_packet()
@@ -215,14 +216,15 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
                 # Start syncro loop
                 # Make client index/load file-list
-                self.client.ioc.facade.replication.load_files_list(
+                await self.client.ioc.facade.api.replication.load_files_list(
                     self.client.preset
                 )
                 await self.pull()
                 await self.push()
 
-            except (asyncio.IncompleteReadError, PacketDecodeError, Error):
-                logging.exception("Network error")
+            except (asyncio.IncompleteReadError, PacketDecodeError, Error) as e:
+                logging.error(e, exc_info=True)
+                # logging.exception("Network error")
                 raise
 
             # await self.send_packet(Packets.RPL_DONE, None)
@@ -231,9 +233,10 @@ class ReplicatorClientHandler(ReplicatorHandler):
             self.client.preset.on_close(self.client.ioc)
 
             self.exit()
-        except Exception:
+        except Exception as e:
+            logging.error(e, exc_info=True)
             self.exit()
-            logging.exception("Client replication failure")
+            # logging.exception("Client replication failure")
             raise
 
     async def pull(self):
@@ -330,6 +333,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
                 crash = False
             except Exception as e:
+                logging.error(e, exc_info=True)
                 if not self._aborted:
                     self.send_packet(Packets.RPL_ABORT, None)
                     logging.info("RPL_ABORT sent")
@@ -440,6 +444,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
                 crash = False
             except Exception as e:
+                logging.error(e, exc_info=True)
                 if not self._aborted:
                     self.send_packet(Packets.RPL_ABORT, None)
                     logging.info("RPL_ABORT sent")
@@ -511,7 +516,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             ):
                 raise Error(reason='File digest mismatch', code=1)
 
-            self.client.ioc.facade.replication.save_file(
+            self.client.ioc.facade.api.replication.save_file(
                 self.client.preset, self._serverfile, self._action
             )
 
@@ -520,8 +525,9 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
             self.client.preset.on_after_download(
                 self._serverfile, self._clientfile, self.client.ioc)
-        except Exception:
-            logging.exception("Download error")
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Download error")
             self.client.preset.on_after_download(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
@@ -531,7 +537,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             # Load file from archive7
             self.client.preset.on_before_upload(
                 self._serverfile, self._clientfile, self.client.ioc)
-            self.client.ioc.facade.replication.load_file(
+            self.client.ioc.facade.api.replication.load_file(
                 self.client.preset, self._clientfile
             )
             c_rel_path = self.client.preset.to_relative(self._clientfile.path)
@@ -593,8 +599,9 @@ class ReplicatorClientHandler(ReplicatorHandler):
             logging.info("RPL_DONE sent")
             self.client.preset.on_after_upload(
                 self._serverfile, self._clientfile, self.client.ioc)
-        except Exception:
-            logging.exception("Upload error")
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Upload error")
             self.client.preset.on_after_upload(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
@@ -604,13 +611,14 @@ class ReplicatorClientHandler(ReplicatorHandler):
             self.client.preset.on_before_delete(
                 self._serverfile, self._clientfile, self.client.ioc)
             # Delete file from Archive7
-            self.client.ioc.facade.replication.del_file(
+            self.client.ioc.facade.api.replication.del_file(
                 self.client.preset, self._clientfile
             )
             self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self.client.ioc)
-        except Exception:
-            logging.exception("Delete error")
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Delete error")
             self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
@@ -793,7 +801,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 raise Error(reason="Incompatible protocol version", code=1)
 
             # Loop for receiving pull/push
-            self._server.ioc.facade.replication.load_files_list(self._preset)
+            await self._server.ioc.facade.api.replication.load_files_list(self._preset)
 
             while True:
                 _, pkttype = await self.handle_packet({
@@ -805,8 +813,9 @@ class ReplicatorServerHandler(ReplicatorHandler):
                     break
             self._preset.on_close(self._server.ioc, self._server.portfolio)
 
-        except (asyncio.IncompleteReadError, PacketDecodeError, Error):
-            logging.exception("Network error")
+        except (asyncio.IncompleteReadError, PacketDecodeError, Error) as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Network error")
             raise
 
     async def _process_init(self, packet):
@@ -826,7 +835,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             archive = packet.get_string().decode()
             path = packet.get_string().decode()
             owner = uuid.UUID(bytes=packet.get_string())
-            self._preset = self._server.ioc.facade.replication.create_preset(
+            self._preset = self._server.ioc.facade.api.replication.create_preset(
                 preset_type,
                 Preset.SERVER,
                 self._server.portfolio.entity.id,
@@ -836,7 +845,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 owner=owner,
             )
         else:
-            self._preset = self._server.ioc.facade.replication.create_preset(
+            self._preset = self._server.ioc.facade.api.replication.create_preset(
                 preset_type,
                 Preset.SERVER,
                 self._server.portfolio.entity.id,
@@ -1014,7 +1023,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             s_fileinfo = self._preset.pull_file_meta()
 
             if s_fileinfo.fileid.int:
-                self._server.ioc.facade.replication.load_file(
+                self._server.ioc.facade.api.replication.load_file(
                     self._preset, s_fileinfo)
 
                 if s_fileinfo.path:
@@ -1096,6 +1105,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
             crash = False
         except Exception as e:
+            logging.error(e, exc_info=True)
             if not self._aborted:
                 self.send_packet(Packets.RPL_ABORT, None)
                 logging.info("RPL_ABORT sent")
@@ -1200,6 +1210,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
             crash = False
         except Exception as e:
+            logging.error(e, exc_info=True)
             if not self._aborted:
                 self.send_packet(Packets.RPL_ABORT, None)
                 logging.info("RPL_ABORT sent")
@@ -1260,8 +1271,9 @@ class ReplicatorServerHandler(ReplicatorHandler):
             self._preset.on_after_download(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
-        except Exception:
-            logging.exception("Downloading error")
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Downloading error")
             self._preset.on_after_download(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, True)
@@ -1305,15 +1317,16 @@ class ReplicatorServerHandler(ReplicatorHandler):
             ):
                 raise Error(reason='File digest mismatch', code=1)
 
-            self._server.ioc.facade.replication.save_file(
+            self._server.ioc.facade.api.replication.save_file(
                 self._preset, self._clientfile, self._action
             )
 
             self._preset.on_after_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
-        except Exception:
-            logging.exception("Uploading error")
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Uploading error")
             self._preset.on_after_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, True)
@@ -1324,13 +1337,14 @@ class ReplicatorServerHandler(ReplicatorHandler):
             self._preset.on_before_delete(
                 self._serverfile, self._clientfile, self._server.ioc)
             # Delete file from Archive7
-            self._server.ioc.facade.replication.del_file(
+            self._server.ioc.facade.api.replication.del_file(
                 self._preset, self._serverfile
             )
             self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self._server.ioc)
-        except Exception:
-            logging.exception("Delete error")
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            # logging.exception("Delete error")
             self._preset.on_after_delete(
                 self._serverfile, self._clientfile, self._server.ioc, True)
             raise

@@ -61,3 +61,61 @@ class TestPreferencesData(BaseTestFacade):
             self.fail(e)
 
         del self.observer
+
+
+class TestClientData(BaseTestFacade):
+    """Test the facade.data.client instance on the facade, which is a DictionaryMixin."""
+
+    @run_async
+    async def test___getitem__(self):
+        try:
+            value = 1
+            self.facade.data.client["Value"] = value
+            self.assertEqual(value, self.facade.data.client["Value"])
+        except Exception as e:
+            self.fail(e)
+
+    @run_async
+    async def test___setitem__(self):
+        try:
+            value = 1
+            self.facade.data.client["Value"] = value
+            self.assertEqual(value, self.facade.data.client["Value"])
+        except Exception as e:
+            self.fail(e)
+
+    @run_async
+    async def test___delitem__(self):
+        try:
+            pass
+        except Exception as e:
+            self.fail(e)
+
+    @run_async
+    async def test_subscribe(self):
+        self.observer = StubObserver()
+        self.facade.data.client.subscribe("Value", self.observer)
+
+        try:
+            self.facade.data.client["Value"] = 123
+            await Misc.sleep()
+            self.assertEqual(self.observer.event.data["value"], 123)
+        except Exception as e:
+            self.fail(e)
+
+        del self.observer
+
+    @run_async
+    async def test_unsubscribe(self):
+        self.observer = StubObserver()
+        self.facade.data.client.subscribe("Value", self.observer)
+
+        try:
+            self.facade.data.client.unsubscribe("Value", self.observer)
+            self.facade.data.client["Value"] = 123
+            await Misc.sleep()
+            self.assertEqual(self.observer.event, None)
+        except Exception as e:
+            self.fail(e)
+
+        del self.observer

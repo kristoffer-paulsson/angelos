@@ -280,6 +280,18 @@ class Portfolio(PortfolioABC):
         self.issuer = Statements()
         self.owner = Statements()
 
+    def _get_type(self, docs: set, doc_cls: type) -> set:
+        return {doc for doc in docs if isinstance(doc, doc_cls)}
+
+    def _get_issuer(self, docs: set, issuer: uuid.UUID) -> set:
+        return {doc for doc in docs if getattr(doc, "issuer", None) == issuer}
+
+    def _get_owner(self, docs: set, owner: uuid.UUID) -> set:
+        return {doc for doc in docs if getattr(doc, "owner", None) == owner}
+
+    def _get_not_expired(self, docs: set) -> set:
+        return {doc for doc in docs if not doc.is_expired()}
+
     def _disassemble(self) -> dict:
         """Disassemble portfolio into dictionary."""
         return {
@@ -335,21 +347,23 @@ class Portfolio(PortfolioABC):
         all = True
         for doc in issuer:
             if isinstance(doc, (Person, Ministry, Church)):
-                self.entity = doc
+                setattr(self, "entity", doc)
             elif isinstance(
                 doc, (PersonProfile, MinistryProfile, ChurchProfile)
             ):
-                self.profile = doc
+                setattr(self, "profile", doc)
             elif isinstance(doc, PrivateKeys):
-                self.privkeys = doc
+                setattr(self, "privkeys", doc)
             elif isinstance(doc, Domain):
-                self.domain = doc
+                setattr(self, "domain", doc)
             elif isinstance(doc, Network):
-                self.network = doc
+                setattr(self, "network", doc)
             elif isinstance(doc, Keys):
-                self.keys.add(doc)
+                if hasattr(self, "keys"):
+                    self.keys.add(doc)
             elif isinstance(doc, Node):
-                self.nodes.add(doc)
+                if hasattr(self, "nodes"):
+                    self.nodes.add(doc)
 
         for doc in issuer:
             if doc.issuer != self.entity.id:
@@ -398,7 +412,10 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
 
     def to_portfolio(self) -> Portfolio:
         """Get portfolio of private."""
-        return self.super()
+        portfolio = Portfolio()
+        issuer, owner = self.to_sets()
+        portfolio.from_sets(issuer, owner)
+        return portfolio
 
     def _disassemble(self) -> dict:
         """Disassemble portfolio into dictionary."""

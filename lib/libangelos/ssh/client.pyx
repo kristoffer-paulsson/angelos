@@ -36,10 +36,10 @@ class ClientsClient(SSHClient):
             writer, reader, _ = await self._connection.open_session(
                 subsystem="replicator", encoding=None
             )
-            preset = self.ioc.facade.replication.create_preset(
+            preset = self.ioc.facade.api.replication.create_preset(
                 Preset.T_MAIL,
                 Preset.CLIENT,
-                self.ioc.facade.portfolio.entity.id,
+                self.ioc.facade.data.portfolio.entity.id,
             )
             repclient = ReplicatorClient(self.ioc, preset)
             session = ClientReplicatorSession()
@@ -51,7 +51,7 @@ class ClientsClient(SSHClient):
             # if asyncio.iscoroutine(handler):
             #    self._connection.create_task(handler, stderr.logger)
         except Exception as e:
-            logging.exception("Client mail repliction faulire")
+            logging.exception("Client mail replication failure")
             raise e
 
 
@@ -82,12 +82,12 @@ class ClientsServer(SSHServer):
 
         try:
             issuer = uuid.UUID(username)
-            self._portfolio = await self.ioc.facade.load_portfolio(
+            self._portfolio = await self.ioc.facade.storage.vault.load_portfolio(
                 issuer, PGroup.CLIENT_AUTH
             )
 
             statement = StatementPolicy.validate_trusted(
-                self.ioc.facade.portfolio, self._portfolio)
+                self.ioc.facade.data.portfolio, self._portfolio)
             logging.info(statement)
             if statement:
                 self._client_keys = [

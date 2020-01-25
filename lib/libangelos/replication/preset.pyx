@@ -251,4 +251,4 @@ class MailServerPreset(Preset):
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Remove received and downloaded envelopes."""
         if not crash:
-            ioc.facade.replication.api.del_file(self, serverfile)
+            ioc.facade.api.replication.del_file(self, serverfile)

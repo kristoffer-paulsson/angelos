@@ -78,15 +78,16 @@ class DictionaryMixin:
         if item not in self.__items.keys():
             raise KeyError(item)
 
-        return self.__items[item].value
+        return Misc.from_ini(self.__items[item].value)
 
     def __setitem__(self, key: str, value: Any) -> None:
+        value = Misc.to_ini(value)
         if key not in self.__items.keys():
             self.__items[key] = ReactiveValue(value)
 
         item = self.__items[key]
         item.value = value
-        self.facade.api.settings.set(self.SECTION[0], key, Misc.to_ini(value))
+        self.facade.api.settings.set(self.SECTION[0], key, value)
 
         item.notify_all(1, {"attr": key, "value": value})
         Loop.main().run(self.facade.api.settings.save_preferences())

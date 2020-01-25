@@ -56,7 +56,7 @@ class ReplicationAPI(ApiFacadeExtension):
 
         preset.files[name] = (entry.id, entry.deleted, entry.modified)
         """
-        storage = getattr(self._facade.storage, preset.archive)
+        storage = getattr(self.facade.storage, preset.archive)
         preset._files = await Globber.syncro(
             storage.archive,
             preset.path,
@@ -68,7 +68,7 @@ class ReplicationAPI(ApiFacadeExtension):
     async def save_file(
             self, preset: Preset, file_info: FileSyncInfo, action: str) -> bool:
         """Create or update file in archive."""
-        storage = getattr(self._facade.storage, preset.archive)
+        storage = getattr(self.facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
 
         if action in (Actions.CLI_CREATE, Actions.SER_CREATE):
@@ -102,7 +102,7 @@ class ReplicationAPI(ApiFacadeExtension):
 
     async def load_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Load file and meta from archive."""
-        storage = getattr(self._facade.storage, preset.archive)
+        storage = getattr(self.facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
 
         entry = storage.archive.info(full_path)
@@ -125,6 +125,6 @@ class ReplicationAPI(ApiFacadeExtension):
 
     async def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Remove file from archive"""
-        storage = getattr(self._facade.storage, preset.archive)
+        storage = getattr(self.facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
         return storage.archive.remove(full_path)
