@@ -145,71 +145,71 @@ class Preset:
         """Convert relative path to absolute."""
         return str(pathlib.PurePath(self.path).joinpath(path))
 
-    def on_init(self, ioc: Container, portfolio: Portfolio=None):
+    async def on_init(self, ioc: Container, portfolio: Portfolio=None):
         """Execute event before init."""
         pass
 
-    def on_close(
+    async def on_close(
             self, ioc: Container, portfolio: Portfolio=None,
             crash: bool=False):
         """Execute event after close."""
         pass
 
-    def on_before_pull(
+    async def on_before_pull(
             self, ioc: Container, portfolio: Portfolio=None,
             crash: bool=False):
         """Execute event before pull."""
         pass
 
-    def on_after_pull(
+    async def on_after_pull(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event after pull."""
         pass
 
-    def on_before_push(
+    async def on_before_push(
             self, ioc: Container, portfolio: Portfolio=None,
             crash: bool=False):
         """Execute event before push."""
         pass
 
-    def on_after_push(
+    async def on_after_push(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event after push."""
         pass
 
-    def on_before_upload(
+    async def on_before_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event before upload."""
         pass
 
-    def on_after_upload(
+    async def on_after_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event after upload."""
         pass
 
-    def on_before_download(
+    async def on_before_download(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event before download."""
         pass
 
-    def on_after_download(
+    async def on_after_download(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event after download."""
         pass
 
-    def on_before_delete(
+    async def on_before_delete(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event before delete."""
         pass
 
-    def on_after_delete(
+    async def on_after_delete(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Execute event after delete."""
@@ -230,12 +230,12 @@ class MailClientPreset(Preset):
         """Convert relative path to absolute."""
         return str(pathlib.PurePath(MailboxAPI.PATH_INBOX[0]).joinpath(path))
 
-    def on_after_upload(
+    async def on_after_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Remove sent and uploaded envelopes."""
         if not crash:
-            ioc.facade.api.replication.del_file(self, clientfile)
+            await ioc.facade.api.replication.del_file(self, clientfile)
 
 
 class MailServerPreset(Preset):
@@ -246,9 +246,9 @@ class MailServerPreset(Preset):
             self, MailStorage.ATTRIBUTE[0], Preset.T_MAIL, modified, "/", owner=owner
         )
 
-    def on_after_download(
+    async def on_after_download(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
             ioc: Container, portfolio: Portfolio=None, crash: bool=False):
         """Remove received and downloaded envelopes."""
         if not crash:
-            ioc.facade.api.replication.del_file(self, serverfile)
+            await ioc.facade.api.replication.del_file(self, serverfile)

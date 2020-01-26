@@ -25,11 +25,11 @@ class MailStorage(StorageFacadeExtension):
     within the community.
     """
     ATTRIBUTE = ("mail",)
+
     CONCEAL = (Const.CNL_MAIL,)
     USEFLAG = (Const.A_USE_MAIL,)
 
-    INIT_HIERARCHY = (
-        "/",)
+    INIT_HIERARCHY = ("/",)
 
     async def save(self, filename, document, document_file_id_match=True):
         """Save a document at a certain location.
@@ -58,16 +58,15 @@ class MailStorage(StorageFacadeExtension):
             modified=updated,
             compression=Entry.COMP_NONE
         )
-    def delete(self, filename):
-        """Remove a document at a certian location."""
-        return self._proxy.call(self._archive.remove, filename=filename)
+    async def delete(self, filename):
+        """Remove a document at a certain location."""
+        return await self.archive.remove(filename)
 
     async def update(self, filename, document):
         """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
-        return self._proxy.call(
-            self._archive.save,
+        return await self.archive.save(
             filename=filename,
             data=PortfolioPolicy.serialize(document),
             modified=updated,
@@ -77,35 +76,29 @@ class MailStorage(StorageFacadeExtension):
         """Search a folder for documents by issuer."""
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
-        async def callback():
-            result = await Globber.owner(self._archive, issuer, path)
-            result.sort(reverse=True, key=lambda e: e[2])
+        result = await Globber.owner(self.archive, issuer, path)
+        result.sort(reverse=True, key=lambda e: e[2])
 
-            datalist = []
-            for r in result[:limit]:
-                datalist.append(self._archive.load(r[0]))
+        datalist = []
+        for r in result[:limit]:
+            datalist.append(self._archive.load(r[0]))
 
-            return datalist
-
-        return await self._proxy.call(callback, 0, 5)
+        return datalist
 
     async def search(
         self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
 
-        async def callback():
-            if issuer:
-                result = await Globber.owner(self._archive, issuer, path)
-            else:
-                result = await Globber.path(self._archive, path)
+        if issuer:
+            result = await Globber.owner(self.archive, issuer, path)
+        else:
+            result = await Globber.path(self.archive, path)
 
-            result.sort(reverse=True, key=lambda e: e[2])
+        result.sort(reverse=True, key=lambda e: e[2])
 
-            datalist = []
-            for r in result[:limit]:
-                datalist.append(self._archive.load(r[0]))
+        datalist = []
+        for r in result[:limit]:
+            datalist.append(await self.archive.load(r[0]))
 
-            return datalist
-
-        return await self._proxy.call(callback, 0, 5)
+        return datalist

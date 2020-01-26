@@ -121,7 +121,11 @@ class SharedResource:
 
         """
         await asyncio.sleep(0)
-        return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
+        try:
+            return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
+        except Exception as e:
+            logging.error(e, exc_info=True)
+            raise RuntimeError(e)
 
 
 @dataclass

@@ -51,7 +51,7 @@ class ClientsClient(SSHClient):
             # if asyncio.iscoroutine(handler):
             #    self._connection.create_task(handler, stderr.logger)
         except Exception as e:
-            logging.exception("Client mail replication failure")
+            logging.error(e, exc_info=True)
             raise e
 
 

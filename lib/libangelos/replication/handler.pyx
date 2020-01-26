@@ -197,7 +197,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
     async def start(self):
         """Start a new replication operation."""
         try:
-            self.client.preset.on_init(self.client.ioc)
+            await self.client.preset.on_init(self.client.ioc)
             self.send_packet(Packets.RPL_INIT, None, UInt32(VERSION))
             logging.info("RPL_INIT sent")
 
@@ -230,7 +230,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             # await self.send_packet(Packets.RPL_DONE, None)
             self.send_packet(Packets.RPL_CLOSE, None)
             logging.info("RPL_CLOSE sent")
-            self.client.preset.on_close(self.client.ioc)
+            await self.client.preset.on_close(self.client.ioc)
 
             self.exit()
         except Exception as e:
@@ -243,7 +243,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
         """Synchronize using pull from the server."""
         while True:
             try:
-                self.client.preset.on_before_pull(self.client.ioc)
+                await self.client.preset.on_before_pull(self.client.ioc)
                 self.send_packet(Packets.RPL_REQUEST, None, String("pull"))
                 logging.info("RPL_REQUEST(pull) sent")
 
@@ -349,7 +349,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             finally:
                 if self._clientfile:
                     self.client.preset.file_processed(self._clientfile.fileid)
-                self.client.preset.on_after_pull(
+                await self.client.preset.on_after_pull(
                     self._serverfile, self._clientfile, self.client.ioc, crash)
                 self._serverfile = None
                 self._clientfile = None
@@ -361,7 +361,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
         """Synchronize using push to the server."""
         while True:
             try:
-                self.client.preset.on_before_push(self.client.ioc)
+                await self.client.preset.on_before_push(self.client.ioc)
                 # Load file metadata
                 c_fileinfo = self.client.preset.pull_file_meta()
                 if not c_fileinfo.fileid.int:
@@ -460,7 +460,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
             finally:
                 if self._clientfile:
                     self.client.preset.file_processed(self._clientfile.fileid)
-                self.client.preset.on_after_push(
+                await self.client.preset.on_after_push(
                     self._serverfile, self._clientfile, self.client.ioc, crash)
                 self._serverfile = None
                 self._clientfile = None
@@ -470,7 +470,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
     async def download(self) -> bool:
         try:
-            self.client.preset.on_before_download(
+            await self.client.preset.on_before_download(
                 self._serverfile, self._clientfile, self.client.ioc)
             self.send_packet(
                 Packets.RPL_DOWNLOAD,
@@ -516,28 +516,28 @@ class ReplicatorClientHandler(ReplicatorHandler):
             ):
                 raise Error(reason='File digest mismatch', code=1)
 
-            self.client.ioc.facade.api.replication.save_file(
+            await self.client.ioc.facade.api.replication.save_file(
                 self.client.preset, self._serverfile, self._action
             )
 
             self.send_packet(Packets.RPL_DONE, None)
             logging.info("RPL_DONE sent")
 
-            self.client.preset.on_after_download(
+            await self.client.preset.on_after_download(
                 self._serverfile, self._clientfile, self.client.ioc)
         except Exception as e:
             logging.error(e, exc_info=True)
             # logging.exception("Download error")
-            self.client.preset.on_after_download(
+            await self.client.preset.on_after_download(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
 
     async def upload(self) -> bool:
         try:
             # Load file from archive7
-            self.client.preset.on_before_upload(
+            await self.client.preset.on_before_upload(
                 self._serverfile, self._clientfile, self.client.ioc)
-            self.client.ioc.facade.api.replication.load_file(
+            await self.client.ioc.facade.api.replication.load_file(
                 self.client.preset, self._clientfile
             )
             c_rel_path = self.client.preset.to_relative(self._clientfile.path)
@@ -597,29 +597,29 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
             self.send_packet(Packets.RPL_DONE, None)
             logging.info("RPL_DONE sent")
-            self.client.preset.on_after_upload(
+            await self.client.preset.on_after_upload(
                 self._serverfile, self._clientfile, self.client.ioc)
         except Exception as e:
             logging.error(e, exc_info=True)
             # logging.exception("Upload error")
-            self.client.preset.on_after_upload(
+            await self.client.preset.on_after_upload(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
 
     async def delete(self) -> bool:
         try:
-            self.client.preset.on_before_delete(
+            await self.client.preset.on_before_delete(
                 self._serverfile, self._clientfile, self.client.ioc)
             # Delete file from Archive7
-            self.client.ioc.facade.api.replication.del_file(
+            await self.client.ioc.facade.api.replication.del_file(
                 self.client.preset, self._clientfile
             )
-            self.client.preset.on_after_delete(
+            await self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self.client.ioc)
         except Exception as e:
             logging.error(e, exc_info=True)
             # logging.exception("Delete error")
-            self.client.preset.on_after_delete(
+            await self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self.client.ioc, True)
             raise
 
@@ -790,7 +790,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             negotiated, _ = await self.handle_packet({
                 Packets.RPL_OPERATION: self._process_operation
             })
-            self._preset.on_init(self._server.ioc, self._server.portfolio)
+            await self._preset.on_init(self._server.ioc, self._server.portfolio)
 
             # Check protocol versions and presets of custom circumstances.
             confirm = negotiated == version
@@ -811,7 +811,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
                 if pkttype == Packets.RPL_CLOSE:
                     break
-            self._preset.on_close(self._server.ioc, self._server.portfolio)
+            await self._preset.on_close(self._server.ioc, self._server.portfolio)
 
         except (asyncio.IncompleteReadError, PacketDecodeError, Error) as e:
             logging.error(e, exc_info=True)
@@ -1017,13 +1017,13 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def pulled(self):
         try:
-            self._preset.on_before_pull(
+            await self._preset.on_before_pull(
                 self._server.ioc, self._server.portfolio)
             # Load a file from archive7 to be pulled
             s_fileinfo = self._preset.pull_file_meta()
 
             if s_fileinfo.fileid.int:
-                self._server.ioc.facade.api.replication.load_file(
+                await self._server.ioc.facade.api.replication.load_file(
                     self._preset, s_fileinfo)
 
                 if s_fileinfo.path:
@@ -1121,7 +1121,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
         finally:
             if self._clientfile:
                 self._preset.file_processed(self._clientfile.fileid)
-            self._preset.on_after_pull(
+            await self._preset.on_after_pull(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, crash)
             self._serverfile = None
@@ -1132,7 +1132,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def pushed(self, c_fileinfo: FileSyncInfo):
         try:
-            self._preset.on_before_push(
+            await self._preset.on_before_push(
                 self._server.ioc, self._server.portfolio)
             # Load a file from archive7 to be pulled
             s_fileinfo = self._preset.get_file_meta(c_fileinfo.fileid)
@@ -1226,7 +1226,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
         finally:
             if self._clientfile:
                 self._preset.file_processed(self._clientfile.fileid)
-            self._preset.on_after_push(
+            await self._preset.on_after_push(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, crash)
             self._serverfile = None
@@ -1237,7 +1237,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def downloading(self):
         try:
-            self._preset.on_before_download(
+            await self._preset.on_before_download(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
             await self.handle_packet({
@@ -1268,20 +1268,20 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 if pkttype == Packets.RPL_DONE:
                     break
 
-            self._preset.on_after_download(
+            await self._preset.on_after_download(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
         except Exception as e:
             logging.error(e, exc_info=True)
             # logging.exception("Downloading error")
-            self._preset.on_after_download(
+            await self._preset.on_after_download(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, True)
             raise
 
     async def uploading(self):
         try:
-            self._preset.on_before_upload(
+            await self._preset.on_before_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
             await self.handle_packet({
@@ -1317,34 +1317,34 @@ class ReplicatorServerHandler(ReplicatorHandler):
             ):
                 raise Error(reason='File digest mismatch', code=1)
 
-            self._server.ioc.facade.api.replication.save_file(
+            await self._server.ioc.facade.api.replication.save_file(
                 self._preset, self._clientfile, self._action
             )
 
-            self._preset.on_after_upload(
+            await self._preset.on_after_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio)
         except Exception as e:
             logging.error(e, exc_info=True)
             # logging.exception("Uploading error")
-            self._preset.on_after_upload(
+            await self._preset.on_after_upload(
                 self._serverfile, self._clientfile, self._server.ioc,
                 self._server.portfolio, True)
             raise
 
     async def delete(self) -> bool:
         try:
-            self._preset.on_before_delete(
+            await self._preset.on_before_delete(
                 self._serverfile, self._clientfile, self._server.ioc)
             # Delete file from Archive7
-            self._server.ioc.facade.api.replication.del_file(
+            await self._server.ioc.facade.api.replication.del_file(
                 self._preset, self._serverfile
             )
-            self.client.preset.on_after_delete(
+            await self.client.preset.on_after_delete(
                 self._serverfile, self._clientfile, self._server.ioc)
         except Exception as e:
             logging.error(e, exc_info=True)
             # logging.exception("Delete error")
-            self._preset.on_after_delete(
+            await self._preset.on_after_delete(
                 self._serverfile, self._clientfile, self._server.ioc, True)
             raise

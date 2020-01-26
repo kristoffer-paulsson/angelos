@@ -239,5 +239,4 @@ class StubClient(StubApplication):
         cnid = uuid.UUID(self.ioc.facade.data.client["CurrentNetwork"])
         host = await self.ioc.facade.storage.vault.load_portfolio(cnid, PGroup.SHARE_MIN_COMMUNITY)
         _, client = await Starter().clients_client(self.ioc.facade.data.portfolio, host, 5 + 8000, ioc=self.ioc)
-        # await client.mail()
         return client

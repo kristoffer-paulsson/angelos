@@ -72,7 +72,7 @@ class ReplicationAPI(ApiFacadeExtension):
         full_path = preset.to_absolute(file_info.path)
 
         if action in (Actions.CLI_CREATE, Actions.SER_CREATE):
-            return storage.archive.mkfile(
+            return await storage.archive.mkfile(
                 full_path,
                 file_info.data,
                 created=file_info.created,
@@ -84,10 +84,10 @@ class ReplicationAPI(ApiFacadeExtension):
                 perms=file_info.perms,
             )
         elif action in (Actions.CLI_UPDATE, Actions.SER_UPDATE):
-            storage.archive.save(
+            await storage.archive.save(
                 full_path, file_info.data, modified=file_info.modified
             )
-            storage.archive.chmod(
+            await storage.archive.chmod(
                 full_path,
                 id=file_info.fileid,
                 owner=file_info.owner,
@@ -105,7 +105,7 @@ class ReplicationAPI(ApiFacadeExtension):
         storage = getattr(self.facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
 
-        entry = storage.archive.info(full_path)
+        entry = await storage.archive.info(full_path)
 
         file_info.pieces = int(math.ceil(entry.length / CHUNK_SIZE))
         file_info.size = entry.length
@@ -120,11 +120,11 @@ class ReplicationAPI(ApiFacadeExtension):
         file_info.group = entry.group if entry.group else file_info.group
         file_info.perms = entry.perms if entry.perms else file_info.perms
 
-        file_info.data = storage.archive.load(full_path)
+        file_info.data = await storage.archive.load(full_path)
         return True
 
     async def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:
         """Remove file from archive"""
         storage = getattr(self.facade.storage, preset.archive)
         full_path = preset.to_absolute(file_info.path)
-        return storage.archive.remove(full_path)
+        return await storage.archive.remove(full_path)

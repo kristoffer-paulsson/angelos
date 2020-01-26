@@ -1555,7 +1555,8 @@ class Archive7(ContainerAware, SharedResource):
 
         def get_pid(self, dirname):
             """Get parent ID for directory."""
-            dirname = dirname.rstrip("/")
+            if dirname != "/":
+                dirname = dirname.rstrip("/")
             paths = self.ioc.hierarchy.paths
             if dirname not in paths.keys():
                 raise Util.exception(
