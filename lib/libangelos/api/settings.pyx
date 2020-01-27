@@ -70,7 +70,8 @@ class SettingsAPI(ApiFacadeExtension):
         """
         data = set()
         for row in csv.reader(await self.facade.storage.vault.load_settings(name)):
-            data.add(tuple([Misc.from_ini(value) for value in row]))
+            if not row.startswith("#")
+                data.add(tuple([Misc.from_ini(value) for value in row]))
         return data
 
     async def save_set(self, name: str, data: Set[Tuple[Any, ...]]) -> bool:
