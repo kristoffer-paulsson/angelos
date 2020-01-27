@@ -70,7 +70,7 @@ class SettingsAPI(ApiFacadeExtension):
         """
         data = set()
         for row in csv.reader(await self.facade.storage.vault.load_settings(name)):
-            if not row.startswith("#"):
+            if not row[0].startswith("#"):
                 data.add(tuple([Misc.from_ini(value) for value in row]))
         return data
 
