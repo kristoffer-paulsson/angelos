@@ -1,5 +1,7 @@
 from unittest import TestCase
 
+from libangelos.api.mailbox import DOCUMENT_PATH
+from libangelos.document.document import DocType
 from libangelos.misc import Misc
 
 

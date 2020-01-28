@@ -65,17 +65,18 @@ class TestNetworkIndexerTask(TestCase):
     async def test__run(self):
         try:
             docs = set()
-            docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[0]))
-            docs.add(StatementPolicy.verified(self.portfolios[0], self.portfolio))
+            # docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[0]))
+            # docs.add(StatementPolicy.verified(self.portfolios[0], self.portfolio))
+            docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
             docs.add(StatementPolicy.trusted(self.portfolios[0], self.portfolio))
             print(self.portfolios[0].entity.id)
 
-            docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[1]))
+            # docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[1]))
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[1]))
             print(self.portfolios[1].entity.id)
 
-            docs.add(StatementPolicy.verified(self.portfolios[2], self.portfolio))
+            # docs.add(StatementPolicy.verified(self.portfolios[2], self.portfolio))
             docs.add(StatementPolicy.trusted(self.portfolios[2], self.portfolio))
             print(self.portfolios[2].entity.id)
 
@@ -86,5 +87,6 @@ class TestNetworkIndexerTask(TestCase):
             await TaskWaitress().wait_for(self.facade.task.network_index)
 
             print((await self.facade.storage.vault.load_settings("networks.csv")).getvalue())
+            print((await self.facade.api.settings.networks()))
         except Exception as e:
             self.fail(e)

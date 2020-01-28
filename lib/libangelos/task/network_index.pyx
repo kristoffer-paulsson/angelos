@@ -86,7 +86,7 @@ class NetworkIndexerTask(TaskFacadeExtension):
     async def _run(self) -> None:
         vault = self.facade.storage.vault
         portfolio = await vault.load_portfolio(self.facade.data.portfolio.entity.id, PGroup.ALL)
-        pattern = DOCUMENT_PATH[DocType.NET_NETWORK].format(dir="/portfolios", file="*")
+        pattern = DOCUMENT_PATH[DocType.NET_NETWORK].format(dir="/portfolios/*", file="*")
         networks = await vault.search(pattern)
 
         self.__network_list = set()
