@@ -288,7 +288,7 @@ class Misc:
                 sock.connect(("1.1.1.1", 1))
                 address.add(ipaddress.ip_address(sock.getsockname()[0]))
                 sock.close()
-            except ValueError:
+            except (ValueError, OSError):
                 continue
             else:
                 break
@@ -296,7 +296,6 @@ class Misc:
         address.add(ipaddress.ip_address("127.0.0.1"))
 
         address = list(address)
-        # address.reverse()
         return address
 
     @staticmethod

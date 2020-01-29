@@ -7,7 +7,6 @@
 """A task for indexing networks in relation to portfolios."""
 import csv
 import io
-import uuid
 
 from libangelos.archive.portfolio_mixin import DOCUMENT_PATH
 from libangelos.document.document import DocType

@@ -1,3 +1,4 @@
+import copy
 import datetime
 import ipaddress
 import os
@@ -233,6 +234,10 @@ class TestDocument(BaseDocument):
     docs = DocumentField(doc_class=TestSubDocument)
 
 
+class TestDocument2(BaseDocument):
+    id = UuidField(init=uuid.uuid4)
+
+
 class TestBaseDocument(TestCase):
     def setUp(self):
         self.instance = TestDocument()
@@ -311,9 +316,35 @@ class TestBaseDocument(TestCase):
             doc = self._populate_test()
             doc.validate()
 
+    def test___eq__(self):
+        try:
+            doc = self._populate_test()
+            self.assertFalse(doc == True)
+            self.assertFalse(doc is True)
 
-class TestDocument2(BaseDocument):
-    id = UuidField(init=uuid.uuid4)
+            my_copy = TestDocument2()
+            self.assertFalse(doc == my_copy)
+            self.assertFalse(doc is my_copy)
+
+            my_copy = doc
+            self.assertTrue(doc == my_copy)
+            self.assertTrue(doc is my_copy)
+
+            my_copy = copy.copy(doc)
+            self.assertTrue(doc == my_copy)
+            self.assertFalse(doc is my_copy)
+
+            my_copy = copy.deepcopy(doc)
+            self.assertTrue(doc == my_copy)
+            self.assertFalse(doc is my_copy)
+
+            my_copy = copy.deepcopy(doc)
+            my_copy.email = "john.doe@example.com"
+            self.assertFalse(doc == my_copy)
+            self.assertFalse(doc is my_copy)
+
+        except Exception as e:
+            self.fail(e)
 
 
 class TestDocumentField(BaseTestField):

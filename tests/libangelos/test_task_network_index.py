@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import tracemalloc
+from collections import OrderedDict
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
@@ -36,6 +37,8 @@ class TestNetworkIndexerTask(TestCase):
             for person in Generate.church_data(cls.count):
                 cls.portfolios.append(SetupChurchOperation.create(person, server=True))
 
+            cls.portfolios.append(SetupChurchOperation.create(Generate.church_data(1)[0]))
+
         portfolios()
 
     @classmethod
@@ -67,26 +70,31 @@ class TestNetworkIndexerTask(TestCase):
             docs = set()
             # docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[0]))
             # docs.add(StatementPolicy.verified(self.portfolios[0], self.portfolio))
-            docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
+
+            # Mutual trust
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
             docs.add(StatementPolicy.trusted(self.portfolios[0], self.portfolio))
-            print(self.portfolios[0].entity.id)
 
             # docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[1]))
+            # One sided trust from facade
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[1]))
-            print(self.portfolios[1].entity.id)
 
             # docs.add(StatementPolicy.verified(self.portfolios[2], self.portfolio))
+            # One sided trust not from facade
             docs.add(StatementPolicy.trusted(self.portfolios[2], self.portfolio))
-            print(self.portfolios[2].entity.id)
 
-            # for portfolio in self.portfolios:
-            #    await self.facade.storage.vault.update_portfolio(portfolio)
+            # Mutual trust but no network
+            docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[3]))
+            docs.add(StatementPolicy.trusted(self.portfolios[3], self.portfolio))
 
             await self.facade.storage.vault.docs_to_portfolio(docs)
             await TaskWaitress().wait_for(self.facade.task.network_index)
 
-            print((await self.facade.storage.vault.load_settings("networks.csv")).getvalue())
-            print((await self.facade.api.settings.networks()))
+            networks = OrderedDict(await self.facade.api.settings.networks())
+
+            self.assertTrue(networks[str(self.portfolios[0].entity.id)])
+            self.assertFalse(networks[str(self.portfolios[1].entity.id)])
+            self.assertFalse(networks[str(self.portfolios[2].entity.id)])
+            self.assertNotIn(str(self.portfolios[3].entity.id), networks)
         except Exception as e:
             self.fail(e)

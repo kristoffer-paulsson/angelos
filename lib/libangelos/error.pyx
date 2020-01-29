@@ -288,6 +288,10 @@ class PortfolioExistsNot(AngelosException):
     pass
 
 
+class PortfolioIllegalDelete(AngelosException):
+    pass
+
+
 class MailboxStoreIssuerMissmatch(AngelosException):
     pass
 
@@ -455,6 +459,7 @@ ERROR_INFO = {
     740: (PortfolioNotStatement, "Document must be subtype of Statement"),
     741: (PortfolioAlreadyExists, "Portfolio already exists."),
     742: (PortfolioExistsNot, "Portfolio doesn't exists"),
+    743: (PortfolioIllegalDelete, "Illegal operation, trying to delete owning entity!"),
 
     780: (MailboxStoreIssuerMissmatch, "Issuer mismatch between Envelope and Message"),
     781: (MailboxStoreOwnerMissmatch, "Owner mismatch between Envelope and Message"),
@@ -542,6 +547,7 @@ class Error(IntEnum):
     PORTFOLIO_NOT_STATEMENT = 740
     PORTFOLIO_ALREADY_EXISTS = 741
     PORTFOLIO_EXISTS_NOT = 742
+    PORTFOLIO_ILLEGAL_DELETE = 743
 
     # 20 error codes for mailbox
     MAILBOX_STORE_ISSUER_MISSMATCH = 780

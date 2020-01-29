@@ -59,9 +59,13 @@ class PortfolioCommand(Command):
         )
         if imp:
             try:
+                statements = portfolio.issuer.to_set() | portfolio.owner.to_set()
                 await self.__facade.storage.vault.import_portfolio(portfolio)
+                await self.__facade.storage.vault.docs_to_portfolio(statements)
             except OSError as e:
+                statements = portfolio.issuer.to_set() | portfolio.owner.to_set()
                 await self.__facade.storage.vault.update_portfolio(portfolio)
+                await self.__facade.storage.vault.docs_to_portfolio(statements)
 
     async def __export(self, entity_id, group):
         if entity_id == "self":

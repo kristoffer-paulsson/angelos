@@ -29,6 +29,10 @@ class PortfolioMixin:
 
     PATH_PORTFOLIOS = ("/portfolios/",)
 
+    def portfolio_path(self, eid: uuid.UUID) -> str:
+        """Generate portfolio path for a particular entity id."""
+        return  "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
+
     async def update_portfolio(
         self, portfolio: Portfolio
     ) -> Tuple[bool, Set[DocumentT], Set[DocumentT]]:
@@ -38,7 +42,7 @@ class PortfolioMixin:
 
         Parameters
         ----------
-        portfolio : Portfolio
+        portfolio_temp : Portfolio
             Portfolio to update storage with.
 
         Returns
@@ -51,9 +55,10 @@ class PortfolioMixin:
             [3] set of removed documents
 
         """
-        old = await self.load_portfolio(portfolio.entity.id, PGroup.ALL)
+        portfolio_temp = copy.copy(portfolio)
+        old = await self.load_portfolio(portfolio_temp.entity.id, PGroup.ALL)
 
-        issuer, owner = portfolio.to_sets()
+        issuer, owner = portfolio_temp.to_sets()
         new_set = issuer | owner
 
         issuer, owner = old.to_sets()
@@ -138,15 +143,15 @@ class PortfolioMixin:
             rejected |= reject
 
         removed = (
-            portfolio.owner.revoked
-            | portfolio.owner.trusted
-            | portfolio.owner.verified
+                portfolio_temp.owner.revoked
+                | portfolio_temp.owner.trusted
+                | portfolio_temp.owner.verified
         )
 
         # Really remove files that can't be verified
-        portfolio.owner.revoked = set()
-        portfolio.owner.trusted = set()
-        portfolio.owner.verified = set()
+        portfolio_temp.owner.revoked = set()
+        portfolio_temp.owner.trusted = set()
+        portfolio_temp.owner.verified = set()
 
         if hasattr(new, "privkeys"):
             if new.privkeys:
@@ -181,7 +186,7 @@ class PortfolioMixin:
 
         Parameters
         ----------
-        portfolio : Portfolio
+        portfolio_temp : Portfolio
             Portfolio to be imported.
 
         Tuple[bool, Set[DocumentT], Set[DocumentT]]
@@ -193,65 +198,64 @@ class PortfolioMixin:
 
         """
         rejected = set()
-        portfolio = copy.copy(portfolio)
-        policy = ImportPolicy(portfolio)
+        portfolio_temp = copy.copy(portfolio)
+        policy = ImportPolicy(portfolio_temp)
 
         entity, keys = policy.entity()
         if (entity, keys) == (None, None):
             logging.error("Portfolio entity and keys doesn't validate")
             return False, None, None
 
-        rejected |= policy._filter_set(portfolio.keys)
-        portfolio.keys.add(keys)
+        rejected |= policy._filter_set(portfolio_temp.keys)
+        portfolio_temp.keys.add(keys)
 
-        if portfolio.profile and not policy.issued_document(portfolio.profile):
-            rejected.add(portfolio.profile)
-            portfolio.profile = None
+        if portfolio_temp.profile and not policy.issued_document(portfolio_temp.profile):
+            rejected.add(portfolio_temp.profile)
+            portfolio_temp.profile = None
             logging.warning("Removed invalid profile from portfolio")
 
-        if portfolio.network and not policy.issued_document(portfolio.network):
-            rejected.add(portfolio.network)
-            portfolio.network = None
+        if portfolio_temp.network and not policy.issued_document(portfolio_temp.network):
+            rejected.add(portfolio_temp.network)
+            portfolio_temp.network = None
             logging.warning("Removed invalid network from portfolio")
 
-        rejected |= policy._filter_set(portfolio.issuer.revoked)
-        rejected |= policy._filter_set(portfolio.issuer.verified)
-        rejected |= policy._filter_set(portfolio.issuer.trusted)
+        rejected |= policy._filter_set(portfolio_temp.issuer.revoked)
+        rejected |= policy._filter_set(portfolio_temp.issuer.verified)
+        rejected |= policy._filter_set(portfolio_temp.issuer.trusted)
 
-        if isinstance(portfolio, PrivatePortfolio):
-            if portfolio.privkeys and not policy.issued_document(
-                portfolio.privkeys
+        if isinstance(portfolio_temp, PrivatePortfolio):
+            if portfolio_temp.privkeys and not policy.issued_document(
+                portfolio_temp.privkeys
             ):
-                rejected.add(portfolio.privkeys)
-                portfolio.privkeys = None
+                rejected.add(portfolio_temp.privkeys)
+                portfolio_temp.privkeys = None
                 logging.warning("Removed invalid private keys from portfolio")
 
-            if portfolio.domain and not policy.issued_document(
-                portfolio.domain
+            if portfolio_temp.domain and not policy.issued_document(
+                portfolio_temp.domain
             ):
-                rejected.add(portfolio.domain)
-                portfolio.domain = None
+                rejected.add(portfolio_temp.domain)
+                portfolio_temp.domain = None
                 logging.warning("Removed invalid domain from portfolio")
 
-            for node in portfolio.nodes:
+            for node in portfolio_temp.nodes:
                 if node and not policy.node_document(node):
                     rejected.add(node)
-                    portfolio.nodes.remove(node)
+                    portfolio_temp.nodes.remove(node)
                     logging.warning("Removed invalid node from portfolio")
 
         removed = (
-            portfolio.owner.revoked
-            | portfolio.owner.trusted
-            | portfolio.owner.verified
+                portfolio_temp.owner.revoked
+                | portfolio_temp.owner.trusted
+                | portfolio_temp.owner.verified
         )
 
         # Really remove files that can't be verified
-        portfolio.owner.revoked = set()
-        portfolio.owner.trusted = set()
-        portfolio.owner.verified = set()
+        portfolio_temp.owner.revoked = set()
+        portfolio_temp.owner.trusted = set()
+        portfolio_temp.owner.verified = set()
 
-        result = await self.import_portfolio(portfolio)
-        return result, rejected, removed
+        return await self.import_portfolio(portfolio_temp), rejected, removed
 
     async def docs_to_portfolio(
         self, documents: Set[DocumentT]
@@ -334,7 +338,7 @@ class PortfolioMixin:
             Success or failure.
 
         """
-        dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], portfolio.entity.id)
+        dirname = self.portfolio_path(portfolio.entity.id)
         if self.archive.isdir(dirname):
             raise Util.exception(Error.PORTFOLIO_ALREADY_EXISTS, {
                 "portfolio": portfolio.entity.id})
@@ -382,7 +386,7 @@ class PortfolioMixin:
             Loaded portfolio object.
 
         """
-        dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
+        dirname = self.portfolio_path(eid)
         if not self.archive.isdir(dirname):
             raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
                 "portfolio": eid})
@@ -444,7 +448,7 @@ class PortfolioMixin:
             Success or failure.
 
         """
-        dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], portfolio.entity.id)
+        dirname = self.portfolio_path(portfolio.entity.id)
         if not self.archive.isdir(dirname):
             raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
                 "portfolio": portfolio.entity.id})
@@ -503,18 +507,25 @@ class PortfolioMixin:
     async def save_portfolio(self, portfolio: PrivatePortfolio) -> bool:
         """Save a changed portfolio.
 
+        This methods simply sorts all the documents from a portfolio into issued and owned documents.
+        The owned documents are thrown away while the issued documents are compared to the list of existing document.
+        Existing documents are updated, while the new files are created.
+
         This method expects policies to be applied."""
-        dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], portfolio.entity.id)
+        dirname = self.portfolio_path(portfolio.entity.id)
         if not self.archive.isdir(dirname):
             raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
                 "portfolio": portfolio.entity.id})
 
-        files = await self.archive.glob(
-            name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id
-        )
+        # files = await self.archive.glob(
+        #     name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id
+        # )
+
+        files = await self.archive.glob(name="{dir}/*".format(dir=dirname))
 
         ops = list()
-        save, _ = portfolio.to_sets()
+        issuer, owner = portfolio.to_sets()
+        save = issuer | owner
 
         loop = asyncio.get_running_loop()
         for doc in save:
@@ -559,9 +570,10 @@ class PortfolioMixin:
 
         """
         if eid == self.facade.data.portfolio.entity.id:
-            raise RuntimeError("Illegal operation, trying to delete owning entity!")
+            raise Util.exception(Error.PORTFOLIO_ILLEGAL_DELETE, {
+                "portfolio": eid})
 
-        dirname = "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
+        dirname = self.portfolio_path(eid)
         if not self.archive.isdir(dirname):
             raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
                 "portfolio": eid})
@@ -572,6 +584,4 @@ class PortfolioMixin:
         ops = list()
         for filename in files:
             ops.append(self.archive.remove(filename=filename, mode=3))
-        result = result if await self.gather(*ops) else False
-        result = result if await self.archive.remove(filename=dirname, mode=3) else False
-        return result
+        return await self.gather(*ops)

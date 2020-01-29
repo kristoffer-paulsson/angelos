@@ -5,6 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Policy classes for document portfolios."""
+import collections
+import pprint
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -253,6 +255,9 @@ class Statements:
         self.trusted = set()
         self.revoked = set()
 
+    def to_set(self) -> set:
+        return self.verified | self.trusted | self.revoked
+
 
 @dataclass
 class Portfolio(PortfolioABC):
@@ -279,6 +284,30 @@ class Portfolio(PortfolioABC):
         self.network = None
         self.issuer = Statements()
         self.owner = Statements()
+
+    def __eq__(self, other):
+        if callable(getattr(other, "to_sets", None)):
+            issuer, owner = self.to_sets()
+            s = issuer | owner
+            issuer, owner = other.to_sets()
+            o = issuer | owner
+            return collections.Counter(s) == collections.Counter(o)
+        else:
+            return False
+
+    def __str__(self):
+        issuer, owner = self.to_sets()
+        output = ""
+
+        for doc in issuer:
+            output += doc.__class__.__name__ + "\n"
+            output += pprint.pformat(doc.export_yaml()) + "\n\n"
+
+        for doc in owner:
+            output += doc.__class__.__name__ + "\n"
+            output += pprint.pformat(doc.export_yaml()) + "\n\n"
+
+        return output
 
     def _get_type(self, docs: set, doc_cls: type) -> set:
         return {doc for doc in docs if isinstance(doc, doc_cls)}
@@ -410,6 +439,16 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
         self.domain = None
         self.nodes = set()
 
+    def __eq__(self, other):
+        if callable(getattr(other, "to_sets", None)):
+            issuer, owner = self.to_sets()
+            s = issuer | owner
+            issuer, owner = other.to_sets()
+            o = issuer | owner
+            return collections.Counter(s) == collections.Counter(o)
+        else:
+            return False
+
     def to_portfolio(self) -> Portfolio:
         """Get portfolio of private."""
         portfolio = Portfolio()
@@ -424,6 +463,12 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
         assembly[PField.DOMAIN] = self.domain
         assembly[PField.NODES] = self.nodes
         return assembly
+
+    @classmethod
+    def factory(cls, issuer: set, owner: set) -> "PrivatePortfolio":
+        portfolio = cls()
+        portfolio.from_sets(issuer, owner)
+        return portfolio
 
 
 class PortfolioPolicy:

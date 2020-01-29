@@ -35,7 +35,6 @@ class TestOwnerMixin(TestCase):
             self.fail(e)
 
 
-
 class ATestDocument(BaseDocument, IssueMixin, UpdatedMixin):
     """Simulates fields: signature, issuer, updated, expires."""
     created = DateField()
@@ -142,6 +141,45 @@ class TestDocument(TestCase):
             self.assertIs(stub.get_touched(), stub.created)
             stub.updated = datetime.date.today() + datetime.timedelta(1)
             self.assertIs(stub.get_touched(), stub.updated)
+        except Exception as e:
+            self.fail(e)
+
+
+    def test___lt__(self):
+        try:
+            doc1 = StubDocument()
+            doc2 = StubDocument()
+            doc2.created = datetime.date.today() + datetime.timedelta(1)
+            self.assertLess(doc1, doc2)
+        except Exception as e:
+            self.fail(e)
+
+    def test___le__(self):
+        try:
+            doc1 = StubDocument()
+            doc2 = StubDocument()
+            self.assertLessEqual(doc1, doc2)
+            doc2.created = datetime.date.today() + datetime.timedelta(1)
+            self.assertLessEqual(doc1, doc2)
+        except Exception as e:
+            self.fail(e)
+
+    def test___gt__(self):
+        try:
+            doc1 = StubDocument()
+            doc2 = StubDocument()
+            doc2.created = datetime.date.today() + datetime.timedelta(1)
+            self.assertGreater(doc2, doc1)
+        except Exception as e:
+            self.fail(e)
+
+    def test___ge__(self):
+        try:
+            doc1 = StubDocument()
+            doc2 = StubDocument()
+            self.assertGreaterEqual(doc2, doc1)
+            doc2.created = datetime.date.today() + datetime.timedelta(1)
+            self.assertGreaterEqual(doc2, doc1)
         except Exception as e:
             self.fail(e)
 

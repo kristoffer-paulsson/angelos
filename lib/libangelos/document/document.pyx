@@ -200,6 +200,19 @@ class Document(IssueMixin, BaseDocument):
         """Latest touch, created or updated date."""
         return self.updated if getattr(self, "updated", None) else self.created
 
+    def __lt__(self, other):
+        return self.get_touched() < other.get_touched()
+
+    def __le__(self, other):
+        return self.get_touched() <= other.get_touched()
+
+    def __gt__(self, other):
+        return self.get_touched() > other.get_touched()
+
+    def __ge__(self, other):
+        return self.get_touched() >= other.get_touched()
+
+
     def get_owner(self) -> uuid.UUID:
         """Correct owner of document."""
         return self.owner if getattr(self, "owner", None) else self.issuer

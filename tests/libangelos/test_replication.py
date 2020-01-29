@@ -1,7 +1,7 @@
 import logging
+import uuid
 from tempfile import TemporaryDirectory
 
-from libangelos.misc import Misc
 from libangelos.task.task import TaskWaitress
 
 from dummy.support import run_async, StubMaker, Operations, Generate
@@ -36,7 +36,10 @@ class TestNetwork(BaseTestNetwork):
             await Operations.trust_mutual(self.server.app.ioc.facade, self.client.app.ioc.facade)
             await Operations.trust_mutual(self.client.app.ioc.facade, self.facade)
             await TaskWaitress().wait_for(self.client.app.ioc.facade.task.network_index)
-            self.client.app.ioc.facade.data.client["CurrentNetwork"] = self.server.app.ioc.facade.data.portfolio.entity.id
+
+            network = uuid.UUID(list(filter(lambda x: x[1], await self.client.app.ioc.facade.api.settings.networks()))[0][0])
+            self.assertEqual(network, self.server.app.ioc.facade.data.portfolio.entity.id)
+            self.client.app.ioc.facade.data.client["CurrentNetwork"] = network
 
             mail = await Operations.send_mail(self.client.app.ioc.facade, self.facade.data.portfolio)
             await self.server.app.listen()
@@ -58,7 +61,10 @@ class TestNetwork(BaseTestNetwork):
             await Operations.trust_mutual(self.server.app.ioc.facade, self.client.app.ioc.facade)
             await Operations.trust_mutual(self.client.app.ioc.facade, self.facade)
             await TaskWaitress().wait_for(self.client.app.ioc.facade.task.network_index)
-            self.client.app.ioc.facade.data.client["CurrentNetwork"] = self.server.app.ioc.facade.data.portfolio.entity.id
+
+            network = uuid.UUID(list(filter(lambda x: x[1], await self.client.app.ioc.facade.api.settings.networks()))[0][0])
+            self.assertEqual(network, self.server.app.ioc.facade.data.portfolio.entity.id)
+            self.client.app.ioc.facade.data.client["CurrentNetwork"] = network
 
             mail = await Operations.inject_mail(
                 self.server.app.ioc.facade, self.facade, self.client.app.ioc.facade.data.portfolio)

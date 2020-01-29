@@ -14,6 +14,8 @@ implement validation.
 import base64
 import datetime
 import ipaddress
+import itertools
+import json
 import re
 import uuid
 from abc import ABC
@@ -349,6 +351,28 @@ class BaseDocument(metaclass=DocumentMeta):
             )
         object.__setattr__(self, key, value)
 
+
+    def __eq__(self, other):
+        """Compare to documents.
+
+        If other is another type then its false.
+        Else if data exported bytes are equal or not.
+
+        Args:
+            other (Any):
+                Should be a BaseDocument otherwise False.
+
+        Returns (bool):
+            True or False based on equality.
+
+        """
+        if not isinstance(other, type(self)):
+            return False
+        else:
+            return self.export_bytes() == other.export_bytes()
+
+    def __hash__(self):
+        return hash(tuple(sorted(itertools.chain(self.export_bytes()))))
 
     @classmethod
     def build(cls: DocumentMeta, data: dict) -> DocumentMeta:

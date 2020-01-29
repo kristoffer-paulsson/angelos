@@ -297,8 +297,8 @@ class Operations:
         StatementPolicy.trusted(f1.data.portfolio, f2.data.portfolio)
         StatementPolicy.trusted(f2.data.portfolio, f1.data.portfolio)
 
-        await f1.storage.vault.import_portfolio(f2.data.portfolio.to_portfolio())
-        await f2.storage.vault.import_portfolio(f1.data.portfolio.to_portfolio())
+        await f1.storage.vault.add_portfolio(f2.data.portfolio.to_portfolio())
+        await f2.storage.vault.add_portfolio(f1.data.portfolio.to_portfolio())
 
         await TaskWaitress().wait_for(f1.task.contact_sync)
         await TaskWaitress().wait_for(f2.task.contact_sync)
@@ -323,3 +323,10 @@ class Operations:
                 dir="", file=envelope.id
             ), envelope)
         return message
+
+    @staticmethod
+    async def portfolios(num: int, portfolio_list: list, server: bool=False, types: int=0):
+        """Generate random portfolios based on input data."""
+
+        for person in StubMaker.TYPES[types][1](num):
+            portfolio_list.append(StubMaker.TYPES[types][0].create(person, server=server))
