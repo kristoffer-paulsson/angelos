@@ -286,22 +286,42 @@ class PortfolioMixin:
                     issuer_id, PGroup.VERIFIER_REVOKED
                 )
             )
-            for document in documents.get_issuer(issuer_id):
-                if not Util.is_typing(document, StatementT):
+            for doc in documents.get_issuer(issuer_id):
+                if not Util.is_typing(doc, StatementT):
                     raise Util.exception(Error.PORTFOLIO_NOT_STATEMENT, {
-                        "document": document.id, "issuer": document.issuer})
-                if policy.issued_document(document):
-                    ops.append(
-                        self.save(
-                            DOCUMENT_PATH[document.type].format(
-                                dir="{0}{1}".format(self.PATH_PORTFOLIOS[0], document.owner),
-                                file=document.id,
-                            ),
-                            document,
-                        )
+                        "document": doc.id, "issuer": doc.issuer})
+                if policy.issued_document(doc):
+                    filename = DOCUMENT_PATH[doc.type].format(
+                        dir="{0}{1}".format(self.PATH_PORTFOLIOS[0], doc.owner),
+                        file=doc.id,
                     )
+                    if self.archive.isfile(filename):
+                        ops.append(
+                           self.archive.save(
+                                filename=filename,
+                                data=msgpack.packb(
+                                    doc.export_bytes(),
+                                    use_bin_type=True,
+                                    strict_types=True,
+                                ),
+                                compression=Entry.COMP_NONE
+                            )
+                        )
+                    else:
+                        created, updated, owner = Glue.doc_save(doc)
+                        ops.append(
+                            self.archive.mkfile(
+                                filename=filename,
+                                data=PortfolioPolicy.serialize(doc),
+                                id=doc.id,
+                                created=created,
+                                modified=updated,
+                                owner=owner,
+                                compression=Entry.COMP_NONE,
+                            )
+                        )
                 else:
-                    rejected.add(document)
+                    rejected.add(doc)
 
         result = await self.gather(*ops)
         return rejected, result

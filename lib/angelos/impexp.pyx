@@ -8,6 +8,8 @@
 import uuid
 import pprint
 
+from libangelos.error import PortfolioAlreadyExists
+
 from angelos.cmd import Command, Option
 from libangelos.policy.portfolio import PGroup
 from libangelos.policy.print import PrintPolicy
@@ -62,7 +64,7 @@ class PortfolioCommand(Command):
                 statements = portfolio.issuer.to_set() | portfolio.owner.to_set()
                 await self.__facade.storage.vault.import_portfolio(portfolio)
                 await self.__facade.storage.vault.docs_to_portfolio(statements)
-            except OSError as e:
+            except PortfolioAlreadyExists as e:
                 statements = portfolio.issuer.to_set() | portfolio.owner.to_set()
                 await self.__facade.storage.vault.update_portfolio(portfolio)
                 await self.__facade.storage.vault.docs_to_portfolio(statements)

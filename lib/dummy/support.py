@@ -294,11 +294,16 @@ class Operations:
     @classmethod
     async def trust_mutual(cls, f1: Facade, f2: Facade):
         """Make two facades mutually trust each other."""
-        StatementPolicy.trusted(f1.data.portfolio, f2.data.portfolio)
-        StatementPolicy.trusted(f2.data.portfolio, f1.data.portfolio)
+
+        docs = set()
+        docs.add(StatementPolicy.trusted(f1.data.portfolio, f2.data.portfolio))
+        docs.add(StatementPolicy.trusted(f2.data.portfolio, f1.data.portfolio))
 
         await f1.storage.vault.add_portfolio(f2.data.portfolio.to_portfolio())
         await f2.storage.vault.add_portfolio(f1.data.portfolio.to_portfolio())
+
+        await f1.storage.vault.docs_to_portfolio(docs)
+        await f2.storage.vault.docs_to_portfolio(docs)
 
         await TaskWaitress().wait_for(f1.task.contact_sync)
         await TaskWaitress().wait_for(f2.task.contact_sync)

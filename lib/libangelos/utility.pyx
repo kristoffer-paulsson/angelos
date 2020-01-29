@@ -5,6 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive7 utility code."""
+import asyncio
 import binascii
 import getpass
 import glob
@@ -159,58 +160,61 @@ def run_test(args, parser):
         else:
             parser.exit(1)
 
-def run_list(args, parser):
+async def run_list(args, parser):
     """Run command list."""
     src = args.list
     key = get_key(args)
+    archive = Archive7.open(src, key, mode="rb")
+    return await archive.execute(__run_list, archive, args, parser)
 
-    # try:
-    with Archive7.open(src, key, mode="rb") as arch, arch.lock:
-        entries = arch.ioc.entries
-        ids = arch.ioc.hierarchy.ids
+def __run_list(arch: Archive7, args, parser):
+    """Run command list."""
 
-        idxs = entries.search(Archive7.Query(), True)
+    entries = arch.ioc.entries
+    ids = arch.ioc.hierarchy.ids
 
-        files = 0
-        dirs = 0
-        links = 0
-        size = 0
-        for i in idxs:
-            idx, entry = i
+    idxs = entries.search(Archive7.Query(), True)
 
-            if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
-                continue
+    files = 0
+    dirs = 0
+    links = 0
+    size = 0
+    for i in idxs:
+        idx, entry = i
 
-            if entry.parent.int == 0:
-                filename = "/" + str(entry.name, "utf-8")
-            else:
-                filename = ids[entry.parent] + "/" + str(entry.name, "utf-8")
+        if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
+            continue
 
-            if entry.type == Entry.TYPE_FILE:
-                files += 1
-                size += entry.length
-            elif entry.type == Entry.TYPE_DIR:
-                dirs += 1
-            elif entry.type == Entry.TYPE_LINK:
-                links += 1
+        if entry.parent.int == 0:
+            filename = "/" + str(entry.name, "utf-8")
+        else:
+            filename = ids[entry.parent] + "/" + str(entry.name, "utf-8")
 
-            if args.verbose:
-                out(
-                    "{3:}  {0:<6}{2:<9}  {1:}".format(
-                        "0{:o}".format(entry.perms) if entry.perms else "n/a ",
-                        filename,
-                        file_size(entry.length) if entry.length else " ",
-                        entry.type.decode().upper(),
-                    )
-                )
-            else:
-                out(filename)
+        if entry.type == Entry.TYPE_FILE:
+            files += 1
+            size += entry.length
+        elif entry.type == Entry.TYPE_DIR:
+            dirs += 1
+        elif entry.type == Entry.TYPE_LINK:
+            links += 1
 
         if args.verbose:
             out(
-                "Statistics:\nFiles: %s\nDirs: %s\nLinks: %s\nSpace: %s\n"
-                % (files, dirs, links, size)
+                "{3:}  {0:<6}{2:<9}  {1:}".format(
+                    "0{:o}".format(entry.perms) if entry.perms else "n/a ",
+                    filename,
+                    file_size(entry.length) if entry.length else " ",
+                    entry.type.decode().upper(),
+                )
             )
+        else:
+            out(filename)
+
+    if args.verbose:
+        out(
+            "Statistics:\nFiles: %s\nDirs: %s\nLinks: %s\nSpace: %s\n"
+            % (files, dirs, links, size)
+        )
 
 def run_extract(args, parser):
     """Run command extract."""
@@ -513,7 +517,7 @@ def main():
         if args.test is not None:
             run_test(args, parser)
         elif args.list is not None:
-            run_list(args, parser)
+            asyncio.run(run_list(args, parser))
         elif args.extract is not None:
             run_extract(args, parser)
         elif args.create is not None:

@@ -9,10 +9,11 @@ from unittest import TestCase
 from libangelos.const import Const
 from libangelos.facade.facade import Facade
 from libangelos.operation.setup import SetupPersonOperation, SetupChurchOperation
+from libangelos.policy.portfolio import PGroup
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import Generate, run_async
+from dummy.support import Generate, run_async, Operations
 
 
 class TestNetworkIndexerTask(TestCase):
@@ -56,7 +57,7 @@ class TestNetworkIndexerTask(TestCase):
         )
 
         for portfolio in self.portfolios:
-            await self.facade.storage.vault.add_portfolio(portfolio)
+             await self.facade.storage.vault.add_portfolio(portfolio.to_portfolio())
         await TaskWaitress().wait_for(self.facade.task.contact_sync)
 
     def tearDown(self) -> None:
@@ -68,24 +69,22 @@ class TestNetworkIndexerTask(TestCase):
     async def test__run(self):
         try:
             docs = set()
-            # docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[0]))
-            # docs.add(StatementPolicy.verified(self.portfolios[0], self.portfolio))
 
             # Mutual trust
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
             docs.add(StatementPolicy.trusted(self.portfolios[0], self.portfolio))
 
-            # docs.add(StatementPolicy.verified(self.portfolio, self.portfolios[1]))
             # One sided trust from facade
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[1]))
 
-            # docs.add(StatementPolicy.verified(self.portfolios[2], self.portfolio))
             # One sided trust not from facade
             docs.add(StatementPolicy.trusted(self.portfolios[2], self.portfolio))
 
             # Mutual trust but no network
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[3]))
             docs.add(StatementPolicy.trusted(self.portfolios[3], self.portfolio))
+
+            print(await self.facade.storage.vault.load_portfolio(self.portfolio.entity.id, PGroup.ALL))
 
             await self.facade.storage.vault.docs_to_portfolio(docs)
             await TaskWaitress().wait_for(self.facade.task.network_index)
