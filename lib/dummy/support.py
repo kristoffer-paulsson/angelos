@@ -16,19 +16,19 @@ import uuid
 from tempfile import TemporaryDirectory
 
 import libnacl
+from libangelos.archive.portfolio_mixin import PortfolioMixin
 from libangelos.const import Const
 from libangelos.document.document import DocType
 from libangelos.document.messages import Mail
 from libangelos.facade.facade import Facade
-from libangelos.misc import Loop, BaseDataClass
+from libangelos.misc import BaseDataClass, Misc
 from libangelos.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation
 from libangelos.policy.message import MessagePolicy, EnvelopePolicy
-from libangelos.policy.portfolio import Portfolio, DOCUMENT_PATH
+from libangelos.policy.portfolio import Portfolio, DOCUMENT_PATH, PortfolioPolicy, PGroup
 from libangelos.policy.types import PersonData, MinistryData, ChurchData
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.stub import StubServer, StubClient
 from dummy.lipsum import (
     SURNAMES,
     MALE_NAMES,
@@ -37,6 +37,7 @@ from dummy.lipsum import (
     LIPSUM_WORDS,
     CHURCHES,
 )
+from dummy.stub import StubServer, StubClient
 
 
 def run_async(coro):
@@ -176,6 +177,34 @@ class Generate:
         return libnacl.secret.SecretBox().sk
 
 
+class Introspection:
+    """Facade introspection tools."""
+
+    @staticmethod
+    async def get_storage_portfolio_file_list(storage: PortfolioMixin, eid: uuid.UUID) -> set:
+        """Create a set of all files in a portfolio stored in a storage"""
+        dirname = storage.portfolio_path(eid)
+        return await storage.archive.glob(name="{dir}/*".format(dir=dirname))
+
+    @staticmethod
+    def get_portfolio_file_list(storage: PortfolioMixin, portfolio: Portfolio):
+        """Create a set of all filenames from a portfolio"""
+        dirname = storage.portfolio_path(portfolio.entity.id)
+        issuer, owner = portfolio.to_sets()
+        return {DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id) for doc in issuer | owner}
+
+    @staticmethod
+    async def load_storage_file_list(storage: PortfolioMixin, file_list: set) -> set:
+        """Load all files from a storage expecting them to be Documents and exist."""
+        files = set()
+        for filename in file_list:
+            data = await storage.archive.load(filename)
+            doc = PortfolioPolicy.deserialize(data)
+            files.add(doc)
+
+        return files
+
+
 class ApplicationContext:
     """Environmental context for a stub application."""
 
@@ -291,8 +320,8 @@ class StubMaker:
 class Operations:
     """Application, facade and portfolio operations."""
 
-    @classmethod
-    async def trust_mutual(cls, f1: Facade, f2: Facade):
+    @staticmethod
+    async def trust_mutual(f1: Facade, f2: Facade):
         """Make two facades mutually trust each other."""
 
         docs = set()
@@ -308,8 +337,8 @@ class Operations:
         await TaskWaitress().wait_for(f1.task.contact_sync)
         await TaskWaitress().wait_for(f2.task.contact_sync)
 
-    @classmethod
-    async def send_mail(cls, sender: Facade, recipient: Portfolio) -> Mail:
+    @staticmethod
+    async def send_mail(sender: Facade, recipient: Portfolio) -> Mail:
         """Generate one mail to recipient using a facade saving the mail to the outbox."""
         builder = MessagePolicy.mail(sender.data.portfolio, recipient)
         message = builder.message(Generate.lipsum_sentence(), Generate.lipsum().decode()).done()
@@ -317,8 +346,8 @@ class Operations:
         await sender.api.mailbox.save_outbox(envelope)
         return message
 
-    @classmethod
-    async def inject_mail(cls, server: Facade, sender: Facade, recipient: Portfolio) -> Mail:
+    @staticmethod
+    async def inject_mail(server: Facade, sender: Facade, recipient: Portfolio) -> Mail:
         """Generate one mail to recipient using a facade injecting the mail to the server."""
         builder = MessagePolicy.mail(sender.data.portfolio, recipient)
         message = builder.message(Generate.lipsum_sentence(), Generate.lipsum().decode()).done()
@@ -330,8 +359,80 @@ class Operations:
         return message
 
     @staticmethod
-    async def portfolios(num: int, portfolio_list: list, server: bool=False, types: int=0):
+    async def portfolios(num: int, portfolio_list: list, server: bool = False, types: int = 0):
         """Generate random portfolios based on input data."""
 
         for person in StubMaker.TYPES[types][1](num):
             portfolio_list.append(StubMaker.TYPES[types][0].create(person, server=server))
+
+    @staticmethod
+    async def cross_authenticate(server: Facade, client: Facade, preselect: bool = True) -> bool:
+        """Cross authenticate a server and a client.
+
+        The facade will import each others portfolios, then they will trust each other and update the portfolios.
+        Also the networks will be indexed at the client and the recent network preselected.
+        When the client and server are cross authenticated, the client should be able to connect to the server.
+
+        Args:
+            server (Facade):
+                Facade of the server
+            client (Facade):
+                Facade of the client
+            preselect (bool):
+                If the server should be the primary network in the client facade.
+
+        Returns (bool):
+            Whether the server is successfully indexed as a trusted network
+
+        """
+        # Client --> Server
+        # Export the public client portfolio
+        client_data = await client.storage.vault.load_portfolio(
+            client.data.portfolio.entity.id, PGroup.SHARE_MAX_USER)
+
+        # Add client portfolio to server
+        await server.storage.vault.add_portfolio(client_data)
+
+        # Load server data from server vault
+        server_data = await server.storage.vault.load_portfolio(
+            server.data.portfolio.entity.id, PGroup.SHARE_MAX_COMMUNITY)
+
+        # Add server portfolio to client
+        await client.storage.vault.add_portfolio(server_data)
+
+        # Server -" Client
+        # Trust the client portfolio
+        trust = StatementPolicy.trusted(
+            server.data.portfolio, client.data.portfolio)
+
+        # Saving server trust for client to server
+        await server.storage.vault.docs_to_portfolio(set([trust]))
+
+        # Client <-- -" Server
+        # Load client data from server vault
+        client_data = await server.storage.vault.load_portfolio(
+            client.data.portfolio.entity.id, PGroup.SHARE_MAX_USER)
+
+        # Saving server trust for client to client
+        await client.storage.vault.docs_to_portfolio(client_data.owner.trusted)
+
+        # Client -" Server
+        # Trust the server portfolio
+        trust = StatementPolicy.trusted(client.data.portfolio, server.data.portfolio)
+
+        # Saving client trust for server to client
+        await client.storage.vault.docs_to_portfolio(set([trust]))
+
+        # Client (index network)
+        await TaskWaitress().wait_for(client.task.network_index)
+
+        # Verify trusted network
+        networks = {net[0] for net in await client.api.settings.networks() if net[1]}
+        if str(server.data.portfolio.entity.id) not in networks:
+            return False
+
+        if preselect:
+            client.data.client["CurrentNetwork"] = server.data.portfolio.entity.id
+            await Misc.sleep()
+
+        return True

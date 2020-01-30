@@ -7,7 +7,7 @@ from libangelos.policy.portfolio import PGroup
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import run_async, StubMaker, Operations, Generate
+from dummy.support import run_async, StubMaker, Operations, Generate, Introspection
 from dummy.testing import BaseTestNetwork
 
 
@@ -31,11 +31,6 @@ class TestNetwork(BaseTestNetwork):
         del self.server
         del self.client
         del self.facade
-
-    async def get_storage_portfolio_file_list(self, storage: PortfolioMixin, eid: uuid.UUID) -> set:
-        """Create a set of all files in a portfolio stored in a storage"""
-        dirname = storage.portfolio_path(eid)
-        return await storage.archive.glob(name="{dir}/*".format(dir=dirname))
 
     @run_async
     async def test_mail_replication_to_server(self):
@@ -106,7 +101,7 @@ class TestNetwork(BaseTestNetwork):
         await self.server.app.ioc.facade.storage.vault.add_portfolio(client_data)
 
         # Verify the client portfolio in server vault
-        files = await self.get_storage_portfolio_file_list(
+        files = await Introspection.get_storage_portfolio_file_list(
             self.server.app.ioc.facade.storage.vault,
             self.client.app.ioc.facade.data.portfolio.entity.id
         )
@@ -122,7 +117,7 @@ class TestNetwork(BaseTestNetwork):
         # Add server portfolio to client
         await self.client.app.ioc.facade.storage.vault.add_portfolio(server_data)
 
-        files = await self.get_storage_portfolio_file_list(
+        files = await Introspection.get_storage_portfolio_file_list(
             self.client.app.ioc.facade.storage.vault,
             self.server.app.ioc.facade.data.portfolio.entity.id
         )
@@ -139,7 +134,7 @@ class TestNetwork(BaseTestNetwork):
         await self.server.app.ioc.facade.storage.vault.docs_to_portfolio(set([trust]))
 
         # Verify the client portfolio in server vault
-        files = await self.get_storage_portfolio_file_list(
+        files = await Introspection.get_storage_portfolio_file_list(
             self.server.app.ioc.facade.storage.vault,
             self.client.app.ioc.facade.data.portfolio.entity.id
         )
@@ -156,7 +151,7 @@ class TestNetwork(BaseTestNetwork):
         await self.client.app.ioc.facade.storage.vault.docs_to_portfolio(client_data.owner.trusted)
 
         # Verify the server trust for client in client vault
-        files = await self.get_storage_portfolio_file_list(
+        files = await Introspection.get_storage_portfolio_file_list(
             self.client.app.ioc.facade.storage.vault,
             self.server.app.ioc.facade.data.portfolio.entity.id
         )
@@ -173,7 +168,7 @@ class TestNetwork(BaseTestNetwork):
         await self.client.app.ioc.facade.storage.vault.docs_to_portfolio(set([trust]))
 
         # Verify the client trust for server in client vault
-        files = await self.get_storage_portfolio_file_list(
+        files = await Introspection.get_storage_portfolio_file_list(
             self.client.app.ioc.facade.storage.vault,
             self.server.app.ioc.facade.data.portfolio.entity.id
         )

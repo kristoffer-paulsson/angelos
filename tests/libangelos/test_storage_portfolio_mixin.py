@@ -11,7 +11,7 @@ from libangelos.operation.setup import SetupPersonOperation
 from libangelos.policy.portfolio import PGroup, Portfolio, DOCUMENT_PATH, PortfolioPolicy, PrivatePortfolio, DocSet
 from libangelos.policy.verify import StatementPolicy
 
-from dummy.support import run_async, StubMaker, Generate, Operations
+from dummy.support import run_async, StubMaker, Generate, Operations, Introspection
 from dummy.testing import BaseTestNetwork
 
 
@@ -44,27 +44,6 @@ class TestPortfolioMixin(BaseTestNetwork):
             StatementPolicy.trusted(self.portfolio, portfolio)
             StatementPolicy.trusted(portfolio, self.portfolio)
 
-    async def get_storage_portfolio_file_list(self, storage: PortfolioMixin, eid: uuid.UUID) -> set:
-        """Create a set of all files in a portfolio stored in a storage"""
-        dirname = storage.portfolio_path(eid)
-        return await storage.archive.glob(name="{dir}/*".format(dir=dirname))
-
-    def get_portfolio_file_list(self, storage: PortfolioMixin, portfolio: Portfolio):
-        """Create a set of all filenames from a portfolio"""
-        dirname = storage.portfolio_path(portfolio.entity.id)
-        issuer, owner = portfolio.to_sets()
-        return {DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id) for doc in issuer | owner}
-
-    async def load_storage_file_list(self, storage: PortfolioMixin, file_list: set) -> set:
-        """Load all files from a storage expecting them to be Documents and exist."""
-        files = set()
-        for filename in file_list:
-            data = await storage.archive.load(filename)
-            doc = PortfolioPolicy.deserialize(data)
-            files.add(doc)
-
-        return files
-
     def test_update_portfolio(self):
         try:
             raise NotImplementedError()
@@ -77,13 +56,13 @@ class TestPortfolioMixin(BaseTestNetwork):
             # Strange error where documents are removed from RAM!
             self.mutual_trust_and_verification()
 
-            files_loaded = self.get_portfolio_file_list(self.facade.storage.vault, self.portfolio)
+            files_loaded = Introspection.get_portfolio_file_list(self.facade.storage.vault, self.portfolio)
             print(self.portfolio, "="*80)
             success, rejected, removed = await self.facade.storage.vault.add_portfolio(self.portfolio)
-            files_saved = await self.get_storage_portfolio_file_list(
+            files_saved = await Introspection.get_storage_portfolio_file_list(
                 self.facade.storage.vault, self.portfolio.entity.id)
 
-            docset = DocSet(await self.load_storage_file_list(self.facade.storage.vault, files_saved))
+            docset = DocSet(await Introspection.load_storage_file_list(self.facade.storage.vault, files_saved))
             portfolio = PrivatePortfolio.factory(
                 docset.get_issuer(self.portfolio.entity.id),
                 docset.get_owner(self.portfolio.entity.id)
@@ -135,10 +114,10 @@ class TestPortfolioMixin(BaseTestNetwork):
         """Full portfolio import"""
         try:
             self.assertTrue(await self.facade.storage.vault.import_portfolio(self.portfolio))
-            files = self.get_portfolio_file_list(self.facade.storage.vault, self.portfolio)
+            files = Introspection.get_portfolio_file_list(self.facade.storage.vault, self.portfolio)
 
             portfolio = PrivatePortfolio.factory(
-                await self.load_storage_file_list(self.facade.storage.vault, files))
+                await Introspection.load_storage_file_list(self.facade.storage.vault, files))
             self.assertEqual(portfolio, self.portfolio)
 
             with self.assertRaises(PortfolioAlreadyExists):
@@ -169,13 +148,13 @@ class TestPortfolioMixin(BaseTestNetwork):
             self.mutual_trust_and_verification()
             await self.facade.storage.vault.save_portfolio(self.portfolio)
 
-            files_loaded = self.get_portfolio_file_list(self.facade.storage.vault, self.portfolio)
-            files_saved = await self.get_storage_portfolio_file_list(
+            files_loaded = Introspection.get_portfolio_file_list(self.facade.storage.vault, self.portfolio)
+            files_saved = await Introspection.get_storage_portfolio_file_list(
                 self.facade.storage.vault, self.portfolio.entity.id)
 
             self.assertEqual(collections.Counter(files_loaded), collections.Counter(files_saved))
 
-            docset = DocSet(await self.load_storage_file_list(self.facade.storage.vault, files_saved))
+            docset = DocSet(await Introspection.load_storage_file_list(self.facade.storage.vault, files_saved))
             portfolio = PrivatePortfolio.factory(
                 docset.get_issuer(self.portfolio.entity.id),
                 docset.get_owner(self.portfolio.entity.id)
@@ -193,7 +172,7 @@ class TestPortfolioMixin(BaseTestNetwork):
             self.mutual_trust_and_verification()
             self.assertTrue(await self.facade.storage.vault.import_portfolio(self.portfolio))
 
-            files_saved = await self.get_storage_portfolio_file_list(
+            files_saved = await Introspection.get_storage_portfolio_file_list(
                 self.facade.storage.vault, self.portfolio.entity.id)
 
             with self.assertRaises(PortfolioIllegalDelete):
@@ -201,7 +180,7 @@ class TestPortfolioMixin(BaseTestNetwork):
 
             self.assertTrue(await self.facade.storage.vault.delete_portfolio(self.portfolio.entity.id))
 
-            files_deleted = await self.get_storage_portfolio_file_list(
+            files_deleted = await Introspection.get_storage_portfolio_file_list(
                 self.facade.storage.vault, self.portfolio.entity.id)
             self.assertNotEqual(files_saved, files_deleted)
             self.assertEqual(files_deleted, set())

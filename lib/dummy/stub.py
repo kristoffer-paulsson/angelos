@@ -8,7 +8,6 @@
 import asyncio
 import collections
 import json
-import logging
 import os
 import uuid
 
@@ -23,7 +22,6 @@ from libangelos.policy.portfolio import PGroup
 from libangelos.policy.types import PersonData, MinistryData, ChurchData
 from libangelos.reactive import Event
 from libangelos.reactive import NotifierMixin, ObserverMixin
-from libangelos.ssh.client import ClientsClient, ClientsServer
 from libangelos.ssh.ssh import SessionManager
 from libangelos.starter import Starter
 

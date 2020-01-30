@@ -23,7 +23,7 @@ from libangelos.policy.types import ChurchData, MinistryData, PersonData
 from libangelos.ssh.ssh import SessionManager
 from libangelos.starter import Starter
 
-from dummy.support import Generate, run_async
+from dummy.support import Generate, run_async, Operations
 
 """Environment default values."""
 ENV_DEFAULT = {"name": "Logo"}
@@ -349,7 +349,7 @@ class StubClient(StubApplication, StubRunnableMixin, ClientsClientMixin):
         """Create a new client"""
         home_dir = TemporaryDirectory()
         secret = Generate.new_secret()
-        return cls(name, await StubApplication._create(home_dir.name, secret, data, True), home_dir, secret)
+        return cls(name, await StubApplication._create(home_dir.name, secret, data, False), home_dir, secret)
 
     def stop(self):
         """Clean up client"""
@@ -419,7 +419,7 @@ class BaseNetworkProcessTestCase(TestCase):
 
     async def setup_client(self, name: str):
         """Start a new client"""
-        self.manager.start(await StubServer.create(name, Generate.person_data()[0]))
+        self.manager.start(await StubClient.create(name, Generate.person_data()[0]))
 
     async def setup_server(self, name: str):
         """Start a new server"""
@@ -442,8 +442,23 @@ class DemoTest(BaseNetworkProcessTestCase):
     """A test to demonstrate the process based application tester."""
     pref_loglevel = logging.DEBUG
 
-    def test_run(self):
+    @run_async
+    async def test_run(self):
         try:
+            # Make the server and clients authenticated and connectable.
+            self.assertTrue(
+                await Operations.cross_authenticate(
+                    self.manager.proc["server"].ioc.facade,
+                    self.manager.proc["client1"].ioc.facade
+                )
+            )
+            self.assertTrue(
+                await Operations.cross_authenticate(
+                    self.manager.proc["server"].ioc.facade,
+                    self.manager.proc["client2"].ioc.facade
+                )
+            )
+
             self.manager.do("server", "exit")
             self.manager.do("client1", "exit")
             self.manager.do("client2", "exit")
