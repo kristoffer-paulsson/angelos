@@ -207,6 +207,7 @@ def __run_list(arch: Archive7, args, parser):
                     entry.type.decode().upper(),
                 )
             )
+            out("{0} {1}".format(entry.id, entry.owner))
         else:
             out(filename)
 
