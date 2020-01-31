@@ -8,15 +8,14 @@ import tracemalloc
 import uuid
 from multiprocessing import Process, JoinableQueue, Queue
 from tempfile import TemporaryDirectory
-from typing import Any
 from unittest import TestCase
 
 from libangelos.automatic import Automatic
 from libangelos.const import Const
-from libangelos.facade.facade import ServerFacadeMixin, TypeFacadeMixin, Facade
+from libangelos.facade.facade import Facade
 from libangelos.ioc import ContainerAware, Handle, Container, Config
 from libangelos.logger import LogHandler
-from libangelos.misc import BaseDataClass, Misc
+from libangelos.misc import Misc
 from libangelos.operation.setup import SetupChurchOperation, SetupMinistryOperation, SetupPersonOperation
 from libangelos.policy.portfolio import PGroup
 from libangelos.policy.types import ChurchData, MinistryData, PersonData
@@ -104,6 +103,18 @@ CONFIG_IMMUTABLE = {
 }
 
 
+class BaseStubMixin:
+    """Base stub application mixin."""
+
+    async def initialize(self, **kwargs):
+        """Initialize method is always a coroutine."""
+        pass
+
+    async def finalize(self):
+        """Finalize method is always a coroutine."""
+        pass
+
+
 class Configuration(Config, Container):
     """Application configuration."""
 
@@ -138,7 +149,8 @@ class Configuration(Config, Container):
         }
 
 
-class BaseStubApplication(ContainerAware):
+class BaseStubApplication(ContainerAware, BaseStubMixin):
+    """Base application that is container aware."""
 
     def __init__(self):
         """Initialize configuration."""
@@ -148,12 +160,11 @@ class BaseStubApplication(ContainerAware):
 class StubApplication(BaseStubApplication):
     """Facade loader and environment."""
 
-    def __init__(self, facade: Facade, home_dir: TemporaryDirectory, secret: bytes):
+    def __init__(self):
         """Load the facade."""
         BaseStubApplication.__init__(self)
-        self.__dir = home_dir
-        self.__secret = secret
-        self.ioc.facade = facade
+        self.__secret = None
+        self.__dir = None
 
     @property
     def path(self):
@@ -165,38 +176,35 @@ class StubApplication(BaseStubApplication):
         """Encryption key"""
         return self.__secret
 
-    @staticmethod
-    async def _create(path: str, secret: bytes, data: BaseDataClass, server: bool) -> TypeFacadeMixin:
-        """Implement facade generation logic here."""
+    async def initialize(self, **kwargs):
+        """Setup application environment and facade."""
+        self.__dir = TemporaryDirectory()
+        self.__secret = Generate.new_secret()
+
+        data = kwargs.get("entity_data")
+        server = kwargs.get("type_server")
+
         if isinstance(data, PersonData):
-            portfolio = SetupPersonOperation.create(data, server=True)
+            portfolio = SetupPersonOperation.create(data, server=server)
         elif isinstance(data, MinistryData):
-            portfolio = SetupMinistryOperation.create(data, server=True)
+            portfolio = SetupMinistryOperation.create(data, server=server)
         elif isinstance(data, ChurchData):
-            portfolio = SetupChurchOperation.create(data, server=True)
+            portfolio = SetupChurchOperation.create(data, server=server)
         else:
             raise TypeError("Unknown data type, got %s" % type(data))
 
-        return await Facade.setup(
-            path,
-            secret,
+        self.ioc.facade = await Facade.setup(
+            self.__dir.name,
+            self.__secret,
             Const.A_ROLE_PRIMARY,
             server,
             portfolio=portfolio
         )
 
-    @staticmethod
-    async def create(name: str, data: BaseDataClass) -> ServerFacadeMixin:
-        """Create application abstract function."""
-        raise NotImplementedError()
-
-    def stop(self):
-        """Clean up home directory"""
+    async def finalize(self):
+        """Clean up environment"""
+        self.oic.facade.close()
         self.__dir.cleanup()
-
-
-class BaseStubMixin:
-    """Base stub application mixin."""
 
 
 class ApplicationCommand:
@@ -236,8 +244,9 @@ class ApplicationCommand:
 class StubRunnableMixin(BaseStubMixin, Process):
     """Mixin to make stub application runnable."""
 
-    def __init__(self, name: str):
-        Process.__init__(self, name=name, daemon=True)
+    def __init__(self, name: str, **kwargs):
+        Process.__init__(self, name=name, daemon=True, kwargs=kwargs)
+        super(StubRunnableMixin, self).__init__()
         self.__queue = JoinableQueue(maxsize=1)
         self.__result = Queue()
 
@@ -246,48 +255,63 @@ class StubRunnableMixin(BaseStubMixin, Process):
         """The command queue"""
         return self.__queue
 
-    def result(self) -> Any:
+    @property
+    def result(self) -> Queue:
         """The result from the last task"""
-        return self.__result.get()
+        return self.__result
 
-    def run(self):
-        """Execute all commands given through the queue."""
+    async def __initialize(self, **kwargs):
+        for cls in self.__class__.mro():
+            if asyncio.iscoroutinefunction(getattr(cls, "initialize", None)):
+                await cls.initialize(self, **kwargs)
+
+    async def __inner_loop(self):
         command = True
-        while command:
+        while bool(command):
             command = self.__queue.get()
             if not command:
                 continue
 
             task = getattr(self, "do_" + command.task, None)
 
-            if callable(task):
-                try:
-                    result = task(*command.largs, **command.kwargs)
-                    if not self.__result.empty():
-                        raise RuntimeError("Pending result")
-                    self.__result.put((command.task, result))
-                except Exception as e:
-                    logging.critical(e, exc_info=True)
+            if asyncio.iscoroutinefunction(task):
+                result = await task(*command.largs, **command.kwargs)
             else:
-                raise AttributeError("Method do_%s doesn't exist." % command.task)
+                raise RuntimeError("Expected '%s' to be a coroutine" % command.task)
 
+            if not self.__result.empty():
+                raise RuntimeError("Pending result")
+            self.__result.put((command.task, result))
             self.__queue.task_done()
 
-    def do_exit(self):
-        """Exit stub task"""
-        pass
+    async def __finalize(self):
+        for cls in self.__class__.mro():
+            if asyncio.iscoroutinefunction(getattr(cls, "finalize", None)):
+                await cls.initialize(self)
 
-    def stop(self):
+    async def _run(self, **kwargs):
+        try:
+            await self.__initialize(**kwargs)
+            await self.__inner_loop()
+            await self.__finalize()
+        except Exception as e:
+            logging.critical(e, exc_info=True)
+
+    def run(self):
+        """Execute all commands given through the queue."""
+        asyncio.run(self._run())
+
+    async def do_exit(self):
+        """Exit stub task"""
+        self.__queue.set(None)
+
+    async def finalize(self):
         """Terminate the process."""
-        if not self.__queue.empty():
-            raise RuntimeError("Queue not empty")
         self.__queue.close()
         self.__queue.join_thread()
 
-        if not self.__result.empty():
-            raise RuntimeError("Result not empty")
         self.__result.close()
-        self.__result .join_thread()
+        self.__result.join_thread()
 
         self.terminate()
 
@@ -311,6 +335,7 @@ class ClientsClientMixin(BaseStubMixin):
 
     async def do_connect_client(self):
         """Runnable task that opens a connection to a server."""
+        print(await self.ioc.facade.api.settings.networks())
         cnid = uuid.UUID(self.ioc.facade.data.client["CurrentNetwork"])
         host = await self.ioc.facade.storage.vault.load_portfolio(cnid, PGroup.SHARE_MIN_COMMUNITY)
         _, client = await Starter().clients_client(self.ioc.facade.data.portfolio, host, 5 + 8000, ioc=self.ioc)
@@ -320,41 +345,17 @@ class ClientsClientMixin(BaseStubMixin):
 class StubServer(StubApplication, StubRunnableMixin, ClientsServerMixin):
     """Stub server for simulations and testing."""
 
-    def __init__(self, name: str, facade: Facade, home_dir: TemporaryDirectory, secret: bytes):
-        StubApplication.__init__(self, facade, home_dir, secret)
-        StubRunnableMixin.__init__(self, name)
-
-    @classmethod
-    async def create(cls, name: str, data: BaseDataClass) -> ServerFacadeMixin:
-        """Create a new stub server."""
-        home_dir = TemporaryDirectory()
-        secret = Generate.new_secret()
-        return cls(name, await StubApplication._create(home_dir.name, secret, data, True), home_dir, secret)
-
-    def stop(self):
-        """Clean up server"""
-        StubRunnableMixin.stop(self)
-        StubApplication.stop(self)
+    def __init__(self, name: str, **kwargs):
+        StubApplication.__init__(self)
+        StubRunnableMixin.__init__(self, name, **kwargs)
 
 
 class StubClient(StubApplication, StubRunnableMixin, ClientsClientMixin):
     """Stub client for simulations and testing."""
 
-    def __init__(self, name: str, facade: Facade, home_dir: TemporaryDirectory, secret: bytes):
-        StubApplication.__init__(self, facade, home_dir, secret)
-        StubRunnableMixin.__init__(self, name)
-
-    @classmethod
-    async def create(cls, name: str, data: BaseDataClass) -> ServerFacadeMixin:
-        """Create a new client"""
-        home_dir = TemporaryDirectory()
-        secret = Generate.new_secret()
-        return cls(name, await StubApplication._create(home_dir.name, secret, data, False), home_dir, secret)
-
-    def stop(self):
-        """Clean up client"""
-        StubRunnableMixin.stop(self)
-        StubApplication.stop(self)
+    def __init__(self, name: str, **kwargs):
+        StubApplication.__init__(self)
+        StubRunnableMixin.__init__(self, name, **kwargs)
 
 
 class StubManager:
@@ -384,11 +385,10 @@ class StubManager:
         proc = self.__processes[name]
         proc.queue.put(ApplicationCommand(task, *largs, **kwargs))
         proc.queue.join()
-        done, result = proc.result()
+        done, result = proc.result.get()
         if done != task:
             raise RuntimeError("Expected result from '%s' but got from '%s'" % (task, done))
         return result
-
 
     def cleanup(self):
         """Kill and clean up all processes"""
@@ -419,11 +419,11 @@ class BaseNetworkProcessTestCase(TestCase):
 
     async def setup_client(self, name: str):
         """Start a new client"""
-        self.manager.start(await StubClient.create(name, Generate.person_data()[0]))
+        self.manager.start(StubClient(name, entity_data=Generate.person_data()[0], type_server=False))
 
     async def setup_server(self, name: str):
         """Start a new server"""
-        self.manager.start(await StubServer.create(name, Generate.church_data()[0]))
+        self.manager.start(StubServer(name, entity_data=Generate.church_data()[0], type_server=False))
 
     @run_async
     async def setUp(self) -> None:
@@ -458,6 +458,32 @@ class DemoTest(BaseNetworkProcessTestCase):
                     self.manager.proc["client2"].ioc.facade
                 )
             )
+
+            # Make the clients know and trust each other
+            await Operations.trust_mutual(
+                self.manager.proc["client1"].ioc.facade,
+                self.manager.proc["client2"].ioc.facade
+            )
+
+            # Write and post a mail from client1 to client2
+            mail = await Operations.send_mail(
+                self.manager.proc["client1"].ioc.facade,
+                self.manager.proc["client2"].ioc.facade.data.portfolio
+            )
+
+            # Start server
+            self.manager.do("server", "listen_clients")
+            # Replicate client1  outbox
+            self.manager.do("client1", "connect_client")
+            # Replicate client2 inbox
+            self.manager.do("client2", "connect_client")
+
+            # Load inbox and verify letter
+            c2f = self.manager.proc["client2"].ioc.facade
+            envelopes = await c2f.api.mailbox.load_inbox()
+            self.assertEqual(len(envelopes), 1)
+            mail2 = await c2f.api.mailbox.open_envelope(envelopes.pop())
+            self.assertEqual(mail, mail2)
 
             self.manager.do("server", "exit")
             self.manager.do("client1", "exit")
