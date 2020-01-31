@@ -11,8 +11,8 @@ from libangelos.operation.setup import SetupPersonOperation
 from libangelos.policy.portfolio import PGroup, Portfolio, DOCUMENT_PATH, PortfolioPolicy, PrivatePortfolio, DocSet
 from libangelos.policy.verify import StatementPolicy
 
-from dummy.support import run_async, StubMaker, Generate, Operations, Introspection
-from dummy.testing import BaseTestNetwork
+from angelossim.support import run_async, StubMaker, Generate, Operations, Introspection
+from angelossim.testing import BaseTestNetwork
 
 
 class TestPortfolioMixin(BaseTestNetwork):

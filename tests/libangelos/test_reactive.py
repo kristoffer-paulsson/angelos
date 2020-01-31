@@ -1,9 +1,9 @@
 import tracemalloc
 
-from dummy.stub import StubObserver, StubNotifier
+from angelossim.stub import StubObserver, StubNotifier
 from unittest import TestCase
 
-from dummy.support import run_async
+from angelossim.support import run_async
 from libangelos.reactive import Event
 
 

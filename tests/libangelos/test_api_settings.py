@@ -3,8 +3,8 @@ from ipaddress import IPv4Address
 
 from libangelos.data.dict_mixin import DictionaryMixin
 
-from dummy.support import run_async, Generate
-from dummy.testing import BaseTestFacade
+from angelossim.support import run_async, Generate
+from angelossim.testing import BaseTestFacade
 
 
 class TestSettingsAPI(BaseTestFacade):

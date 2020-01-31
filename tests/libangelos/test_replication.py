@@ -7,8 +7,8 @@ from libangelos.policy.portfolio import PGroup
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import run_async, StubMaker, Operations, Generate, Introspection
-from dummy.testing import BaseTestNetwork
+from angelossim.support import run_async, StubMaker, Operations, Generate, Introspection
+from angelossim.testing import BaseTestNetwork
 
 
 class TestNetwork(BaseTestNetwork):

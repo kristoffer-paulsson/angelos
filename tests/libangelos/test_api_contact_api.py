@@ -9,7 +9,7 @@ from libangelos.operation.setup import SetupPersonOperation
 from libangelos.policy.portfolio import PGroup
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import Generate, run_async
+from angelossim.support import Generate, run_async
 
 
 class TestContactAPI(TestCase):

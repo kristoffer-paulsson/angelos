@@ -13,7 +13,7 @@ from libangelos.error import (
 from libangelos.document.model import Field, UuidField, BaseDocument, DocumentField, IPField, DateField, DateTimeField, \
     TypeField, BinaryField, SignatureField, StringField, ChoiceField, RegexField, EmailField, DocumentMeta
 
-from dummy.support import Generate
+from angelossim.support import Generate
 
 
 class BaseTestField(TestCase):

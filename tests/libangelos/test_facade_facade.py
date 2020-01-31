@@ -23,7 +23,7 @@ from libangelos.facade.facade import Facade, ServerFacadeMixin, ClientFacadeMixi
 from libangelos.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation
 from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
-from dummy.support import Generate, run_async
+from angelossim.support import Generate, run_async
 
 
 class TestFacade(TestCase):

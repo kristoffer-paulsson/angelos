@@ -23,7 +23,7 @@ from libangelos.policy.types import ChurchData, MinistryData, PersonData
 from libangelos.ssh.ssh import SessionManager
 from libangelos.starter import Starter
 
-from dummy.support import Generate, run_async, Operations
+from angelossim.support import Generate, run_async, Operations
 
 """Environment default values."""
 ENV_DEFAULT = {"name": "Logo"}

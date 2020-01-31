@@ -18,7 +18,7 @@ from libangelos.facade.facade import Facade
 from libangelos.operation.setup import SetupPersonOperation
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import run_async, Generate
+from angelossim.support import run_async, Generate
 
 
 class BaseTestFacade(TestCase):

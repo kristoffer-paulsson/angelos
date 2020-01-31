@@ -29,7 +29,7 @@ from libangelos.policy.types import PersonData, MinistryData, ChurchData
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.lipsum import (
+from angelossim.lipsum import (
     SURNAMES,
     MALE_NAMES,
     FEMALE_NAMES,
@@ -37,7 +37,7 @@ from dummy.lipsum import (
     LIPSUM_WORDS,
     CHURCHES,
 )
-from dummy.stub import StubServer, StubClient
+from angelossim.stub import StubServer, StubClient
 
 
 def run_async(coro):

@@ -13,7 +13,7 @@ from libangelos.policy.portfolio import PGroup
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import Generate, run_async, Operations
+from angelossim.support import Generate, run_async, Operations
 
 
 class TestNetworkIndexerTask(TestCase):

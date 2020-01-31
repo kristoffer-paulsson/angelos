@@ -1,8 +1,8 @@
 from libangelos.misc import Misc
 
-from dummy.stub import StubObserver
-from dummy.support import run_async
-from dummy.testing import BaseTestFacade
+from angelossim.stub import StubObserver
+from angelossim.support import run_async
+from angelossim.testing import BaseTestFacade
 
 
 class TestPreferencesData(BaseTestFacade):

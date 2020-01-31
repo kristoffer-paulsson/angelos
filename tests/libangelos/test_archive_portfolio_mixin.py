@@ -8,7 +8,7 @@ from libangelos.facade.facade import Facade
 from libangelos.operation.setup import SetupPersonOperation
 from libangelos.task.task import TaskWaitress
 
-from dummy.support import Generate, run_async
+from angelossim.support import Generate, run_async
 
 
 class TestPortfolioMixin(TestCase):

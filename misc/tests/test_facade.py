@@ -12,7 +12,7 @@ sys.path.append('../angelos')  # noqa
 import testing
 import tempfile
 
-from dummy.dummy import DummyPolicy
+from angelossim.dummy import DummyPolicy
 
 
 class TestFacade(testing.TestCase):
