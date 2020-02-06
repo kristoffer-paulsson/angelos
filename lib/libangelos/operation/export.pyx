@@ -8,8 +8,8 @@
 import base64
 import re
 
-from ..policy.portfolio import PortfolioPolicy, Portfolio
-from .operation import Operation
+from libangelos.policy.portfolio import PortfolioPolicy, Portfolio
+from libangelos.operation.operation import Operation
 
 
 REGEX = r"----[\n\r]([a-zA-Z0-9+/\n\r]+={0,3})[\n\r]----"

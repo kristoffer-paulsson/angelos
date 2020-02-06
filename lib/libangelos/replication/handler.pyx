@@ -746,7 +746,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
     def exit(self):
         if self._writer:
-            self._writer.write_eof()
+             self._writer.write_eof()
 
     async def wait_closed(self):
         if self._writer:
@@ -1014,6 +1014,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
 
     async def _process_close(self, packet):
         logging.info("RPL_CLOSE received")
+        self._server.connection.close()
 
     async def pulled(self):
         try:
