@@ -569,7 +569,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 String(self._clientfile.created.isoformat()),
                 String(self._clientfile.modified.isoformat()),
                 String(self._clientfile.owner.bytes),
-                String(self._serverfile.fileid.bytes),
+                String(self._serverfile.fileid.bytes if self._serverfile.fileid.int else self._clientfile.fileid.bytes),
                 String(self._clientfile.user),
                 String(self._clientfile.group),
                 UInt32(self._clientfile.perms)

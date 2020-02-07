@@ -1,7 +1,7 @@
 import logging
 from tempfile import TemporaryDirectory
 
-from libangelos.policy.portfolio import PGroup
+from libangelos.policy.portfolio import PGroup, PortfolioPolicy
 from libangelos.policy.verify import StatementPolicy
 from libangelos.task.task import TaskWaitress
 
@@ -9,7 +9,7 @@ from angelossim.support import run_async, StubMaker, Operations, Generate, Intro
 from angelossim.testing import BaseTestNetwork
 
 
-class TestPartialReplication(BaseTestNetwork):
+class TestCrossAuthentication(BaseTestNetwork):
     pref_loglevel = logging.DEBUG
     pref_connectable = True
 
@@ -29,61 +29,6 @@ class TestPartialReplication(BaseTestNetwork):
         del self.server
         del self.client
         del self.facade
-
-    @run_async
-    async def test_mail_replication_to_server(self):
-        try:
-            # Make all players trust each other
-            await Operations.trust_mutual(self.server.app.ioc.facade, self.client.app.ioc.facade)
-            await Operations.trust_mutual(self.client.app.ioc.facade, self.facade)
-            await TaskWaitress().wait_for(self.client.app.ioc.facade.task.network_index)
-
-            # print(await self.client.app.ioc.facade.api.settings.networks())
-            # network = uuid.UUID(list(filter(lambda x: x[1], await self.client.app.ioc.facade.api.settings.networks()))[0][0])
-            # self.assertEqual(network, self.server.app.ioc.facade.data.portfolio.entity.id)
-            self.client.app.ioc.facade.data.client[
-                "CurrentNetwork"] = self.server.app.ioc.facade.data.portfolio.entity.id
-
-            mail = await Operations.send_mail(self.client.app.ioc.facade, self.facade.data.portfolio)
-            await self.server.app.listen()
-            self.assertIs(len(await self.client.app.ioc.facade.api.mailbox.load_outbox()), 1)
-
-            client = await self.client.app.connect()
-            await client.mail()
-
-            self.assertIs(len(await self.server.app.ioc.facade.storage.mail.search()), 1)
-            self.assertIs(len(await self.client.app.ioc.facade.api.mailbox.load_outbox()), 0)
-
-        except Exception as e:
-            self.fail(e)
-
-    @run_async
-    async def test_mail_replication_to_client(self):
-        try:
-            # Make all players trust each other
-            await Operations.trust_mutual(self.server.app.ioc.facade, self.client.app.ioc.facade)
-            await Operations.trust_mutual(self.client.app.ioc.facade, self.facade)
-            await TaskWaitress().wait_for(self.client.app.ioc.facade.task.network_index)
-
-            # network = uuid.UUID(list(filter(lambda x: x[1], await self.client.app.ioc.facade.api.settings.networks()))[0][0])
-            # self.assertEqual(network, self.server.app.ioc.facade.data.portfolio.entity.id)
-            # self.client.app.ioc.facade.data.client["CurrentNetwork"] = network
-            self.client.app.ioc.facade.data.client[
-                "CurrentNetwork"] = self.server.app.ioc.facade.data.portfolio.entity.id
-
-            mail = await Operations.inject_mail(
-                self.server.app.ioc.facade, self.facade, self.client.app.ioc.facade.data.portfolio)
-            await self.server.app.listen()
-            self.assertIs(len(await self.server.app.ioc.facade.storage.mail.search()), 1)
-
-            client = await self.client.app.connect()
-            await client.mail()
-
-            self.assertIs(len(await self.client.app.ioc.facade.api.mailbox.load_inbox()), 1)
-            self.assertIs(len(await self.server.app.ioc.facade.storage.mail.search()), 0)
-
-        except Exception as e:
-            self.fail(e)
 
     @run_async
     async def test_cross_auth(self):
@@ -235,14 +180,18 @@ class TestFullReplication(BaseTestNetwork):
             client = await self.client2.app.connect()
             await client.mail()
 
+            inbox = await self.client2.app.ioc.facade.api.mailbox.load_inbox()
             self.assertIs(
-                len(await self.client2.app.ioc.facade.api.mailbox.load_inbox()), 1,
+                len(inbox), 1,
                 "Client 2 should have one (1) letter in its inbox after connecting to the server."
             )
             self.assertIs(
                 len(await self.server.app.ioc.facade.storage.mail.search()), 0,
                 "Server should have zero (0) letters in its routing mail box after Client 2 connected."
             )
+
+            mail2 = await self.client2.app.ioc.facade.api.mailbox.open_envelope(inbox.pop())
+            self.assertEqual(mail.body, mail2.body, "Checking that the sent mail equals the received mail.")
 
         except Exception as e:
             self.fail(e)
