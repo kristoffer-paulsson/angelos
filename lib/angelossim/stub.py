@@ -1,4 +1,3 @@
-# cython: language_level=3
 #
 # Copyright (c) 2020 by:
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
@@ -6,6 +5,7 @@
 #
 """Stub classes for dummy and unit testing."""
 import asyncio
+
 import collections
 import json
 import os

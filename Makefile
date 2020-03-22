@@ -45,3 +45,6 @@ clean:
 docs: basic
 	sphinx-apidoc -o docs lib/angelos
 	sphinx-build -M html docs docs
+
+test_document:
+	python -m unittest tests/libangelos/test_document_*.py

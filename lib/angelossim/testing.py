@@ -1,10 +1,10 @@
-# cython: language_level=3
 #
 # Copyright (c) 2020 by:
 # Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
 # This file is distributed under the terms of the MIT license.
 #
 """Testcase base classes for simplified unit testing."""
+import copy
 import logging
 import os
 import sys
@@ -23,12 +23,8 @@ from angelossim.support import run_async, Generate
 
 class BaseTestFacade(TestCase):
     """Base test for facade based unit testing."""
-
-    secret = b""
-    server = False
-    count = 0
-    portfolios = list()
-    portfolio = None
+    count = 1
+    provision = True
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -37,16 +33,16 @@ class BaseTestFacade(TestCase):
         logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
         cls.secret = os.urandom(32)
+        cls.server = False
+        cls._portfolios = list()
 
         @run_async
-        async def setup():
+        async def portfolios():
             """Generate a facade and inject random contacts."""
-            cls.portfolio = SetupPersonOperation.create(Generate.person_data()[0], server=cls.server)
+            for person in Generate.person_data(cls.count):
+                cls._portfolios.append(SetupPersonOperation.create(person, server=cls.server))
 
-            for entity in range(cls.count):
-                cls.portfolios.append(SetupPersonOperation.create(Generate.person_data()[0], server=False))
-
-        setup()
+        portfolios()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -54,6 +50,11 @@ class BaseTestFacade(TestCase):
 
     @run_async
     async def setUp(self) -> None:
+        """Set up a case with a fresh copy of portfolios and facade"""
+        portfolios = copy.deepcopy(self._portfolios)
+        self.portfolio = portfolios.pop()
+        self.portfolios = portfolios
+
         self.dir = TemporaryDirectory()
         self.home = self.dir.name
 
@@ -62,14 +63,20 @@ class BaseTestFacade(TestCase):
             Const.A_ROLE_PRIMARY, self.server, portfolio=self.portfolio
         )
 
-        for portfolio in self.portfolios:
-            await self.facade.storage.vault.add_portfolio(portfolio)
-        await TaskWaitress().wait_for(self.facade.task.contact_sync)
+        if self.provision:
+            print("Do provision")
+            for portfolio in self.portfolios:
+                await self.facade.storage.vault.add_portfolio(portfolio)
+            await TaskWaitress().wait_for(self.facade.task.contact_sync)
 
     def tearDown(self) -> None:
+        """Tear down after the test."""
         if not self.facade.closed:
             self.facade.close()
         self.dir.cleanup()
+
+        self.portfolios = list()
+        self.portfolio = None
 
 
 class BaseTestNetwork(TestCase):

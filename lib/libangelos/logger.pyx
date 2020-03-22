@@ -7,8 +7,9 @@
 """Logger service that offers specialized logs."""
 import logging
 from logging.config import dictConfig
-from .const import Const
-from .utils import Util
+
+from libangelos.const import Const
+from libangelos.utils import Util
 
 
 class LogHandler:

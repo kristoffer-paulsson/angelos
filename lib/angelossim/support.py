@@ -194,6 +194,12 @@ class Introspection:
         return {DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id) for doc in issuer | owner}
 
     @staticmethod
+    def get_portfolio_virtual_list(storage: PortfolioMixin, portfolio: Portfolio, docs: set):
+        """Create a set of virtual filenames from a portfolio"""
+        dirname = storage.portfolio_path(portfolio.entity.id)
+        return {DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id) for doc in docs}
+
+    @staticmethod
     async def load_storage_file_list(storage: PortfolioMixin, file_list: set) -> set:
         """Load all files from a storage expecting them to be Documents and exist."""
         files = set()

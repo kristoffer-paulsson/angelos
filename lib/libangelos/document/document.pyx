@@ -12,7 +12,7 @@ import msgpack
 from libangelos.error import Error
 from libangelos.utils import Util
 
-from .model import (
+from libangelos.document.model import (
     DocumentMeta,
     BaseDocument,
     UuidField,
@@ -57,6 +57,20 @@ class OwnerMixin(metaclass=DocumentMeta):
     """
     owner = UuidField()
 
+    def _check_issuer(self):
+        """Checks that the issuer is not the owner.
+
+        Documents having an "owner" field should not be self issued.
+        """
+        if hasattr(self, "issuer"):  # TODO: Check if attribute check for "issue" can be implemented differently.
+            if self.issuer == self.owner:
+                raise Util.exception(
+                    Error.DOCUMENT_OWNER_IS_ISSUER,
+                    {
+                        "owner": self.owner,
+                    },
+                )
+
     def apply_rules(self) -> bool:
         """Short summary.
 
@@ -66,6 +80,7 @@ class OwnerMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
+        self._check_issuer()
         return True
 
 
@@ -224,9 +239,10 @@ class Document(IssueMixin, BaseDocument):
             True if everything validates.
 
         """
-        classes = set(self.__class__.mro()[:-1]) - set([Document, object])
+        classes = set(self.__class__.mro())
         for cls in classes:
-            cls.apply_rules(self)
+            if hasattr(cls, "apply_rules"):
+                cls.apply_rules(self)
 
         return True
 

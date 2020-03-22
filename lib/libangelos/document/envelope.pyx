@@ -21,7 +21,7 @@ from libangelos.document.model import (
 from libangelos.error import Error
 from libangelos.utils import Util
 
-from .document import DocType, Document, OwnerMixin
+from libangelos.document.document import DocType, Document, OwnerMixin
 
 
 class Header(BaseDocument):

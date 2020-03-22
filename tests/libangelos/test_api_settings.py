@@ -8,6 +8,7 @@ from angelossim.testing import BaseTestFacade
 
 
 class TestSettingsAPI(BaseTestFacade):
+    count = 1
 
     @run_async
     async def test_load_preferences(self):

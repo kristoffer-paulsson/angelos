@@ -15,7 +15,7 @@ import importlib
 import os
 import sys
 from asyncio import Task
-from typing import _GenericAlias, Callable, Any
+from typing import _GenericAlias, Callable
 
 from libangelos.error import ERROR_INFO
 

@@ -7,16 +7,13 @@
 """Mixin for enforcing portfolio policy's before importing."""
 import asyncio
 import copy
-import functools
 import logging
 import uuid
 from typing import Tuple, List, Set, Any
 
-import msgpack
-from libangelos.error import Error
 from libangelos.archive7 import Entry
-from libangelos.document.entities import Entity
-from libangelos.document.types import EntityT, StatementT, DocumentT
+from libangelos.document.types import StatementT, DocumentT
+from libangelos.error import Error
 from libangelos.helper import Glue
 from libangelos.policy.accept import ImportPolicy, ImportUpdatePolicy
 from libangelos.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, Portfolio, \
@@ -33,7 +30,37 @@ class PortfolioMixin:
         """Generate portfolio path for a particular entity id."""
         return  "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
 
-    async def update_portfolio(
+    async def portfolio_files(self, path: str, owner: uuid.UUID = None):
+        """Glob a list of all files in a portfolio."""
+        return await self.archive.glob(name="{dir}/*".format(dir=path), owner=owner)
+
+    def portfolio_exists_not(self, path: str, eid: uuid.UUID):
+        """Check that portfolio exists."""
+        if not self.archive.isdir(path):
+            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
+                "portfolio": eid})
+
+    def write_file(self, filename: str, doc: DocumentT):
+        """Write a document to the current archive."""
+        if self.archive.isfile(filename):
+           return self.archive.save(
+                filename=filename,
+                data=PortfolioPolicy.serialize(doc),
+                compression=Entry.COMP_NONE
+            )
+        else:
+            created, updated, owner = Glue.doc_save(doc)
+            return self.archive.mkfile(
+                filename=filename,
+                data=PortfolioPolicy.serialize(doc),
+                id=doc.id,
+                created=created,
+                modified=updated,
+                owner=owner,
+                compression=Entry.COMP_NONE,
+            )
+
+    async def update_portfolio( # FIXME: Make sure it follows policy
         self, portfolio: Portfolio
     ) -> Tuple[bool, Set[DocumentT], Set[DocumentT]]:
         """Update a portfolio in storage with documents.
@@ -55,7 +82,7 @@ class PortfolioMixin:
             [3] set of removed documents
 
         """
-        portfolio_temp = copy.copy(portfolio)
+        portfolio_temp = copy.deepcopy(portfolio)
         old = await self.load_portfolio(portfolio_temp.entity.id, PGroup.ALL)
 
         issuer, owner = portfolio_temp.to_sets()
@@ -172,7 +199,7 @@ class PortfolioMixin:
 
         return await self.save_portfolio(new), rejected, removed
 
-    async def add_portfolio(
+    async def add_portfolio(  # FIXME: Make sure it follows policy
         self, portfolio: Portfolio
     ) -> Tuple[bool, Set[DocumentT], Set[DocumentT]]:
         """Import a portfolio of douments into the vault.
@@ -198,7 +225,7 @@ class PortfolioMixin:
 
         """
         rejected = set()
-        portfolio_temp = copy.copy(portfolio)
+        portfolio_temp = copy.deepcopy(portfolio)
         policy = ImportPolicy(portfolio_temp)
 
         entity, keys = policy.entity()
@@ -295,31 +322,7 @@ class PortfolioMixin:
                         dir="{0}{1}".format(self.PATH_PORTFOLIOS[0], doc.owner),
                         file=doc.id,
                     )
-                    if self.archive.isfile(filename):
-                        ops.append(
-                           self.archive.save(
-                                filename=filename,
-                                data=msgpack.packb(
-                                    doc.export_bytes(),
-                                    use_bin_type=True,
-                                    strict_types=True,
-                                ),
-                                compression=Entry.COMP_NONE
-                            )
-                        )
-                    else:
-                        created, updated, owner = Glue.doc_save(doc)
-                        ops.append(
-                            self.archive.mkfile(
-                                filename=filename,
-                                data=PortfolioPolicy.serialize(doc),
-                                id=doc.id,
-                                created=created,
-                                modified=updated,
-                                owner=owner,
-                                compression=Entry.COMP_NONE,
-                            )
-                        )
+                    ops.append(self.write_file(filename, doc))
                 else:
                     rejected.add(doc)
 
@@ -407,11 +410,9 @@ class PortfolioMixin:
 
         """
         dirname = self.portfolio_path(eid)
-        if not self.archive.isdir(dirname):
-            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
-                "portfolio": eid})
+        self.portfolio_exists_not(dirname, eid)
 
-        result = await self.archive.glob(name="{0}/*".format(dirname), owner=eid)
+        result = await self.portfolio_files(dirname, owner=eid)
 
         files = set()
         for field in config:
@@ -421,7 +422,6 @@ class PortfolioMixin:
                     files.add(filename)
 
         ops = list()
-        loop = asyncio.get_running_loop()
         for doc in files:
             ops.append(self.archive.load(filename=doc))
 
@@ -468,14 +468,11 @@ class PortfolioMixin:
             Success or failure.
 
         """
-        dirname = self.portfolio_path(portfolio.entity.id)
-        if not self.archive.isdir(dirname):
-            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
-                "portfolio": portfolio.entity.id})
+        eid = portfolio.entity.id
+        dirname = self.portfolio_path(eid)
+        self.portfolio_exists_not(dirname, eid)
 
-        result = await self.archive.glob(
-            name="{dir}/*".format(dirname), owner=portfolio.entity.id
-        )
+        result = await self.portfolio_files(dirname, owner=eid)
 
         files = set()
         for field in config:
@@ -490,7 +487,7 @@ class PortfolioMixin:
 
         issuer, owner = portfolio.to_sets()
         loaded = set()
-        for doc in issuer + owner:
+        for doc in issuer | owner:
             loaded.add(PortfolioPolicy.doc2fileident(doc))
 
         toload = available - loaded
@@ -516,7 +513,7 @@ class PortfolioMixin:
 
             document = PortfolioPolicy.deserialize(data)
 
-            if document.issuer != portfolio.entity.id:
+            if document.issuer != eid:
                 owner.add(document)
             else:
                 issuer.add(document)
@@ -533,48 +530,17 @@ class PortfolioMixin:
 
         This method expects policies to be applied."""
         dirname = self.portfolio_path(portfolio.entity.id)
-        if not self.archive.isdir(dirname):
-            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
-                "portfolio": portfolio.entity.id})
+        self.portfolio_exists_not(dirname, portfolio.entity.id)
 
-        # files = await self.archive.glob(
-        #     name="{dir}/*".format(dir=dirname), owner=portfolio.entity.id
-        # )
-
-        files = await self.archive.glob(name="{dir}/*".format(dir=dirname))
+        files = await self.portfolio_files(dirname)
 
         ops = list()
         issuer, owner = portfolio.to_sets()
         save = issuer | owner
 
-        loop = asyncio.get_running_loop()
         for doc in save:
             filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
-            if filename in files:
-                ops.append(
-                   self.archive.save(
-                        filename=filename,
-                        data=msgpack.packb(
-                            doc.export_bytes(),
-                            use_bin_type=True,
-                            strict_types=True,
-                        ),
-                        compression=Entry.COMP_NONE
-                    )
-                )
-            else:
-                created, updated, owner = Glue.doc_save(doc)
-                ops.append(
-                    self.archive.mkfile(
-                        filename=filename,
-                        data=PortfolioPolicy.serialize(doc),
-                        id=doc.id,
-                        created=created,
-                        modified=updated,
-                        owner=owner,
-                        compression=Entry.COMP_NONE,
-                    )
-                )
+            ops.append(self.write_file(filename, doc))
 
         return await self.gather(*ops)
 
@@ -594,11 +560,9 @@ class PortfolioMixin:
                 "portfolio": eid})
 
         dirname = self.portfolio_path(eid)
-        if not self.archive.isdir(dirname):
-            raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
-                "portfolio": eid})
+        self.portfolio_exists_not(dirname, eid)
 
-        files = await self.archive.glob(name="{dir}/*".format(dir=dirname))
+        files = await self.portfolio_files(dirname)
 
         result = True
         ops = list()

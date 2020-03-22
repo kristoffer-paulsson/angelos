@@ -10,7 +10,7 @@ import sys
 
 import libnacl
 
-from .policy import Policy
+from libangelos.policy.policy import Policy
 
 if sys.platform.startswith('darwin'):
     import macos_keychain

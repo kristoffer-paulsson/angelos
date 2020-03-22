@@ -5,7 +5,6 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring"""
-import asyncio
 import atexit
 import os
 import uuid

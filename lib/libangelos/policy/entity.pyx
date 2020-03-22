@@ -8,14 +8,12 @@
 import datetime
 
 import libnacl.dual
-
-# from ..utils import Util
-from .policy import Policy
-from .crypto import Crypto
-from ..document.types import EntityT
-from ..document.entities import PrivateKeys, Keys, Person, Ministry, Church
-from .portfolio import PrivatePortfolio
-from .types import (
+from libangelos.document.entities import PrivateKeys, Keys, Person, Ministry, Church
+from libangelos.document.types import EntityT
+from libangelos.policy.crypto import Crypto
+from libangelos.policy.policy import Policy
+from libangelos.policy.portfolio import PrivatePortfolio
+from libangelos.policy.types import (
     EntityDataT,
     PersonData,
     MinistryData,

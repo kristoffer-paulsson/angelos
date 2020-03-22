@@ -7,6 +7,7 @@ from angelossim.testing import BaseTestFacade
 
 class TestPreferencesData(BaseTestFacade):
     """Test the facade.data.prefs instance on the facade, which is a DictionaryMixin."""
+    count = 1
 
     @run_async
     async def test___getitem__(self):
@@ -41,6 +42,7 @@ class TestPreferencesData(BaseTestFacade):
         try:
             self.facade.data.prefs["Value"] = 123
             await Misc.sleep()
+            print(type(self.observer.event.data["value"]))
             self.assertEqual(self.observer.event.data["value"], 123)
         except Exception as e:
             self.fail(e)
@@ -65,6 +67,7 @@ class TestPreferencesData(BaseTestFacade):
 
 class TestClientData(BaseTestFacade):
     """Test the facade.data.client instance on the facade, which is a DictionaryMixin."""
+    count = 1
 
     @run_async
     async def test___getitem__(self):

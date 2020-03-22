@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Set, Tuple
 
 import msgpack
-from libangelos.document.document import DocType
+from libangelos.document.document import DocType, Document
 from libangelos.document.domain import Domain, Node, Network
 from libangelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from libangelos.document.envelope import Envelope
@@ -23,6 +23,8 @@ from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchP
 from libangelos.document.statements import Verified, Trusted, Revoked
 from libangelos.document.types import EntityT, ProfileT, DocumentT
 from libangelos.policy.types import PortfolioABC, PrivatePortfolioABC
+
+from libangelos.validation import BaseValidator
 
 
 class PField:
@@ -237,6 +239,182 @@ DOCUMENT_PATH = {
 }
 
 
+class NewPortfolio:
+
+    def __init__(self, docs: set = set()):
+        self.__docs = docs
+        self.__additional = set()
+
+    def documents(self) -> set:
+        """Portfolio original documents."""
+        return self.__docs
+
+    def additional(self) -> set:
+        """Portfolio added documents."""
+        return self.__additional
+
+    def issuer(self):
+        """Statements issued by entity."""
+        return self._get_issuer(self._get_subset(Document), self.entity.id)
+
+    def owner(self):
+        """Statements owned by entity."""
+        return self._get_owner(self._get_subset(Document), self.entity.id)
+
+    def _get_type(self, docs: set, doc_cls: type) -> set:
+        return {doc for doc in docs if isinstance(doc, doc_cls)}
+
+    def _get_issuer(self, docs: set, issuer: uuid.UUID) -> set:
+        return {doc for doc in docs if getattr(doc, "issuer", None) == issuer}
+
+    def _get_owner(self, docs: set, owner: uuid.UUID) -> set:
+        return {doc for doc in docs if getattr(doc, "owner", None) == owner}
+
+    def _get_not_expired(self, docs: set) -> set:
+        return {doc for doc in docs if not doc.is_expired()}
+
+    def _get_doc(self, types):
+        docs = self._get_type(self.__docs | self.__additional, types)
+        return docs.pop() if docs else None
+
+    def _get_subset(self, types) -> set:
+        docs = self._get_type(self.__docs | self.__additional, types)
+        return docs if docs else set()
+
+    def __eq__(self, other):
+        s = self.__documents | self.__additional
+        o = other.documents | other.__additional
+        return collections.Counter(s) == collections.Counter(o)
+
+    def __str__(self):
+        issuer = self._get_issuer(self.__docs | self.__additional)
+        owner = self._get_owner(self.__docs | self.__additional)
+        output = ""
+
+        for doc in issuer:
+            output += doc.__class__.__name__ + "\n"
+            output += pprint.pformat(doc.export_yaml()) + "\n\n"
+
+        for doc in owner:
+            output += doc.__class__.__name__ + "\n"
+            output += pprint.pformat(doc.export_yaml()) + "\n\n"
+
+        return output
+
+    def add(self, docs: set):
+        """Add documents to the portfolio.
+
+        Documents that are being added will be used for updating the saved portfolio.
+
+        Args:
+            docs (set):
+                A set of docs to be added.
+
+        """
+        self.__additional |= docs
+
+    def complement(self, docs: set):
+        """Complement portfolio with updated documents.
+
+        Only use this method when loading complementing updates from the archive.
+
+        Args:
+            docs (set):
+                A set of docs to be complemented.
+
+        """
+        self.__docs |= docs
+
+    @property
+    def entity(self):
+        """Entity that owns the portfolio."""
+        return self._get_doc((Person, Ministry, Church))
+
+    @property
+    def profile(self):
+        """Profile for the entity."""
+        return self._get_doc((PersonProfile, MinistryProfile, ChurchProfile))
+
+    @property
+    def keys(self) -> set:
+        """Public keys."""
+        return self._get_subset(Keys)
+
+    @property
+    def network(self):
+        """Network for the entity."""
+        return self._get_doc(Network)
+
+    @property
+    def verified(self) -> set:
+        """Verification statements."""
+        return self._get_subset(Verified)
+
+    @property
+    def trusted(self) -> set:
+        """Trust statements."""
+        return self._get_subset(Trusted)
+
+    @property
+    def revoked(self) -> set:
+        """Revokes of statements."""
+        return self._get_subset(Revoked)
+
+    @property
+    def verified_issuer(self):
+        """Verification statements issued by entity."""
+        return self._get_issuer(self._get_subset(Verified), self.entity.id)
+
+    @property
+    def trusted_issuer(self):
+        """Trust statements issued by entity."""
+        return self._get_issuer(self._get_subset(Trusted), self.entity.id)
+
+    @property
+    def revoked_issuer(self):
+        """Revokes of statements issued by entity."""
+        return self._get_issuer(self._get_subset(Revoked), self.entity.id)
+
+    @property
+    def verified_owner(self):
+        """Verification statements owned by entity."""
+        return self._get_owner(self._get_subset(Verified), self.entity.id)
+
+    @property
+    def trusted_owner(self):
+        """Trust statements owned by entity."""
+        return self._get_owner(self._get_subset(Trusted), self.entity.id)
+
+    @property
+    def revoked_owner(self):
+        """Revokes of statements owned by entity."""
+        return self._get_owner(self._get_subset(Revoked), self.entity.id)
+
+    def apply_rules(self):
+        return True
+
+
+class NewPrivatePortfolio(NewPortfolio):
+
+    @property
+    def privkeys(self):
+        """Private keys of entity."""
+        return self._get_doc(PrivateKeys)
+
+    @property
+    def domain(self):
+        """Domain for the entity."""
+        return self._get_doc(Domain)
+
+    @property
+    def nodes(self) -> set:
+        """Nodes of the current domain."""
+        return self._get_subset(Node)
+
+    def apply_rules(self):
+        return True
+
+
 @dataclass
 class Statements:
     """
@@ -423,6 +601,9 @@ class Portfolio(PortfolioABC):
 
         return all
 
+    def apply_rules(self):
+        return True
+
 
 @dataclass
 class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
@@ -469,6 +650,9 @@ class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
         portfolio = cls()
         portfolio.from_sets(issuer, owner)
         return portfolio
+
+    def apply_rules(self):
+        return True
 
 
 class PortfolioPolicy:
@@ -641,3 +825,24 @@ class DocSet:
         get = {doc for doc in self._docs if doc.owner.int == owner.int}
         self._docs -= get
         return get
+
+
+class PortfolioValidator(BaseValidator):
+    """Validates portfolio documents in relation to each other and individually."""
+
+    def __init__(self, portfolio: Portfolio):
+        self.__portfolio = portfolio
+
+    @property
+    def portfolio(self):
+        """Portfolio to validate."""
+        return self.__portfolio
+
+    def _check_entity(self):
+        pass
+
+    def validate(self):
+        pass
+
+    def apply_rules(self):
+        return True

@@ -176,6 +176,10 @@ class DocumentNoHost(ModelException):
     pass  # noqa E302
 
 
+class DocumentInvalidOwner(ModelException):
+    pass  # noqa E302
+
+
 class ConcealException(AngelosException):
     pass  # noqa E302
 
@@ -427,6 +431,7 @@ ERROR_INFO = {
     611: (DocumentNoHost, "Network document has no valid hosts"),  # noqa E501
     612: (DocumentUpdatedNotLatest, "Document updated earlier than created"),  # noqa E501
     613: (DocumentWrongID, "Document ID is not the same as Containing document."),  # noqa E501
+    614: (DocumentInvalidOwner, "Document owner can not be the same as issuer."),  # noqa E501
 
     700: (
         ConcealUnkownMode,
@@ -517,6 +522,7 @@ class Error(IntEnum):
     DOCUMENT_NO_HOST = 611
     DOCUMENT_UPDATED_NOT_LATEST = 612
     DOCUMENT_WRONG_ID = 613
+    DOCUMENT_OWNER_IS_ISSUER = 614
 
     # 20 error codes for Conceal
     CONCEAL_UNKOWN_MODE = 700

@@ -12,8 +12,8 @@ import multiprocessing
 import concurrent.futures
 import functools
 
-from .utils import Event
-from .ioc import ContainerAware
+from libangelos.utils import Event
+from libangelos.ioc import ContainerAware
 
 
 class Worker(ContainerAware):
