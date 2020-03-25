@@ -8,6 +8,9 @@ from libangelos.validation import Report, BaseValidator, BaseValidatable
 class StubValidator(BaseValidator):
     """Stub validator"""
 
+    def validate_test(self, validatable: BaseValidatable, report: Report) -> bool:
+        return self._validator(validatable, report)
+
 
 class StubSubValidatable(BaseValidatable):
     """Stub sub validatable."""
@@ -36,7 +39,7 @@ class StubSubValidatable(BaseValidatable):
         return True
 
 
-class StubValidatable(BaseValidatable, StubValidator):
+class StubValidatable(BaseValidatable, BaseValidator):
     """Stub validatable."""
 
     def __init__(self):
@@ -104,15 +107,30 @@ class TestReport(TestCase):
 class TestBaseValidatable(TestCase):
     def test__checker(self):
         try:
-            validatable = StubValidatable()
-            report = validatable.validate()
-            print(report)
+            report = Report(StubValidator())
+            validatable = StubSubValidatable("test")
+            validatable.apply_rules(report, Report.NULL_IDENTITY)
+            self.assertIs(len(report.applied), 3)
+            self.assertIs(len(report.failed), 1)
+
+            report = Report(StubValidator())
+            validatable = StubSubValidatable("test", True)
+            validatable.apply_rules(report, Report.NULL_IDENTITY)
+            self.assertIs(len(report.applied), 3)
+            self.assertIs(len(report.failed), 2)
         except Exception as e:
             self.fail(e)
 
     def test_apply_rules(self):
         try:
-            pass
+            with self.assertRaises(TypeError):
+                BaseValidatable()
+
+            report = Report(StubValidator())
+            validatable = StubValidatable()
+            validatable.apply_rules(report, Report.NULL_IDENTITY)
+            self.assertIs(len(report.applied), 9)
+            self.assertIs(len(report.failed), 4)
         except Exception as e:
             self.fail(e)
 
@@ -120,12 +138,16 @@ class TestBaseValidatable(TestCase):
 class TestBaseValidator(TestCase):
     def test__validator(self):
         try:
-            pass
+            validator = StubValidator()
+            report = Report(validator)
+            validatable = StubValidatable()
+            self.assertFalse(validator.validate_test(validatable, report))
         except Exception as e:
             self.fail(e)
 
     def test_validate(self):
         try:
-            pass
+            validator = BaseValidator()
+            validator.validate()
         except Exception as e:
             self.fail(e)

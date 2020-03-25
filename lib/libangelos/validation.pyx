@@ -211,7 +211,6 @@ class BaseValidator(ABC):
         valid = self._validator(self, report)
 
         if valid and len(report.failed):
-            logging.critical("Inaccurate report of failures and validation success.")
-            raise Exception()
+            raise RuntimeError("Inaccurate report of failures and validation success.")
 
         return report
