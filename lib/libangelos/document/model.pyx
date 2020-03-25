@@ -74,11 +74,14 @@ class Field(ABC):
         self.init = init
 
     def _check_required(self, value: Any, name: str) -> bool:
+        """1A-0001: Check that a field marked as required isn't empty. Required fields are mandatory."""
         if self.required and not bool(value):
             raise Util.exception(Error.FIELD_NOT_SET, {"field": name})
         return True
 
     def _check_multiple(self, value: Any, name: str) -> bool:
+        """1A-0002: Check that multifield isn't assigned non-list items directly, this goes both ways.
+        A multifield must have a list."""
         if not self.multiple and isinstance(value, list):
             raise Util.exception(
                 Error.FIELD_NOT_MULTIPLE,
@@ -92,6 +95,8 @@ class Field(ABC):
         return True
 
     def _check_types(self, value: Any, name: str) -> bool:
+        """1A-0003: Check that a field is assigned an item of a specified type only.
+        The specified item types are required."""
         for v in value if isinstance(value, list) else [value]:
             if not type(v) in (self.TYPES + (type(None),)):
                 raise Util.exception(

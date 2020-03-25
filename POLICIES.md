@@ -42,9 +42,12 @@ Example: 1A-0001 Policy description and purpose.
   
  ## Implented policies
  
- 0I-0000 Null policy. This policy should never happen, it indicates an implementation failure or different error.
+0I-0000 Null policy. This policy should never happen, it indicates an implementation failure or different error.
  
- 
- 
+1A-0001: Check that a field marked as required isn't empty. Required fields are mandatory.
+
+1A-0002: Check that multifield isn't assigned non-list items directly, this goes both ways. A multifield must have a list.
+
+1A-0003: Check that a field is assigned an item of a specified type only. The specified item types are required
 
 
