@@ -170,7 +170,7 @@ class BaseValidatable(ABC):
             rules = [
                 (self._check_something, b'I', 345)
             ]
-            return self._checker(rules, Report.NULL_IDENTITY, report)
+            return self._checker(rules, report, identity)
 
         Args:
             identity (uuid.UUID):

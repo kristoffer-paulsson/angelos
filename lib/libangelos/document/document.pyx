@@ -246,8 +246,12 @@ class Document(IssueMixin, BaseDocument):
 
         return True
 
+    def is_way_old(self) -> bool:  # FIXME: Write a unittest.
+        """Is the document older than three years?"""
+        return datetime.date.today() - self.get_touched() > datetime.timedelta(365*3+1)
+
     def is_expired(self) -> bool:
-        """Is the document expired."""
+        """Is the document expired?"""
         return self.expires < datetime.date.today()
 
     def expires_soon(self) -> bool:

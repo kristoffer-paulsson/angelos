@@ -390,9 +390,6 @@ class NewPortfolio:
         """Revokes of statements owned by entity."""
         return self._get_owner(self._get_subset(Revoked), self.entity.id)
 
-    def apply_rules(self):
-        return True
-
 
 class NewPrivatePortfolio(NewPortfolio):
 
@@ -410,9 +407,6 @@ class NewPrivatePortfolio(NewPortfolio):
     def nodes(self) -> set:
         """Nodes of the current domain."""
         return self._get_subset(Node)
-
-    def apply_rules(self):
-        return True
 
 
 @dataclass
@@ -825,24 +819,3 @@ class DocSet:
         get = {doc for doc in self._docs if doc.owner.int == owner.int}
         self._docs -= get
         return get
-
-
-class PortfolioValidator(BaseValidator):
-    """Validates portfolio documents in relation to each other and individually."""
-
-    def __init__(self, portfolio: Portfolio):
-        self.__portfolio = portfolio
-
-    @property
-    def portfolio(self):
-        """Portfolio to validate."""
-        return self.__portfolio
-
-    def _check_entity(self):
-        pass
-
-    def validate(self):
-        pass
-
-    def apply_rules(self):
-        return True

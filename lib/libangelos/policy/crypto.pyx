@@ -84,7 +84,7 @@ class Crypto:
             )
 
     @staticmethod
-    def _latestkeys(keys: Set[Keys]) -> Keys:
+    def latest_keys(keys: Set[Keys]) -> Keys:
         """Return latest key from set."""
         return sorted(keys, key=lambda doc: doc.created, reverse=True)[0]
 
@@ -93,7 +93,7 @@ class Crypto:
         data: bytes, sender: PrivatePortfolio, receiver: Portfolio
     ) -> bytes:
         """Conceal data."""
-        keys = Crypto._latestkeys(receiver.keys)
+        keys = Crypto.latest_keys(receiver.keys)
 
         if not (sender.privkeys.issuer == sender.entity.id):
             raise RuntimeError(
@@ -128,7 +128,7 @@ class Crypto:
         data: bytes, receiver: PrivatePortfolio, sender: Portfolio
     ) -> bytes:
         """Unveil data."""
-        keys = Crypto._latestkeys(sender.keys)
+        keys = Crypto.latest_keys(sender.keys)
 
         if not (receiver.privkeys.issuer == receiver.entity.id):
             raise RuntimeError(
@@ -164,7 +164,7 @@ class Crypto:
         multiple=False,
     ) -> DocumentT:
         """Main document signing algorithm."""
-        keys = Crypto._latestkeys(signer.keys)
+        keys = Crypto.latest_keys(signer.keys)
 
         if not (document.issuer == keys.issuer == signer.entity.id):
             raise RuntimeError(
@@ -243,7 +243,7 @@ class Crypto:
         envelope: Envelope, header: Header, signer: PrivatePortfolio
     ) -> Header:
         """Sign envelope header"""
-        keys = Crypto._latestkeys(signer.keys)
+        keys = Crypto.latest_keys(signer.keys)
 
         if not (header.issuer == keys.issuer == signer.entity.id):
             raise RuntimeError(

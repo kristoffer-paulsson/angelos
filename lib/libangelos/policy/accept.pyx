@@ -5,24 +5,27 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-import datetime
 import copy
+import datetime
 import logging
-
+import uuid
+from abc import ABC
 from typing import Set
 
-from libangelos.utils import Util
-from libangelos.document.types import EntityT, DocumentT, StatementT, MessageT
-from libangelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
-from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from libangelos.document.document import Document
 from libangelos.document.domain import Domain, Node, Network
-from libangelos.document.statements import Verified, Trusted, Revoked
-from libangelos.document.messages import Note, Instant, Mail
+from libangelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from libangelos.document.envelope import Envelope
-from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from libangelos.document.messages import Note, Instant, Mail
+from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
+from libangelos.document.statements import Verified, Trusted, Revoked
+from libangelos.document.types import EntityT, DocumentT, StatementT, MessageT
 from libangelos.policy.crypto import Crypto
+from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from libangelos.policy.policy import Policy, BasePolicy, BasePolicyMixin
 from libangelos.policy.portfolio import Portfolio
-from libangelos.policy.policy import Policy
+from libangelos.utils import Util
+from libangelos.validation import Report
 
 
 class ImportPolicy(Policy):
@@ -35,7 +38,7 @@ class ImportPolicy(Policy):
         """Validate entity for import, use internal portfolio."""
         valid = True
         entity = self.__portfolio.entity
-        keys = Crypto._latestkeys(self.__portfolio.keys)
+        keys = Crypto.latest_keys(self.__portfolio.keys)
 
         today = datetime.date.today()
         valid = False if entity.expires < today else valid
@@ -283,3 +286,240 @@ class ImportUpdatePolicy(Policy):
             valid = False
 
         return valid
+
+
+class BasePortfolioPolicy(BasePolicy, BasePolicyMixin, ABC):
+    """Base class for portfolio policies."""
+
+    def __init__(self, portfolio: Portfolio):
+        self.__portfolio = portfolio
+
+    @property
+    def portfolio(self):
+        """Expose the portfolio."""
+        return self.__portfolio
+
+
+class EntityKeysPortfolioValidatePolicy(BasePortfolioPolicy):
+    """0I-0000: Check that an entity and key pair in a portfolio validates. Entity and keys must validate."""
+
+    def _check_entity_and_keys(self):
+        if not isinstance(self.portfolio.entity, (Person, Ministry, Church)):
+            raise RuntimeWarning("There is no entity in the portfolio or of wrong type.")
+        if not self.portfolio.keys:
+            raise RuntimeWarning("There is no public keys in the portfolio.")
+
+        entity = self.portfolio.entity
+        keys = Crypto.latest_keys(self.portfolio.keys)
+
+        if not isinstance(keys, Keys):
+            raise RuntimeWarning("The latest public key is of wrong type.")
+
+        if entity.is_expired():
+            raise RuntimeWarning("Entity document is expired.")
+        if keys.is_expired():
+            raise RuntimeWarning("Latest Keys document is expired.")
+
+        if not entity.validate():
+            raise RuntimeWarning("Entity document doesn't validate.")
+        if not keys.validate():
+            raise RuntimeWarning("Latest Keys document doesn't validate.")
+
+        if not Crypto.verify(entity, self.portfolio):
+            raise RuntimeWarning("Entity document doesn't cryptographically verify.")
+        if not Crypto.verify(keys, self.portfolio):
+            raise RuntimeWarning("Latest Keys document doesn't cryptographically verify.")
+
+        return True
+
+    def apply_rules(self, report: Report = None, identity: uuid.UUID = Report.NULL_IDENTITY):
+        """Apply rules."""
+        identity = self.portfolio.entity.id if self.portfolio.entity else identity
+        rules = [
+            (self._check_entity_and_keys, b'I', 0)
+        ]
+        return self._checker(rules, report, identity)
+
+
+class BaseDocumentPortfolioPolicy(BasePortfolioPolicy, ABC):
+    """Base class for portfolio issued document policies."""
+
+    TYPES = (Document,)
+
+    def __init__(self, portfolio: Portfolio):
+        BasePortfolioPolicy.__init__(self, portfolio)
+        self.__document = None
+
+    @property
+    def document(self):
+        """Expose document"""
+        return self.__document
+
+    def _check_type(self):
+        """Validate that the document is of type defined in self.TYPES"""
+        if not isinstance(self.__document, self.TYPES):
+            raise RuntimeWarning("The document is of wrong type.")
+
+        return True
+
+    def _check_document_validity(self):
+        """Validate document validity based on: expiry date passed, all fields validate."""
+
+        if self.__document.is_expired():
+            raise RuntimeWarning("Document is expired.")
+
+        if not self.__document.validate():
+            raise RuntimeWarning("Document doesn't validate.")
+
+        return True
+
+    def validate_document(self, document: DocumentT, report: Report = None):
+        """Receive a document to be validated against the portfolio.
+
+        Args:
+            document (DocumentT):
+                Document to validate.
+            report (Report):
+                The journal to write to.
+
+        Returns (bool):
+            The validation result.
+
+        """
+        self.__document = document
+        return self._validator(self, report)
+
+    def validate_all(self, documents: Set[DocumentT]) -> Report:
+        """Validate a batch of documents against the portfolio.
+
+        Args:
+            documents (Set[DocumentT()]):
+                Documents to be validated in batch.
+
+        Returns (Report):
+            Report with the batch result.
+
+        """
+        valid = True
+        report = Report(self)
+
+        for doc in documents:
+            valid = valid if self.validate_document(doc, report) else False
+        self.__document = None
+
+        if valid and len(report.failed):
+            raise RuntimeError("Inaccurate report of failures and validation success.")
+
+        return report
+
+
+class IssuedDocumentPortfolioValidatePolicy(BaseDocumentPortfolioPolicy):
+    """0I-0000: Check that documents issued by a portfolio validate.
+    Issued documents must validate with the portfolio.
+
+    This policy expects EntityKeysPortfolioValidatePolicy to apply."""
+
+    TYPES = (
+        Revoked, Trusted, Verified, PersonProfile, MinistryProfile,
+        ChurchProfile, Domain, Network, Keys, PrivateKeys
+    )
+
+    def _check_issuer(self):
+        """Validate that the document is issued by the internal portfolio."""
+        if self.document.issuer != self.portfolio.entity.id:
+            raise RuntimeWarning("The document is not issued by this portfolio.")
+
+        return True
+
+    def _check_verified_portfolio(self):
+        """Validate the document as cryptographically verified against internal portfolio."""
+        if not Crypto.verify(self.document, self.portfolio):
+            raise RuntimeWarning("Document doesn't cryptographically verify.")
+
+        return True
+
+    def apply_rules(self, report: Report = None, identity: uuid.UUID = Report.NULL_IDENTITY):
+        """Apply rules."""
+        identity = self.document.id if self.document else identity
+        rules = [
+            (self._check_type, b'I', 0),
+            (self._check_issuer, b'I', 0),
+            (self._check_document_validity, b'I', 0),
+            (self._check_verified_portfolio, b'I', 0)
+        ]
+        return self._checker(rules, report, identity)
+
+
+class NodePortfolioValidatePolicy(IssuedDocumentPortfolioValidatePolicy):
+    """0I-0000: Check that nodes issued by a portfolio has a domain and validate.
+    Issued nodes must validate with the portfolio domain.
+
+    This policy expects the portfolio to have valid domain document."""
+
+    TYPES = (Node,)
+
+    def _check_domain_of_node(self):
+        """Validated that the document is a node of the portfolio domain."""
+        if self.document.domain != self.portfolio.domain.id:
+            raise RuntimeWarning("The document is not a node of the portfolio domain.")
+
+        return True
+
+    def apply_rules(self, report: Report = None, identity: uuid.UUID = Report.NULL_IDENTITY):
+        """Apply rules."""
+        identity = self.document.id if self.document else identity
+        rules = [
+            (self._check_domain_of_node, b'I', 0)
+        ]
+        return self._checker(rules, report, identity)
+
+
+class OwnedDocumentPortfolioPolicy(BaseDocumentPortfolioPolicy):
+    """0I-0000: Check that owned documents issued by an issuing portfolio validate and is linked to portfolio.
+    Issued documents must validate with the portfolio and issuer."""
+
+    TYPES = (
+        Revoked, Trusted, Verified,
+        Envelope,
+        Note, Instant, Mail
+    )
+
+    def __init__(self, portfolio: Portfolio):
+        BaseDocumentPortfolioPolicy.__init__(self, portfolio)
+        self.__issuer = None
+
+    @property
+    def issuer(self):
+        """Expose issuing portfolio"""
+        return self.__issuer
+
+    @issuer.setter
+    def issuer(self, issuer: Portfolio):
+        """Setter of issuing portfolio"""
+        self.__issuer = issuer
+
+    def _check_owner_issuer(self):
+        """Check that the portfolio is the owner and the issuer the issuer."""
+        if self.document.owner != self.portfolio.entity.id:
+            raise RuntimeWarning("Document not owned by internal portfolio.")
+        if self.document.issuer != self.__issuer.entity.id:
+            raise RuntimeWarning("Document not issued by issuing portfolio.")
+
+    def _check_verified_issuer(self):
+        """Check the document as cryptographically verified against issuing portfolio."""
+        if not Crypto.verify(self.document, self.__issuer):
+            raise RuntimeWarning("Document doesn't cryptographically verify.")
+
+        return True
+
+    def apply_rules(self, report: Report = None, identity: uuid.UUID = Report.NULL_IDENTITY):
+        """Apply rules."""
+        identity = self.document.id if self.document else identity
+        rules = [
+            (self._check_type, b'I', 0),
+            (self._check_owner_issuer, b'I', 0),
+            (self._check_document_validity, b'I', 0),
+            (self._check_verified_issuer, b'I', 0)
+        ]
+        return self._checker(rules, report, identity)
+

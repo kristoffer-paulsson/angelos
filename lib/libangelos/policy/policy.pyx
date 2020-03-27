@@ -5,6 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Baseclasses for policies."""
+from abc import ABC
+
 from libangelos.validation import BaseValidator, BaseValidatable
 
 
@@ -23,7 +25,7 @@ class BasePolicy(BaseValidator):
     pass
 
 
-class BasePolicyMixin(BaseValidatable):
+class BasePolicyMixin(BaseValidatable, ABC):
     """Abstract base class for composite policy components.
 
     The purpose for the policy mixin classes it to implement validation and applying rule checking.
