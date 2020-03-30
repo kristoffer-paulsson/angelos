@@ -7,7 +7,7 @@
 """Module docstring."""
 import json
 
-from libangelos.document.document import DocType, Document, UpdatedMixin
+from libangelos.document.document import DocType, Document, ChangeableMixin
 from libangelos.document.entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 from libangelos.document.model import TypeField, BinaryField, SignatureField
 
@@ -78,7 +78,7 @@ class Keys(Document):
         return True
 
 
-class Entity(Document, UpdatedMixin):
+class Entity(Document, ChangeableMixin):
     """Short summary."""
     def apply_rules(self):
         return True
@@ -93,6 +93,10 @@ class Person(Entity, PersonMixin):
         Description of attribute `type`.
     """
     type = TypeField(value=int(DocType.ENTITY_PERSON))
+
+    def changeables(self) -> tuple:
+        """Fields that are changeable when updating."""
+        return "family_name",
 
     def apply_rules(self):
         """Short summary.
@@ -118,6 +122,10 @@ class Ministry(Entity, MinistryMixin):
     """
     type = TypeField(value=int(DocType.ENTITY_MINISTRY))
 
+    def changeables(self) -> tuple:
+        """Fields that are changeable when updating."""
+        return "vision",
+
     def apply_rules(self):
         """Short summary.
 
@@ -141,6 +149,10 @@ class Church(Entity, ChurchMixin):
         Description of attribute `type`.
     """
     type = TypeField(value=int(DocType.ENTITY_CHURCH))
+
+    def changeables(self):
+        """Fields that are changeable when updating."""
+        return "region", "country"
 
     def apply_rules(self):
         """Short summary.

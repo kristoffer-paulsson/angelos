@@ -84,7 +84,7 @@ class TestNetworkIndexerTask(TestCase):
             docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[3]))
             docs.add(StatementPolicy.trusted(self.portfolios[3], self.portfolio))
 
-            print(await self.facade.storage.vault.load_portfolio(self.portfolio.entity.id, PGroup.ALL))
+            await self.facade.storage.vault.load_portfolio(self.portfolio.entity.id, PGroup.ALL)
 
             await self.facade.storage.vault.docs_to_portfolio(docs)
             await TaskWaitress().wait_for(self.facade.task.network_index)

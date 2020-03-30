@@ -33,21 +33,21 @@ class BaseEntityPolicy(Policy):
         entity = klass(nd=entity_data._asdict())
         entity.issuer = entity.id
         entity.signature = box.signature(
-            entity.issuer.bytes + Crypto._document_data(entity)
+            entity.issuer.bytes + Crypto.document_data(entity)
         )
 
         privkeys = PrivateKeys(
             nd={"issuer": entity.id, "secret": box.sk, "seed": box.seed}
         )
         privkeys.signature = box.signature(
-            privkeys.issuer.bytes + Crypto._document_data(privkeys)
+            privkeys.issuer.bytes + Crypto.document_data(privkeys)
         )
 
         keys = Keys(
             nd={"issuer": entity.id, "public": box.pk, "verify": box.vk}
         )
         keys.signature = [
-            box.signature(keys.issuer.bytes + Crypto._document_data(keys))
+            box.signature(keys.issuer.bytes + Crypto.document_data(keys))
         ]
 
         entity.validate()
@@ -108,6 +108,7 @@ class BaseEntityPolicy(Policy):
             }
         )
         # Sign new private key with latest private key
+        # TODO: Private keys should be double signed like new public keys.
         new_pk = Crypto.sign(new_pk, portfolio)
 
         new_keys = Keys(
@@ -118,7 +119,7 @@ class BaseEntityPolicy(Policy):
             }
         )
         # sign new public key with old and new private key, REWRITE
-        raise NotImplementedError("REWRITE the signing of new public keys")
+        #  FIXME: REWRITE the signing of new public keys
         new_keys = Crypto.sign(
             new_keys,
             portfolio.entity,

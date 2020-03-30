@@ -56,6 +56,11 @@ Example: 1A-0001; Policy purpose and description.
 import logging
 import uuid
 from abc import ABC, abstractmethod
+from contextlib import ContextDecorator, AbstractContextManager, AbstractAsyncContextManager
+from contextvars import ContextVar
+
+
+report_ctx = ContextVar("report", default=None)
 
 
 class Report:
@@ -120,6 +125,138 @@ class Report:
         If report has applied policies without failure it's True, but False if empty or with failures.
         """
         return bool(self.__applied) and not bool(self.__failed)
+
+
+class PolicyException(UserWarning):  # TODO: Write unittest
+    pass
+
+
+class PolicyBreachException(UserWarning):  # TODO: Write unittest
+    pass
+
+
+def policy(func, section, sn, level=None):  # TODO: Write unittest
+    """Policy decorator.
+
+    Args:
+        func (callable):
+            The function being decorated
+        section (bytes):
+            Policy section
+        sn (int):
+            Policy serial number
+        level (bool):
+            Instruct report to add a level
+
+    Returns (callable):
+        Wrapper writing policy to the report
+
+    """
+    def wrapper(self, *args, **kwargs):
+        """Wrapping the callable.
+
+        Args:
+            self (class):
+                Method owner
+            *args:
+                Any arguments
+            **kwargs:
+                Any keyword arguments
+
+        Returns:
+            The result from the callable
+
+        """
+        report = report_ctx.get()
+        if not report:
+            return func(self, *args, **kwargs)
+        else:
+            result = None
+            if level: report.up(self.__class__.__name__)
+            try:
+                result = func(self, *args, **kwargs)
+                failure = False
+            except PolicyException as e:
+                failure = True
+                logging.error(e, exc_info=True)
+            report.record(Report.NULL_IDENTITY, section, sn, failure)
+            if level: report.down()
+            return result
+
+    return wrapper
+
+
+class evaluate(ContextDecorator, AbstractContextManager, AbstractAsyncContextManager):  # TODO: Write unittest
+    """Evaluate decorator and context manager.
+
+    Wrap methods or enclose pieces of code that you want to evaluate
+    that they are complying with certain policies.
+    """
+
+    def __init__(self, report: Report = None):
+        self.__token = report_ctx.set(report if report else Report())
+
+    def __evaluate(self):
+        report = report_ctx.get()
+        report_ctx.reset(self.__token)
+        if not report:
+            logging.critical(report)
+            raise PolicyBreachException()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.__evalute()
+        return None
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self.__evalute()
+        return None
+
+
+class PolicyMixin(ABC):
+    """Base class that applies one policy."""
+
+    @abstractmethod
+    def apply(self) -> bool:
+        """Implement policy to be applied here, then decorate with @policy(section=b'I' sn=0)."""
+        pass
+
+
+class BasePolicyApplier:
+    """Apply all mixed in policies."""
+
+    def _applier(self) -> bool:
+        self._setup()
+        success = all([cls.apply() for cls in self.__class__.mro() if issubclass(cls, PolicyMixin)])
+        self._clean()
+        return success
+
+    @abstractmethod
+    def _setup(self):
+        """Carry out setup operation before applying."""
+        pass
+
+    @abstractmethod
+    def _clean(self):
+        """Carry out clean up operation after applying."""
+        pass
+
+
+class PolicyValidator(ABC, BasePolicyApplier):
+    """Base class for policies that validates data."""
+
+    @abstractmethod
+    def validate(self, **kwargs):
+        """Execute validation."""
+        pass
+
+
+class PolicyPerformer(ABC, BasePolicyApplier):
+    """Base class for policies to be performed."""
+
+    @abstractmethod
+    def perform(self, **kwargs):
+        """Perform an action."""
+        pass
 
 
 class BaseValidatable(ABC):

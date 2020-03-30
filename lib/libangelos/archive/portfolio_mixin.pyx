@@ -16,11 +16,14 @@ from libangelos.document.types import StatementT, DocumentT
 from libangelos.error import Error
 from libangelos.helper import Glue
 from libangelos.policy.accept import EntityKeysPortfolioValidatePolicy, IssuedDocumentPortfolioValidatePolicy, \
-    NodePortfolioValidatePolicy
-from libangelos.policy.accept import ImportPolicy, ImportUpdatePolicy
+    NodePortfolioValidatePolicy, ImportPolicy, ProfileUpdatePortfolioPolicy, NetworkUpdatePortfolioPolicy, \
+    StatementImportPortfolioPolicy, EntityUpdatePortfolioPolicy, PrivateKeysImportPortfolioPolicy, \
+    NodeUpdatePortfolioPolicy, DomainUpdatePortfolioPolicy
 from libangelos.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, Portfolio, \
     PField, PGroup, DocSet
 from libangelos.utils import Util
+
+from policy.accept import KeysImportPortfolioPolicy
 
 
 class PortfolioMixin:
@@ -84,122 +87,200 @@ class PortfolioMixin:
             [3] set of removed documents
 
         """
-        portfolio_temp = copy.deepcopy(portfolio)
-        old = await self.load_portfolio(portfolio_temp.entity.id, PGroup.ALL)
+        updating_portfolio = copy.deepcopy(portfolio)
 
-        issuer, owner = portfolio_temp.to_sets()
-        new_set = issuer | owner
+        # Begin checking that the entity and latest public keys validates.
+        validator = EntityKeysPortfolioValidatePolicy(updating_portfolio)
+        report = validator.validate()
+        if not report:
+            raise RuntimeError("Portfolio entity and keys doesn't validate")
 
-        issuer, owner = old.to_sets()
-        old_set = issuer | owner
+        original_portfolio = await self.load_portfolio(updating_portfolio.entity.id, PGroup.ALL)
 
-        newdoc = set()
-        upddoc = set()
-        for ndoc in new_set:  # Find documents that are new or changed.
-            newone = True
-            updone = False
-            for odoc in old_set:
-                if ndoc.id == odoc.id:
-                    newone = False
-                    if ndoc.expires != odoc.expires:
-                        updone = True
-            if newone:
-                newdoc.add(ndoc)
-            elif updone:
-                upddoc.add(ndoc)
+        # Get all keys that differs from updating portfolio
+        keys = updating_portfolio.keys - original_portfolio.keys
 
-        new = Portfolio()
+        validator = KeysImportPortfolioPolicy(original_portfolio)
+        report = validator.validate_all(keys)
+        if not report:
+            raise RuntimeError("Some of the new keys didn't validate.")
+
+
+        validator = EntityUpdatePortfolioPolicy(original_portfolio)
+        report = validator.validate_all(updating_portfolio.entity)
+        if not report:
+            raise RuntimeError("The new entity didn't validate.")
+
+        if updating_portfolio.profile:
+            validator = ProfileUpdatePortfolioPolicy(original_portfolio)
+            report = validator.validate_all(updating_portfolio.profile)
+            if not report:
+                raise RuntimeError("The new profile didn't validate.")
+
+        if updating_portfolio.network:
+            validator = NetworkUpdatePortfolioPolicy(original_portfolio)
+            report = validator.validate_all(updating_portfolio.network)
+            if not report:
+                raise RuntimeError("The new profile didn't validate.")
+
+        validator = StatementImportPortfolioPolicy(original_portfolio)
+        report = validator.validate_all(
+            updating_portfolio.issuer.revoked | updating_portfolio.issuer.trusted | updating_portfolio.issuer.verified
+        )
+        if not report:
+            raise RuntimeError("The new statements didn't validate.")
+
+        original_portfolio.owner.revoked = set()
+        original_portfolio.owner.trusted = set()
+        original_portfolio.owner.verified = set()
+
+        if isinstance(updating_portfolio, PrivatePortfolio) and isinstance(original_portfolio, PrivatePortfolio):
+            if updating_portfolio.privkeys:
+                validator = PrivateKeysImportPortfolioPolicy(original_portfolio)
+                report = validator.validate_all(updating_portfolio.privkeys)
+                if not report:
+                    raise RuntimeError("The new private key didn't validate.")
+
+            if updating_portfolio.domain:
+                validator = DomainUpdatePortfolioPolicy(original_portfolio)
+                report = validator.validate_all(updating_portfolio.domain)
+                if not report:
+                    raise RuntimeError("The new private key didn't validate.")
+
+            if updating_portfolio.nodes:
+                validator = NodeUpdatePortfolioPolicy(original_portfolio)
+                report = validator.validate_all(updating_portfolio.nodes)
+                if not report:
+                    raise RuntimeError("The new private key didn't validate.")
+
+        return await self.save_portfolio(original_portfolio), set(), set()
+
+
+
+
+
+        # Verify changes in entity according to policy.
+
+
+
+        # ...
+        # issuer, owner = updating_portfolio.to_sets()
+        # new_set = issuer | owner
+
+        # issuer, owner = original_portfolio.to_sets()
+        # old_set = issuer | owner
+
+        # newdoc = set()
+        # upddoc = set()
+        # for ndoc in new_set:  # Find documents that are new or changed.
+        #    newone = True
+        #    updone = False
+        #    for odoc in old_set:
+        #        if ndoc.id == odoc.id:
+        #            newone = False
+        #            if ndoc.expires != odoc.expires:
+        #                updone = True
+        #    if newone:
+        #        newdoc.add(ndoc)
+        #    elif updone:
+        #        upddoc.add(ndoc)
+
+        # new = Portfolio()
         # Setting entity manually is required in case it is the same document
         # Old entity will be overridden if there is a newer
-        new.entity = old.entity
-        new.from_sets(newdoc | upddoc, newdoc | upddoc)
-        rejected = set()
+        # new.entity = original_portfolio.entity
+        # new.from_sets(newdoc | upddoc, newdoc | upddoc)
+        # rejected = set()
 
         # Validating any new keys
-        imp_policy = ImportPolicy(old)
-        upd_policy = ImportUpdatePolicy(old)
-        if new.keys and old.keys:
-            for key in new.keys:
-                reject = set()
-                if not upd_policy.keys(key):
-                    reject.add(key)
-            new.keys -= reject
-            old.keys += new.keys  # Adding new keys to old portfolio,
+        # imp_policy = ImportPolicy(original_portfolio)
+        # upd_policy = ImportUpdatePolicy(original_portfolio)
+        # if new.keys and original_portfolio.keys:
+        #    for key in new.keys:
+        #        reject = set()
+        #        if not upd_policy.keys(key):
+        #            reject.add(key)
+        #    new.keys -= reject
+        #    original_portfolio.keys += new.keys  # Adding new keys to old portfolio,
             # this way the old portfolio can verify documents signed with
             # new keys.
-            rejected |= reject
+        #    rejected |= reject
+
 
         # Validating any new entity
-        if new.entity and old.entity:
-            if not upd_policy.entity(new.entity):
-                new.entity = None
+        # if new.entity and original_portfolio.entity:
+        #    if not upd_policy.entity(new.entity):
+        #        new.entity = None
 
         # Adding old entity and keys if none.
-        if not new.entity:
-            new.entity = old.entity
-        if not new.keys:
-            new.keys = old.keys
+        # if not new.entity:
+        #     new.entity = original_portfolio.entity
+        # if not new.keys:
+        #    new.keys = original_portfolio.keys
 
-        if new.profile:
-            if not imp_policy.issued_document(new.profile):
-                rejected.add(new.profile)
-                new.profile = None
-        if new.network:
-            if not imp_policy.issued_document(new.network):
-                rejected.add(new.network)
-                new.network = None
+        # if new.profile:
+        #    if not imp_policy.issued_document(new.profile):
+        #        rejected.add(new.profile)
+        #        new.profile = None
 
-        if new.issuer.verified:
-            for verified in new.issuer.verified:
-                reject = set()
-                if not imp_policy.issued_document(verified):
-                    reject.add(verified)
-            new.issuer.verified -= reject
-            rejected |= reject
-        if new.issuer.trusted:
-            for trusted in new.issuer.trusted:
-                reject = set()
-                if not imp_policy.issued_document(trusted):
-                    reject.add(trusted)
-            new.issuer.trusted -= reject
-            rejected |= reject
-        if new.issuer.revoked:
-            for revoked in new.issuer.revoked:
-                reject = set()
-                if not imp_policy.issued_document(revoked):
-                    reject.add(revoked)
-            new.issuer.revoked -= reject
-            rejected |= reject
+        # if new.network:
+        #    if not imp_policy.issued_document(new.network):
+        #        rejected.add(new.network)
+        #        new.network = None
 
-        removed = (
-                portfolio_temp.owner.revoked
-                | portfolio_temp.owner.trusted
-                | portfolio_temp.owner.verified
-        )
+        # if new.issuer.verified:
+        #    for verified in new.issuer.verified:
+        #        reject = set()
+        #        if not imp_policy.issued_document(verified):
+        #            reject.add(verified)
+        #    new.issuer.verified -= reject
+        #    rejected |= reject
+        # if new.issuer.trusted:
+        #    for trusted in new.issuer.trusted:
+        #        reject = set()
+        #        if not imp_policy.issued_document(trusted):
+        #            reject.add(trusted)
+        #    new.issuer.trusted -= reject
+        #    rejected |= reject
+        # if new.issuer.revoked:
+        #    for revoked in new.issuer.revoked:
+        #        reject = set()
+        #        if not imp_policy.issued_document(revoked):
+        #            reject.add(revoked)
+        #    new.issuer.revoked -= reject
+        #    rejected |= reject
+
+        # removed = (
+        #        updating_portfolio.owner.revoked
+        #        | updating_portfolio.owner.trusted
+        #        | updating_portfolio.owner.verified
+        # )
 
         # Really remove files that can't be verified
-        portfolio_temp.owner.revoked = set()
-        portfolio_temp.owner.trusted = set()
-        portfolio_temp.owner.verified = set()
+        # updating_portfolio.owner.revoked = set()
+        # updating_portfolio.owner.trusted = set()
+        # updating_portfolio.owner.verified = set()
 
-        if hasattr(new, "privkeys"):
-            if new.privkeys:
-                if not imp_policy.issued_document(new.privkeys):
-                    new.privkeys = None
-        if hasattr(new, "domain"):
-            if new.domain:
-                if not imp_policy.issued_document(new.domain):
-                    new.domain = None
-        if hasattr(new, "nodes"):
-            if new.nodes:
-                for node in new.nodes:
-                    reject = set()
-                    if not imp_policy.node_document(node):
-                        reject.add(node)
-                new.nodes -= reject
-                rejected |= reject
 
-        return await self.save_portfolio(new), rejected, removed
+        # if hasattr(new, "privkeys"):
+        #    if new.privkeys:
+        #        if not imp_policy.issued_document(new.privkeys):
+        #            new.privkeys = None
+        # if hasattr(new, "domain"):
+        #    if new.domain:
+        #        if not imp_policy.issued_document(new.domain):
+        #            new.domain = None
+        # if hasattr(new, "nodes"):
+        #    if new.nodes:
+        #        for node in new.nodes:
+        #            reject = set()
+        #            if not imp_policy.node_document(node):
+        #                reject.add(node)
+        #        new.nodes -= reject
+        #        rejected |= reject
+
+        # return await self.save_portfolio(new), rejected, removed
+
 
     async def add_portfolio(  # FIXME: Make sure it follows policy
         self, portfolio: Portfolio
@@ -224,104 +305,51 @@ class PortfolioMixin:
             [3] set of removed documents
 
         """
-        # rejected = set()
-        portfolio_temp = copy.deepcopy(portfolio)
-        policy = ImportPolicy(portfolio_temp)
+        additional_portfolio = copy.deepcopy(portfolio)
 
         # Begin checking that the entity and latest public keys validates.
-        validator = EntityKeysPortfolioValidatePolicy(portfolio_temp)
+        validator = EntityKeysPortfolioValidatePolicy(additional_portfolio)
         report = validator.validate()
         if not report:
             raise RuntimeError("Portfolio entity and keys doesn't validate")
 
-        # entity, keys = policy.entity()
-        # if (entity, keys) == (None, None):
-        #    logging.error("Portfolio entity and keys doesn't validate")
-        #    return False, None, None
-
-        # Filter out invalid and expired public keys
-        #   We will just test the keys
-        # rejected |= policy._filter_set(portfolio_temp.keys)
-        # portfolio_temp.keys.add(keys)
-
-        # Filter out invalid and expired profile
-        #   we will just test the profile
-        # if portfolio_temp.profile and not policy.issued_document(portfolio_temp.profile):
-        #    rejected.add(portfolio_temp.profile)
-        #    portfolio_temp.profile = None
-        #    logging.warning("Removed invalid profile from portfolio")
-
-        # Filter out invalid and expired network
-        #   we will just test the network
-        # if portfolio_temp.network and not policy.issued_document(portfolio_temp.network):
-        #    rejected.add(portfolio_temp.network)
-        #    portfolio_temp.network = None
-        #    logging.warning("Removed invalid network from portfolio")
-
-        # Filter out invalid and expired revoked, verified and trusted
-        #   we will just test the revoked, verified and trusted
-        # rejected |= policy._filter_set(portfolio_temp.issuer.revoked)
-        # rejected |= policy._filter_set(portfolio_temp.issuer.verified)
-        # rejected |= policy._filter_set(portfolio_temp.issuer.trusted)
+        # Check all the documents without special constraints.
         docs = set()
-        docs |= portfolio_temp.keys
-        docs |= portfolio_temp.issuer.revoked
-        docs |= portfolio_temp.issuer.verified
-        docs |= portfolio_temp.issuer.trusted
-        if portfolio_temp.profile: docs.add(portfolio_temp.profile)
-        if portfolio_temp.network: docs.add(portfolio_temp.network)
+        docs |= additional_portfolio.keys
+        docs |= additional_portfolio.issuer.revoked
+        docs |= additional_portfolio.issuer.verified
+        docs |= additional_portfolio.issuer.trusted
+        if additional_portfolio.profile: docs.add(additional_portfolio.profile)
+        if additional_portfolio.network: docs.add(additional_portfolio.network)
 
-        validator = IssuedDocumentPortfolioValidatePolicy(portfolio_temp)
+        validator = IssuedDocumentPortfolioValidatePolicy(additional_portfolio)
         report = validator.validate_all(docs)
         if not report:
             raise RuntimeError("Some of the portfolios issued documents didn't validate.")
 
-        if isinstance(portfolio_temp, PrivatePortfolio):
-            # Filter out invalid and expired private keys
-            #   we will just test the private keys
-            # if portfolio_temp.privkeys and not policy.issued_document(
-            #    portfolio_temp.privkeys
-            # ):
-            #    rejected.add(portfolio_temp.privkeys)
-            #    portfolio_temp.privkeys = None
-            #    logging.warning("Removed invalid private keys from portfolio")
-
-            # Filter out invalid and expired domain
-            #   we will just test the domain
-            # if portfolio_temp.domain and not policy.issued_document(
-            #     portfolio_temp.domain
-            # ):
-            #    rejected.add(portfolio_temp.domain)
-            #    portfolio_temp.domain = None
-            #    logging.warning("Removed invalid domain from portfolio")
-
+        # Private portfolio section
+        if isinstance(additional_portfolio, PrivatePortfolio):
+            # Check all documents that are private portfolio specific without special constraints.
             docs = set()
-            if portfolio_temp.privkeys: docs.add(portfolio_temp.privkeys)
-            if portfolio_temp.domain: docs.add(portfolio_temp.domain)
+            if additional_portfolio.privkeys: docs.add(additional_portfolio.privkeys)
+            if additional_portfolio.domain: docs.add(additional_portfolio.domain)
 
             report = validator.validate_all(docs)
             if not report:
                 raise RuntimeError("Some of the portfolios issued documents didn't validate.")
 
-            # Filter out invalid and expired nodes
-            #   we will just test the nodes
-            # for node in portfolio_temp.nodes:
-            #    if node and not policy.node_document(node):
-            #        rejected.add(node)
-            #        portfolio_temp.nodes.remove(node)
-            #        logging.warning("Removed invalid node from portfolio")
-
-            validator = NodePortfolioValidatePolicy(portfolio_temp)
-            report = validator.validate_all(portfolio_temp.nodes)
+            # Check the nodes of the portfolio.
+            validator = NodePortfolioValidatePolicy(additional_portfolio)
+            report = validator.validate_all(additional_portfolio.nodes)
             if not report:
                 raise RuntimeError("Some of the portfolios nodes didn't validate.")
 
         # Really remove files that can't be verified
-        portfolio_temp.owner.revoked = set()
-        portfolio_temp.owner.trusted = set()
-        portfolio_temp.owner.verified = set()
+        additional_portfolio.owner.revoked = set()
+        additional_portfolio.owner.trusted = set()
+        additional_portfolio.owner.verified = set()
 
-        return await self.import_portfolio(portfolio_temp), set(), set() # Rejected and Removed ain't used any more
+        return await self.import_portfolio(additional_portfolio), set(), set() # Rejected and Removed ain't used any more
 
     async def docs_to_portfolio(
         self, documents: Set[DocumentT]

@@ -376,6 +376,7 @@ class BaseDocument(metaclass=DocumentMeta):
             return self.export_bytes() == other.export_bytes()
 
     def __hash__(self):
+        """Used for dictionary lookup of documents."""
         return hash(tuple(sorted(itertools.chain(self.export_bytes()))))
 
     @classmethod

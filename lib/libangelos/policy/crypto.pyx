@@ -8,7 +8,7 @@
 import libnacl
 import datetime
 
-from typing import Set
+from typing import Set, List, Union
 
 from libangelos.utils import Util
 from libangelos.document.types import DocumentT
@@ -22,9 +22,9 @@ class Crypto:
     """Conceal/unveil policy."""
 
     @staticmethod
-    def _document_data(document: DocumentT, exclude: list = []) -> bytes:
+    def document_data(document: DocumentT, exclude: list = []) -> bytes:
         new_dict = {}
-        exclude += ["issuer", "signature"]
+        exclude += ["issuer", "signature"]  # FIXME: Is it safe to exclude issuer? Was there a reason for it?
 
         for k, v in document.export_bytes().items():
             if k not in exclude:
@@ -82,6 +82,11 @@ class Crypto:
             return keys.created <= document.created and (
                 keys.expires >= document.created
             )
+
+    @staticmethod
+    def _sort_keys(keys: Set[Keys]) -> List[Keys]:
+        """Sort keys from set to list."""
+        return sorted(keys, key=lambda doc: doc.created, reverse=True)
 
     @staticmethod
     def latest_keys(keys: Set[Keys]) -> Keys:
@@ -187,7 +192,7 @@ class Crypto:
                 "This document doesn't support multiple signatures"
             )
 
-        data = bytes(signer.entity.id.bytes) + Crypto._document_data(
+        data = bytes(signer.entity.id.bytes) + Crypto.document_data(
             document, exclude
         )
         signature = libnacl.sign.Signer(signer.privkeys.seed).signature(data)
@@ -204,7 +209,67 @@ class Crypto:
         return document
 
     @staticmethod
+    def __verifier(signature: Union[bytes, list], data: bytes, keys: Keys):
+        """Verify data and signature(s) against a public key."""
+        verifier = libnacl.sign.Verifier(keys.verify.hex())
+
+        for signature in signature if isinstance(signature, list) else [signature]:
+            try:
+                verifier.verify(signature + data)
+                return True
+            except ValueError:
+                pass
+
+        return False
+
+    @staticmethod
     def verify(document: DocumentT, signer: Portfolio, exclude=[]) -> bool:
+        """Main document verifying algorithm."""
+
+        if not (document.issuer == signer.entity.id):
+            raise RuntimeError("Document issuer and Entity id doesn't match")
+
+        data = bytes(document.issuer.bytes) + Crypto.document_data(document, exclude)
+
+        for keys in Crypto._sort_keys(signer.keys):
+            if not Crypto._overlap(document, keys):
+                continue
+
+            if not (keys.issuer == signer.entity.id):
+                raise RuntimeError("Keys issuer and Entity id doesn't match")
+
+            if Crypto.__verifier(document.signature, data, keys):
+                return True
+
+        return False
+
+    @staticmethod
+    def verify_keys(new_key: Keys, signer: Portfolio, exclude=[]) -> bool:
+        """Verify double signed keys."""
+
+        if not (new_key.issuer == signer.entity.id):
+            raise RuntimeError("Document issuer and Entity id doesn't match")
+
+        data = bytes(new_key.issuer.bytes) + Crypto.document_data(new_key, exclude)
+
+        if not Crypto.__verifier(new_key.signature, data, new_key):
+            raise RuntimeError("Double signed key not self-signed.")
+
+        for keys in Crypto._sort_keys(signer.keys):
+            if not Crypto._overlap(new_key, keys):
+                continue
+
+            if not (keys.issuer == signer.entity.id):
+                raise RuntimeError("Keys issuer and Entity id doesn't match")
+
+            if Crypto.__verifier(new_key.signature, data, keys):
+                return True
+
+        return False
+
+    # TODO: Clean up or restore original verify method.
+    @staticmethod
+    def old_verify(document: DocumentT, signer: Portfolio, exclude=[]) -> bool:
         """Main document verifying algorithm."""
 
         for keys in sorted(
@@ -217,11 +282,20 @@ class Crypto:
                 raise RuntimeError(
                     "Document/Keys issuer or Entity id doesn't match"
                 )
-            data = bytes(document.issuer.bytes) + Crypto._document_data(
+            data = bytes(document.issuer.bytes) + Crypto.document_data(
                 document, exclude
             )
             verifier = libnacl.sign.Verifier(keys.verify.hex())
 
+            # Exchange the verifier loop to this one!
+            for signature in document.signature if isinstance(document.signature, list) else [document.signature]:
+                try:
+                    verifier.verify(signature + data)
+                except ValueError:
+                    pass
+                else:
+                    return True
+            """
             if isinstance(document.signature, list):
                 for signature in document.signature:
                     try:
@@ -235,6 +309,7 @@ class Crypto:
                     return True
                 except ValueError:
                     pass
+            """
 
         return False
 
@@ -268,7 +343,7 @@ class Crypto:
         data = (
             old_signature
             + bytes(signer.entity.id.bytes)
-            + Crypto._document_data(header)
+            + Crypto.document_data(header)
         )
         signature = libnacl.sign.Signer(signer.privkeys.seed).signature(data)
 
@@ -290,12 +365,13 @@ class Crypto:
         data = (
             old_signature
             + bytes(signer.entity.id.bytes)
-            + Crypto._document_data(header)
+            + Crypto.document_data(header)
         )
 
         for keys in sorted(
             signer.keys, key=lambda doc: doc.created, reverse=True
         ):
+
             if not (header.issuer == keys.issuer == signer.entity.id):
                 raise RuntimeError(
                     "Header/Keys issuer or Entity id doesn't match"

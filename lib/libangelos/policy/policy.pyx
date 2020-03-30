@@ -5,14 +5,13 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Baseclasses for policies."""
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from libangelos.validation import BaseValidator, BaseValidatable
 
 
 class Policy:
     """Abstract baseclass for all policies."""
-
     pass
 
 
@@ -32,3 +31,7 @@ class BasePolicyMixin(BaseValidatable, ABC):
     By implementing mixins, policy checks can be reused over several policy operations.
     """
     pass
+
+
+
+

@@ -94,7 +94,7 @@ class UpdatedMixin(metaclass=DocumentMeta):
     """
     updated = DateField(required=False)
 
-    def _check_expiry_period(self):
+    def _check_expiry_period(self):  # FIXME: Investigate if and how this conflicts with the Document implementation.
         """Checks that the expiry time period.
 
         The time period between update date and
@@ -150,6 +150,14 @@ class UpdatedMixin(metaclass=DocumentMeta):
         if hasattr(self, "signature"):
             self._fields["signature"].redo = True
             setattr(self, "signature", None)
+
+
+class ChangeableMixin(UpdatedMixin):
+    """Changeable is an updatable mixin that gives provision to change the value of some fields."""
+
+    def changeables(self) -> tuple:
+        """Fields that are allowed to change when updated."""
+        return tuple()
 
 
 class Document(IssueMixin, BaseDocument):
@@ -211,6 +219,15 @@ class Document(IssueMixin, BaseDocument):
                 {"expected": _type, "current": self.type},
             )
 
+    def period(self) -> datetime.timedelta:  # TODO: Implement expiry period as a method on all documents.
+        """The Delta period to expiry date.
+
+        Returns (datetime.timedelta):
+            The Delta period.
+
+        """
+        return datetime.timedelta(13 * 365 / 12)
+
     def get_touched(self) -> datetime.date:
         """Latest touch, created or updated date."""
         return self.updated if getattr(self, "updated", None) else self.created
@@ -226,7 +243,6 @@ class Document(IssueMixin, BaseDocument):
 
     def __ge__(self, other):
         return self.get_touched() >= other.get_touched()
-
 
     def get_owner(self) -> uuid.UUID:
         """Correct owner of document."""
@@ -266,6 +282,10 @@ class Document(IssueMixin, BaseDocument):
         month = self.expires - datetime.timedelta(days=365 / 12)
         today = datetime.date.today()
         return month <= today <= self.expires
+
+    def compare(self, document: "Document") -> bool:  # FIXME: Write a unittest
+        """Compare two documents to see if they are the same even if other fields mismatch."""
+        return (self.id.bytes == document.id.bytes) and (self.issuer.bytes == document.issuer.bytes)
 
     def save(self) -> bytes:
         """Serialize document.

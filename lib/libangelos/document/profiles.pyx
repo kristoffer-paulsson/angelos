@@ -5,7 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-from libangelos.document.document import DocType, Document, UpdatedMixin
+from libangelos.document.document import DocType, Document, ChangeableMixin
 from libangelos.document.entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 from libangelos.document.model import (
     BaseDocument,
@@ -59,7 +59,7 @@ class Social(BaseDocument):
     service = StringField()
 
 
-class Profile(Document, UpdatedMixin):
+class Profile(Document, ChangeableMixin):
     """Short summary.
 
     Attributes
@@ -110,6 +110,13 @@ class PersonProfile(Profile, PersonMixin):
     born = DateField(required=False)
     names = StringField(required=False, multiple=True)
 
+    def changeables(self) -> tuple:
+        """Fields that are changeable when updating."""
+        return (
+            "sex", "born", "names", "family_name", "given_names",
+            "picture", "email", "mobile", "phone", "address", "language", "social"
+        )
+
     def apply_rules(self) -> bool:
         """Short summary.
 
@@ -134,6 +141,13 @@ class MinistryProfile(Profile, MinistryMixin):
     """
     type = TypeField(value=int(DocType.PROF_MINISTRY))
 
+    def changeables(self) -> tuple:
+        """Fields that are changeable when updating."""
+        return (
+            "vision", "ministry", "founded",
+            "picture", "email", "mobile", "phone", "address", "language", "social"
+        )
+
     def apply_rules(self) -> bool:
         """Short summary.
 
@@ -157,6 +171,13 @@ class ChurchProfile(Profile, ChurchMixin):
         Description of attribute `type`.
     """
     type = TypeField(value=int(DocType.PROF_CHURCH))
+
+    def changeables(self) -> tuple:
+        """Fields that are changeable when updating."""
+        return (
+            "founded", "city", "region", "country",
+            "picture", "email", "mobile", "phone", "address", "language", "social"
+        )
 
     def apply_rules(self) -> bool:
         """Short summary.

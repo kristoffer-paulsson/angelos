@@ -5,6 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
+from libangelos.document.document import DocType, Document, UpdatedMixin, ChangeableMixin
 from libangelos.document.model import (
     BaseDocument,
     StringField,
@@ -16,8 +17,6 @@ from libangelos.document.model import (
 )
 from libangelos.error import Error
 from libangelos.utils import Util
-
-from libangelos.document.document import DocType, Document, UpdatedMixin
 
 
 class Host(BaseDocument):
@@ -120,7 +119,7 @@ class Node(Document, UpdatedMixin):
         return True
 
 
-class Network(Document, UpdatedMixin):
+class Network(Document, ChangeableMixin):
     """Short summary.
 
     Attributes
@@ -140,6 +139,10 @@ class Network(Document, UpdatedMixin):
         for host in self.hosts if self.hosts else []:
             if not (host.hostname or host.ip):
                 raise Util.exception(Error.DOCUMENT_NO_HOST)
+
+    def changeables(self) -> tuple:
+        """Fields that are changeable when updating."""
+        return "hosts",
 
     def apply_rules(self):
         """Short summary.
