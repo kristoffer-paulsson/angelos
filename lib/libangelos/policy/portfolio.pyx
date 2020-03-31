@@ -172,6 +172,23 @@ PORTFOLIO_PATTERN = {
     PField.OWNER_REVOKED: ".rev",
 }
 
+PORTFOLIO_TYPE = {
+    PField.ENTITY: (Person, Ministry, Church),
+    PField.PROFILE: (PersonProfile, MinistryProfile, ChurchProfile),
+    PField.PRIVKEYS: (PrivateKeys, ),
+    PField.KEYS: (Keys, ),
+    PField.DOMAIN: (Domain, ),
+    PField.NODES: (Node, ),
+    PField.NODE: (Node, ),
+    PField.NET: (Network, ),
+    PField.ISSUER_VERIFIED: (Verified, ),
+    PField.ISSUER_TRUSTED: (Trusted, ),
+    PField.ISSUER_REVOKED: (Revoked, ),
+    PField.OWNER_VERIFIED: (Verified, ),
+    PField.OWNER_TRUSTED: (Trusted, ),
+    PField.OWNER_REVOKED: (Revoked, ),
+}
+
 DOCUMENT_PATTERN = {
     DocType.KEYS_PRIVATE: ".pky",
     DocType.KEYS: ".key",
@@ -791,6 +808,70 @@ class PortfolioPolicy:
             portfolio.owner.revoked = assembly[PField.OWNER_REVOKED]
 
         return portfolio
+
+    @staticmethod
+    def is_importable(portfolio: Portfolio, field: str, doc: DocumentT):
+        """Test if a document is importable.
+
+        In order to be importable the document has to be non-existent in the portfolio.
+
+        Args:
+            portfolio:
+            field:
+            doc:
+
+        Returns:
+
+        """
+        if isinstance(doc, type(None)):
+            return False
+        content = getattr(portfolio, field, -1)
+        if content is -1:
+            raise AttributeError("Field doesn't exist.")
+        if not isinstance(doc, PORTFOLIO_TYPE[field]):
+            raise TypeError("Wrong document type for this field")
+
+        if isinstance(content, type(None)):
+            # If the content is None it means that the single field is empty and free to populate
+            return True
+        elif not isinstance(content, set):
+            # If the content is not a set it means that the single field is a document
+            content = set([content])
+
+        # In order to be importable the candidate document can not already exist.
+        return len({document for document in content if document.compare(doc)}) == 0
+
+    @staticmethod
+    def is_updatable(portfolio: Portfolio, field: str, doc: DocumentT):
+        """Test if a document is updatable.
+
+        In order to be importable the document has to be existent in the portfolio but newer.
+
+        Args:
+            portfolio:
+            field:
+            doc:
+
+        Returns:
+
+        """
+        if isinstance(doc, type(None)):
+            return False
+        content = getattr(portfolio, field, -1)
+        if content is -1:
+            raise AttributeError("Field doesn't exist.")
+        if not isinstance(doc, PORTFOLIO_TYPE[field]):
+            raise TypeError("Wrong document type for this field")
+
+        if isinstance(content, type(None)):
+            # If content is None it means it is importable and not updatable.
+            return False
+        elif not isinstance(content, set):
+            # If the content is not a set it means that the single field is a document
+            content = set([content])
+
+        # In order to be updatable the candidate document must already exist and be newer.
+        return len({document for document in content if document.compare(doc) and document < doc}) > 0
 
 
 class DocSet:

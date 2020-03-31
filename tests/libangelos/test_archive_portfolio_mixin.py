@@ -1,5 +1,6 @@
 import collections
 import copy
+import uuid
 
 from libangelos.error import PortfolioAlreadyExists, PortfolioExistsNot, PortfolioIllegalDelete
 from libangelos.policy.portfolio import PrivatePortfolio, DocSet, PGroup, Portfolio
@@ -21,112 +22,70 @@ class TestPortfolioMixin(BaseTestFacade):
             StatementPolicy.trusted(self.portfolio, portfolio)
             StatementPolicy.trusted(portfolio, self.portfolio)
 
+    async def load(self, eid: uuid.UUID):
+        """Load portfolio by using custom loader."""
+        docset = DocSet(
+            await Introspection.load_storage_file_list(
+                self.facade.storage.vault,
+                await Introspection.get_storage_portfolio_file_list(
+                    self.facade.storage.vault,
+                    eid
+                )
+            )
+        )
+
+        return PrivatePortfolio.factory(
+            docset.get_issuer(eid),
+            docset.get_owner(eid)
+        )
+
     @run_async
     async def test_update_portfolio(self):
         # TODO: Make sure it follows policy
         # update_portfolio don't seem to work according to the same rules as add_portfolio
         try:
             local_portfolio = self.portfolios[0]
+
+            original_portfolio = copy.deepcopy(local_portfolio)
             await self.facade.storage.vault.add_portfolio(local_portfolio)
-            files_saved_original = await Introspection.get_storage_portfolio_file_list(
-                self.facade.storage.vault, local_portfolio.entity.id)
-            files_memory_original = Introspection.get_portfolio_file_list(
-                self.facade.storage.vault, local_portfolio)
-            self.assertEqual(files_saved_original, files_memory_original)
+
+            self.assertEqual(local_portfolio, original_portfolio)
+            temp_portfolio = copy.deepcopy(original_portfolio)
+
+            temp_portfolio.owner.revoked = set()
+            temp_portfolio.owner.trusted = set()
+            temp_portfolio.owner.verified = set()
+
+            self.assertEqual(temp_portfolio, await self.load(temp_portfolio.entity.id))
 
             self.mutual_trust_and_verification()
 
-            files_memory_mutual = Introspection.get_portfolio_file_list(
-                self.facade.storage.vault, local_portfolio)
-            self.assertEqual(files_saved_original, files_memory_original)
+            self.assertNotEqual(local_portfolio, original_portfolio)
 
-            success, rejected, removed = await self.facade.storage.vault.update_portfolio(local_portfolio)
-            files_updated_removed = Introspection.get_portfolio_virtual_list(
-                self.facade.storage.vault, local_portfolio, removed)
+            await self.facade.storage.vault.update_portfolio(local_portfolio)
 
-            files_saved_mutual = await Introspection.get_storage_portfolio_file_list(
-                self.facade.storage.vault, local_portfolio.entity.id)
-
-            self.assertEqual(files_saved_mutual, files_memory_mutual)
-
-            print("files_saved_original:", files_saved_original)
-            print("files_memory_original:", files_memory_original)
-
-            print("files_saved_mutual:", files_saved_mutual)
-            print("files_memory_mutual:", files_memory_mutual)
-
-            print("files_updated_removed:", files_updated_removed)
-
-
-            """
-            # Files updated, files saved from updated portfolio
-            files_updated = await Introspection.get_storage_portfolio_file_list(
-                self.facade.storage.vault, local_portfolio.entity.id)
-
-            loaded_portfolio = await self.facade.storage.vault.load_portfolio(
-                local_portfolio.entity.id, PGroup.ALL)
-
-            # Files loaded, files from loaded updated portfolio
-            files_loaded = Introspection.get_portfolio_file_list(self.facade.storage.vault, loaded_portfolio)
-            print(files_loaded)
-            print(files_updated)
-            self.assertEqual(files_updated - files_missing, files_loaded)
-
-            print(files_loaded)
-            print(files_updated)
-            print(files_missing)
-
-            print(files_updated - files_saved - files_missing)
-            print(files_loaded - files_saved - files_missing)
-            self.assertEqual(files_updated - files_saved - files_missing, files_loaded - files_saved - files_missing)
-            self.assertEqual(files_updated, files_loaded)
-
-            docset = DocSet(await Introspection.load_storage_file_list(
-                self.facade.storage.vault, files_updated | files_missing))
-
-            composite_portfolio = PrivatePortfolio.factory(
-                docset.get_issuer(local_portfolio.entity.id),
-                docset.get_owner(local_portfolio.entity.id)
-            )
-
-            self.assertNotEqual(local_portfolio, loaded_portfolio)
-            self.assertEqual(local_portfolio, composite_portfolio)
-            """
 
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_add_portfolio(self):
-        # TODO: Make sure it follows policy
         try:
             local_portfolio = self.portfolios[0]
             self.mutual_trust_and_verification()
 
-            files_loaded = Introspection.get_portfolio_file_list(self.facade.storage.vault, local_portfolio)
+            success, _, _ = await self.facade.storage.vault.add_portfolio(local_portfolio)
+            self.assertTrue(success)
 
-            success, rejected, removed = await self.facade.storage.vault.add_portfolio(local_portfolio)
-            files_missing = Introspection.get_portfolio_virtual_list(
-                self.facade.storage.vault, local_portfolio, removed)
-
-            files_saved = await Introspection.get_storage_portfolio_file_list(
-                self.facade.storage.vault, local_portfolio.entity.id)
-
-            self.assertEqual(files_loaded, files_saved | files_missing)
-
-            docset = DocSet(await Introspection.load_storage_file_list(self.facade.storage.vault, files_saved))
-            docset2 = copy.deepcopy(docset)
-            loaded_portfolio = PrivatePortfolio.factory(
-                docset.get_issuer(local_portfolio.entity.id),
-                docset.get_owner(local_portfolio.entity.id)
-            )
-            composite_portfolio = PrivatePortfolio.factory(
-                docset2.get_issuer(local_portfolio.entity.id),
-                docset2.get_owner(local_portfolio.entity.id) | removed
-            )
+            loaded_portfolio = await self.load(local_portfolio.entity.id)
 
             self.assertNotEqual(local_portfolio, loaded_portfolio)
-            self.assertEqual(local_portfolio, composite_portfolio)
+
+            local_portfolio.owner.revoked = set()
+            local_portfolio.owner.trusted = set()
+            local_portfolio.owner.verified = set()
+
+            self.assertEqual(local_portfolio, loaded_portfolio)
 
         except Exception as e:
             self.fail(e)

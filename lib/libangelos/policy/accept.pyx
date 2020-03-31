@@ -292,12 +292,7 @@ class BasePortfolioPolicy(BasePolicy, BasePolicyMixin, ABC):
     """Base class for portfolio policies."""
 
     def __init__(self, portfolio: Portfolio):
-        self.__portfolio = portfolio
-
-    @property
-    def portfolio(self):
-        """Expose the portfolio."""
-        return self.__portfolio
+        self.portfolio = portfolio
 
 
 class EntityKeysPortfolioValidatePolicy(BasePortfolioPolicy):
@@ -348,16 +343,11 @@ class BaseDocumentPortfolioPolicy(BasePortfolioPolicy, ABC):
 
     def __init__(self, portfolio: Portfolio):
         BasePortfolioPolicy.__init__(self, portfolio)
-        self.__document = None
-
-    @property
-    def document(self):
-        """Expose document"""
-        return self.__document
+        self.document = None
 
     def _check_type(self):
         """Validate that the document is of type defined in self.TYPES"""
-        if not isinstance(self.__document, self.TYPES):
+        if not isinstance(self.document, self.TYPES):
             raise RuntimeWarning("The document is of wrong type.")
 
         return True
@@ -365,10 +355,10 @@ class BaseDocumentPortfolioPolicy(BasePortfolioPolicy, ABC):
     def _check_document_validity(self):
         """Validate document validity based on: expiry date passed, all fields validate."""
 
-        if self.__document.is_expired():
+        if self.document.is_expired():
             raise RuntimeWarning("Document is expired.")
 
-        if not self.__document.validate():
+        if not self.document.validate():
             raise RuntimeWarning("Document doesn't validate.")
 
         return True
@@ -386,7 +376,7 @@ class BaseDocumentPortfolioPolicy(BasePortfolioPolicy, ABC):
             The validation result.
 
         """
-        self.__document = document
+        self.document = document
         return self._validator(self, report)
 
     def validate_all(self, documents: Union[DocumentT, Set[DocumentT]]) -> Report:
@@ -408,7 +398,7 @@ class BaseDocumentPortfolioPolicy(BasePortfolioPolicy, ABC):
 
         for doc in documents:
             valid = valid if self.validate_document(doc, report) else False
-        self.__document = None
+        self.document = None
 
         if valid and len(report.failed):
             raise RuntimeError("Inaccurate report of failures and validation success.")
@@ -512,28 +502,18 @@ class OwnedDocumentPortfolioPolicy(BaseDocumentPortfolioPolicy):
 
     def __init__(self, portfolio: Portfolio):
         BaseDocumentPortfolioPolicy.__init__(self, portfolio)
-        self.__issuer = None
-
-    @property
-    def issuer(self):
-        """Expose issuing portfolio"""
-        return self.__issuer
-
-    @issuer.setter
-    def issuer(self, issuer: Portfolio):
-        """Setter of issuing portfolio"""
-        self.__issuer = issuer
+        self.issuer = None
 
     def _check_owner_issuer(self):
         """Check that the portfolio is the owner and the issuer the issue."""
         if self.document.owner != self.portfolio.entity.id:
             raise RuntimeWarning("Document not owned by internal portfolio.")
-        if self.document.issuer != self.__issuer.entity.id:
+        if self.document.issuer != self.issuer.entity.id:
             raise RuntimeWarning("Document not issued by issuing portfolio.")
 
     def _check_verified_issuer(self):
         """Check the document as cryptographically verified against issuing portfolio."""
-        if not Crypto.verify(self.document, self.__issuer):
+        if not Crypto.verify(self.document, self.issuer):
             raise RuntimeWarning("Document doesn't cryptographically verify.")
 
         return True
@@ -557,12 +537,7 @@ class BaseDocumentUpdatePortfolioPolicy(BasePortfolioPolicy, ABC):
 
     def __init__(self, portfolio: Portfolio):
         BasePortfolioPolicy.__init__(self, portfolio)
-        self.__document = None
-
-    @property
-    def document(self):
-        """Expose document"""
-        return self.__document
+        self.document = None
 
     @abstractmethod
     def _import_doc(self, doc: DocumentT):
@@ -571,7 +546,7 @@ class BaseDocumentUpdatePortfolioPolicy(BasePortfolioPolicy, ABC):
 
     def _check_type(self):
         """Validate that the document is of type defined in self.TYPES"""
-        if not isinstance(self.__document, self.TYPES):
+        if not isinstance(self.document, self.TYPES):
             raise RuntimeWarning("The document is of wrong type.")
 
         return True
@@ -579,10 +554,10 @@ class BaseDocumentUpdatePortfolioPolicy(BasePortfolioPolicy, ABC):
     def _check_document_validity(self):
         """Validate document validity based on: expiry date passed, all fields validate."""
 
-        if self.__document.is_expired():
+        if self.document.is_expired():
             raise RuntimeWarning("Document is expired.")
 
-        if not self.__document.validate():
+        if not self.document.validate():
             raise RuntimeWarning("Document doesn't validate.")
 
         return True
@@ -600,7 +575,7 @@ class BaseDocumentUpdatePortfolioPolicy(BasePortfolioPolicy, ABC):
             The validation result.
 
         """
-        self.__document = document
+        self.document = document
         return self._validator(self, report)
 
     def validate_all(self, documents: Union[DocumentT, Set[DocumentT]]) -> Report:
@@ -624,8 +599,8 @@ class BaseDocumentUpdatePortfolioPolicy(BasePortfolioPolicy, ABC):
             success = self.validate_document(doc, report)
             valid = valid if success else False
             if success:
-                self.import_doc(doc)
-        self.__document = None
+                self._import_doc(doc)
+        self.document = None
 
         if valid and len(report.failed):
             raise RuntimeError("Inaccurate report of failures and validation success.")
@@ -677,7 +652,7 @@ class PrivateKeysImportPortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def _check_verified_keys(self):
         """Check the key is cryptographically verified against internal portfolio."""
-        if not Crypto.verify_keys(self.document, self.portfolio):
+        if not Crypto.verify(self.document, self.portfolio):
             raise RuntimeWarning("Key document doesn't cryptographically verify.")
 
         return True
@@ -715,14 +690,14 @@ class StatementImportPortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def _import_doc(self, doc: DocumentT):
         if isinstance(doc, Revoked):
-            if not self.document in self.portfolio.issued.revoked:
-                self.portfolio.issued.revoked.add(doc)
+            if not self.document in self.portfolio.issuer.revoked:
+                self.portfolio.issuer.revoked.add(doc)
         if isinstance(doc, Trusted):
-            if not self.document in self.portfolio.issued.trusted:
-                self.portfolio.issued.trusted.add(doc)
+            if not self.document in self.portfolio.issuer.trusted:
+                self.portfolio.issuer.trusted.add(doc)
         if isinstance(doc, Verified):
-            if not self.document in self.portfolio.issued.verified:
-                self.portfolio.issued.verified.add(doc)
+            if not self.document in self.portfolio.issuer.verified:
+                self.portfolio.issuer.verified.add(doc)
 
     def apply_rules(self, report: Report = None, identity: uuid.UUID = Report.NULL_IDENTITY):
         identity = self.document.id if self.document else identity
@@ -730,7 +705,7 @@ class StatementImportPortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
             (self._check_type, b'I', 0),
             (self._check_issuer, b'I', 0),
             (self._check_document_validity, b'I', 0),
-            (self._check_verified_keys, b'I', 0)
+            (self._check_verified_portfolio, b'I', 0)
         ]
         return self._checker(rules, report, identity)
 
@@ -741,12 +716,7 @@ class EntityUpdatePortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def __init__(self, portfolio: Portfolio):
         BaseDocumentUpdatePortfolioPolicy.__init__(self, portfolio)
-        self.__original = None
-
-    @property
-    def original(self):
-        """Expose original document"""
-        return self.__original
+        self.original = None
 
     def _check_issuer(self):
         """Validate that the document is issued by the internal portfolio."""
@@ -794,12 +764,7 @@ class ProfileUpdatePortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def __init__(self, portfolio: Portfolio):
         BaseDocumentUpdatePortfolioPolicy.__init__(self, portfolio)
-        self.__original = None
-
-    @property
-    def original(self):
-        """Expose original document"""
-        return self.__original
+        self._original = None
 
     def _check_issuer(self):
         """Validate that the document is issued by the internal portfolio."""
@@ -847,12 +812,7 @@ class NetworkUpdatePortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def __init__(self, portfolio: Portfolio):
         BaseDocumentUpdatePortfolioPolicy.__init__(self, portfolio)
-        self.__original = None
-
-    @property
-    def original(self):
-        """Expose original document"""
-        return self.__original
+        self.original = None
 
     def _check_issuer(self):
         """Validate that the document is issued by the internal portfolio."""
@@ -900,12 +860,7 @@ class NodeUpdatePortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def __init__(self, portfolio: Portfolio):
         BaseDocumentUpdatePortfolioPolicy.__init__(self, portfolio)
-        self.__original = None
-
-    @property
-    def original(self):
-        """Expose original document"""
-        return self.__original
+        self.original = None
 
     def _check_issuer(self):
         """Validate that the document is issued by the internal portfolio."""
@@ -930,7 +885,7 @@ class NodeUpdatePortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
         if hash(Crypto.document_data(self.document, exclude)) != hash(Crypto.document_data(self.original, exclude)):
             raise RuntimeWarning("Document has changed fields.")
 
-    def _import_doc(self, doc: DocumentT)
+    def _import_doc(self, doc: DocumentT):
         self.portfolio.nodes.remove(self.original)
         self.portfolio.nodes.add(self.document)
 
@@ -954,12 +909,7 @@ class DomainUpdatePortfolioPolicy(BaseDocumentUpdatePortfolioPolicy):
 
     def __init__(self, portfolio: Portfolio):
         BaseDocumentUpdatePortfolioPolicy.__init__(self, portfolio)
-        self.__original = None
-
-    @property
-    def original(self):
-        """Expose original document"""
-        return self.__original
+        self.original = None
 
     def _check_issuer(self):
         """Validate that the document is issued by the internal portfolio."""

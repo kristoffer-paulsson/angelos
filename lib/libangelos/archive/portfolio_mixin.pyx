@@ -18,12 +18,10 @@ from libangelos.helper import Glue
 from libangelos.policy.accept import EntityKeysPortfolioValidatePolicy, IssuedDocumentPortfolioValidatePolicy, \
     NodePortfolioValidatePolicy, ImportPolicy, ProfileUpdatePortfolioPolicy, NetworkUpdatePortfolioPolicy, \
     StatementImportPortfolioPolicy, EntityUpdatePortfolioPolicy, PrivateKeysImportPortfolioPolicy, \
-    NodeUpdatePortfolioPolicy, DomainUpdatePortfolioPolicy
+    NodeUpdatePortfolioPolicy, DomainUpdatePortfolioPolicy, KeysImportPortfolioPolicy
 from libangelos.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, Portfolio, \
     PField, PGroup, DocSet
 from libangelos.utils import Util
-
-from policy.accept import KeysImportPortfolioPolicy
 
 
 class PortfolioMixin:
@@ -97,31 +95,34 @@ class PortfolioMixin:
 
         original_portfolio = await self.load_portfolio(updating_portfolio.entity.id, PGroup.ALL)
 
-        # Get all keys that differs from updating portfolio
-        keys = updating_portfolio.keys - original_portfolio.keys
-
         validator = KeysImportPortfolioPolicy(original_portfolio)
-        report = validator.validate_all(keys)
+        report = validator.validate_all(updating_portfolio.keys)
         if not report:
             raise RuntimeError("Some of the new keys didn't validate.")
 
+        if PortfolioPolicy.is_importable(original_portfolio, PField.ENTITY, updating_portfolio.entity):
+            original_portfolio.entity = updating_portfolio.entity
+        elif PortfolioPolicy.is_updatable(original_portfolio, PField.ENTITY, updating_portfolio.entity):
+            validator = EntityUpdatePortfolioPolicy(original_portfolio)
+            report = validator.validate_all(updating_portfolio.entity)
+            if not report:
+                raise RuntimeError("The new entity didn't validate.")
 
-        validator = EntityUpdatePortfolioPolicy(original_portfolio)
-        report = validator.validate_all(updating_portfolio.entity)
-        if not report:
-            raise RuntimeError("The new entity didn't validate.")
-
-        if updating_portfolio.profile:
+        if PortfolioPolicy.is_importable(original_portfolio, PField.PROFILE, updating_portfolio.profile):
+            original_portfolio.profile = updating_portfolio.profile
+        elif PortfolioPolicy.is_updatable(original_portfolio, PField.PROFILE, updating_portfolio.profile):
             validator = ProfileUpdatePortfolioPolicy(original_portfolio)
             report = validator.validate_all(updating_portfolio.profile)
             if not report:
                 raise RuntimeError("The new profile didn't validate.")
 
-        if updating_portfolio.network:
+        if PortfolioPolicy.is_importable(original_portfolio, PField.NET, updating_portfolio.network):
+            original_portfolio.network = updating_portfolio.network
+        elif PortfolioPolicy.is_updatable(original_portfolio, PField.NET, updating_portfolio.network):
             validator = NetworkUpdatePortfolioPolicy(original_portfolio)
             report = validator.validate_all(updating_portfolio.network)
             if not report:
-                raise RuntimeError("The new profile didn't validate.")
+                raise RuntimeError("The new network didn't validate.")
 
         validator = StatementImportPortfolioPolicy(original_portfolio)
         report = validator.validate_all(
@@ -135,33 +136,33 @@ class PortfolioMixin:
         original_portfolio.owner.verified = set()
 
         if isinstance(updating_portfolio, PrivatePortfolio) and isinstance(original_portfolio, PrivatePortfolio):
-            if updating_portfolio.privkeys:
+            if PortfolioPolicy.is_importable(original_portfolio, PField.PRIVKEYS, updating_portfolio.privkeys):
+                original_portfolio.privkeys = updating_portfolio.privkeys
+            elif PortfolioPolicy.is_updatable(original_portfolio, PField.PRIVKEYS, updating_portfolio.privkeys):
                 validator = PrivateKeysImportPortfolioPolicy(original_portfolio)
                 report = validator.validate_all(updating_portfolio.privkeys)
                 if not report:
                     raise RuntimeError("The new private key didn't validate.")
 
-            if updating_portfolio.domain:
+            if PortfolioPolicy.is_importable(original_portfolio, PField.DOMAIN, updating_portfolio.domain):
+                original_portfolio.domain = updating_portfolio.domain
+            elif PortfolioPolicy.is_updatable(original_portfolio, PField.DOMAIN, updating_portfolio.domain):
                 validator = DomainUpdatePortfolioPolicy(original_portfolio)
                 report = validator.validate_all(updating_portfolio.domain)
                 if not report:
                     raise RuntimeError("The new private key didn't validate.")
 
-            if updating_portfolio.nodes:
-                validator = NodeUpdatePortfolioPolicy(original_portfolio)
-                report = validator.validate_all(updating_portfolio.nodes)
-                if not report:
-                    raise RuntimeError("The new private key didn't validate.")
+            # FIXME: Nodes should check both if one doesn't exist and does exist and is newer.
+            for node in updating_portfolio.nodes:
+                if PortfolioPolicy.is_importable(original_portfolio, PField.NODES, node):
+                    original_portfolio.nodes.add(node)
+                elif PortfolioPolicy.is_updatable(original_portfolio, PField.NODES, node):
+                    validator = NodeUpdatePortfolioPolicy(original_portfolio)
+                    report = validator.validate_all(updating_portfolio.nodes)
+                    if not report:
+                        raise RuntimeError("The new private key didn't validate.")
 
         return await self.save_portfolio(original_portfolio), set(), set()
-
-
-
-
-
-        # Verify changes in entity according to policy.
-
-
 
         # ...
         # issuer, owner = updating_portfolio.to_sets()
@@ -598,8 +599,6 @@ class PortfolioMixin:
         This method expects policies to be applied."""
         dirname = self.portfolio_path(portfolio.entity.id)
         self.portfolio_exists_not(dirname, portfolio.entity.id)
-
-        files = await self.portfolio_files(dirname)
 
         ops = list()
         issuer, owner = portfolio.to_sets()
