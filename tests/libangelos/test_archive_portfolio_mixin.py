@@ -45,25 +45,36 @@ class TestPortfolioMixin(BaseTestFacade):
         # update_portfolio don't seem to work according to the same rules as add_portfolio
         try:
             local_portfolio = self.portfolios[0]
-
             original_portfolio = copy.deepcopy(local_portfolio)
+            # Add the local portfolio
             await self.facade.storage.vault.add_portfolio(local_portfolio)
 
-            self.assertEqual(local_portfolio, original_portfolio)
-            temp_portfolio = copy.deepcopy(original_portfolio)
-
+            # Make a copy and remove docs according to specified behavior
+            temp_portfolio = copy.deepcopy(local_portfolio)
             temp_portfolio.owner.revoked = set()
             temp_portfolio.owner.trusted = set()
             temp_portfolio.owner.verified = set()
 
+            # Compare copy and loaded portfolio
             self.assertEqual(temp_portfolio, await self.load(temp_portfolio.entity.id))
 
+            # Add some docs according to user behavior
             self.mutual_trust_and_verification()
 
+            # Compare local and original, should be different
             self.assertNotEqual(local_portfolio, original_portfolio)
 
+            # Update local portfolio, the "user" modified
             await self.facade.storage.vault.update_portfolio(local_portfolio)
 
+            # Make a new copy and remove according to defined behavior
+            temp_portfolio = copy.deepcopy(local_portfolio)
+            temp_portfolio.owner.revoked = set()
+            temp_portfolio.owner.trusted = set()
+            temp_portfolio.owner.verified = set()
+
+            # Compare current local and loaded/updated files
+            self.assertEqual(temp_portfolio, await self.load(temp_portfolio.entity.id))
 
         except Exception as e:
             self.fail(e)
