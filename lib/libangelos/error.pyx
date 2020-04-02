@@ -276,8 +276,8 @@ class LogoException(Exception):
     pass
 
 
-class PolicyBreach(AngelosException):
-    pass  # noqa E302
+# class PolicyBreach(AngelosException):
+#    pass  # noqa E302
 
 
 class PortfolioNotStatement(AngelosException):

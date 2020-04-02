@@ -34,7 +34,7 @@ class ExportImportOperation(Operation):
 
     @staticmethod
     def exporter(name: str, portfolio: Portfolio):
-        output = ExportImportOperation.headline(name, "(Start)")
+        output = ExportImportOperation.headline(name, "(Begin)")
         data = base64.b64encode(PortfolioPolicy.exports(portfolio)).decode(
             "utf-8"
         )

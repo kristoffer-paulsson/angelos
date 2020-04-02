@@ -302,6 +302,14 @@ class Util:
             secs = seconds - hour * 3600 - mins * 60
             return "{:}:{:02}:{:02}".format(hour, mins, secs)
 
+    @staticmethod
+    def headline(title: str, filler: str = "", barrier = "-"):
+        """Print headlines."""
+        title = " " + title + " " + (filler + " " if filler else "")
+        line = barrier * 79
+        offset = int(79 / 2 - len(title) / 2)
+        return line[:offset] + title + line[offset + len(title):]
+
 
 class FactoryInterface:
     """Docstring"""

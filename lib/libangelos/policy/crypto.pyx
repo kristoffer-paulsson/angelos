@@ -25,6 +25,7 @@ class Crypto:
     def document_data(document: DocumentT, exclude: list = []) -> bytes:
         new_dict = {}
         exclude += ["issuer", "signature"]  # FIXME: Is it safe to exclude issuer? Was there a reason for it?
+        # exclude += ["signature"]
 
         for k, v in document.export_bytes().items():
             if k not in exclude:
