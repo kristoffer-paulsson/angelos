@@ -318,5 +318,3 @@ class FactoryInterface:
     def factory(cls, **kwargs):
         """Docstring"""
         return cls(kwargs["io"])
-
-

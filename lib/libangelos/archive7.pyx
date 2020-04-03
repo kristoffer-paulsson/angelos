@@ -27,6 +27,7 @@ import sys
 import time
 import uuid
 import zlib
+from abc import ABC
 
 from libangelos.conceal import ConcealIO
 from libangelos.error import Error, ArchiveInvalidFile
