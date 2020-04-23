@@ -276,10 +276,10 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         count = 0
         for _, entry in idxs:
             filename = entry.name.decode()
-            if entry.parent.int == 0:
+            if entry.__parent.int == 0:
                 name = "/" + filename
             else:
-                name = ids[entry.parent] + "/" + filename
+                name = ids[entry.__parent] + "/" + filename
 
             if follow and entry.type == Entry.TYPE_LINK:
                 link, _ = ops.follow_link(entry)

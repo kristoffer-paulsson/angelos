@@ -357,7 +357,7 @@ class BaseDocument(metaclass=DocumentMeta):
 
 
     def __eq__(self, other):
-        """Compare to documents.
+        """Compare two documents.
 
         If other is another type then its false.
         Else if data exported bytes are equal or not.

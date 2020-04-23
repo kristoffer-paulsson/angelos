@@ -430,8 +430,8 @@ class Entry(
             self.id.bytes
             if isinstance(self.id, uuid.UUID)
             else uuid.uuid4().bytes,
-            self.parent.bytes
-            if isinstance(self.parent, uuid.UUID)
+            self.__parent.bytes
+            if isinstance(self.__parent, uuid.UUID)
             else b"\x00" * 16,
             self.owner.bytes
             if isinstance(self.owner, uuid.UUID)
@@ -669,10 +669,10 @@ class Archive7(ContainerAware, SharedResource):
         for i in idxs:
             idx, entry = i
             filename = entry.name.decode()
-            if entry.parent.int == 0:
+            if entry.__parent.int == 0:
                 name = "/" + filename
             else:
-                name = ids[entry.parent] + "/" + filename
+                name = ids[entry.__parent] + "/" + filename
             files.add(name)
 
         return files
@@ -1901,7 +1901,7 @@ class Archive7(ContainerAware, SharedResource):
                 for key, value in paths.items():
                     if bool(self.__dir_regex.match(key)):
                         parents.append(value)
-                self.parent(tuple(parents))
+                self.__parent(tuple(parents))
 
             def _type_in(x):
                 return x.type in self.__type
@@ -1913,10 +1913,10 @@ class Archive7(ContainerAware, SharedResource):
                 return self.__id.int == x.id.int
 
             def _parent_is(x):
-                return x.parent.int in self.__parent[0]
+                return x.__parent.int in self.__parent[0]
 
             def _parent_not(x):
-                return x.parent.int not in self.__parent[0]
+                return x.__parent.int not in self.__parent[0]
 
             def _owner_is(x):
                 return x.owner.int in self.__owner[0]

@@ -29,6 +29,10 @@ from io import RawIOBase, SEEK_SET, SEEK_END, SEEK_CUR
 import libnacl.secret
 
 
+# FIXME: Use pythons built in cache for optimization.
+#  https://docs.python.org/3.4/library/functools.html#functools.lru_cache
+
+
 class BaseHeap(ABC):
     pass
 

@@ -23,13 +23,27 @@ class Crypto:
 
     @staticmethod
     def document_data(document: DocumentT, exclude: list = []) -> bytes:
-        new_dict = {}
-        exclude += ["issuer", "signature"]  # FIXME: Is it safe to exclude issuer? Was there a reason for it?
-        # exclude += ["signature"]
+        """Flatten the data of a Document in a standardized way to a byte string.
 
-        for k, v in document.export_bytes().items():
-            if k not in exclude:
-                new_dict[k] = v
+        Args:
+            document (Document):
+                The document to be flattened.
+            exclude (list):
+                List of fieldnames to exclude from flattening.
+
+        Returns (bytes):
+            The flattened document as bytes.
+
+        """
+        new_dict = {}
+        exclude += ["issuer", "signature"]
+        # exclude += ["signature"]
+        # FIXME: Is it safe to exclude issuer? Was there a reason for it?
+        #  Otherwise don't exclude issuer, seems safer, otherwise might require more policies.
+
+        for field, data in sorted(document.export_bytes().items()):
+            if field not in exclude:
+                new_dict[field] = data
 
         return Crypto._dict_data(new_dict)
 
