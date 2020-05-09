@@ -22,15 +22,16 @@ import math
 import os
 import random
 import struct
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Reversible
 from io import RawIOBase, SEEK_SET, SEEK_END, SEEK_CUR
 
 import libnacl.secret
 
-
 # FIXME: Use pythons built in cache for optimization.
 #  https://docs.python.org/3.4/library/functools.html#functools.lru_cache
+from bplustree import BPlusTree, UUIDSerializer
 
 
 class BaseHeap(ABC):
@@ -40,14 +41,14 @@ class BaseHeap(ABC):
 class BaseFileObject(ABC, RawIOBase):
     """FileIO-compliant and transparent abstract file object layer."""
 
-    def __init__(self, file: str, mode: str = "r"):
-        self.__name = file
+    def __init__(self, filename: str, mode: str = "r"):
+        self.__name = filename
         self.__mode = mode
         self.__readable = False
         self.__writable = False
         self.__seekable = True
 
-        if not (len(mode) != len(set(mode)) and len(set(mode) - set("abrwx+")) == 0):
+        if not (len(mode) == len(set(mode)) and len(set(mode) - set("abrwx+")) == 0):
             raise ValueError("Invalid mode: %s." % mode)
 
         self.seek(0)
@@ -103,8 +104,12 @@ class BaseFileObject(ABC, RawIOBase):
         This method has no effect if the file is already closed.
         """
         if not self.closed:
-            super().close(self)
+            RawIOBase.close(self)
             self._close()
+
+    @abstractmethod
+    def _close(self):
+        pass
 
     def fileno(self):
         """
@@ -120,7 +125,7 @@ class BaseFileObject(ABC, RawIOBase):
 
         This is not implemented for read-only and non-blocking streams.
         """
-        super().flush(self)
+        # super().flush(self)
         self._flush()
 
     @abstractmethod
@@ -184,7 +189,7 @@ class BaseFileObject(ABC, RawIOBase):
         """Tell current IO position."""
         self.__is_seekable()
 
-        return self.__position
+        return self._position
 
     def truncate(self, size=None):
         """
@@ -226,8 +231,8 @@ class BaseFileObject(ABC, RawIOBase):
 
 
 BLOCK_SIZE = 4096
-DATA_SIZE = 4020
-MAX_UINT32 = 2**32
+DATA_SIZE = 4008
+MAX_UINT32 = 2 ** 32
 
 
 class StreamBlock:
@@ -239,14 +244,15 @@ class StreamBlock:
         self.previous. 4 bytes, signed integer linking to previous block.
         self.next. 4 bytes, signed integer linking to next block.
         self.index. 4 bytes, unsigned integer block in stream index.
-        self.stream. 4 bytes, unsigned integer setting stream id.
+        self.stream. 16 bytes, unsigned integer setting stream id.
         self.digest. 20 bytes, sha1 digest of the data field.
-        self.data. 4020 bytes
+        self.data. 4004 bytes
     """
 
-    FORMAT = "!iiII20s4020s"
+    FORMAT = "!iiI16s20s4008s"
 
-    def __init__(self, position: int = None, previous: int = -1, next: int = -1, index: int = 0, stream: int = 0,
+    def __init__(self, position: int = None, previous: int = -1, next: int = -1, index: int = 0,
+                 stream: uuid.UUID = uuid.UUID(int=0),
                  block: bytes = None):
         self.__position = position
 
@@ -258,7 +264,7 @@ class StreamBlock:
         self.data = bytearray(DATA_SIZE)
 
         if block:
-            self.load(block)
+            self.load_meta(block)
 
     @property
     def position(self) -> int:
@@ -278,13 +284,15 @@ class StreamBlock:
         """
         valid = True
         data = None
+        stream = None
         (
-            self.previous, self.next, self.index, self.stream, self.digest, data
+            self.previous, self.next, self.index, stream, self.digest, data
         ) = struct.unpack(StreamBlock.FORMAT, block)
         if hashlib.sha1(self.data).digest() != self.digest:
             valid = False
             # raise ValueError("Loaded data chunk is corrupt.")
 
+        self.stream = uuid.UUID(bytes=stream)
         self.data[:] = data[:]
         return valid
 
@@ -294,13 +302,13 @@ class StreamBlock:
             self.previous,
             self.next,
             self.index,
-            self.stream,
+            self.stream.bytes,
             hashlib.sha1(self.data).digest(),
             self.data
         )
 
 
-class DataStream(Iterable, Reversible):
+class DataStream:  # (Iterable, Reversible):
     """Descriptor for an open data stream to be read and written too.
 
     Data streams should be wrapped in a file descriptor.
@@ -315,9 +323,9 @@ class DataStream(Iterable, Reversible):
 
     COMP_NONE = 0
 
-    FORMAT = "!iIIiQH"
+    FORMAT = "!16siiIQH"
 
-    def __init__(self, manager: "StreamManager", block: StreamBlock, identity: int, begin: int = -1,
+    def __init__(self, manager: "StreamManager", block: StreamBlock, identity: uuid.UUID, begin: int = -1,
                  end: int = -1, count: int = 0, length: int = 0, compression: int = 0):
         self.__manager = manager
         self.__block = block
@@ -330,6 +338,11 @@ class DataStream(Iterable, Reversible):
         self._count = count
         self._length = length
         self._compression = compression
+
+    @property
+    def identity(self):
+        """Expose the streams identity number."""
+        return self._identity
 
     @property
     def data(self):
@@ -349,13 +362,19 @@ class DataStream(Iterable, Reversible):
         """
         (
             self._identity, self._begin, self._end, self._count, self._length, self._compression
-        ) = struct.unpack(StreamBlock.FORMAT, stream)
+        ) = DataStream.meta_unpack(stream)
         return True
+
+    @staticmethod
+    def meta_unpack(data: bytes) -> tuple():
+        metadata = struct.unpack(DataStream.FORMAT, data)
+        identity = uuid.UUID(bytes=metadata[0])
+        return (identity,) + metadata[1:]
 
     def __bytes__(self):
         return struct.pack(
             DataStream.FORMAT,
-            self._identity,
+            self._identity.bytes,
             self._begin,
             self._end,
             self._count,
@@ -529,23 +548,31 @@ class DataStream(Iterable, Reversible):
 
         return pos
 
+    def close(self):
+        """Save and close stream at manager."""
+        self.save()
+        self.__manager.close_stream(self)
+
 
 class VirtualFileObject(BaseFileObject):
     """Stream for the registry index database."""
 
-    def __init__(self, stream: DataStream, file: str, mode: str = "r"):
+    def __init__(self, stream: DataStream, filename: str, mode: str = "r"):
         self.__stream = stream
-        self.__position = 0
+        self._position = 0
         self.__offset = 0
         self.__end = stream.length()
-        BaseFileObject.__init__(file, mode)
+        BaseFileObject.__init__(self, filename, mode)
+
+    def _close(self):
+        self.__stream.close()
 
     def _flush(self):
         self.__stream.save(True)
 
     def _readinto(self, b):
         m = memoryview(b).cast("B")
-        size = min(len(m), self.__end - self.__position)
+        size = min(len(m), self.__end - self._position)
 
         data = bytearray()
         cursor = 0
@@ -556,7 +583,7 @@ class VirtualFileObject(BaseFileObject):
 
             data += self.__stream.data[self.__offset:self.__offset + num_copy]
             cursor += num_copy
-            self.__position += num_copy
+            self._position += num_copy
             self.__offset += num_copy
 
             if self.__offset == DATA_SIZE:
@@ -572,9 +599,9 @@ class VirtualFileObject(BaseFileObject):
             cursor = min(max(offset, 0), self.__end)
         elif whence == SEEK_CUR:
             if offset < 0:
-                cursor = max(self.__position + offset, 0)
+                cursor = max(self._position + offset, 0)
             else:
-                cursor = min(self.__position + offset, self.__end)
+                cursor = min(self._position + offset, self.__end)
         elif whence == SEEK_END:
             cursor = max(min(self.__end + offset, self.__end), 0)
         else:
@@ -582,19 +609,19 @@ class VirtualFileObject(BaseFileObject):
 
         block = int(math.floor(cursor / DATA_SIZE))
         if self.__stream.wind(block) != block:
-            return self.__position
+            return self._position
         else:
             self.__offset = cursor - (block * DATA_SIZE)
-            self.__position = cursor
-            return self.__position
+            self._position = cursor
+            return self._position
 
     def _truncate(self, size):
         if size:
             self.__stream.truncate(size)
             self.__end = size
         else:
-            self.__stream.truncate(self.__position)
-            self.__end = self.__position
+            self.__stream.truncate(self._position)
+            self.__end = self._position
         return self.__end
 
     def _write(self, b):
@@ -606,16 +633,16 @@ class VirtualFileObject(BaseFileObject):
 
         while write_len > cursor:
             self.__stream.changed()
-            num_copy = min(DATA_SIZE - self._offset, write_len - cursor)
+            num_copy = min(DATA_SIZE - self.__offset, write_len - cursor)
 
             self.__stream.data[self.__offset:self.__offset + num_copy] = b[cursor:cursor + num_copy]
 
             cursor += num_copy
-            self.__position += num_copy
+            self._position += num_copy
             self.__offset += num_copy
-            if self.__position > self.__end:  # Updating stream length
-                self.__stream.length(self.__position - self.__end)
-                self.__end = self.__position
+            if self._position > self.__end:  # Updating stream length
+                self.__stream.length(self._position - self.__end)
+                self.__end = self._position
 
             if self.__offset >= DATA_SIZE:  # Load next or new block
                 if not self.__stream.next():
@@ -634,31 +661,116 @@ class TrashStream:
     pass
 
 
-class StreamRegistry:
+class Registry:
+    def __init__(self, main: DataStream, journal: DataStream, key_size: int, value_size: int):
+        self.__tree = BPlusTree(
+            VirtualFileObject(main, "index", "wb+"),
+            VirtualFileObject(journal, "journal", "wb+"),
+            page_size=DATA_SIZE,
+            key_size=key_size,
+            value_size=value_size,
+            serializer=UUIDSerializer()
+        )
 
+    @property
+    def tree(self):
+        return self.__tree
+
+    def close(self):
+        self.__tree.close()
+
+
+class StreamRegistry:
+    """Registry to keep track of all streams and the trash."""
     FORMAT = "!i"
 
     def __init__(self, manager: "StreamManager"):
         self.__manager = manager
         self.__index = None
-        self.heap = []
-        self.entries = 0
+        self.__trash = None
 
         self.__open_index()
         self.__open_trash()
 
-    def load(self, block: bytes):
-        pass
+    def close(self):
+        self.__close_index()
+        self.__close_trash()
 
-    def __bytes__(self):
-        pass
+    def register(self, stream: DataStream) -> int:
+        """Register a data stream.
+
+        Args:
+            stream (DataStream):
+                Stream to be registered.
+
+        Returns (int):
+            Stream identity number.
+
+        """
+        self.__index.tree.insert(stream.identity, bytes(stream))
+        return stream.identity
+
+    def unregister(self, identity: int) -> bytes:
+        """Unregister a data stream.
+
+        Args:
+            identity (int):
+                Stream identity number.
+
+        Returns (bytes):
+            Stream metadata.
+
+        """
+        return self.__index.tree.remove(identity)
+
+    def update(self, stream: DataStream) -> bool:
+        """Update stream metadata.
+
+        Args:
+            stream (DataStream):
+                Stream to update metadata from.
+
+        Returns (bool):
+            Success of update.
+
+        """
+        try:
+            self.__index.tree.insert(stream.identity, bytes(stream), True)
+            return True
+        except ValueError:
+            return False
+
+    def search(self, identity: int) -> bytes:
+        """Search for a stream by identity number.
+
+        Args:
+            identity (int):
+                Identity number.
+
+        Returns (bytes):
+            Stream metadata.
+
+        """
+        return self.__index.tree.get(identity)
 
     def __open_index(self):
         identity = 0
-        block = self.__manager.special_block(StreamManager.BLOCK_INDEX)
-        stream = DataStream(self.__manager, block, StreamManager.STREAM_INDEX, begin=block.position)
+        self.__index = Registry(
+            self.__manager.special_stream(StreamManager.STREAM_INDEX),
+            self.__manager.special_stream(StreamManager.STREAM_JOURNAL),
+            key_size=16,
+            value_size=struct.calcsize(DataStream.FORMAT)
+        )
+
+    def __close_index(self):
+        # FIXME: Clean up index stream
+        pass
 
     def __open_trash(self):
+        self.__trash = self.__manager.special_stream(StreamManager.STREAM_TRASH)
+
+    def __close_trash(self):
+        # FIXME: Clean up trash stream
         pass
 
 
@@ -673,17 +785,18 @@ class StreamManager(ABC):
     streams.
     """
 
-    BLOCK_META = 0
+    BLOCK_DATA = 0
     BLOCK_OP = 1
-    BLOCK_SWAP1 = 2
-    BLOCK_SWAP2 = 3
-    BLOCK_SWAP3 = 4
-    BLOCK_DATA = 5
-    BLOCK_INDEX = 6
-    BLOCK_TRASH = 7
+    BLOCK_SWAP = 2
+    BLOCK_RESERVED_1 = 3
+    BLOCK_RESERVED_2 = 4
+    BLOCK_INDEX = 5
+    BLOCK_TRASH = 6
+    BLOCK_JOURNAL = 7
 
     STREAM_INDEX = 0
     STREAM_TRASH = 1
+    STREAM_JOURNAL = 2
 
     def __init__(self, filename: str, secret: bytes):
         # Filename and path
@@ -704,7 +817,7 @@ class StreamManager(ABC):
         # Reserved streams
         self.__streams = dict()
         # Currently open streams
-        self.__open = set()
+        self.__opened = dict()
 
         dirname = os.path.dirname(filename)
         if not os.path.isdir(dirname):
@@ -731,9 +844,10 @@ class StreamManager(ABC):
 
     def __setup(self):
         self.__file = open(self.__filename, "ab+", BLOCK_SIZE)
-        self.__blocks = {i:self.new_block() for i in range(8)}
+        self.__blocks = {i: self.new_block() for i in range(8)}
         self.__start_core()
         self.__save_data()
+        self.__registry = StreamRegistry(self)
 
     def __open(self):
         self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
@@ -741,32 +855,39 @@ class StreamManager(ABC):
         if position % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
         self.__count = int(position / BLOCK_SIZE)
-        self.__blocks = {i:self.load_block() for i in range(8)}
+        self.__blocks = {i: self.load_block() for i in range(8)}
         self.__start_core()
         self.__load_data()
+        self.__registry = StreamRegistry(self)
 
     def __close(self):
         self.__streams[StreamManager.STREAM_INDEX].save(True)
         self.__streams[StreamManager.STREAM_TRASH].save(True)
+        self.__streams[StreamManager.STREAM_JOURNAL].save(True)
+        self.__registry.close()
         self.__save_data()
 
     def __start_core(self):
         self.__streams[StreamManager.STREAM_INDEX] = DataStream(
-            self, self.__blocks[StreamManager.BLOCK_INDEX], StreamManager.STREAM_INDEX)
+            self, self.__blocks[StreamManager.BLOCK_INDEX], uuid.UUID(int=StreamManager.STREAM_INDEX))
         self.__streams[StreamManager.STREAM_TRASH] = DataStream(
-            self, self.__blocks[StreamManager.BLOCK_INDEX], StreamManager.STREAM_TRASH)
+            self, self.__blocks[StreamManager.BLOCK_TRASH], uuid.UUID(int=StreamManager.STREAM_TRASH))
+        self.__streams[StreamManager.STREAM_JOURNAL] = DataStream(
+            self, self.__blocks[StreamManager.BLOCK_JOURNAL], uuid.UUID(int=StreamManager.STREAM_JOURNAL))
 
     def __load_data(self):
         size = struct.calcsize(StreamBlock.FORMAT)
         data = self.__block[StreamManager.BLOCK_DATA]
         self.__streams[StreamManager.STREAM_INDEX].load_meta(data.data[:size])
-        self.__streams[StreamManager.STREAM_TRASH].load_meta(data.data[size:size*2])
+        self.__streams[StreamManager.STREAM_TRASH].load_meta(data.data[size:size * 2])
+        self.__streams[StreamManager.STREAM_JOURNAL].load_meta(data.data[size:size * 3])
 
     def __save_data(self):
         size = struct.calcsize(StreamBlock.FORMAT)
-        data = self.__block[StreamManager.BLOCK_DATA]
+        data = self.__blocks[StreamManager.BLOCK_DATA]
         data.data[:size] = bytes(self.__streams[StreamManager.STREAM_INDEX])
-        data.data[size:size*2] = bytes(self.__streams[StreamManager.STREAM_TRASH])
+        data.data[size:size * 2] = bytes(self.__streams[StreamManager.STREAM_TRASH])
+        data.data[size:size * 3] = bytes(self.__streams[StreamManager.STREAM_JOURNAL])
         self.save_block(data.position, data)
 
     def special_block(self, position: int):
@@ -783,9 +904,10 @@ class StreamManager(ABC):
             The newly created block.
 
         """
-        self.__file.seek(0, os.SEEK_END)
+        offset = self.__file.seek(0, os.SEEK_END)
         block = StreamBlock(position=self.__count)
         self.__count += 1
+        print("New:", self.__count, offset)
         length = self.__file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
@@ -805,10 +927,11 @@ class StreamManager(ABC):
         if index >= self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__blocks))
 
-        position = index % BLOCK_SIZE
+        position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
+        print("Load:", index, offset)
 
         return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
 
@@ -830,10 +953,20 @@ class StreamManager(ABC):
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
 
-        length = self.__file.write(self.__box.encrypt(block))
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        self.__file.flush()
+        os.fsync(self.__file)
+        print("Save:", index, offset)
 
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+
+    def special_stream(self, position: int):
+        """Receive one of the 3 reserved special streams."""
+        if 0 <= position <= 2:
+            return self.__streams[position]
+        else:
+            raise IndexError("Index must be between 0 and 2, was %s." % position)
 
     def new_stream(self) -> DataStream:
         """Create a new data stream.
@@ -842,27 +975,36 @@ class StreamManager(ABC):
             The new data stream created.
 
         """
-        identity = random.random(8, MAX_UINT32)  # FIXME: Generate identity in registry instead.
-        block = self.new_block(index=0, stream=identity)
+        identity = uuid.uuid4()
+        block = self.new_block()
+        block.index = 0
+        block.stream = identity
         stream = DataStream(self, block, identity, begin=block.position, end=block.position, count=1)
         self.__registry.register(stream)
-        self.__streams.add(stream)
+        self.__opened[stream.identity] = stream
         return stream
 
-    def open_stream(self, stream: int) -> DataStream:
+    def open_stream(self, identity: uuid.UUID) -> DataStream:
         """Open an existing data stream.
 
         Args:
-            stream (int):
+            identity (uuid.UUID):
                 Data stream number.
 
         Returns (DataStream):
             The opened data stream object.
 
         """
-        pass
+        if identity in self.__opened.keys():
+            raise OSError("Already opened")
+        metadata = DataStream.meta_unpack(self.__registry.search(identity))
+        if metadata[0] != identity:
+            raise OSError("Identity doesn't match stream %s" % identity)
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        self.__opened[identity] = stream
+        return stream
 
-    def close_stream(self, stream: DataStream):
+    def close_stream(self, stream: DataStream) -> bool:
         """Close an open data stream.
 
         Args:
@@ -870,23 +1012,37 @@ class StreamManager(ABC):
                 Data stream object being saved.
 
         """
-        pass
+        if stream.identity not in self.__opened:
+            raise OSError("Stream not known to be open.")
+        stream.save()
+        self.__registry.update(stream)
+        del self.__opened[stream.identity]
+        del stream
 
-    def del_stream(self, stream: int) -> bool:
+    def del_stream(self, identity: uuid.UUID) -> bool:
         """Delete data stream from file.
 
         Args:
-            stream (int):
+            identity (uuid.UUID):
                 Data stream number to be erased.
 
         Returns (bool):
             Success of deleting data stream.
 
         """
-        pass
+        metadata = DataStream.meta_unpack(self.__registry.update(identity))
+        if metadata[0] != identity:
+            raise OSError("Identity doesn't match stream %s" % identity)
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        self.__registry.trash(stream)
+        del stream
+        self.__registry.unregister(identity)
+        return True
 
     def __del__(self):
         if not self.__file.closed:
+            self.__file.flush()
+            os.fsync(self.__file)
             fcntl.flock(self.__file, fcntl.LOCK_UN)
             self.__file.close()
 
