@@ -72,16 +72,14 @@ class TestStreamManager(BaseArchiveTestCase):
 
             fileobj = VirtualFileObject(stream, "test", "wb+")
             fileobj.write(data)
-            print(fileobj.tell())
             fileobj.close()
 
             fileobj = VirtualFileObject(mgr.open_stream(identity), "test")
             data2 = fileobj.read()
-            print(fileobj.tell())
 
             self.assertEqual(
-                hashlib.sha1(data).digest(),
-                hashlib.sha1(data2).digest()
+                 hashlib.sha1(data).digest(),
+                 hashlib.sha1(data2).digest()
             )
             fileobj.close()
         except Exception as e:

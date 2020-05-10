@@ -251,7 +251,7 @@ class StreamBlock:
 
     FORMAT = "!iiI16s20s4008s"
 
-    def __init__(self, position: int = None, previous: int = -1, next: int = -1, index: int = 0,
+    def __init__(self, position: int, previous: int = -1, next: int = -1, index: int = 0,
                  stream: uuid.UUID = uuid.UUID(int=0),
                  block: bytes = None):
         self.__position = position
@@ -290,7 +290,6 @@ class StreamBlock:
         ) = struct.unpack(StreamBlock.FORMAT, block)
         if hashlib.sha1(self.data).digest() != self.digest:
             valid = False
-            # raise ValueError("Loaded data chunk is corrupt.")
 
         self.stream = uuid.UUID(bytes=stream)
         self.data[:] = data[:]
@@ -450,12 +449,12 @@ class DataStream:  # (Iterable, Reversible):
         """
         return self.__step(self.__block.previous)
 
-    def __step(self, to: int):
+    def __step(self, to: int) -> bool:
         if to == -1:
             return False
         else:
-            block = self.__manager.load_block(to)
             self.save()
+            block = self.__manager.load_block(to)
             self.__block = block
             return True
 
@@ -664,8 +663,8 @@ class TrashStream:
 class Registry:
     def __init__(self, main: DataStream, journal: DataStream, key_size: int, value_size: int):
         self.__tree = BPlusTree(
-            VirtualFileObject(main, "index", "wb+"),
-            VirtualFileObject(journal, "journal", "wb+"),
+            VirtualFileObject(main, "index", "ab+"),
+            VirtualFileObject(journal, "journal", "ab+"),
             page_size=DATA_SIZE,
             key_size=key_size,
             value_size=value_size,
@@ -843,27 +842,27 @@ class StreamManager(ABC):
         return self.__file.tell()
 
     def __setup(self):
-        self.__file = open(self.__filename, "ab+", BLOCK_SIZE)
+        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
         self.__blocks = {i: self.new_block() for i in range(8)}
         self.__start_core()
         self.__save_data()
         self.__registry = StreamRegistry(self)
 
     def __open(self):
-        self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
-        position = self.__get_size()
-        if position % BLOCK_SIZE:
+        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
+        length = self.__get_size()
+        if length % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
-        self.__count = int(position / BLOCK_SIZE)
-        self.__blocks = {i: self.load_block() for i in range(8)}
+        self.__count = int(math.floor(length / BLOCK_SIZE))
+        self.__blocks = {i: self.load_block(i) for i in range(8)}
         self.__start_core()
         self.__load_data()
         self.__registry = StreamRegistry(self)
 
     def __close(self):
-        self.__streams[StreamManager.STREAM_INDEX].save(True)
-        self.__streams[StreamManager.STREAM_TRASH].save(True)
-        self.__streams[StreamManager.STREAM_JOURNAL].save(True)
+        self.__streams[StreamManager.STREAM_INDEX].save()
+        self.__streams[StreamManager.STREAM_TRASH].save()
+        self.__streams[StreamManager.STREAM_JOURNAL].save()
         self.__registry.close()
         self.__save_data()
 
@@ -905,9 +904,9 @@ class StreamManager(ABC):
 
         """
         offset = self.__file.seek(0, os.SEEK_END)
-        block = StreamBlock(position=self.__count)
+        index = int(math.floor(offset / BLOCK_SIZE))
+        block = StreamBlock(position=index)
         self.__count += 1
-        print("New:", self.__count, offset)
         length = self.__file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
@@ -924,14 +923,13 @@ class StreamManager(ABC):
             Loaded block a stream block.
 
         """
-        if index >= self.__count:
-            raise IndexError("Index out of bounds, %s of %s." % (index, self.__blocks))
+        if not index < self.__count:
+            raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
 
         position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
-        if not position == offset:
+        if position != offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        print("Load:", index, offset)
 
         return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
 
@@ -945,10 +943,13 @@ class StreamManager(ABC):
                 Block to save to file.
 
         """
+        if not index < self.__count:
+            raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
+
         if index != block.position:
             raise IndexError("Index %s and position %s are not the same." % (index, block.position))
 
-        position = index % BLOCK_SIZE
+        position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
@@ -956,7 +957,6 @@ class StreamManager(ABC):
         length = self.__file.write(self.__box.encrypt(bytes(block)))
         self.__file.flush()
         os.fsync(self.__file)
-        print("Save:", index, offset)
 
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
