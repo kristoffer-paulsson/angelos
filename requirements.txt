@@ -9,4 +9,3 @@ keyring
 msgpack
 pyyaml
 macos-keychain
-git+https://github.com/kristoffer-paulsson/bplustree.git

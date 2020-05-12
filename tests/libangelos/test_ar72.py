@@ -1,21 +1,12 @@
-import copy
 import hashlib
-import heapq
 import logging
-import math
 import os
-import random
-import statistics
-import struct
 import sys
 import tracemalloc
-from typing import Any
-from abc import ABC, abstractmethod
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from libangelos.ar72 import StreamManager
-
 from libangelos.ar72 import VirtualFileObject
 
 
@@ -81,6 +72,33 @@ class TestStreamManager(BaseArchiveTestCase):
                  hashlib.sha1(data).digest(),
                  hashlib.sha1(data2).digest()
             )
+
             fileobj.close()
+            mgr.close()
+        except Exception as e:
+            self.fail(e)
+
+    def test_run2(self):
+        try:
+            data = bytes(os.urandom(2**20))
+            mgr = StreamManagerStub(os.path.join(self.home, "test.ar7"), self.secret)
+            stream = mgr.new_stream()
+            identity = stream.identity
+            fileobj = VirtualFileObject(stream, "test", "wb+")
+            fileobj.write(data)
+            fileobj.close()
+            mgr.close()
+
+            print(os.lstat(os.path.join(self.home, "test.ar7")).st_size)
+            mgr = StreamManagerStub(os.path.join(self.home, "test.ar7"), self.secret)
+            fileobj = VirtualFileObject(mgr.open_stream(identity), "test")
+            data2 = fileobj.read()
+
+            self.assertEqual(
+                 hashlib.sha1(data).digest(),
+                 hashlib.sha1(data2).digest()
+            )
+            fileobj.close()
+            mgr.close()
         except Exception as e:
             self.fail(e)

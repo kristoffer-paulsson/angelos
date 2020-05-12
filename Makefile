@@ -19,6 +19,7 @@ init:
 	mkdir -p libangelos/server
 	mkdir -p libangelos/ssh
 	mkdir -p angelos
+	mkdir -p bplustree
 	pip install -r requirements.txt
 	python setup.py develop
 
