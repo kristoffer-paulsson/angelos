@@ -16,7 +16,7 @@ import uuid
 from tempfile import TemporaryDirectory
 
 import libnacl
-from libangelos.archive.portfolio_mixin import PortfolioMixin
+from libangelos.storage.portfolio_mixin import PortfolioMixin
 from libangelos.const import Const
 from libangelos.document.document import DocType
 from libangelos.document.messages import Mail

@@ -8,7 +8,7 @@
 import csv
 import io
 
-from libangelos.archive.portfolio_mixin import DOCUMENT_PATH
+from libangelos.storage.portfolio_mixin import DOCUMENT_PATH
 from libangelos.document.document import DocType
 from libangelos.policy.crypto import Crypto
 from libangelos.policy.portfolio import PGroup, PortfolioPolicy, PrivatePortfolio

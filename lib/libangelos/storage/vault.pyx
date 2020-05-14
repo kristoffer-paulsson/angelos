@@ -11,8 +11,8 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional
 
-from libangelos.archive.portfolio_mixin import PortfolioMixin
-from libangelos.archive.storage import StorageFacadeExtension
+from libangelos.storage.portfolio_mixin import PortfolioMixin
+from libangelos.storage.storage import StorageFacadeExtension
 from libangelos.archive7 import Entry, Archive7
 from libangelos.const import Const
 from libangelos.helper import Glue, Globber
@@ -276,10 +276,10 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         count = 0
         for _, entry in idxs:
             filename = entry.name.decode()
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 name = "/" + filename
             else:
-                name = ids[entry.__parent] + "/" + filename
+                name = ids[entry.parent] + "/" + filename
 
             if follow and entry.type == Entry.TYPE_LINK:
                 link, _ = ops.follow_link(entry)

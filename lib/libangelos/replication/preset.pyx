@@ -13,8 +13,8 @@ import pathlib
 import uuid
 
 from libangelos.api.mailbox import MailboxAPI
-from libangelos.archive.mail import MailStorage
-from libangelos.archive.vault import VaultStorage
+from libangelos.storage.mail import MailStorage
+from libangelos.storage.vault import VaultStorage
 from libangelos.ioc import Container
 from libangelos.policy.portfolio import Portfolio
 

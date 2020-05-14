@@ -51,7 +51,6 @@ class TestCrossAuthentication(BaseTestNetwork):
             self.server.app.ioc.facade.storage.vault,
             self.client.app.ioc.facade.data.portfolio.entity.id
         )
-        print(files)
 
         """ Client <-- Server """
         # Load server data from server vault

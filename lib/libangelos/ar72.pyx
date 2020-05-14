@@ -815,7 +815,8 @@ class StreamRegistry:
 
 
 class StreamManager(ABC):
-    pass
+    SPECIAL_BLOCK_COUNT = 0
+    SPECIAL_STREAM_COUNT = 0
 
 
 class SingleStreamManager(StreamManager):
@@ -829,128 +830,96 @@ class SingleStreamManager(StreamManager):
     streams.
     """
 
-    BLOCK_DATA = 0
-    BLOCK_OP = 1
-    BLOCK_SWAP = 2
-    BLOCK_RESERVED_1 = 3
-    BLOCK_RESERVED_2 = 4
-    BLOCK_INDEX = 5
-    BLOCK_TRASH = 6
-    BLOCK_JOURNAL = 7
+    SPECIAL_BLOCK_COUNT = 1
 
-    STREAM_INDEX = 0
-    STREAM_TRASH = 1
-    STREAM_JOURNAL = 2
+    BLOCK_DATA = 0
 
     def __init__(self, filename: str, secret: bytes):
-        # Filename and path
-        self.__filename = filename
-        # Encryption secret
+        self.__created = False
+        self._filename = filename
+        self._file = None
         self.__secret = secret
-        self.__closed = False
-        # Archive file descriptor
-        self.__file = None
-        # Encryption/decryption object
         self.__box = libnacl.secret.SecretBox(secret)
-        # Number of blocks in archive
         self.__count = 0
-        # Reserved blocks
-        self.__blocks = None
-        # Reserved streams
-        self.__internal = [None for _ in range(3)]
-        # Currently open streams
+        self.__blocks = [None for _ in range(self.SPECIAL_BLOCK_COUNT)]
+        self.__closed = False
+        self.__internal = [None for _ in range(self.SPECIAL_STREAM_COUNT)]
         self.__streams = dict()
+
         dirname = os.path.dirname(filename)
         if not os.path.isdir(dirname):
             raise OSError("Directory %s doesn't exist." % dirname)
+
         if os.path.isfile(filename):
             # Open and use file
-            self.__open()
+            self._open()
         else:
             # Initialize file before using
-            self.__setup()
+            self._setup()
+            self.__created = True
+
     @property
     def closed(self):
         return self.__closed
 
-    def __get_size(self) -> int:
+    @property
+    def created(self):
+        return self.__created
+
+    def _get_size(self) -> int:
         """Size of the underlying file.
 
         Returns (int):
             Length of file.
 
         """
-        self.__file.seek(0, os.SEEK_END)
-        return self.__file.tell()
+        self._file.seek(0, os.SEEK_END)
+        return self._file.tell()
 
-    def __setup(self):
-        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
-        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        self.__blocks = {i: self.new_block() for i in range(8)}
-        self.__start_core()
-        self.__save_data()
-        self.__registry = StreamRegistry(self)
+    def _setup(self):
+        self._file = open(self._filename, "wb+", BLOCK_SIZE)
+        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.__blocks = {i: self.new_block() for i in range(self.SPECIAL_BLOCK_COUNT)}
+        self._start()
+        self._save()
 
-    def __open(self):
-        self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
-        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        length = self.__get_size()
+    def _open(self):
+        self._file = open(self._filename, "rb+", BLOCK_SIZE)
+        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        length = self._get_size()
         if length % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
         self.__count = length // BLOCK_SIZE
-        self.__blocks = {i: self.load_block(i) for i in range(8)}
-        self.__start_core()
-        self.__load_data()
-        self.__registry = StreamRegistry(self)
+        self.__blocks = {i: self.load_block(i) for i in range(self.SPECIAL_BLOCK_COUNT)}
+        self._start()
+        self._load()
 
     def close(self):
         if not self.closed:
             self.__closed = True
-            self.__internal[MultiStreamManager.STREAM_INDEX].save()
-            self.__internal[MultiStreamManager.STREAM_TRASH].save()
-            self.__internal[MultiStreamManager.STREAM_JOURNAL].save()
-            self.__registry.close()
-            self.__save_data()
-            self.__file.flush()
-            os.fsync(self.__file)
-            fcntl.lockf(self.__file, fcntl.LOCK_UN)
-            self.__file.close()
+            for stream in self.__internal:
+                stream.save()
+            self._save()
+            self._file.flush()
+            os.fsync(self._file)
+            fcntl.lockf(self._file, fcntl.LOCK_UN)
+            self._file.close()
 
-    def __start_core(self):
-        identity = uuid.UUID(int=MultiStreamManager.STREAM_INDEX)
-        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_INDEX], identity)
-        self.__internal[MultiStreamManager.STREAM_INDEX] = stream
-        self.__streams[identity] = stream
-        identity = uuid.UUID(int=MultiStreamManager.STREAM_TRASH)
-        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_TRASH], identity)
-        self.__internal[MultiStreamManager.STREAM_TRASH] = stream
-        self.__streams[identity] = stream
-        identity = uuid.UUID(int=MultiStreamManager.STREAM_JOURNAL)
-        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_JOURNAL], identity)
-        self.__internal[MultiStreamManager.STREAM_JOURNAL] = stream
-        self.__streams[identity] = stream
+    def _start(self):
+        pass
 
-    def __load_data(self):
-        size = struct.calcsize(InternalStream.FORMAT)
-        block = self.__blocks[MultiStreamManager.BLOCK_DATA]
-        self.__internal[MultiStreamManager.STREAM_INDEX].load_meta(block.data[:size])
-        self.__internal[MultiStreamManager.STREAM_TRASH].load_meta(block.data[size:size * 2])
-        self.__internal[MultiStreamManager.STREAM_JOURNAL].load_meta(block.data[size * 2:size * 3])
+    def _load(self):
+        pass
 
-    def __save_data(self):
-        size = struct.calcsize(InternalStream.FORMAT)
-        block = self.__blocks[MultiStreamManager.BLOCK_DATA]
-        block.data[:size * 3] = bytes(self.__internal[MultiStreamManager.STREAM_INDEX]) + \
-                                bytes(self.__internal[MultiStreamManager.STREAM_TRASH]) + \
-                                bytes(self.__internal[MultiStreamManager.STREAM_JOURNAL])
-        self.save_block(block.position, block)
+    def _save(self):
+        pass
 
     def special_block(self, position: int):
-        """Receive one of the 8 reserved special blocks."""
-        if 0 <= position <= 7:
+        """Receive one of the reserved special blocks."""
+        if 0 <= position < self.SPECIAL_BLOCK_COUNT:
             return self.__blocks[position]
         else:
-            raise IndexError("Index must be between 0 and 7, was %s." % position)
+            raise IndexError("Index must be between 0 and %s, was %s." % (self.SPECIAL_BLOCK_COUNT, position))
 
     def new_block(self) -> StreamBlock:
         """Create new block at the end of file, write empty block to file.
@@ -959,11 +928,10 @@ class SingleStreamManager(StreamManager):
             The newly created block.
 
         """
-        offset = self.__file.seek(0, os.SEEK_END)
-        index = offset // BLOCK_SIZE
-        block = StreamBlock(position=index)
+        offset = self._file.seek(0, os.SEEK_END)
+        block = StreamBlock(position=offset // BLOCK_SIZE)
         self.__count += 1
-        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        length = self._file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
         return block
@@ -982,10 +950,10 @@ class SingleStreamManager(StreamManager):
         if not index < self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
         position = index * BLOCK_SIZE
-        offset = self.__file.seek(position)
+        offset = self._file.seek(position)
         if position != offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
+        return StreamBlock(position=index, block=self.__box.decrypt(self._file.read(BLOCK_SIZE)))
 
     def save_block(self, index: int, block: StreamBlock):
         """Save a block and encrypt it.
@@ -1002,21 +970,21 @@ class SingleStreamManager(StreamManager):
         if index != block.position:
             raise IndexError("Index %s and position %s are not the same." % (index, block.position))
         position = index * BLOCK_SIZE
-        offset = self.__file.seek(position)
+        offset = self._file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        length = self.__file.write(self.__box.encrypt(bytes(block)))
-        self.__file.flush()
-        os.fsync(self.__file)
+        length = self._file.write(self.__box.encrypt(bytes(block)))
+        self._file.flush()
+        os.fsync(self._file)
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
     def special_stream(self, position: int):
-        """Receive one of the 3 reserved special streams."""
-        if 0 <= position <= 2:
+        """Receive one of the reserved special streams."""
+        if 0 <= position < self.SPECIAL_STREAM_COUNT:
             return self.__internal[position]
         else:
-            raise IndexError("Index must be between 0 and 2, was %s." % position)
+            raise IndexError("Index must be between 0 and %s, was %s." % (self.SPECIAL_BLOCK_COUNT, position))
 
     def new_stream(self) -> DataStream:
         """Create a new data stream.
@@ -1093,8 +1061,8 @@ class SingleStreamManager(StreamManager):
         return True
 
     def recycle(self, chain: StreamBlock) -> bool:
-        pass
-        # FIXME: Implement block recycling
+
+        chain.position
 
     def __del__(self):
         self.close()
@@ -1125,12 +1093,12 @@ class MultiStreamManager(StreamManager):
 
     def __init__(self, filename: str, secret: bytes):
         # Filename and path
-        self.__filename = filename
+        self._filename = filename
         # Encryption secret
         self.__secret = secret
         self.__closed = False
         # Archive file descriptor
-        self.__file = None
+        self._file = None
         # Encryption/decryption object
         self.__box = libnacl.secret.SecretBox(secret)
         # Number of blocks in archive
@@ -1161,27 +1129,27 @@ class MultiStreamManager(StreamManager):
             Length of file.
 
         """
-        self.__file.seek(0, os.SEEK_END)
-        return self.__file.tell()
+        self._file.seek(0, os.SEEK_END)
+        return self._file.tell()
 
     def __setup(self):
-        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
-        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self._file = open(self._filename, "wb+", BLOCK_SIZE)
+        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         self.__blocks = {i: self.new_block() for i in range(8)}
-        self.__start_core()
-        self.__save_data()
+        self._start()
+        self._save()
         self.__registry = StreamRegistry(self)
 
     def __open(self):
-        self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
-        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        length = self.__get_size()
+        self._file = open(self._filename, "rb+", BLOCK_SIZE)
+        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        length = self._get_size()
         if length % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
         self.__count = length // BLOCK_SIZE
         self.__blocks = {i: self.load_block(i) for i in range(8)}
-        self.__start_core()
-        self.__load_data()
+        self._start()
+        self._load()
         self.__registry = StreamRegistry(self)
 
     def close(self):
@@ -1191,11 +1159,11 @@ class MultiStreamManager(StreamManager):
             self.__internal[MultiStreamManager.STREAM_TRASH].save()
             self.__internal[MultiStreamManager.STREAM_JOURNAL].save()
             self.__registry.close()
-            self.__save_data()
-            self.__file.flush()
-            os.fsync(self.__file)
-            fcntl.lockf(self.__file, fcntl.LOCK_UN)
-            self.__file.close()
+            self._save()
+            self._file.flush()
+            os.fsync(self._file)
+            fcntl.lockf(self._file, fcntl.LOCK_UN)
+            self._file.close()
 
     def __start_core(self):
         identity = uuid.UUID(int=MultiStreamManager.STREAM_INDEX)
@@ -1242,11 +1210,11 @@ class MultiStreamManager(StreamManager):
             The newly created block.
 
         """
-        offset = self.__file.seek(0, os.SEEK_END)
+        offset = self._file.seek(0, os.SEEK_END)
         index = offset // BLOCK_SIZE
         block = StreamBlock(position=index)
         self.__count += 1
-        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        length = self._file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
         return block
@@ -1265,10 +1233,10 @@ class MultiStreamManager(StreamManager):
         if not index < self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
         position = index * BLOCK_SIZE
-        offset = self.__file.seek(position)
+        offset = self._file.seek(position)
         if position != offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
+        return StreamBlock(position=index, block=self.__box.decrypt(self._file.read(BLOCK_SIZE)))
 
     def save_block(self, index: int, block: StreamBlock):
         """Save a block and encrypt it.
@@ -1285,12 +1253,12 @@ class MultiStreamManager(StreamManager):
         if index != block.position:
             raise IndexError("Index %s and position %s are not the same." % (index, block.position))
         position = index * BLOCK_SIZE
-        offset = self.__file.seek(position)
+        offset = self._file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        length = self.__file.write(self.__box.encrypt(bytes(block)))
-        self.__file.flush()
-        os.fsync(self.__file)
+        length = self._file.write(self.__box.encrypt(bytes(block)))
+        self._file.flush()
+        os.fsync(self._file)
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
@@ -1490,7 +1458,7 @@ class ArchiveEntry:
             ArchiveEntry.FORMAT,
             self.type,
             self.id.bytes if isinstance(self.id, uuid.UUID) else uuid.uuid4().bytes,
-            self.parent.bytes if isinstance(self.__parent, uuid.UUID) else b"\x00" * 16,
+            self.parent.bytes if isinstance(self.parent, uuid.UUID) else b"\x00" * 16,
             self.owner.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
             self.stream.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
             int(

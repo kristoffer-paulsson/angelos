@@ -5,9 +5,9 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Pool."""
-from libangelos.archive.portfolio_mixin import PortfolioMixin
+from libangelos.storage.portfolio_mixin import PortfolioMixin
 from libangelos.const import Const
-from libangelos.archive.storage import StorageFacadeExtension
+from libangelos.storage.storage import StorageFacadeExtension
 
 
 class PoolStorage(StorageFacadeExtension, PortfolioMixin):

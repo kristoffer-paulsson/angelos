@@ -6,7 +6,7 @@
 #
 """Routing."""
 from libangelos.const import Const
-from libangelos.archive.storage import StorageFacadeExtension
+from libangelos.storage.storage import StorageFacadeExtension
 
 
 class RoutingStorage(StorageFacadeExtension):

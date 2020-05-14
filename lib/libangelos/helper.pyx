@@ -118,10 +118,10 @@ class Globber:
         files = {}
         for i in idxs:
             idx, entry = i
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 name = "/" + str(entry.name, "utf-8")
             else:
-                name = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
             if cmp_uuid:
                 files[entry.id] = (name, entry.deleted, entry.modified)
             else:
@@ -155,10 +155,10 @@ class Globber:
         files = {}
         for i in idxs:
             idx, entry = i
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 name = "/" + str(entry.name, "utf-8")
             else:
-                name = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
             if cmp_uuid:
                 files[entry.id] = (name, entry.modified, entry.deleted)
             else:
@@ -179,10 +179,10 @@ class Globber:
         files = []
         for i in idxs:
             idx, entry = i
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 name = "/" + str(entry.name, "utf-8")
             else:
-                name = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
             files.append((name, entry.id, entry.created))
 
         return files
@@ -200,10 +200,10 @@ class Globber:
         files = []
         for i in idxs:
             idx, entry = i
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 name = "/" + str(entry.name, "utf-8")
             else:
-                name = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
             files.append((name, entry.id, entry.created))
 
         return files

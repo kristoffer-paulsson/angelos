@@ -10,7 +10,7 @@ import os
 
 from libangelos.const import Const
 from libangelos.facade.facade import Facade
-from libangelos.archive.helper import Glue
+from libangelos.storage.helper import Glue
 from .generator import (
     random_church_entity_data,
     random_ministry_entity_data,

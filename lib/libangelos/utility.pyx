@@ -97,10 +97,10 @@ def run_test(args, parser):
 
         for i in idxs:
             idx, entry = i
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 filename = "/" + str(entry.name, "utf-8")
             else:
-                filename = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+                filename = ids[entry.parent] + "/" + str(entry.name, "utf-8")
 
             try:
                 data = ops.load_data(entry)
@@ -185,10 +185,10 @@ def __run_list(arch: Archive7, args, parser):
         if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
             continue
 
-        if entry.__parent.int == 0:
+        if entry.parent.int == 0:
             filename = "/" + str(entry.name, "utf-8")
         else:
-            filename = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+            filename = ids[entry.parent] + "/" + str(entry.name, "utf-8")
 
         if entry.type == Entry.TYPE_FILE:
             files += 1
@@ -244,10 +244,10 @@ def run_extract(args, parser):
             if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
                 continue
 
-            if entry.__parent.int == 0:
+            if entry.parent.int == 0:
                 filename = "/" + str(entry.name, "utf-8")
             else:
-                filename = ids[entry.__parent] + "/" + str(entry.name, "utf-8")
+                filename = ids[entry.parent] + "/" + str(entry.name, "utf-8")
 
             realname = os.path.join(curdir, filename[1:])
 

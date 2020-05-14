@@ -13,7 +13,7 @@ from libangelos.const import Const
 from libangelos.policy.portfolio import PortfolioPolicy
 from libangelos.archive7 import Entry, Archive7
 from libangelos.helper import Glue, Globber
-from libangelos.archive.storage import StorageFacadeExtension
+from libangelos.storage.storage import StorageFacadeExtension
 
 
 class MailStorage(StorageFacadeExtension):
