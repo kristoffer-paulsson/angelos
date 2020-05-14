@@ -9,14 +9,14 @@ from functools import partial
 from logging import getLogger
 from typing import Optional, Union, Iterator, Iterable
 
-from bplustree import utils
+from bplustree.utils import pairwise, iter_slice
 from bplustree.const import TreeConf
 from bplustree.entry import Record, Reference, OpaqueData
 from bplustree.memory import FileMemory
 from bplustree.node import (
     Node, LonelyRootNode, RootNode, InternalNode, LeafNode, OverflowNode
 )
-from .serializer import Serializer, IntSerializer
+from bplustree.serializer import Serializer, IntSerializer
 
 logger = getLogger(__name__)
 
@@ -328,7 +328,7 @@ class BPlusTree:
             page = node.biggest_entry.after
 
         else:
-            for ref_a, ref_b in utils.pairwise(node.entries):
+            for ref_a, ref_b in pairwise(node.entries):
                 if ref_a.key <= key < ref_b.key:
                     page = ref_a.after
                     break
@@ -400,7 +400,7 @@ class BPlusTree:
         first_overflow_page = self._mem.next_available_page
         next_overflow_page = first_overflow_page
 
-        iterator = utils.iter_slice(value, self.OverflowNode().max_payload)
+        iterator = iter_slice(value, self.OverflowNode().max_payload)
         for slice_value, is_last in iterator:
             current_overflow_page = next_overflow_page
 

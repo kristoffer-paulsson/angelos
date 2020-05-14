@@ -16,23 +16,30 @@ c) BTree indexed file system
 In future C implementation, use BTree for entries:
 https://github.com/antirez/otree
 """
+import datetime
 import fcntl
 import hashlib
 import math
 import os
 import struct
+import time
 import uuid
 from abc import ABC, abstractmethod
 from io import RawIOBase, SEEK_SET, SEEK_END, SEEK_CUR
+from pathlib import PurePath
 from typing import Union
 
 import libnacl.secret
 from bplustree.tree import BPlusTree
 from bplustree.serializer import UUIDSerializer
+from libangelos.error import Error
+from libangelos.utils import Util
 
 
 class BaseFileObject(ABC, RawIOBase):
     """FileIO-compliant and transparent abstract file object layer."""
+
+    __slots__ = ["__name", "__mode", "__readable", "__writable", "__seekable"]
 
     def __init__(self, filename: str, mode: str = "r"):
         self.__name = filename
@@ -241,6 +248,8 @@ class StreamBlock:
         self.data. 4004 bytes
     """
 
+    __slots__ = ["__position", "previous", "next", "index", "stream", "digest", "data"]
+
     FORMAT = "!iiI16s20s4008s"
 
     def __init__(self, position: int, previous: int = -1, next: int = -1, index: int = 0,
@@ -312,6 +321,8 @@ class BaseStream:  # (Iterable, Reversible):
         self.__compression, unsigned short, compression algorithm of choice.
     """
 
+    __slots__ = ["_manager", "__block", "__changed", "_identity", "_begin", "_end", "_count", "_length", "_compression"]
+
     COMP_NONE = 0
 
     FORMAT = "!16siiIQH"
@@ -344,7 +355,7 @@ class BaseStream:  # (Iterable, Reversible):
         """Unpack metadata and populate the fields.
 
         Args:
-            block (bytes):
+            stream (Union[bytearray, bytes]):
                 Bytes to be read into metadata.
 
         Returns (bool):
@@ -358,6 +369,16 @@ class BaseStream:  # (Iterable, Reversible):
 
     @staticmethod
     def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+        """
+
+        Args:
+            data (Union[bytes, bytearray]):
+                Data to be unpacked
+
+        Returns (tuple):
+            Unpacked tuple
+
+        """
         metadata = struct.unpack(DataStream.FORMAT, data)
         identity = uuid.UUID(bytes=metadata[0])
         return (identity,) + metadata[1:]
@@ -568,6 +589,8 @@ class DataStream(BaseStream):
 class VirtualFileObject(BaseFileObject):
     """Stream for the registry index database."""
 
+    __slots__ = ["__stream", "_position", "__offset", "__end"]
+
     def __init__(self, stream: DataStream, filename: str, mode: str = "r"):
         self.__stream = stream
         self._position = 0
@@ -619,7 +642,7 @@ class VirtualFileObject(BaseFileObject):
             raise OSError("Invalid seek, %s" % whence)
 
         block = cursor // DATA_SIZE
-        if  self.__stream.wind(block) != block:
+        if self.__stream.wind(block) != block:
             return self._position
             # raise OSError("Couldn't seek to position, problem with underlying stream.")
         else:
@@ -686,9 +709,10 @@ class Registry:
 
 class StreamRegistry:
     """Registry to keep track of all streams and the trash."""
-    FORMAT = "!i"
 
-    def __init__(self, manager: "StreamManager"):
+    __slots__ = ["__cnt", "__manager", "__index", "__trash"]
+
+    def __init__(self, manager: "MultiStreamManager"):
         self.__cnt = 0
         self.__manager = manager
         self.__index = None
@@ -773,8 +797,8 @@ class StreamRegistry:
     def __open_index(self):
         identity = 0
         self.__index = Registry(
-            self.__manager.special_stream(StreamManager.STREAM_INDEX),
-            self.__manager.special_stream(StreamManager.STREAM_JOURNAL),
+            self.__manager.special_stream(MultiStreamManager.STREAM_INDEX),
+            self.__manager.special_stream(MultiStreamManager.STREAM_JOURNAL),
             key_size=16,
             value_size=struct.calcsize(DataStream.FORMAT)
         )
@@ -783,7 +807,7 @@ class StreamRegistry:
         self.__index.close()
 
     def __open_trash(self):
-        self.__trash = self.__manager.special_stream(StreamManager.STREAM_TRASH)
+        self.__trash = self.__manager.special_stream(MultiStreamManager.STREAM_TRASH)
 
     def __close_trash(self):
         # FIXME: Clean up trash stream
@@ -791,6 +815,10 @@ class StreamRegistry:
 
 
 class StreamManager(ABC):
+    pass
+
+
+class SingleStreamManager(StreamManager):
     """Stream manager handles all the streams and blocks that are underlying of a virtual file system.
 
     The underlying system is built up of 4Kb blocks that can be chained like linked lists, those are data streams.
@@ -819,35 +847,28 @@ class StreamManager(ABC):
         self.__filename = filename
         # Encryption secret
         self.__secret = secret
-
         self.__closed = False
-
         # Archive file descriptor
         self.__file = None
         # Encryption/decryption object
         self.__box = libnacl.secret.SecretBox(secret)
-
         # Number of blocks in archive
         self.__count = 0
-
         # Reserved blocks
         self.__blocks = None
         # Reserved streams
         self.__internal = [None for _ in range(3)]
         # Currently open streams
         self.__streams = dict()
-
         dirname = os.path.dirname(filename)
         if not os.path.isdir(dirname):
             raise OSError("Directory %s doesn't exist." % dirname)
-
         if os.path.isfile(filename):
             # Open and use file
             self.__open()
         else:
             # Initialize file before using
             self.__setup()
-
     @property
     def closed(self):
         return self.__closed
@@ -885,46 +906,43 @@ class StreamManager(ABC):
     def close(self):
         if not self.closed:
             self.__closed = True
-            self.__internal[StreamManager.STREAM_INDEX].save()
-            self.__internal[StreamManager.STREAM_TRASH].save()
-            self.__internal[StreamManager.STREAM_JOURNAL].save()
+            self.__internal[MultiStreamManager.STREAM_INDEX].save()
+            self.__internal[MultiStreamManager.STREAM_TRASH].save()
+            self.__internal[MultiStreamManager.STREAM_JOURNAL].save()
             self.__registry.close()
             self.__save_data()
-
             self.__file.flush()
             os.fsync(self.__file)
             fcntl.lockf(self.__file, fcntl.LOCK_UN)
             self.__file.close()
 
     def __start_core(self):
-        identity = uuid.UUID(int=StreamManager.STREAM_INDEX)
-        stream = InternalStream(self, self.__blocks[StreamManager.BLOCK_INDEX], identity)
-        self.__internal[StreamManager.STREAM_INDEX] = stream
+        identity = uuid.UUID(int=MultiStreamManager.STREAM_INDEX)
+        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_INDEX], identity)
+        self.__internal[MultiStreamManager.STREAM_INDEX] = stream
         self.__streams[identity] = stream
-
-        identity = uuid.UUID(int=StreamManager.STREAM_TRASH)
-        stream = InternalStream(self, self.__blocks[StreamManager.BLOCK_TRASH], identity)
-        self.__internal[StreamManager.STREAM_TRASH] = stream
+        identity = uuid.UUID(int=MultiStreamManager.STREAM_TRASH)
+        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_TRASH], identity)
+        self.__internal[MultiStreamManager.STREAM_TRASH] = stream
         self.__streams[identity] = stream
-
-        identity = uuid.UUID(int=StreamManager.STREAM_JOURNAL)
-        stream = InternalStream(self, self.__blocks[StreamManager.BLOCK_JOURNAL], identity)
-        self.__internal[StreamManager.STREAM_JOURNAL] = stream
+        identity = uuid.UUID(int=MultiStreamManager.STREAM_JOURNAL)
+        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_JOURNAL], identity)
+        self.__internal[MultiStreamManager.STREAM_JOURNAL] = stream
         self.__streams[identity] = stream
 
     def __load_data(self):
         size = struct.calcsize(InternalStream.FORMAT)
-        block = self.__blocks[StreamManager.BLOCK_DATA]
-        self.__internal[StreamManager.STREAM_INDEX].load_meta(block.data[:size])
-        self.__internal[StreamManager.STREAM_TRASH].load_meta(block.data[size:size*2])
-        self.__internal[StreamManager.STREAM_JOURNAL].load_meta(block.data[size*2:size*3])
+        block = self.__blocks[MultiStreamManager.BLOCK_DATA]
+        self.__internal[MultiStreamManager.STREAM_INDEX].load_meta(block.data[:size])
+        self.__internal[MultiStreamManager.STREAM_TRASH].load_meta(block.data[size:size * 2])
+        self.__internal[MultiStreamManager.STREAM_JOURNAL].load_meta(block.data[size * 2:size * 3])
 
     def __save_data(self):
         size = struct.calcsize(InternalStream.FORMAT)
-        block = self.__blocks[StreamManager.BLOCK_DATA]
-        block.data[:size*3] = bytes(self.__internal[StreamManager.STREAM_INDEX]) + \
-                           bytes(self.__internal[StreamManager.STREAM_TRASH]) + \
-                           bytes(self.__internal[StreamManager.STREAM_JOURNAL])
+        block = self.__blocks[MultiStreamManager.BLOCK_DATA]
+        block.data[:size * 3] = bytes(self.__internal[MultiStreamManager.STREAM_INDEX]) + \
+                                bytes(self.__internal[MultiStreamManager.STREAM_TRASH]) + \
+                                bytes(self.__internal[MultiStreamManager.STREAM_JOURNAL])
         self.save_block(block.position, block)
 
     def special_block(self, position: int):
@@ -963,12 +981,10 @@ class StreamManager(ABC):
         """
         if not index < self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
-
         position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
         if position != offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-
         return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
 
     def save_block(self, index: int, block: StreamBlock):
@@ -983,19 +999,15 @@ class StreamManager(ABC):
         """
         if not index < self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
-
         if index != block.position:
             raise IndexError("Index %s and position %s are not the same." % (index, block.position))
-
         position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-
         length = self.__file.write(self.__box.encrypt(bytes(block)))
         self.__file.flush()
         os.fsync(self.__file)
-
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
@@ -1088,95 +1100,695 @@ class StreamManager(ABC):
         self.close()
 
 
-class FilesystemMixin:
+class MultiStreamManager(StreamManager):
+    """Stream manager handles all the streams and blocks that are underlying of a virtual file system.
+
+    The underlying system is built up of 4Kb blocks that can be chained like linked lists, those are data streams.
+    There can be and are several data streams, they can be used for files and can expand by adding more blocks,
+    thanks to this streams can grow in size.
+
+    There are reserved blocks and streams. In total the first eight blocks are reserved, so are the first eight
+    streams.
+    """
+    BLOCK_DATA = 0
+    BLOCK_OP = 1
+    BLOCK_SWAP = 2
+    BLOCK_RESERVED_1 = 3
+    BLOCK_RESERVED_2 = 4
+    BLOCK_INDEX = 5
+    BLOCK_TRASH = 6
+    BLOCK_JOURNAL = 7
+
+    STREAM_INDEX = 0
+    STREAM_TRASH = 1
+    STREAM_JOURNAL = 2
+
+    def __init__(self, filename: str, secret: bytes):
+        # Filename and path
+        self.__filename = filename
+        # Encryption secret
+        self.__secret = secret
+        self.__closed = False
+        # Archive file descriptor
+        self.__file = None
+        # Encryption/decryption object
+        self.__box = libnacl.secret.SecretBox(secret)
+        # Number of blocks in archive
+        self.__count = 0
+        # Reserved blocks
+        self.__blocks = None
+        # Reserved streams
+        self.__internal = [None for _ in range(3)]
+        # Currently open streams
+        self.__streams = dict()
+        dirname = os.path.dirname(filename)
+        if not os.path.isdir(dirname):
+            raise OSError("Directory %s doesn't exist." % dirname)
+        if os.path.isfile(filename):
+            # Open and use file
+            self.__open()
+        else:
+            # Initialize file before using
+            self.__setup()
+    @property
+    def closed(self):
+        return self.__closed
+
+    def __get_size(self) -> int:
+        """Size of the underlying file.
+
+        Returns (int):
+            Length of file.
+
+        """
+        self.__file.seek(0, os.SEEK_END)
+        return self.__file.tell()
+
+    def __setup(self):
+        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
+        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.__blocks = {i: self.new_block() for i in range(8)}
+        self.__start_core()
+        self.__save_data()
+        self.__registry = StreamRegistry(self)
+
+    def __open(self):
+        self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
+        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        length = self.__get_size()
+        if length % BLOCK_SIZE:
+            raise OSError("Archive length uneven to block size.")
+        self.__count = length // BLOCK_SIZE
+        self.__blocks = {i: self.load_block(i) for i in range(8)}
+        self.__start_core()
+        self.__load_data()
+        self.__registry = StreamRegistry(self)
+
+    def close(self):
+        if not self.closed:
+            self.__closed = True
+            self.__internal[MultiStreamManager.STREAM_INDEX].save()
+            self.__internal[MultiStreamManager.STREAM_TRASH].save()
+            self.__internal[MultiStreamManager.STREAM_JOURNAL].save()
+            self.__registry.close()
+            self.__save_data()
+            self.__file.flush()
+            os.fsync(self.__file)
+            fcntl.lockf(self.__file, fcntl.LOCK_UN)
+            self.__file.close()
+
+    def __start_core(self):
+        identity = uuid.UUID(int=MultiStreamManager.STREAM_INDEX)
+        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_INDEX], identity)
+        self.__internal[MultiStreamManager.STREAM_INDEX] = stream
+        self.__streams[identity] = stream
+
+        identity = uuid.UUID(int=MultiStreamManager.STREAM_TRASH)
+        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_TRASH], identity)
+        self.__internal[MultiStreamManager.STREAM_TRASH] = stream
+        self.__streams[identity] = stream
+
+        identity = uuid.UUID(int=MultiStreamManager.STREAM_JOURNAL)
+        stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_JOURNAL], identity)
+        self.__internal[MultiStreamManager.STREAM_JOURNAL] = stream
+        self.__streams[identity] = stream
+
+    def __load_data(self):
+        size = struct.calcsize(InternalStream.FORMAT)
+        block = self.__blocks[MultiStreamManager.BLOCK_DATA]
+        self.__internal[MultiStreamManager.STREAM_INDEX].load_meta(block.data[:size])
+        self.__internal[MultiStreamManager.STREAM_TRASH].load_meta(block.data[size:size * 2])
+        self.__internal[MultiStreamManager.STREAM_JOURNAL].load_meta(block.data[size * 2:size * 3])
+
+    def __save_data(self):
+        size = struct.calcsize(InternalStream.FORMAT)
+        block = self.__blocks[MultiStreamManager.BLOCK_DATA]
+        block.data[:size * 3] = bytes(self.__internal[MultiStreamManager.STREAM_INDEX]) + \
+                                bytes(self.__internal[MultiStreamManager.STREAM_TRASH]) + \
+                                bytes(self.__internal[MultiStreamManager.STREAM_JOURNAL])
+        self.save_block(block.position, block)
+
+    def special_block(self, position: int):
+        """Receive one of the 8 reserved special blocks."""
+        if 0 <= position <= 7:
+            return self.__blocks[position]
+        else:
+            raise IndexError("Index must be between 0 and 7, was %s." % position)
+
+    def new_block(self) -> StreamBlock:
+        """Create new block at the end of file, write empty block to file.
+
+        Returns (StreamBlock):
+            The newly created block.
+
+        """
+        offset = self.__file.seek(0, os.SEEK_END)
+        index = offset // BLOCK_SIZE
+        block = StreamBlock(position=index)
+        self.__count += 1
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        if length != BLOCK_SIZE:
+            raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+        return block
+
+    def load_block(self, index: int) -> StreamBlock:
+        """Load a block from index and decrypt.
+
+        Args:
+            index (int):
+                Block index.
+
+        Returns (StreamBlock):
+            Loaded block a stream block.
+
+        """
+        if not index < self.__count:
+            raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
+        position = index * BLOCK_SIZE
+        offset = self.__file.seek(position)
+        if position != offset:
+            raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
+        return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
+
+    def save_block(self, index: int, block: StreamBlock):
+        """Save a block and encrypt it.
+
+        Args:
+            index (int):
+                Index for offset where to write block
+            block (StreamBlock):
+                Block to save to file.
+
+        """
+        if not index < self.__count:
+            raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
+        if index != block.position:
+            raise IndexError("Index %s and position %s are not the same." % (index, block.position))
+        position = index * BLOCK_SIZE
+        offset = self.__file.seek(position)
+        if not position == offset:
+            raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        self.__file.flush()
+        os.fsync(self.__file)
+        if length != BLOCK_SIZE:
+            raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+
+    def special_stream(self, position: int):
+        """Receive one of the 3 reserved special streams."""
+        if 0 <= position <= 2:
+            return self.__internal[position]
+        else:
+            raise IndexError("Index must be between 0 and 2, was %s." % position)
+
+    def new_stream(self) -> DataStream:
+        """Create a new data stream.
+
+        Returns (DataStream):
+            The new data stream created.
+
+        """
+        identity = uuid.uuid4()
+        block = self.new_block()
+        block.index = 0
+        block.stream = identity
+        stream = DataStream(self, block, identity, begin=block.position, end=block.position, count=1)
+        self.__registry.register(stream)
+        self.__streams[stream.identity] = stream
+        return stream
+
+    def open_stream(self, identity: uuid.UUID) -> DataStream:
+        """Open an existing data stream.
+
+        Args:
+            identity (uuid.UUID):
+                Data stream number.
+
+        Returns (DataStream):
+            The opened data stream object.
+
+        """
+        if identity in self.__streams.keys():
+            raise OSError("Already opened")
+        data = self.__registry.search(identity)
+        if not data:
+            raise OSError("Identity doesn't exist %s" % identity)
+        metadata = DataStream.meta_unpack(data)
+        if metadata[0] != identity:
+            raise OSError("Identity doesn't match stream %s" % identity)
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        self.__streams[identity] = stream
+        return stream
+
+    def close_stream(self, stream: DataStream) -> bool:
+        """Close an open data stream.
+
+        Args:
+            stream (DataStream):
+                Data stream object being saved.
+
+        """
+        if stream.identity not in self.__streams:
+            raise OSError("Stream not known to be open.")
+        stream.save()
+        self.__registry.update(stream)
+        del self.__streams[stream.identity]
+        del stream
+
+    def del_stream(self, identity: uuid.UUID) -> bool:
+        """Delete data stream from file.
+
+        Args:
+            identity (uuid.UUID):
+                Data stream number to be erased.
+
+        Returns (bool):
+            Success of deleting data stream.
+
+        """
+        metadata = DataStream.meta_unpack(self.__registry.update(identity))
+        if metadata[0] != identity:
+            raise OSError("Identity doesn't match stream %s" % identity)
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        self.__registry.trash(stream)
+        del stream
+        self.__registry.unregister(identity)
+        return True
+
+    def recycle(self, chain: StreamBlock) -> bool:
+        pass
+        # FIXME: Implement block recycling
+
+    def __del__(self):
+        self.close()
+
+
+class ArchiveHeader:
+    """Header for the Archive 7 format."""
+
+    __slots__ = ["major", "minor", "type", "role", "use", "id", "owner", "domain", "node", "created", "title"]
+    FORMAT = "!8sHHbbb16s16s16s16sQ256s"
+
+    def __init__(self, owner: uuid.UUID, identity: uuid.UUID = None, node: uuid.UUID = None, domain: uuid.UUID = None,
+                 title: Union[bytes, bytearray] = None, type: int = None, role: int = None, use: int = None,
+                 major: int = 2, minor: int = 0):
+        self.major = major,
+        self.minor = minor,
+        self.type = type,
+        self.role = role,
+        self.use = use,
+        self.id = identity,
+        self.owner = owner,
+        self.domain = domain,
+        self.node = node,
+        self.created = datetime.datetime.now(),
+        self.title = title,
+
+    def __bytes__(self):
+        return struct.pack(
+            ArchiveHeader.FORMAT,
+            b"archive7",
+            2,
+            0,
+            self.type if not isinstance(self.type, type(None)) else 0,
+            self.role if not isinstance(self.role, type(None)) else 0,
+            self.use if not isinstance(self.use, type(None)) else 0,
+            self.id.bytes if isinstance(self.id, uuid.UUID) else uuid.uuid4().bytes,
+            self.owner.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
+            self.domain.bytes if isinstance(self.domain, uuid.UUID) else b"\x00" * 16,
+            self.node.bytes if isinstance(self.node, uuid.UUID) else b"\x00" * 16,
+            int(
+                time.mktime(self.created.timetuple())
+                if isinstance(self.created, datetime.datetime)
+                else time.mktime(datetime.datetime.now().timetuple())
+            ),
+            self.title[:256] if isinstance(self.title, (bytes, bytearray)) else b"\x00" * 256,
+        )
+
+    @staticmethod
+    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+        metadata = struct.unpack(ArchiveHeader.FORMAT, data)
+
+        if metadata[0] != b"archive7":
+            raise Util.exception(Error.AR7_INVALID_FORMAT, {"format": metadata[0]})
+
+        return ArchiveHeader(
+            type=metadata[3],
+            role=metadata[4],
+            use=metadata[5],
+            identity=uuid.UUID(bytes=metadata[6]),
+            owner=uuid.UUID(bytes=metadata[7]),
+            domain=uuid.UUID(bytes=metadata[8]),
+            node=uuid.UUID(bytes=metadata[9]),
+            created=datetime.datetime.fromtimestamp(metadata[10]),
+            title=metadata[11].strip(b"\x00"),
+            major=metadata[1],
+            minor=metadata[2],
+        )
+
+
+class ArchiveEntry:
+    """Header for the Archive 7 format."""
+
+    __slots__ = ["type", "id", "parent", "owner", "stream", "created", "modified", "size", "length", "compression",
+                 "deleted", "name", "user", "group", "perms"]
+    FORMAT = "!c16s16s16s16qqQQQ?256s32s16sH"
+
+    TYPE_FILE = b"f"  # Represents a file
+    TYPE_LINK = b"l"  # Represents a link
+    TYPE_DIR = b"d"  # Represents a directory
+
+    COMP_NONE = 0
+    COMP_ZIP = 1
+    COMP_GZIP = 2
+    COMP_BZIP2 = 3
+
+    def __init__(self, type: bytes = b"f", identity: uuid.UUID = uuid.uuid4(), parent: uuid.UUID = uuid.UUID(int=0),
+                 owner: uuid.UUID = uuid.UUID(int=0), stream: uuid.UUID = uuid.UUID(int=0),
+                 created: datetime.datetime = datetime.datetime.fromtimestamp(0),
+                 modified: datetime.datetime = datetime.datetime.fromtimestamp(0), size: int = None, length: int = None,
+                 compression: int = 0, deleted: bool = False, name: Union[bytes, bytearray] = None,
+                 user: Union[bytes, bytearray] = None, group: Union[bytes, bytearray] = None, perms: int = 0o755):
+        self.type = type  # Entry type
+        self.id = identity  # File id
+        self.parent = parent  # File id of parent directory or link to target
+        self.owner = owner  # UUID of owner
+        self.stream = stream  # UUID of underlying stream
+        self.created = created  # Created date/time timestamp
+        self.modified = modified  # Modified date/time timestamp
+        self.size = size  # File size (compressed)
+        self.length = length  # Data length (uncompressed)
+        self.compression = compression  # Applied compression
+        self.deleted = deleted  # Deleted marker
+        self.name = name  # File name
+        self.user = user  # Unix user
+        self.group = group  # Unix group
+        self.perms = perms  # Unix permissions
+
+    def __bytes__(self):
+        return struct.pack(
+            ArchiveEntry.FORMAT,
+            self.type,
+            self.id.bytes if isinstance(self.id, uuid.UUID) else uuid.uuid4().bytes,
+            self.parent.bytes if isinstance(self.__parent, uuid.UUID) else b"\x00" * 16,
+            self.owner.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
+            self.stream.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
+            int(
+                time.mktime(self.created.timetuple())
+                if isinstance(self.created, datetime.datetime)
+                else time.mktime(datetime.datetime.now().timetuple())
+            ),
+            int(
+                time.mktime(self.modified.timetuple())
+                if isinstance(self.modified, datetime.datetime)
+                else time.mktime(datetime.datetime.now().timetuple())
+            ),
+            self.size if isinstance(self.size, int) else 0,
+            self.length if isinstance(self.length, int) else 0,
+            self.compression if isinstance(self.compression, int) else ArchiveEntry.COMP_NONE,
+            self.deleted if isinstance(self.deleted, bool) else False,
+            self.name[:256] if isinstance(self.name, (bytes, bytearray)) else b"\x00" * 256,
+            self.user[:32] if isinstance(self.user, (bytes, bytearray)) else b"\x00" * 32,
+            self.group[:16] if isinstance(self.group, (bytes, bytearray)) else b"\x00" * 16,
+            self.perms if isinstance(self.perms, int) else 0o755,
+        )
+
+    @staticmethod
+    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+        metadata = struct.unpack(ArchiveEntry.FORMAT, data)
+        return ArchiveEntry(
+            type=metadata[0],
+            id=uuid.UUID(bytes=metadata[1]),
+            parent=uuid.UUID(bytes=metadata[2]),
+            owner=uuid.UUID(bytes=metadata[3]),
+            stream=uuid.UUID(bytes=metadata[4]),
+            created=datetime.datetime.fromtimestamp(metadata[5]),
+            modified=datetime.datetime.fromtimestamp(metadata[6]),
+            size=metadata[7],
+            length=metadata[8],
+            compression=metadata[9],
+            deleted=metadata[10],
+            name=metadata[11].strip(b"\x00"),
+            user=metadata[12].strip(b"\x00"),
+            group=metadata[13].strip(b"\x00"),
+            perms=int(metadata[14]),
+        )
+
+    @staticmethod
+    def dir(name: str, parent: uuid.UUID = None, owner: uuid.UUID = None, created: datetime.datetime = None,
+            modified: datetime.datetime = None, user: str = None, group: str = None, perms: int = None):
+        kwargs = {
+            "type": ArchiveEntry.TYPE_DIR,
+            "id": uuid.uuid4(),
+            "created": datetime.datetime.now(),
+            "modified": datetime.datetime.now(),
+            "name": name.encode("utf-8")[:256],
+        }
+
+        if parent:
+            kwargs.setdefault("parent", parent)
+        if owner:
+            kwargs.setdefault("owner", owner)
+        if created:
+            kwargs.setdefault("created", created)
+        if modified:
+            kwargs.setdefault("modified", modified)
+        if user:
+            kwargs.setdefault("user", user.encode("utf-8")[:32])
+        if group:
+            kwargs.setdefault("group", group.encode("utf-8")[:16])
+        if perms:
+            kwargs.setdefault("perms", perms)
+
+        return ArchiveEntry(**kwargs)
+
+    @staticmethod
+    def link(name: str, link: uuid.UUID, parent: uuid.UUID = None, created: datetime.datetime = None,
+             modified: datetime.datetime = None, user: str = None, group: str = None, perms: str = None):
+        """Generate entry for file link."""
+
+        kwargs = {
+            "type": ArchiveEntry.TYPE_LINK,
+            "id": uuid.uuid4(),
+            "owner": link,
+            "created": datetime.datetime.now(),
+            "modified": datetime.datetime.now(),
+            "name": name.encode("utf-8")[:256],
+        }
+
+        if parent:
+            kwargs.setdefault("parent", parent)
+        if created:
+            kwargs.setdefault("created", created)
+        if modified:
+            kwargs.setdefault("modified", modified)
+        if user:
+            kwargs.setdefault("user", user.encode("utf-8")[:32])
+        if group:
+            kwargs.setdefault("group", group.encode("utf-8")[:16])
+        if perms:
+            kwargs.setdefault("perms", perms)
+
+        return ArchiveEntry(**kwargs)
+
+    @staticmethod
+    def file(name: str, size: int, stream: uuid.UUID, identity: uuid.UUID = None, parent: uuid.UUID = None,
+             owner: uuid.UUID = None, created: datetime.datetime = None, modified: datetime.datetime = None,
+             compression: int = None, length: int = None, user: str = None, group: str = None, perms: int = None):
+        """Entry header for file."""
+
+        kwargs = {
+            "type": ArchiveEntry.TYPE_FILE,
+            "id": uuid.uuid4(),
+            "stream": stream,
+            "created": datetime.datetime.now(),
+            "modified": datetime.datetime.now(),
+            "size": size,
+            "name": name.encode("utf-8")[:256],
+        }
+
+        if identity:
+            kwargs.setdefault("id", identity)
+        if parent:
+            kwargs.setdefault("parent", parent)
+        if owner:
+            kwargs.setdefault("owner", owner)
+        if created:
+            kwargs.setdefault("created", created)
+        if modified:
+            kwargs.setdefault("modified", modified)
+        if user:
+            kwargs.setdefault("user", user.encode("utf-8")[:32])
+        if group:
+            kwargs.setdefault("group", group.encode("utf-8")[:16])
+        if perms:
+            kwargs.setdefault("perms", perms)
+        if compression and length:
+            if 1 <= compression <= 3 and not isinstance(length, int):
+                raise Util.exception(
+                    Error.AR7_INVALID_COMPRESSION, {"compression": compression}
+                )
+            kwargs.setdefault("compression", compression)
+            kwargs.setdefault("length", length)
+        else:
+            kwargs.setdefault("length", size)
+
+        return ArchiveEntry(**kwargs)
+
+
+class ArchivePath:
+    """Record for parent id and entry name."""
+
+    __slots__ = ["id", "key"]
+
+    FORMAT = "!16s16s"
+
+    def __init__(self, identity: uuid.UUID, key: uuid.UUID):
+        self.id = identity
+        self.key = key
+
+    def __bytes__(self):
+        return struct.pack(
+            ArchiveEntry.FORMAT,
+            self.id.bytes,
+            self.key.bytes
+        )
+
+    @staticmethod
+    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+        metadata = struct.unpack(ArchivePath.FORMAT, data)
+        return ArchivePath(
+            identity=uuid.UUID(bytes=metadata[0]),
+            key=uuid.UUID(bytes=metadata[1])
+        )
+
+    @staticmethod
+    def path(identity: uuid.UUID, parent: uuid.UUID, name: str):
+        """Entry header for file."""
+        return ArchivePath(
+            identity=identity,
+            key=uuid.uuid5(parent, name)
+        )
+
+
+class FilesystemMixin(ABC):
     """Mixin for all essential function calls for a file system."""
 
+    @abstractmethod
     def access(self, path, mode, *, dir_fd=None, effective_ids=False, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def chflags(self, path, flags, *, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def chmod(self, path, mode, *, dir_fd=None, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def chown(self, path, uid, gid, *, dir_fd=None, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def lchflags(self, path, flags):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def lchmod(self, path, mode):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def lchown(self, path, uid, gid):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def link(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def listdir(self, path="."):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def lstat(self, path, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def mkdir(self, path, mode=0o777, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def makedirs(self, name, mode=0o777, exist_ok=False):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def mkfifo(self, path, mode=0o666, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def readlink(self, path, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def remove(self, path, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def removedirs(self, name):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def rename(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def renames(self, old, new):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def replace(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def rmdir(self, path, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def scandir(self, path="."):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def symlink(self, src, dst, target_is_directory=False, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def sync(self):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def truncate(self, path, length):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def unlink(self, path, *, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def time(self, path, times=None, *, ns, dir_fd=None, follow_symlinks=True):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def walk(self, top, topdown=True, onerror=None, followlinks=False):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def fwalk(self, top=".", topdown=True, onerror=None, *, follow_symlinks=False, dir_fd=None):
-        raise NotImplementedError()
+        pass
 
 
 class AbstractVirtualFilesystem(FilesystemMixin):
@@ -1189,7 +1801,7 @@ class AbstractVirtualFilesystem(FilesystemMixin):
         pass
 
 
-class AbstractFilesystemSession(FilesystemMixin):
+class AbstractFilesystemSession:
     """Abstract class for a file system session. (current directory support)."""
     def __init__(self):
         pass
@@ -1207,4 +1819,249 @@ class AbstractFilesystemSession(FilesystemMixin):
         pass
 
     def getcwdb(self):
+        pass
+
+
+class Archive7(FilesystemMixin):
+    """
+
+    """
+
+    STREAM_ENTRIES = 4
+    STREAM_ENTRIES_JOURNAL = 5
+
+    STREAM_PATHS = 6
+    STREAM_PATHS_JOURNAL = 7
+
+    STREAM_HIERARCHY = 8
+    STREAM_HIERARCHY_JOURNAL = 9
+
+    def __init__(self, filename: str, secret: bytes):
+        self.__entries = None
+        self.__paths = None
+        self.__hierarchy = None
+        self.__descriptors = dict()
+        self.__closed = False
+
+        self.__manager = StreamManager(filename, secret)
+
+        if self.__manager.created:
+            self.__entries = Registry(
+                self.__manager.new_stream(uuid.UUID(int=Archive7.STREAM_ENTRIES)),
+                self.__manager.new_stream(uuid.UUID(int=Archive7.STREAM_ENTRIES_JOURNAL)),
+                key_size=16,
+                value_size=struct.calcsize(DataStream.FORMAT)
+            )
+            self.__paths = Registry(
+                self.__manager.new_stream(uuid.UUID(int=Archive7.STREAM_PATHS)),
+                self.__manager.new_stream(uuid.UUID(int=Archive7.STREAM_PATHS_JOURNAL)),
+                key_size=16,
+                value_size=struct.calcsize(DataStream.FORMAT)
+            )
+            self.__hierarchy = Registry(
+                self.__manager.new_stream(uuid.UUID(int=Archive7.STREAM_HIERARCHY)),
+                self.__manager.new_stream(uuid.UUID(int=Archive7.STREAM_HIERARCHY_JOURNAL)),
+                key_size=16,
+                value_size=struct.calcsize(DataStream.FORMAT)
+            )
+            root = ArchiveEntry.dir("root")
+            root.id = uuid.UUID(int=0)
+            root.parent = root.id
+            self.__entries.tree.insert(root.id, bytes(root))
+        else:
+            self.__entries = Registry(
+                self.__manager.open_stream(uuid.UUID(int=Archive7.STREAM_ENTRIES)),
+                self.__manager.open_stream(uuid.UUID(int=Archive7.STREAM_ENTRIES_JOURNAL)),
+                key_size=16,
+                value_size=struct.calcsize(ArchiveEntry.FORMAT)
+            )
+            self.__paths = Registry(
+                self.__manager.open_stream(uuid.UUID(int=Archive7.STREAM_PATHS)),
+                self.__manager.open_stream(uuid.UUID(int=Archive7.STREAM_PATHS_JOURNAL)),
+                key_size=16,
+                value_size=struct.calcsize(ArchiveEntry.FORMAT)
+            )
+            self.__hierarchy = Registry(
+                self.__manager.open_stream(uuid.UUID(int=Archive7.STREAM_HIERARCHY)),
+                self.__manager.open_stream(uuid.UUID(int=Archive7.STREAM_HIERARCHY_JOURNAL)),
+                key_size=16,
+                value_size=struct.calcsize(ArchiveEntry.FORMAT)
+            )
+
+    @property
+    def closed(self):
+        return self.__closed
+
+    def close(self):
+        if not self.__closed:
+            for fd in self.__descriptors:
+                fd.close()
+            self.__hierarchy.close()
+            self.__paths.close()
+            self.__entries.close()
+            self.__manager.close()
+
+    def __del__(self):
+        self.close()
+
+    def __find_parent(self, name: str, parent: uuid.UUID = uuid.UUID(int=0)) -> uuid.UUID:
+        return uuid.uuid5(parent, name)
+
+    def __find_directory(self, dirname: PurePath) -> ArchiveEntry:
+        """Find directory for current path.
+
+        Args:
+            dirname (pathlib.PurePath):
+                The path to follow.
+
+        Returns (ArchiveEntry):
+            The entry of the path or None.
+
+        """
+        entry = None
+        for name in dirname.parts:
+            key = uuid.uuid5(uuid.UUID(int=0), "root") if name == "/" else uuid.uuid5(entry.parent, name)
+            record = self.__paths.tree.get(key)
+            entry = self.__entries.tree.get(record.id)
+
+        if entry.type != ArchiveEntry.TYPE_DIR:
+            raise OSError("Entry not a directory")
+        return entry
+
+    def __find_file(self, directory: ArchiveEntry, name: str) -> ArchiveEntry:
+        """Find file in directory
+
+        Args:
+            name:
+
+        Returns:
+
+        """
+        key = uuid.uuid5(directory.id, name)
+        record = self.__paths.tree.get(key)
+        entry = self.__entries.tree.get(record.identity)
+        if entry.type not in (ArchiveEntry.TYPE_FILE, ArchiveEntry.TYPE_LINK):
+            raise OSError("File not found")
+        return entry
+
+    def __add_entry(self, entry: ArchiveEntry):
+        self.__entries.tree.insert(entry.id, bytes(entry))
+        record = ArchivePath.path(entry.id, entry.parent, entry.name)
+        self.__paths.tree.insert(record.key, bytes(record))
+
+    def open(self, path: str, mode: str = "r") -> VirtualFileObject:
+        """Open file of path.
+
+        Args:
+            path (str):
+                Path to file.
+            mode (str):
+                Mode to open file in.
+
+        Returns (VirtualFileObject):
+            File descriptor of open file or None.
+
+        """
+        dirname, name = os.path.split(path)
+        directory = self.__find_directory(PurePath(dirname))
+        entry = self.__find_file(directory, name)
+        if entry is None:
+            stream = self.__manager.new_stream()
+            entry = ArchiveEntry.file(name=name, parent=directory.id, stream=stream.identity)
+            self.__add_entry(entry)
+            # Create a new entry and stream
+        else:
+            if not entry.type == ArchiveEntry.TYPE_FILE:
+                raise OSError("Path not a file")
+            stream = self.__manager.open_stream(entry.stream)
+
+        fd = VirtualFileObject(name=entry.name, stream=stream, mode=mode)
+        self.__descriptors[entry.id] = fd
+        return fd
+
+    def access(self, path, mode, dir_fd=None, effective_ids=False, follow_symlinks=True):
+        pass
+
+    def chflags(self, path, flags, follow_symlinks=True):
+        pass
+
+    def chmod(self, path, mode, dir_fd=None, follow_symlinks=True):
+        pass
+
+    def chown(self, path, uid, gid, dir_fd=None, follow_symlinks=True):
+        pass
+
+    def lchflags(self, path, flags):
+        pass
+
+    def lchmod(self, path, mode):
+        pass
+
+    def lchown(self, path, uid, gid):
+        pass
+
+    def link(self, src, dst, src_dir_fd=None, dst_dir_fd=None, follow_symlinks=True):
+        pass
+
+    def listdir(self, path="."):
+        pass
+
+    def lstat(self, path, dir_fd=None):
+        pass
+
+    def mkdir(self, path, mode=0o777, dir_fd=None):
+        pass
+
+    def makedirs(self, name, mode=0o777, exist_ok=False):
+        pass
+
+    def mkfifo(self, path, mode=0o666, dir_fd=None):
+        pass
+
+    def readlink(self, path, dir_fd=None):
+        pass
+
+    def remove(self, path, dir_fd=None):
+        pass
+
+    def removedirs(self, name):
+        pass
+
+    def rename(self, src, dst, src_dir_fd=None, dst_dir_fd=None):
+        pass
+
+    def renames(self, old, new):
+        pass
+
+    def replace(self, src, dst, src_dir_fd=None, dst_dir_fd=None):
+        pass
+
+    def rmdir(self, path, dir_fd=None):
+        pass
+
+    def scandir(self, path="."):
+        pass
+
+    def stat(self, path, dir_fd=None, follow_symlinks=True):
+        pass
+
+    def symlink(self, src, dst, target_is_directory=False, dir_fd=None):
+        pass
+
+    def sync(self):
+        pass
+
+    def truncate(self, path, length):
+        pass
+
+    def unlink(self, path, dir_fd=None):
+        pass
+
+    # def time(self, path, times=None, ns, dir_fd=None, follow_symlinks=True):
+    #    pass
+
+    def walk(self, top, topdown=True, onerror=None, followlinks=False):
+        pass
+
+    def fwalk(self, top=".", topdown=True, onerror=None, follow_symlinks=False, dir_fd=None):
         pass

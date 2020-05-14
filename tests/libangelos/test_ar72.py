@@ -6,8 +6,7 @@ import tracemalloc
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from libangelos.ar72 import StreamManager
-from libangelos.ar72 import VirtualFileObject
+from libangelos.ar72 import MultiStreamManager, VirtualFileObject
 
 
 class BaseArchiveTestCase(TestCase):
@@ -39,7 +38,7 @@ class TestStreamBlock(BaseArchiveTestCase):
         self.fail()
 
 
-class StreamManagerStub(StreamManager):
+class StreamManagerStub(MultiStreamManager):
     pass
 
 
