@@ -75,7 +75,7 @@ setup(
         'keyring', 'msgpack'],
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
-    packages=['libangelos', 'angelos', 'eidon', 'angelossim', 'bplustree'],
+    packages=['libangelos', 'angelos', 'eidon', 'angelossim', 'bplustree', 'archive7'],
     package_dir={'': 'lib'},
     scripts=glob('bin/*'),
     ext_modules=cythonize(glob(
@@ -83,7 +83,8 @@ setup(
         'lib/libangelos/**/*.pyx', recursive=True) + glob(
         'lib/angelos/**.pyx', recursive=True) + glob(
         'lib/angelos/**/*.pyx', recursive=True) + glob(
-        'lib/bplustree/**.pyx', recursive=True),
+        'lib/bplustree/**.pyx', recursive=True) + glob(
+        'lib/archive7/**.pyx', recursive=True),
         build_dir="build", compiler_directives={
             'language_level': 3, 'embedsignature': True})
 )

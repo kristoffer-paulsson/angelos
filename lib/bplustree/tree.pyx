@@ -255,7 +255,7 @@ class BPlusTree:
             return False
 
     def __repr__(self):
-        return '<BPlusTree: {} {}>'.format(self._filename, self._tree_conf)
+        return '<BPlusTree: {} {}>'.format(self.__filename, self._tree_conf)
 
     # ####################### Implementation ##############################
 

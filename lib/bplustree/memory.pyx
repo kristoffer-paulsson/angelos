@@ -335,7 +335,7 @@ class FileMemory:
         write_to_file(self._fd, data)
 
     def __repr__(self):
-        return '<FileMemory: {}>'.format(self._filename)
+        return '<FileMemory: {}>'.format(self.__filename)
 
 
 class FrameType(enum.Enum):

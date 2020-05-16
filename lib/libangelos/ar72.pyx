@@ -836,8 +836,8 @@ class SingleStreamManager(StreamManager):
 
     def __init__(self, filename: str, secret: bytes):
         self.__created = False
-        self._filename = filename
-        self._file = None
+        self.__filename = filename
+        self.__file = None
         self.__secret = secret
         self.__box = libnacl.secret.SecretBox(secret)
         self.__count = 0
@@ -845,6 +845,8 @@ class SingleStreamManager(StreamManager):
         self.__closed = False
         self.__internal = [None for _ in range(self.SPECIAL_STREAM_COUNT)]
         self.__streams = dict()
+
+        self.__data = None
 
         dirname = os.path.dirname(filename)
         if not os.path.isdir(dirname):
@@ -873,19 +875,21 @@ class SingleStreamManager(StreamManager):
             Length of file.
 
         """
-        self._file.seek(0, os.SEEK_END)
-        return self._file.tell()
+        self.__file.seek(0, os.SEEK_END)
+        return self.__file.tell()
 
     def _setup(self):
-        self._file = open(self._filename, "wb+", BLOCK_SIZE)
-        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
+        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         self.__blocks = {i: self.new_block() for i in range(self.SPECIAL_BLOCK_COUNT)}
         self._start()
+        stream = self._new_stream()
+        self.__data = bytes(stream)
         self._save()
 
     def _open(self):
-        self._file = open(self._filename, "rb+", BLOCK_SIZE)
-        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
+        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         length = self._get_size()
         if length % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
@@ -897,22 +901,22 @@ class SingleStreamManager(StreamManager):
     def close(self):
         if not self.closed:
             self.__closed = True
-            for stream in self.__internal:
-                stream.save()
             self._save()
-            self._file.flush()
-            os.fsync(self._file)
-            fcntl.lockf(self._file, fcntl.LOCK_UN)
-            self._file.close()
+            self.__file.flush()
+            os.fsync(self.__file)
+            fcntl.lockf(self.__file, fcntl.LOCK_UN)
+            self.__file.close()
 
     def _start(self):
         pass
 
     def _load(self):
-        pass
+        self.__data = self.special_block(self.BLOCK_DATA)[:struct.calcsize(DataStream.FORMAT)]
 
     def _save(self):
-        pass
+        block = self.special_block(self.BLOCK_DATA)
+        block.data[:struct.calcsize(DataStream.FORMAT)] = self.__data
+        self.save_block(block)
 
     def special_block(self, position: int):
         """Receive one of the reserved special blocks."""
@@ -928,10 +932,10 @@ class SingleStreamManager(StreamManager):
             The newly created block.
 
         """
-        offset = self._file.seek(0, os.SEEK_END)
+        offset = self.__file.seek(0, os.SEEK_END)
         block = StreamBlock(position=offset // BLOCK_SIZE)
         self.__count += 1
-        length = self._file.write(self.__box.encrypt(bytes(block)))
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
         return block
@@ -950,10 +954,10 @@ class SingleStreamManager(StreamManager):
         if not index < self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
         position = index * BLOCK_SIZE
-        offset = self._file.seek(position)
+        offset = self.__file.seek(position)
         if position != offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        return StreamBlock(position=index, block=self.__box.decrypt(self._file.read(BLOCK_SIZE)))
+        return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
 
     def save_block(self, index: int, block: StreamBlock):
         """Save a block and encrypt it.
@@ -970,39 +974,31 @@ class SingleStreamManager(StreamManager):
         if index != block.position:
             raise IndexError("Index %s and position %s are not the same." % (index, block.position))
         position = index * BLOCK_SIZE
-        offset = self._file.seek(position)
+        offset = self.__file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        length = self._file.write(self.__box.encrypt(bytes(block)))
-        self._file.flush()
-        os.fsync(self._file)
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        self.__file.flush()
+        os.fsync(self.__file)
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
-    def special_stream(self, position: int):
-        """Receive one of the reserved special streams."""
-        if 0 <= position < self.SPECIAL_STREAM_COUNT:
-            return self.__internal[position]
-        else:
-            raise IndexError("Index must be between 0 and %s, was %s." % (self.SPECIAL_BLOCK_COUNT, position))
-
-    def new_stream(self) -> DataStream:
+    def _new_stream(self) -> DataStream:
         """Create a new data stream.
 
         Returns (DataStream):
             The new data stream created.
 
         """
-        identity = uuid.uuid4()
+        identity = uuid.UUID(int=1)
         block = self.new_block()
         block.index = 0
         block.stream = identity
         stream = DataStream(self, block, identity, begin=block.position, end=block.position, count=1)
-        self.__registry.register(stream)
-        self.__streams[stream.identity] = stream
+        self._streams[stream.identity] = stream
         return stream
 
-    def open_stream(self, identity: uuid.UUID) -> DataStream:
+    def open_stream(self) -> DataStream:
         """Open an existing data stream.
 
         Args:
@@ -1013,19 +1009,15 @@ class SingleStreamManager(StreamManager):
             The opened data stream object.
 
         """
-        if identity in self.__streams.keys():
-            raise OSError("Already opened")
-        data = self.__registry.search(identity)
-        if not data:
-            raise OSError("Identity doesn't exist %s" % identity)
-        metadata = DataStream.meta_unpack(data)
-        if metadata[0] != identity:
-            raise OSError("Identity doesn't match stream %s" % identity)
+        identity = uuid.UUID(int=1)
+        if identity in self._streams.keys():
+            return self._streams[identity]
+        metadata = DataStream.meta_unpack(self.__data[1])
         stream = DataStream(self, self.load_block(metadata[1]), *metadata)
-        self.__streams[identity] = stream
+        self._streams[stream.identity] = stream
         return stream
 
-    def close_stream(self, stream: DataStream) -> bool:
+    def close_stream(self) -> bool:
         """Close an open data stream.
 
         Args:
@@ -1033,36 +1025,19 @@ class SingleStreamManager(StreamManager):
                 Data stream object being saved.
 
         """
-        if stream.identity not in self.__streams:
+        identity = uuid.UUID(int=1)
+        if identity not in self._streams:
             raise OSError("Stream not known to be open.")
+        stream = self._streams[identity]
         stream.save()
-        self.__registry.update(stream)
-        del self.__streams[stream.identity]
+        del self._streams[stream.identity]
         del stream
-
-    def del_stream(self, identity: uuid.UUID) -> bool:
-        """Delete data stream from file.
-
-        Args:
-            identity (uuid.UUID):
-                Data stream number to be erased.
-
-        Returns (bool):
-            Success of deleting data stream.
-
-        """
-        metadata = DataStream.meta_unpack(self.__registry.update(identity))
-        if metadata[0] != identity:
-            raise OSError("Identity doesn't match stream %s" % identity)
-        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
-        self.__registry.trash(stream)
-        del stream
-        self.__registry.unregister(identity)
-        return True
 
     def recycle(self, chain: StreamBlock) -> bool:
-
-        chain.position
+        """Truncate stream at block position."""
+        self.__file.seek(chain.position * BLOCK_SIZE)
+        self.__file.truncate()
+        self.__count = self.__file.tell() // BLOCK_SIZE
 
     def __del__(self):
         self.close()
@@ -1093,12 +1068,12 @@ class MultiStreamManager(StreamManager):
 
     def __init__(self, filename: str, secret: bytes):
         # Filename and path
-        self._filename = filename
+        self.__filename = filename
         # Encryption secret
         self.__secret = secret
         self.__closed = False
         # Archive file descriptor
-        self._file = None
+        self.__file = None
         # Encryption/decryption object
         self.__box = libnacl.secret.SecretBox(secret)
         # Number of blocks in archive
@@ -1129,20 +1104,20 @@ class MultiStreamManager(StreamManager):
             Length of file.
 
         """
-        self._file.seek(0, os.SEEK_END)
-        return self._file.tell()
+        self.__file.seek(0, os.SEEK_END)
+        return self.__file.tell()
 
     def __setup(self):
-        self._file = open(self._filename, "wb+", BLOCK_SIZE)
-        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
+        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         self.__blocks = {i: self.new_block() for i in range(8)}
         self._start()
         self._save()
-        self.__registry = StreamRegistry(self)
+        self._registry = StreamRegistry(self)
 
     def __open(self):
-        self._file = open(self._filename, "rb+", BLOCK_SIZE)
-        fcntl.lockf(self._file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
+        fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         length = self._get_size()
         if length % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
@@ -1150,7 +1125,7 @@ class MultiStreamManager(StreamManager):
         self.__blocks = {i: self.load_block(i) for i in range(8)}
         self._start()
         self._load()
-        self.__registry = StreamRegistry(self)
+        self._registry = StreamRegistry(self)
 
     def close(self):
         if not self.closed:
@@ -1158,28 +1133,28 @@ class MultiStreamManager(StreamManager):
             self.__internal[MultiStreamManager.STREAM_INDEX].save()
             self.__internal[MultiStreamManager.STREAM_TRASH].save()
             self.__internal[MultiStreamManager.STREAM_JOURNAL].save()
-            self.__registry.close()
+            self._registry.close()
             self._save()
-            self._file.flush()
-            os.fsync(self._file)
-            fcntl.lockf(self._file, fcntl.LOCK_UN)
-            self._file.close()
+            self.__file.flush()
+            os.fsync(self.__file)
+            fcntl.lockf(self.__file, fcntl.LOCK_UN)
+            self.__file.close()
 
     def __start_core(self):
         identity = uuid.UUID(int=MultiStreamManager.STREAM_INDEX)
         stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_INDEX], identity)
         self.__internal[MultiStreamManager.STREAM_INDEX] = stream
-        self.__streams[identity] = stream
+        self._streams[identity] = stream
 
         identity = uuid.UUID(int=MultiStreamManager.STREAM_TRASH)
         stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_TRASH], identity)
         self.__internal[MultiStreamManager.STREAM_TRASH] = stream
-        self.__streams[identity] = stream
+        self._streams[identity] = stream
 
         identity = uuid.UUID(int=MultiStreamManager.STREAM_JOURNAL)
         stream = InternalStream(self, self.__blocks[MultiStreamManager.BLOCK_JOURNAL], identity)
         self.__internal[MultiStreamManager.STREAM_JOURNAL] = stream
-        self.__streams[identity] = stream
+        self._streams[identity] = stream
 
     def __load_data(self):
         size = struct.calcsize(InternalStream.FORMAT)
@@ -1210,11 +1185,11 @@ class MultiStreamManager(StreamManager):
             The newly created block.
 
         """
-        offset = self._file.seek(0, os.SEEK_END)
+        offset = self.__file.seek(0, os.SEEK_END)
         index = offset // BLOCK_SIZE
         block = StreamBlock(position=index)
         self.__count += 1
-        length = self._file.write(self.__box.encrypt(bytes(block)))
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
         return block
@@ -1233,10 +1208,10 @@ class MultiStreamManager(StreamManager):
         if not index < self.__count:
             raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
         position = index * BLOCK_SIZE
-        offset = self._file.seek(position)
+        offset = self.__file.seek(position)
         if position != offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        return StreamBlock(position=index, block=self.__box.decrypt(self._file.read(BLOCK_SIZE)))
+        return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
 
     def save_block(self, index: int, block: StreamBlock):
         """Save a block and encrypt it.
@@ -1253,12 +1228,12 @@ class MultiStreamManager(StreamManager):
         if index != block.position:
             raise IndexError("Index %s and position %s are not the same." % (index, block.position))
         position = index * BLOCK_SIZE
-        offset = self._file.seek(position)
+        offset = self.__file.seek(position)
         if not position == offset:
             raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
-        length = self._file.write(self.__box.encrypt(bytes(block)))
-        self._file.flush()
-        os.fsync(self._file)
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        self.__file.flush()
+        os.fsync(self.__file)
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
@@ -1281,8 +1256,8 @@ class MultiStreamManager(StreamManager):
         block.index = 0
         block.stream = identity
         stream = DataStream(self, block, identity, begin=block.position, end=block.position, count=1)
-        self.__registry.register(stream)
-        self.__streams[stream.identity] = stream
+        self._registry.register(stream)
+        self._streams[stream.identity] = stream
         return stream
 
     def open_stream(self, identity: uuid.UUID) -> DataStream:
@@ -1296,16 +1271,16 @@ class MultiStreamManager(StreamManager):
             The opened data stream object.
 
         """
-        if identity in self.__streams.keys():
+        if identity in self._streams.keys():
             raise OSError("Already opened")
-        data = self.__registry.search(identity)
+        data = self._registry.search(identity)
         if not data:
             raise OSError("Identity doesn't exist %s" % identity)
         metadata = DataStream.meta_unpack(data)
         if metadata[0] != identity:
             raise OSError("Identity doesn't match stream %s" % identity)
         stream = DataStream(self, self.load_block(metadata[1]), *metadata)
-        self.__streams[identity] = stream
+        self._streams[identity] = stream
         return stream
 
     def close_stream(self, stream: DataStream) -> bool:
@@ -1316,11 +1291,11 @@ class MultiStreamManager(StreamManager):
                 Data stream object being saved.
 
         """
-        if stream.identity not in self.__streams:
+        if stream.identity not in self._streams:
             raise OSError("Stream not known to be open.")
         stream.save()
-        self.__registry.update(stream)
-        del self.__streams[stream.identity]
+        self._registry.update(stream)
+        del self._streams[stream.identity]
         del stream
 
     def del_stream(self, identity: uuid.UUID) -> bool:
@@ -1334,13 +1309,13 @@ class MultiStreamManager(StreamManager):
             Success of deleting data stream.
 
         """
-        metadata = DataStream.meta_unpack(self.__registry.update(identity))
+        metadata = DataStream.meta_unpack(self._registry.update(identity))
         if metadata[0] != identity:
             raise OSError("Identity doesn't match stream %s" % identity)
         stream = DataStream(self, self.load_block(metadata[1]), *metadata)
-        self.__registry.trash(stream)
+        self._registry.trash(stream)
         del stream
-        self.__registry.unregister(identity)
+        self._registry.unregister(identity)
         return True
 
     def recycle(self, chain: StreamBlock) -> bool:
