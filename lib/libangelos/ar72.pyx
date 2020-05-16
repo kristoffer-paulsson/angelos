@@ -592,17 +592,17 @@ class VirtualFileObject(BaseFileObject):
     __slots__ = ["__stream", "_position", "__offset", "__end"]
 
     def __init__(self, stream: DataStream, filename: str, mode: str = "r"):
-        self.__stream = stream
+        self._stream = stream
         self._position = 0
         self.__offset = 0
         self.__end = stream.length()
         BaseFileObject.__init__(self, filename, mode)
 
     def _close(self):
-        self.__stream.close()
+        self._stream.close()
 
     def _flush(self):
-        self.__stream.save(True)
+        self._stream.save(True)
 
     def _readinto(self, b):
         m = memoryview(b).cast("B")
@@ -615,13 +615,13 @@ class VirtualFileObject(BaseFileObject):
         while size > cursor:
             num_copy = min(DATA_SIZE - self.__offset, size - cursor)
 
-            data += self.__stream.data[self.__offset:self.__offset + num_copy]
+            data += self._stream.data[self.__offset:self.__offset + num_copy]
             cursor += num_copy
             self._position += num_copy
             self.__offset += num_copy
 
             if self.__offset == DATA_SIZE:
-                self.__stream.next()
+                self._stream.next()
                 self.__offset = 0
 
         n = len(data)
@@ -642,7 +642,7 @@ class VirtualFileObject(BaseFileObject):
             raise OSError("Invalid seek, %s" % whence)
 
         block = cursor // DATA_SIZE
-        if self.__stream.wind(block) != block:
+        if self._stream.wind(block) != block:
             return self._position
             # raise OSError("Couldn't seek to position, problem with underlying stream.")
         else:
@@ -652,10 +652,10 @@ class VirtualFileObject(BaseFileObject):
 
     def _truncate(self, size):
         if size:
-            self.__stream.truncate(size)
+            self._stream.truncate(size)
             self.__end = size
         else:
-            self.__stream.truncate(self._position)
+            self._stream.truncate(self._position)
             self.__end = self._position
         return self.__end
 
@@ -667,21 +667,21 @@ class VirtualFileObject(BaseFileObject):
         cursor = 0
 
         while write_len > cursor:
-            self.__stream.changed()
+            self._stream.changed()
             num_copy = min(DATA_SIZE - self.__offset, write_len - cursor)
 
-            self.__stream.data[self.__offset:self.__offset + num_copy] = b[cursor:cursor + num_copy]
+            self._stream.data[self.__offset:self.__offset + num_copy] = b[cursor:cursor + num_copy]
 
             cursor += num_copy
             self._position += num_copy
             self.__offset += num_copy
             if self._position > self.__end:  # Updating stream length
-                self.__stream.length(self._position - self.__end)
+                self._stream.length(self._position - self.__end)
                 self.__end = self._position
 
             if self.__offset >= DATA_SIZE:  # Load next or new block
-                if not self.__stream.next():
-                    if not self.__stream.extend():
+                if not self._stream.next():
+                    if not self._stream.extend():
                         raise OSError("Out of space.")
                 self.__offset = 0
 

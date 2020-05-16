@@ -317,8 +317,8 @@ class BaseStream:  # (Iterable, Reversible):
             self.save(True)
 
             block = self._manager.load_block(next)
-            block.previous = -1
-            self._manager.save_block(block.position, block)
+            # block.previous = -1
+            # self._manager.save_block(block.position, block)
             self._manager.recycle(block)
 
         return length
@@ -368,6 +368,26 @@ class InternalStream(BaseStream):
         """Save block."""
         self.save()
 
+    def push_block(self, block: StreamBlock):
+        """Push a block at end of stream.
+
+        Args:
+            block (StreamBlock):
+                Block to push.
+
+        """
+        # FIXME Implement block attachment
+        pass
+
+    def pop_block(self) -> StreamBlock:
+        """Pop block off the end of stream.
+
+        Returns (StreamBlock):
+            Popped block.
+
+        """
+        # FIXME Implemenet block detachment
+        pass
 
 class DataStream(BaseStream):
     """Stream for general use."""
@@ -381,20 +401,20 @@ class DataStream(BaseStream):
 class VirtualFileObject(BaseFileObject):
     """Stream for the registry index database."""
 
-    __slots__ = ["__stream", "_position", "__offset", "__end"]
+    __slots__ = ["_stream", "_position", "__offset", "__end"]
 
     def __init__(self, stream: DataStream, filename: str, mode: str = "r"):
-        self.__stream = stream
+        self._stream = stream
         self._position = 0
         self.__offset = 0
         self.__end = stream.length()
         BaseFileObject.__init__(self, filename, mode)
 
     def _close(self):
-        self.__stream.close()
+        self._stream.close()
 
     def _flush(self):
-        self.__stream.save(True)
+        self._stream.save(True)
 
     def _readinto(self, b):
         m = memoryview(b).cast("B")
@@ -407,13 +427,13 @@ class VirtualFileObject(BaseFileObject):
         while size > cursor:
             num_copy = min(DATA_SIZE - self.__offset, size - cursor)
 
-            data += self.__stream.data[self.__offset:self.__offset + num_copy]
+            data += self._stream.data[self.__offset:self.__offset + num_copy]
             cursor += num_copy
             self._position += num_copy
             self.__offset += num_copy
 
             if self.__offset == DATA_SIZE:
-                self.__stream.next()
+                self._stream.next()
                 self.__offset = 0
 
         n = len(data)
@@ -434,7 +454,7 @@ class VirtualFileObject(BaseFileObject):
             raise OSError("Invalid seek, %s" % whence)
 
         block = cursor // DATA_SIZE
-        if self.__stream.wind(block) != block:
+        if self._stream.wind(block) != block:
             return self._position
             # raise OSError("Couldn't seek to position, problem with underlying stream.")
         else:
@@ -444,10 +464,10 @@ class VirtualFileObject(BaseFileObject):
 
     def _truncate(self, size):
         if size:
-            self.__stream.truncate(size)
+            self._stream.truncate(size)
             self.__end = size
         else:
-            self.__stream.truncate(self._position)
+            self._stream.truncate(self._position)
             self.__end = self._position
         return self.__end
 
@@ -459,21 +479,21 @@ class VirtualFileObject(BaseFileObject):
         cursor = 0
 
         while write_len > cursor:
-            self.__stream.changed()
+            self._stream.changed()
             num_copy = min(DATA_SIZE - self.__offset, write_len - cursor)
 
-            self.__stream.data[self.__offset:self.__offset + num_copy] = b[cursor:cursor + num_copy]
+            self._stream.data[self.__offset:self.__offset + num_copy] = b[cursor:cursor + num_copy]
 
             cursor += num_copy
             self._position += num_copy
             self.__offset += num_copy
             if self._position > self.__end:  # Updating stream length
-                self.__stream.length(self._position - self.__end)
+                self._stream.length(self._position - self.__end)
                 self.__end = self._position
 
             if self.__offset >= DATA_SIZE:  # Load next or new block
-                if not self.__stream.next():
-                    if not self.__stream.extend():
+                if not self._stream.next():
+                    if not self._stream.extend():
                         raise OSError("Out of space.")
                 self.__offset = 0
 
@@ -751,10 +771,14 @@ class StreamManager(ABC):
             The newly created block.
 
         """
-        offset = self.__file.seek(0, os.SEEK_END)
-        index = offset // BLOCK_SIZE
-        block = StreamBlock(position=index)
-        self.__count += 1
+        block = self.reuse()
+        if block:
+            block.data[0:DATA_SIZE] = b"\x00" * DATA_SIZE
+        else:
+            offset = self.__file.seek(0, os.SEEK_END)
+            index = offset // BLOCK_SIZE
+            block = StreamBlock(position=index)
+            self.__count += 1
         length = self.__file.write(self.__box.encrypt(bytes(block)))
         if length != BLOCK_SIZE:
             raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
@@ -839,6 +863,10 @@ class StreamManager(ABC):
     def recycle(self, chain: StreamBlock) -> bool:
         pass
 
+    @abstractmethod
+    def reuse(self) -> StreamBlock:
+        pass
+
 
 class SingleStreamManager(StreamManager):
     SPECIAL_BLOCK_COUNT = 1
@@ -863,6 +891,42 @@ class SingleStreamManager(StreamManager):
         self.__file.seek(chain.position * BLOCK_SIZE)
         self.__file.truncate()
         self.__count = self.__file.tell() // BLOCK_SIZE
+
+    def reuse(self) -> StreamBlock:
+        """Single stream don't need reuse."""
+        return None
+
+
+class FixedMultiStreamManager(StreamManager):
+    SPECIAL_BLOCK_COUNT = 1
+    SPECIAL_STREAM_COUNT = 1
+
+    STREAM_TRASH = 0
+
+    def new_stream(self):
+        raise NotImplementedError()
+
+    def open_stream(self, identity: uuid.UUID):
+        raise NotImplementedError()
+
+    def close_stream(self, stream: DataStream):
+        raise NotImplementedError()
+
+    def del_stream(self, identity: uuid.UUID):
+        raise NotImplementedError()
+
+    def recycle(self, chain: StreamBlock) -> bool:
+        """Truncate stream at block position."""
+        trash = self.special_stream(self.STREAM_TRASH)
+        trash.wind(trash._end)
+        trash.block
+        self.__file.seek(chain.position * BLOCK_SIZE)
+        self.__file.truncate()
+        self.__count = self.__file.tell() // BLOCK_SIZE
+
+    def reuse(self) -> StreamBlock:
+        """Single stream don't need reuse."""
+        return None
 
 
 class MultiStreamManager(StreamManager):
