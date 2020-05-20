@@ -37,5 +37,6 @@ TreeConf = namedtuple('TreeConf', [
     'order',  # Branching factor of the tree
     'key_size',  # Maximum size of a key in bytes
     'value_size',  # Maximum size of a value in bytes
+    'item_size',  # Size of items in multi item values
     'serializer',  # Instance of a Serializer
 ])

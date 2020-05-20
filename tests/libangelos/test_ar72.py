@@ -6,7 +6,7 @@ import tracemalloc
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from archive7.streams import MultiStreamManager, VirtualFileObject, SingleStreamManager
+from archive7.streams import VirtualFileObject, SingleStreamManager, DynamicMultiStreamManager
 
 
 class BaseArchiveTestCase(TestCase):
@@ -38,7 +38,7 @@ class TestStreamBlock(BaseArchiveTestCase):
         self.fail()
 
 
-class StreamManagerStub(MultiStreamManager):
+class StreamManagerStub(DynamicMultiStreamManager):
     pass
 
 

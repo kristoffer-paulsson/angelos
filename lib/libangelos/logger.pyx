@@ -58,7 +58,7 @@ class EncryptedRotatingFileHandler(RotatingFileHandler):
     """Encrypted rotating file handler for encrypted logging."""
 
     def __init__(
-        self, filename: str, secret: bytes, mode: bytes = "a",
+        self, filename: str, secret: bytes, mode: str = "a",
         max_bytes: int = 2**21, backup_count: int = 0,
         encoding: str = None, delay: int = False
     ):
