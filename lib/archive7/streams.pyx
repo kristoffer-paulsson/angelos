@@ -19,6 +19,8 @@ from archive7.base import BaseFileObject
 from bplustree.serializer import UUIDSerializer
 from bplustree.tree import BPlusTree
 
+from tree import SingleItemTree
+
 BLOCK_SIZE = 4096
 DATA_SIZE = 4008
 MAX_UINT32 = 2 ** 32
@@ -112,15 +114,20 @@ class BaseStream:  # (Iterable, Reversible):
         self.__compression, unsigned short, compression algorithm of choice.
     """
 
-    __slots__ = ["_manager", "_block", "__changed", "_identity", "_begin", "_end", "_count", "_length", "_compression"]
+    __slots__ = [
+        "_manager", "_block", "__changed", "_identity", "_begin",
+        "_end", "_count", "_length", "_compression"
+    ]
 
     COMP_NONE = 0
 
     FORMAT = "!16siiIQH"
     SIZE = struct.calcsize("!16siiIQH")
 
-    def __init__(self, manager: "StreamManager", block: StreamBlock, identity: uuid.UUID, begin: int = -1,
-                 end: int = -1, count: int = 0, length: int = 0, compression: int = 0):
+    def __init__(
+        self, manager: "StreamManager", block: StreamBlock, identity: uuid.UUID, begin: int = -1,
+        end: int = -1, count: int = 0, length: int = 0, compression: int = 0
+    ):
         self._manager = manager
         self._block = block
         self.__changed = False
@@ -137,6 +144,11 @@ class BaseStream:  # (Iterable, Reversible):
     def identity(self):
         """Expose the streams identity number."""
         return self._identity
+
+    @property
+    def manager(self):
+        """Expose stream manager."""
+        return self._manager
 
     @property
     def data(self):
@@ -539,44 +551,55 @@ class VirtualFileObject(BaseFileObject):
         return cursor if cursor else None
 
 
-class Registry:
+class Registry(ABC):
     """B+Tree registry and wal wrapper"""
-    def __init__(self, main: DataStream, wal: DataStream, key_size: int, value_size: int):
-        self.__tree = BPlusTree(
-            VirtualFileObject(main, "main", "wb+"),
-            VirtualFileObject(wal, "wal", "wb+"),
-            page_size=DATA_SIZE // 4,
-            key_size=key_size,
-            value_size=value_size,
-            serializer=UUIDSerializer()
-        )
 
-    @property
-    def tree(self):
-        return self.__tree
-
-    def close(self):
-        self.__tree.checkpoint()
-        self.__tree.close()
-
-
-class StreamRegistry:
-    """Registry to keep track of all streams and the trash."""
-
-    __slots__ = ["__cnt", "__manager", "__index", "__trash"]
+    __slots__ = ["__tree", "__cnt", "__manager"]
 
     def __init__(self, manager: "DynamicMultiStreamManager"):
         self.__cnt = 0
-        self.__manager = manager
-        self.__index = Registry(
-            self.__manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX),
-            self.__manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX_WAL),
-            key_size=16,
-            value_size=DataStream.SIZE
-        )
+        self._manager = manager
+        self._tree = self._init_tree()
+
+    @property
+    def tree(self):
+        return self._tree
 
     def close(self):
-        self.__index.close()
+        self._tree.checkpoint()
+        self._tree.close()
+
+    @abstractmethod
+    def _init_tree(self, main: DataStream, wal: DataStream, key_size: int, value_size: int):
+        pass
+
+    def _checkpoint(self, enforce: bool = False):
+        self.__cnt += 1
+        if self.__cnt >= 10 or enforce:
+            self._tree.checkpoint()
+            self.__cnt = 0
+
+
+class StreamRegistry(Registry):
+    """Registry to keep track of all streams and the trash."""
+
+    __slots__ = []
+
+    def _init_tree(self):
+        return SingleItemTree(
+            VirtualFileObject(
+                self._manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX),
+                "main", "wb+"
+            ),
+            VirtualFileObject(
+                self._manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX_WAL),
+                "wal", "wb+"
+            ),
+            page_size=DATA_SIZE // 4,
+            key_size=16,
+            value_size=DataStream.SIZE,
+            serializer=UUIDSerializer()
+        )
 
     def register(self, stream: DataStream) -> int:
         """Register a data stream.
@@ -589,8 +612,8 @@ class StreamRegistry:
             Stream identity number.
 
         """
-        self.__index.tree.insert(stream.identity, bytes(stream))
-        self.__checkpoint()
+        self._tree.insert(stream.identity, bytes(stream))
+        self._checkpoint()
         return stream.identity
 
     def unregister(self, identity: int) -> bytes:
@@ -605,8 +628,8 @@ class StreamRegistry:
 
         """
 
-        result = self.__index.tree.remove(identity)
-        self.__checkpoint()
+        result = self._tree.delete(identity)
+        self._checkpoint()
         return result
 
     def update(self, stream: DataStream) -> bool:
@@ -621,8 +644,8 @@ class StreamRegistry:
 
         """
         try:
-            self.__index.tree.insert(stream.identity, bytes(stream), True)
-            self.__checkpoint()
+            self._tree.update(stream.identity, bytes(stream))
+            self._checkpoint()
             return True
         except ValueError:
             return False
@@ -638,14 +661,9 @@ class StreamRegistry:
             Stream metadata.
 
         """
-        return self.__index.tree.get(identity)
+        return self._tree.get(identity)
 
-    def __checkpoint(self):
-        self.__index.tree.checkpoint()
-        # self.__cnt += 1
-        # if self.__cnt >= 10:
-        #    self.__index.tree.checkpoint()
-        #    self.__cnt = 0
+
 
 
 class StreamManager(ABC):

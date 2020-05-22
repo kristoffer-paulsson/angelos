@@ -2023,9 +2023,7 @@ class Archive7(ContainerAware, SharedResource):
         """Delete mode flags."""
 
         SOFT = 1  # Raise file delete flag
-        HARD = (
-            2
-        )  # Raise  file delete flag, set size and offset to zero, add empty block.  # noqa #E501
+        HARD = 2 # Raise  file delete flag, set size and offset to zero, add empty block.  # noqa #E501
         ERASE = 3  # Replace file with empty block
 
     def __del__(self):

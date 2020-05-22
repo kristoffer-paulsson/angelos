@@ -967,7 +967,7 @@ class MultiItemTree(BaseTree):
                         otherwise a ValueError is raised.
         """
         if not isinstance(value, (set, list)):
-            raise TypeError("Value must be bytes.")
+            raise TypeError("Value must be set or list.")
 
         with self._mem.write_transaction:
             node = self._search_in_tree(key, self._root_node)
