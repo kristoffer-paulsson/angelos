@@ -17,9 +17,7 @@ from typing import Union
 import libnacl.secret
 from archive7.base import BaseFileObject
 from bplustree.serializer import UUIDSerializer
-from bplustree.tree import BPlusTree
-
-from tree import SingleItemTree
+from bplustree.tree import SingleItemTree
 
 BLOCK_SIZE = 4096
 DATA_SIZE = 4008

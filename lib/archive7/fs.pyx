@@ -7,12 +7,14 @@
 """File system."""
 import datetime
 import enum
+import os
 import struct
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections import Iterator
 from pathlib import PurePath
-from typing import Union
+from typing import Union, _T_co
 
 from archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject, DATA_SIZE
 from bplustree.serializer import UUIDSerializer
@@ -362,6 +364,52 @@ class Delete(enum.IntEnum):
     ERASE = 3  # Replace file with empty block
 
 
+class HierarchyTraverser(Iterator):
+    """Traverse the file system hierarchy at a defined starting point."""
+
+    def __init__(self, identity: uuid.UUID, entries: EntryRegistry, paths: PathRegistry, listings: ListingRegistry):
+        self.__identity = identity
+        self.__generators = list()
+        self.__segments = list()
+
+        self.__entries = entries
+        self.__paths = paths
+        self.__listings = listings
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        item = None
+        try:
+            if not self.__generators:
+                item = self.__identity.bytes
+            else:
+                item = next(self.__generators[-1])
+        except StopIteration:
+            if self.__generators:
+                self.__generators.pop()
+                self.__segments.pop()
+
+            if not self.__generators:
+                raise StopIteration()
+        else:
+            entry = EntryRecord.meta_unpack(
+                self.__entries.tree.get(
+                    uuid.UUID(bytes=item)))
+
+            if entry.type == TYPE_DIR:
+                self.__generators.append(self.__listings.tree.traverse(self.__identity))
+                self.__segments.append(entry.name)
+
+            return entry
+
+    @property
+    def path(self) -> str:
+        """Current path."""
+        return os.path.join(*self.__segments)
+
+
 class FileSystemStreamManager(DynamicMultiStreamManager):
     """Stream management with all necessary registries for a filesystem and entry management."""
     SPECIAL_BLOCK_COUNT = 1
@@ -395,7 +443,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
 
         self.__entries.tree.insert(key=entry.id, value=bytes(entry))
         self.__paths.tree.insert(key=path.key, value=bytes(path))
-        self.__listings.tree.insert(key=entry.id, set())
+        self.__listings.tree.insert(key=entry.id, value=set())
 
     def _setup(self):
         self.__start()
@@ -476,7 +524,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
 
         if type == TYPE_DIR:
             entry = EntryRecord.dir(name=name, parent=parent, **kwargs)
-            self.__listings.tree.update(key=entry.parent, set([entry.id.bytes]))
+            self.__listings.tree.update(key=entry.parent, value=set([entry.id.bytes]))
         elif type == TYPE_FILE:
             entry = EntryRecord.file(name=name, parent=parent, **kwargs)
         elif type == TYPE_LINK:
@@ -494,7 +542,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
 
         self.__entries.tree.insert(key=entry.id, value=bytes(entry))
         self.__paths.tree.insert(key=path_key, value=bytes(PathRecord.path(entry.type, entry.id)))
-        self.__listings.tree.insert(key=entry.id, set())
+        self.__listings.tree.insert(key=entry.id, value=set())
 
         return entry.id
 
@@ -678,6 +726,22 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         number = fd.fileno()
         if fd.fileno() in self.__descriptors.keys():
             del self.__descriptors[number]
+
+    def traverse_hierarchy(self, directory: uuid.UUID) -> Iterator:
+        """Iterator that traverses the hierarchy.
+        
+        Iterates over the listing of a directory and traverses down each directory.
+        This iterator uses the listings to iterate over a directory, then yealds each entry.
+        
+        Args:
+            directory (uuid.UUID): 
+                Directory entry UUID number
+
+        Returns (Iterator):
+            Iterator that traverses the hierarchy
+        """
+        iterator = HierarchyTraverser(directory, self.__entries, self.__paths, self.__listings)
+        return iterator
 
 
 class FilesystemMixin(ABC):

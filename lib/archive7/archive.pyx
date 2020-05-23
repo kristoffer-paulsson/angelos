@@ -9,6 +9,7 @@ import copy
 import datetime
 import enum
 import functools
+import hashlib
 import os
 import re
 import struct
@@ -17,10 +18,12 @@ import uuid
 from typing import Union
 
 from archive7.fs import FileSystemStreamManager
+from libangelos.error import ArchiveInvalidFile
 from libangelos.misc import SharedResource
 from libangelos.utils import Util
 
 from error import Error
+from fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
 
 
 class Header:
@@ -194,12 +197,6 @@ class Archive7(SharedResource):
 
         """
 
-        dirname, name = os.path.split(filename)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(name, pid)
-
-        return copy.deepcopy(entry)
-
     async def glob(self, *args, **kwargs):
         return await self._run(functools.partial(self.__glob, *args, **kwargs))
 
@@ -265,7 +262,7 @@ class Archive7(SharedResource):
 
         entry = entry._asdict()
         entry["parent"] = did
-        entry = Entry(**entry)
+        entry = EntryRecord(**entry)
         self.ioc.entries.update(entry, idx)
 
     async def chmod(self, *args, **kwargs):
@@ -301,7 +298,7 @@ class Archive7(SharedResource):
             entry["group"] = group
         if perms:
             entry["perms"] = perms
-        entry = Entry(**entry)
+        entry = EntryRecord(**entry)
         self.ioc.entries.update(entry, idx)
 
     async def remove(self, *args, **kwargs):
@@ -318,16 +315,16 @@ class Archive7(SharedResource):
 
         # Check for unsupported types
         if entry.type not in (
-                Entry.TYPE_FILE,
-                Entry.TYPE_DIR,
-                Entry.TYPE_LINK,
+                TYPE_FILE,
+                TYPE_DIR,
+                TYPE_LINK,
         ):
             raise Util.exception(
                 Error.AR7_WRONG_ENTRY, {"type": entry.type, "id": entry.id}
             )
 
         # If directory is up for removal, check that it is empty or abort
-        if entry.type == Entry.TYPE_DIR:
+        if entry.type == TYPE_DIR:
             cidx = entries.search(Archive7.Query().parent(entry.id))
             if len(cidx):
                 raise Util.exception(Error.AR7_NOT_EMPTY, {"index": cidx})
@@ -336,29 +333,29 @@ class Archive7(SharedResource):
             mode = self.__delete
 
         if mode == Archive7.Delete.ERASE:
-            if entry.type == Entry.TYPE_FILE:
+            if entry.type == TYPE_FILE:
                 entries.update(
-                    Entry.empty(
+                    EntryRecord.empty(
                         offset=entry.offset,
                         size=entries._sector(entry.size),
                     ),
                     idx,
                 )
-            elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
-                entries.update(Entry.blank(), idx)
+            elif entry.type in (TYPE_DIR, TYPE_LINK):
+                entries.update(EntryRecord.blank(), idx)
         elif mode == Archive7.Delete.SOFT:
             entry = entry._asdict()
             entry["deleted"] = True
             entry["modified"] = datetime.datetime.now()
-            entry = Entry(**entry)
+            entry = EntryRecord(**entry)
             self.ioc.entries.update(entry, idx)
         elif mode == Archive7.Delete.HARD:
-            if entry.type == Entry.TYPE_FILE:
+            if entry.type == TYPE_FILE:
                 if not entries.find_blank():
                     entries.make_blanks()
                 bidx = entries.get_blank()
                 entries.update(
-                    Entry.empty(
+                    EntryRecord.empty(
                         offset=entry.offset,
                         size=entries._sector(entry.size),
                     ),
@@ -370,13 +367,13 @@ class Archive7(SharedResource):
                 entry["size"] = 0
                 entry["length"] = 0
                 entry["offset"] = 0
-                entry = Entry(**entry)
+                entry = EntryRecord(**entry)
                 self.ioc.entries.update(entry, idx)
-            elif entry.type in (Entry.TYPE_DIR, Entry.TYPE_LINK):
+            elif entry.type in (TYPE_DIR, TYPE_LINK):
                 entry = entry._asdict()
                 entry["deleted"] = True
                 entry["modified"] = datetime.datetime.now()
-                entry = Entry(**entry)
+                entry = EntryRecord(**entry)
                 self.ioc.entries.update(entry, idx)
         else:
             raise Util.exception(
@@ -398,7 +395,7 @@ class Archive7(SharedResource):
 
         entry = entry._asdict()
         entry["name"] = bytes(dest, "utf-8")
-        entry = Entry(**entry)
+        entry = EntryRecord(**entry)
         entries.update(entry, idx)
 
     def isdir(self, dirname):
@@ -422,11 +419,11 @@ class Archive7(SharedResource):
 
     def isfile(self, filename):
         """Check if a path is a known file."""
-        return self.__is_type(filename, Entry.TYPE_FILE)
+        return self.__is_type(filename, TYPE_FILE)
 
     def islink(self, filename):
         """Check if a path is a known file."""
-        return self.__is_type(filename, Entry.TYPE_LINK)
+        return self.__is_type(filename, TYPE_LINK)
 
     async def mkdir(self, *args, **kwargs):
         return await self._run(functools.partial(self.__mkdir, *args, **kwargs))
@@ -453,7 +450,7 @@ class Archive7(SharedResource):
         entries = self.ioc.entries
 
         for newdir in subpath:
-            entry = Entry.dir(
+            entry = EntryRecord.dir(
                 name=name, parent=pid, user=user, group=group, perms=perms
             )
             entries.add(entry)
@@ -473,7 +470,7 @@ class Archive7(SharedResource):
             owner=None,
             parent=None,
             id=None,
-            compression=Entry.COMP_NONE,
+            compression=EntryRecord.COMP_NONE,
             user=None,
             group=None,
             perms=None
@@ -501,7 +498,7 @@ class Archive7(SharedResource):
             data = ops.zip(data, compression)
         size = len(data)
 
-        entry = Entry.file(
+        entry = EntryRecord.file(
             name=name,
             size=size,
             offset=0,
@@ -543,12 +540,12 @@ class Archive7(SharedResource):
         lpid = ops.get_pid(ldir)
         target, tidx = ops.find_entry(lname, lpid)
 
-        if target.type == Entry.TYPE_LINK:
+        if target.type == TYPE_LINK:
             raise Util.exception(
                 Error.AR7_LINK_2_LINK, {"path": path, "link": target}
             )
 
-        entry = Entry.link(
+        entry = EntryRecord.link(
             name=name,
             link=target.id,
             parent=pid,
@@ -564,7 +561,7 @@ class Archive7(SharedResource):
     async def save(self, *args, **kwargs):
         return await self._run(functools.partial(self.__save, *args, **kwargs))
 
-    def __save(self, filename, data, compression=Entry.COMP_NONE, modified=None):
+    def __save(self, filename, data, compression=EntryRecord.COMP_NONE, modified=None):
         """Update a file with new data."""
         if not modified:
             modified = datetime.datetime.now()
@@ -578,10 +575,10 @@ class Archive7(SharedResource):
         dirname, name = os.path.split(filename)
         pid = ops.get_pid(dirname)
         entry, idx = ops.find_entry(
-            name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK)
+            name, pid, (TYPE_FILE, TYPE_LINK)
         )
 
-        if entry.type == Entry.TYPE_LINK:
+        if entry.type == TYPE_LINK:
             entry, idx = ops.follow_link(entry)
 
         length = len(data)
@@ -594,7 +591,7 @@ class Archive7(SharedResource):
         nsize = entries._sector(size)
 
         if osize < nsize:
-            empty = Entry.empty(offset=entry.offset, size=osize)
+            empty = EntryRecord.empty(offset=entry.offset, size=osize)
             last = entries.get_entry(entries.get_thithermost())
             new_offset = entries._sector(last.offset + last.size)
             ops.write_data(new_offset, data + ops.filler(data))
@@ -606,7 +603,7 @@ class Archive7(SharedResource):
             entry["length"] = length
             entry["modified"] = modified
             entry["compression"] = compression
-            entry = Entry(**entry)
+            entry = EntryRecord(**entry)
             entries.update(entry, idx)
 
             bidx = entries.get_blank()
@@ -620,7 +617,7 @@ class Archive7(SharedResource):
             entry["length"] = length
             entry["modified"] = modified
             entry["compression"] = compression
-            entry = Entry(**entry)
+            entry = EntryRecord(**entry)
             entries.update(entry, idx)
         elif osize > nsize:
             ops.write_data(entry.offset, data + ops.filler(data))
@@ -634,10 +631,10 @@ class Archive7(SharedResource):
             entry["compression"] = compression
             if not size:  # If data is b''
                 entry["offset"] = 0
-            entry = Entry(**entry)
+            entry = EntryRecord(**entry)
             entries.update(entry, idx)
 
-            empty = Entry.empty(
+            empty = EntryRecord.empty(
                 offset=entries._sector(old_offset + nsize),
                 size=osize - nsize,
             )
@@ -654,10 +651,10 @@ class Archive7(SharedResource):
         dirname, name = os.path.split(filename)
         pid = ops.get_pid(dirname)
         entry, idx = ops.find_entry(
-            name, pid, (Entry.TYPE_FILE, Entry.TYPE_LINK)
+            name, pid, (TYPE_FILE, TYPE_LINK)
         )
 
-        if entry.type == Entry.TYPE_LINK:
+        if entry.type == TYPE_LINK:
             entry, idx = ops.follow_link(entry)
 
         data = self.ioc.operations.load_data(entry)
@@ -683,7 +680,7 @@ class Archive7(SharedResource):
 
         def __init__(self, pattern="*"):
             """Init a query."""
-            self.__type = (Entry.TYPE_FILE, Entry.TYPE_DIR, Entry.TYPE_LINK)
+            self.__type = (TYPE_FILE, TYPE_DIR, TYPE_LINK)
             self.__file_regex = None
             self.__dir_regex = None
             if not pattern == "*":

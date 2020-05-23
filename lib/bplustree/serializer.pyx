@@ -46,7 +46,8 @@ class StrSerializer(Serializer):
 
     def serialize(self, obj: str, key_size: int) -> bytes:
         rv = obj.encode(encoding='utf-8')
-        assert len(rv) <= key_size
+        if len(rv) > key_size:
+            raise ValueError("String longer than key size")
         return rv
 
     def deserialize(self, data: bytes) -> str:
@@ -56,7 +57,7 @@ class StrSerializer(Serializer):
 class UUIDSerializer(Serializer):
     __slots__ = []
 
-    def serialize(self, obj: UUID, key_size: int) -> bytes:
+    def serialize(self, obj: UUID, key_size: int = None) -> bytes:
         return obj.bytes
 
     def deserialize(self, data: bytes) -> UUID:
@@ -71,7 +72,7 @@ class DatetimeUTCSerializer(Serializer):
             raise RuntimeError('Serialization to/from datetime needs the '
                                'third-party library "temporenc"')
 
-    def serialize(self, obj: datetime, key_size: int) -> bytes:
+    def serialize(self, obj: datetime, key_size: int = None) -> bytes:
         if obj.tzinfo is None:
             raise ValueError('DatetimeUTCSerializer needs a timezone aware '
                              'datetime')

@@ -4,11 +4,12 @@
 # Copyright (c) 2020 by Kristoffer Paulsson
 # This file is distributed under the terms of the MIT license.
 #
+import functools
 import io
 import collections
 from abc import abstractmethod, ABC
 from functools import partial
-from typing import Optional, Union, Iterator, Iterable
+from typing import Optional, Union, Iterator, Iterable, _T_co, Generator
 
 from bplustree.utils import pairwise, iter_slice
 from bplustree.const import TreeConf, ENDIAN, OTHERS_BYTES
@@ -944,6 +945,22 @@ class SingleItemTree(BaseTree):
         return record.value
 
 
+class MultiItemIterator(Iterator):
+    """Iterator that iterates over a multi item generator."""
+    def __init__(self, generator: Generator, count: int):
+        self.__count = count
+        self.__generator = generator
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self.__generator)
+
+    def __len__(self):
+        return self.__count
+
+
 class MultiItemTree(BaseTree):
     """BPlusTree that uses values with sets/lists of items.
 
@@ -1217,3 +1234,36 @@ class MultiItemTree(BaseTree):
 
     def _get_value_from_record(self, record: Record) -> bytes:
         return self._read_from_overflow(record.overflow_page, record.value)
+
+    def traverse(self, key) -> list:
+        """Like get but returns an iterator."""
+        with self._mem.read_transaction:
+            node = self._search_in_tree(key, self._root_node)
+            try:
+                record = node.get_entry(key)
+            except ValueError:
+                return None
+            else:
+                count = int.from_bytes(record.value, ENDIAN)
+                generator = (functools.partial(self._iterate_overflow, record.overflow_page, count)())
+                return MultiItemIterator(generator, count)
+
+    def _iterate_overflow(self, first_overflow_page: int, count: int):
+        """Collect all values of an overflow chain."""
+        size = self._tree_conf.item_size
+        serializer = self._tree_conf.serializer
+
+        batch = self.OverflowNode().max_payload // size
+        batch_cnt = count // batch
+        batch_cnt += 1 if bool(count % batch) else 0
+
+        rv = list()
+        rest = count
+        for overflow_node in self._traverse_overflow(first_overflow_page):
+            chunk = overflow_node.smallest_entry.data[0:batch*size]
+            for item_idx in range(min(batch, rest)):
+                yield chunk[item_idx*size:item_idx*size+size]
+            rest -= batch
+
+        if rest != 0:
+            raise ValueError("Failed reading all values")

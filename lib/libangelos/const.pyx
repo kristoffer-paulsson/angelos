@@ -34,6 +34,7 @@ class Const:
     A_USE_POOL              Archive used as public document pool
     A_USE_FTP               Archive used as encrypted ftp file system
     A_USE_ROUTING           Archive used as interchurch mail routing pool
+    A_USE_META              Archive used as internal node meta-information
 
     CNL_VAULT               Vault file path
     CNL_HOME                Encrypted home directory file path
@@ -41,6 +42,7 @@ class Const:
     CNL_POOL                Public document pool file path
     CNL_FTP                 Encrypted ftp file path
     CNL_ROUTING             Mail routing pool file path
+    CNL_META                Meta information storage path
 
     LOG_ERR                 Logger for technical error messages
     LOG_APP                 Logger for application related events
@@ -68,13 +70,15 @@ class Const:
     A_USE_POOL = ord(b"p")
     A_USE_FTP = ord(b"f")
     A_USE_ROUTING = ord(b"r")
+    A_USE_META = ord(b"M")
 
-    CNL_VAULT = "vault.ar7.cnl"
-    CNL_HOME = "home.ar7.cnl"
-    CNL_MAIL = "mail.ar7.cnl"
-    CNL_POOL = "pool.ar7.cnl"
-    CNL_FTP = "ftp.ar7.cnl"
-    CNL_ROUTING = "routing.ar7.cnl"
+    CNL_VAULT = "vault.ar7"
+    CNL_HOME = "home.ar7"
+    CNL_MAIL = "mail.ar7"
+    CNL_POOL = "pool.ar7"
+    CNL_FTP = "ftp.ar7"
+    CNL_ROUTING = "routing.ar7"
+    CNL_META = "meta.ar7"
 
     LOG_ERR = "err"
     LOG_APP = "app"

@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2020 by:
+# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
+# This file is distributed under the terms of the MIT license.
+#
 from unittest import TestCase
 
 from libangelos.document.messages import Attachment, Message, Note, Instant, Mail, Share, Report
