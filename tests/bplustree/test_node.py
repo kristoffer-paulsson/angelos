@@ -39,7 +39,15 @@ class TestNode(TestCase):
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = Node(self.conf, parent=parent)
+            data = node.dump()
+            new_node = Node(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -184,15 +192,23 @@ class TestRecordNode(TestCase):
     def test_load(self):
         try:
             parent = self.node
-            node = Node(self.conf, parent=parent)
+            node = RecordNode(self.conf, parent=parent)
             data = node.dump()
-            new_node = Node(self.conf, bytes(data))
+            new_node = RecordNode(self.conf, bytes(data))
             self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = RecordNode(self.conf, parent=parent)
+            data = node.dump()
+            new_node = RecordNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -328,7 +344,6 @@ class TestRecordNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass
 
 
@@ -342,15 +357,23 @@ class TestLonelyRootNode(TestCase):
     def test_load(self):
         try:
             parent = self.node
-            node = Node(self.conf, parent=parent)
+            node = LonelyRootNode(self.conf, parent=parent)
             data = node.dump()
-            new_node = Node(self.conf, bytes(data))
+            new_node = LonelyRootNode(self.conf, bytes(data))
             self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = LonelyRootNode(self.conf, parent=parent)
+            data = node.dump()
+            new_node = LonelyRootNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -486,7 +509,6 @@ class TestLonelyRootNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass
 
     ####
@@ -505,15 +527,23 @@ class TestLeafNode(TestCase):
     def test_load(self):
         try:
             parent = self.node
-            node = Node(self.conf, parent=parent)
+            node = LeafNode(self.conf, parent=parent)
             data = node.dump()
-            new_node = Node(self.conf, bytes(data))
+            new_node = LeafNode(self.conf, bytes(data))
             self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = LeafNode(self.conf, parent=parent)
+            data = node.dump()
+            new_node = LeafNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -649,7 +679,6 @@ class TestLeafNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass
 
 
@@ -663,15 +692,23 @@ class TestReferenceNode(TestCase):
     def test_load(self):
         try:
             parent = self.node
-            node = Node(self.conf, parent=parent)
+            node = ReferenceNode(self.conf, parent=parent)
             data = node.dump()
-            new_node = Node(self.conf, bytes(data))
+            new_node = ReferenceNode(self.conf, bytes(data))
             self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = ReferenceNode(self.conf, parent=parent)
+            data = node.dump()
+            new_node = ReferenceNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -796,7 +833,6 @@ class TestReferenceNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass
 
     ####
@@ -829,15 +865,23 @@ class TestRootNode(TestCase):
     def test_load(self):
         try:
             parent = self.node
-            node = Node(self.conf, parent=parent)
+            node = RootNode(self.conf, parent=parent)
             data = node.dump()
-            new_node = Node(self.conf, bytes(data))
+            new_node = RootNode(self.conf, bytes(data))
             self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = RootNode(self.conf, parent=parent)
+            data = node.dump()
+            new_node = RootNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -973,7 +1017,6 @@ class TestRootNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass
 
     ####
@@ -992,15 +1035,23 @@ class TestInternalNode(TestCase):
     def test_load(self):
         try:
             parent = self.node
-            node = Node(self.conf, parent=parent)
+            node = InternalNode(self.conf, parent=parent)
             data = node.dump()
-            new_node = Node(self.conf, bytes(data))
+            new_node = InternalNode(self.conf, bytes(data))
             self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            parent = self.node
+            node = InternalNode(self.conf, parent=parent)
+            data = node.dump()
+            new_node = InternalNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -1136,7 +1187,6 @@ class TestInternalNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass
 
 
@@ -1150,14 +1200,23 @@ class TestOverflowNode(TestCase):
     def test_load(self):
         try:
             node = self.node
-            # data = node.dump()
-            new_node = OverflowNode(self.conf)
-            self.assertEqual(node, new_node)
+            data = node.dump()
+            # TODO:
+            #  Redesign classes / refactor
+            # new_node = OverflowNode(self.conf, bytes(data))
+            # self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            node = self.node
+            data = node.dump()
+            new_node = OverflowNode(self.conf)
+            # new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -1186,7 +1245,7 @@ class TestOverflowNode(TestCase):
             with self.assertRaises(IndexError):
                 node.smallest_key
             node.insert_entry(self.small_rec)
-            # FIXME:
+            # TODO:
             #  Attribute error, smallest_key isn't compatible with OpaqueData
             #  Redesign classes / refactor
             # node.smallest_key
@@ -1209,7 +1268,7 @@ class TestOverflowNode(TestCase):
             with self.assertRaises(IndexError):
                 node.biggest_key
             node.insert_entry(self.big_rec)
-            # FIXME:
+            # TODO:
             #  Attribute error, biggest_key isn't compatible with OpaqueData
             #  Redesign classes / refactor
             # node.biggest_key
@@ -1265,7 +1324,7 @@ class TestOverflowNode(TestCase):
         try:
             node = self.node
             node.insert_entry(self.small_rec)
-            # FIXME:
+            # TODO:
             #  Attribute error, remove_entry() isn't compatible with OpaqueData
             #  Redesign classes / refactor
             # node.remove_entry(self.small_rec.key)
@@ -1276,7 +1335,7 @@ class TestOverflowNode(TestCase):
         try:
             node = self.node
             node.insert_entry(self.small_rec)
-            # FIXME:
+            # TODO:
             #  Attribute error, get_entry() isn't compatible with OpaqueData
             #  Redesign classes / refactor
             # entry = node.get_entry(self.small_rec.key)
@@ -1303,18 +1362,25 @@ class TestFreelistNode(TestCase):
 
     def test_load(self):
         try:
-            # FIXME:
+            # TODO:
             #  Attribute error, something isn't compatible with FreelistNode
             #  Redesign classes / refactor
             node = self.node
-            # data = node.dump()
-            new_node = Node(self.conf)
-            # self.assertEqual(node, new_node)
+            data = node.dump()
+            new_node = FreelistNode(self.conf)
+            self.assertEqual(node, new_node)
         except Exception as e:
             self.fail(e)
 
     def test_dump(self):
-        pass
+        try:
+            node = self.node
+            data = node.dump()
+            new_node = FreelistNode(self.conf)
+            new_node.load(bytes(data))
+            self.assertEqual(node, new_node)
+        except Exception as e:
+            self.fail(e)
 
     def test_max_payload(self):
         try:
@@ -1423,7 +1489,7 @@ class TestFreelistNode(TestCase):
             node = self.node
             node.insert_entry(self.small_rec)
             node.insert_entry(self.big_rec)
-            # FIXME:
+            # TODO:
             #  Attribute error, remove_entry() and get_entry() isn't compatible with FreelistNode
             #  Redesign classes / refactor
             # node.remove_entry(self.small_rec.key)
@@ -1436,7 +1502,7 @@ class TestFreelistNode(TestCase):
             node = self.node
             node.insert_entry(self.small_rec)
             node.insert_entry(self.big_rec)
-            # FIXME:
+            # TODO:
             #  Attribute error, remove_entry() and get_entry() isn't compatible with FreelistNode
             #  Redesign classes / refactor
             # entry = node.get_entry(self.small_rec.key)
@@ -1450,5 +1516,4 @@ class TestFreelistNode(TestCase):
         pass
 
     def test_from_page_data(self):
-        # Only applicable on non-abstract class
         pass

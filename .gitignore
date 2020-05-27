@@ -12,6 +12,7 @@
 *.ar7
 *.c
 **/__pycache__
+/cython_debug
 /build/
 /dist/
 /libangelos/

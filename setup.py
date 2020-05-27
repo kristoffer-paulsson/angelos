@@ -78,13 +78,14 @@ setup(
     packages=['libangelos', 'angelos', 'eidon', 'angelossim', 'bplustree', 'archive7'],
     package_dir={'': 'lib'},
     scripts=glob('bin/*'),
-    ext_modules=cythonize(glob(
-        'lib/libangelos/**.pyx', recursive=True) + glob(
-        'lib/libangelos/**/*.pyx', recursive=True) + glob(
-        'lib/angelos/**.pyx', recursive=True) + glob(
-        'lib/angelos/**/*.pyx', recursive=True) + glob(
-        'lib/bplustree/**.pyx', recursive=True) + glob(
-        'lib/archive7/**.pyx', recursive=True),
+    ext_modules=cythonize(
+        glob('lib/libangelos/**.pyx', recursive=True) +
+        glob('lib/libangelos/**/*.pyx', recursive=True) +
+        glob('lib/angelos/**.pyx', recursive=True) +
+        glob('lib/angelos/**/*.pyx', recursive=True) +
+        glob('lib/bplustree/**.pyx', recursive=True) +
+        glob('lib/archive7/**.pyx', recursive=True),
+        gdb_debug=True,
         build_dir="build", compiler_directives={
             'language_level': 3, 'embedsignature': True})
 )

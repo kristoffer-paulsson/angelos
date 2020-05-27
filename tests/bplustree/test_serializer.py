@@ -73,7 +73,7 @@ class TestUUIDSerializer(TestCase):
         try:
             s = UUIDSerializer()
             u = uuid4()
-            data = s.serialize(u)
+            data = s.serialize(u, 0)
             self.assertIsInstance(data, bytes)
             self.assertEqual(data, u.bytes)
         except Exception as e:
@@ -95,7 +95,7 @@ class TestDatetimeUTCSerializer(TestCase):
     def __test(self):
         s = DatetimeUTCSerializer()
         dt = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
-        data = s.serialize(dt)
+        data = s.serialize(dt, 0)
         self.assertIsInstance(data, bytes)
         self.assertEqual(s.deserialize(data), dt)
 

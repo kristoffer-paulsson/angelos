@@ -5,8 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 import abc
+import uuid
 from datetime import datetime, timezone
-from uuid import UUID
 
 try:
     import temporenc
@@ -57,11 +57,11 @@ class StrSerializer(Serializer):
 class UUIDSerializer(Serializer):
     __slots__ = []
 
-    def serialize(self, obj: UUID, key_size: int = None) -> bytes:
+    def serialize(self, obj: uuid.UUID, key_size: int) -> bytes:
         return obj.bytes
 
-    def deserialize(self, data: bytes) -> UUID:
-        return UUID(bytes=data)
+    def deserialize(self, data: bytes) -> uuid.UUID:
+        return uuid.UUID(bytes=data)
 
 
 class DatetimeUTCSerializer(Serializer):
@@ -72,7 +72,7 @@ class DatetimeUTCSerializer(Serializer):
             raise RuntimeError('Serialization to/from datetime needs the '
                                'third-party library "temporenc"')
 
-    def serialize(self, obj: datetime, key_size: int = None) -> bytes:
+    def serialize(self, obj: datetime, key_size: int) -> bytes:
         if obj.tzinfo is None:
             raise ValueError('DatetimeUTCSerializer needs a timezone aware '
                              'datetime')

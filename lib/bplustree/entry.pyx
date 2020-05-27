@@ -149,7 +149,7 @@ class Record(ComparableEntry):
         if self._data:
             return self._data
 
-        assert self._value is None or self._overflow_page is None
+        # assert self._value is None or self._overflow_page is None
         key_as_bytes = self._tree_conf.serializer.serialize(
             self._key, self._tree_conf.key_size
         )

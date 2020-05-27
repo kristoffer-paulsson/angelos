@@ -9,7 +9,7 @@ import io
 import collections
 from abc import abstractmethod, ABC
 from functools import partial
-from typing import Optional, Union, Iterator, Iterable, _T_co, Generator
+from typing import Optional, Union, Iterator, Iterable, Generator
 
 from bplustree.utils import pairwise, iter_slice
 from bplustree.const import TreeConf, ENDIAN, OTHERS_BYTES
@@ -460,69 +460,6 @@ class BPlusTree:
 
         return self._read_from_overflow(record.overflow_page)
 
-    def _multi_value_update(
-            self, first_overflow_page: int, size: int, additions: set = set(),
-            deletions: set = set()
-    ) -> int:
-        """Iterate over items in overflow and add/delete.
-
-        Args:
-            first_overflow_page (int):
-                Overflow to read from
-            size (int):
-                Item size.
-            additions (set):
-                Items to be added.
-            deletions (set):
-                Items to be deleted.
-
-        Returns (int):
-            The new overflow page.
-
-        """
-        data_read = bytearray()
-        data_write = bytearray()
-        begin_overflow_page = self._mem.next_available_page
-        next_overflow_page = begin_overflow_page
-
-        for item in additions:
-            data_read.extend(bytes(item))
-
-        for old_overflow_node in self._traverse_overflow(first_overflow_page):
-            data_read.extend(old_overflow_node.smallest_entry.data)
-
-            for index in range(len(data_read) // size):
-                offset = index * size
-                item = data_read[offset:offset + self.__size]
-                if item not in deletions:
-                    data_write.extend(item)
-
-                data_read = data_read[-(len(data_read) % size):]
-
-            if len(data_write) >= self.OverflowNode().max_payload:
-                offset = len(data_write) % size
-                value = data_write[:offset]
-                data_write = data_write[-offset:]
-
-                iterator = iter_slice(value, self.OverflowNode().max_payload)
-                for slice_value, is_last in iterator:
-                    current_overflow_page = next_overflow_page
-
-                    if is_last:
-                        next_overflow_page = None
-                    else:
-                        next_overflow_page = self._mem.next_available_page
-
-                    new_overflow_node = self.OverflowNode(
-                        page=current_overflow_page, next_page=next_overflow_page
-                    )
-                    new_overflow_node.insert_entry_at_the_end(OpaqueData(data=slice_value))
-                    self._mem.set_node(new_overflow_node)
-
-            self._mem.del_node(old_overflow_node)
-
-        return begin_overflow_page
-
 
 class BaseTree(ABC):
     """Base of a BPlusTree."""
@@ -531,10 +468,10 @@ class BaseTree(ABC):
                  '_is_open', 'LonelyRootNode', 'RootNode', 'InternalNode',
                  'LeafNode', 'OverflowNode', 'Record', 'Reference']
 
-    def __init__(self, file_db: io.FileIO, file_journal: io.FileIO, page_size: int = 4096, order: int = 100,
+    def __init__(self, file_db: io.FileIO, file_journal: io.FileIO, page_size: int = 4096,
                  key_size: int = 8, value_size: int = 32, cache_size: int = 64,
                  serializer: Optional[Serializer] = None):
-        self._tree_conf = self._conf(page_size, order, key_size, value_size, serializer)
+        self._tree_conf = self._conf(page_size, key_size, value_size, serializer)
         self._create_partials()
         self._mem = FileMemory(file_db, file_journal, self._tree_conf, cache_size=cache_size)
         try:
@@ -545,11 +482,12 @@ class BaseTree(ABC):
             self._root_node_page, self._tree_conf = metadata
         self._is_open = True
 
-    def _conf(self, page_size, order, key_size, value_size, serializer):
-        return TreeConf(
-            page_size, order, key_size, value_size, None,
-            serializer or IntSerializer()
-        )
+    @abstractmethod
+    def _conf(
+        self, page_size: int, key_size: int, value_size: int,
+        serializer: Optional[Serializer] = None
+    ) -> TreeConf:
+        pass
 
     def close(self):
         with self._mem.write_transaction:
@@ -824,9 +762,12 @@ class SingleItemTree(BaseTree):
     """
     __slots__ = []
 
-    def _conf(self, page_size, order, key_size, value_size, serializer):
+    def _conf(
+        self, page_size: int, key_size: int, value_size: int,
+        serializer: Optional[Serializer] = None
+    ) -> TreeConf:
         return TreeConf(
-            page_size, order, key_size, value_size, value_size,
+            page_size, page_size // (value_size+24), key_size, value_size, value_size,
             serializer or IntSerializer()
         )
 
@@ -945,7 +886,7 @@ class SingleItemTree(BaseTree):
         return record.value
 
 
-class MultiItemIterator(Iterator):
+class MultiItemIterator(collections.abc.Iterator):
     """Iterator that iterates over a multi item generator."""
     def __init__(self, generator: Generator, count: int):
         self.__count = count
@@ -968,9 +909,12 @@ class MultiItemTree(BaseTree):
     """
     __slots__ = []
 
-    def _conf(self, page_size, order, key_size, value_size, serializer):
+    def _conf(
+        self, page_size: int, key_size: int, value_size: int,
+        serializer: Optional[Serializer] = None
+    ) -> TreeConf:
         return TreeConf(
-            page_size, order, key_size, OTHERS_BYTES, value_size,
+            page_size, page_size // (OTHERS_BYTES + 24), key_size, OTHERS_BYTES, value_size,
             serializer or IntSerializer()
         )
 
@@ -1025,7 +969,7 @@ class MultiItemTree(BaseTree):
             else:
                 record.overflow_page, record.value = self._update_overflow(
                     record.overflow_page,
-                    record.value,
+                    int.from_bytes(record.value, ENDIAN),
                     insertions,
                     deletions
                 )
@@ -1118,7 +1062,8 @@ class MultiItemTree(BaseTree):
         for overflow_node in self._traverse_overflow(first_overflow_page):
             chunk = overflow_node.smallest_entry.data[0:batch*size]
             for item_idx in range(min(batch, rest)):
-                rv.append(chunk[item_idx*size:item_idx*size+size])
+                item = chunk[item_idx*size:item_idx*size+size]
+                rv.append(item)
             rest -= batch
 
         if len(rv) != count:
@@ -1128,27 +1073,25 @@ class MultiItemTree(BaseTree):
 
     def _iterate_from_overflow(self, first_overflow_page: int, count: int, insertions: list = list()):
         """Collect all values of an overflow chain."""
-        for item in insertions:
-            yield item
-
         size = self._tree_conf.item_size
         serializer = self._tree_conf.serializer
 
-        batch = self.OverflowNode().max_payload // size
-        batch_cnt = count // batch
-        batch_cnt += 1 if bool(count % batch) else 0
+        for item in insertions:
+            if type(item) is bytes:
+                yield item
+            else:
+                yield serializer.serialize(item, size)
 
-        rv = list()
-        rest = count
         for overflow_node in self._traverse_overflow(first_overflow_page):
-            chunk = overflow_node.smallest_entry.data[0:batch*size]
-            for item_idx in range(min(batch, rest)):
-                yield chunk[item_idx*size:item_idx*size+size]
-            rest -= batch
+            data = overflow_node.smallest_entry.data
+            length = len(data)
+            for item_offset in range(0, length, size):
+                yield data[item_offset:item_offset+size]
+                count -= 1
             self._mem.del_node(overflow_node)
 
-        if rest != 0:
-            raise ValueError("Failed reading all values")
+        if count != 0:
+            raise ValueError("Failed reading all values, %s values left" % count)
 
     def _add_overflow(self, next_overflow_page: int, chunk: list, is_last: bool = False) -> int:
         size = self._tree_conf.item_size
@@ -1158,7 +1101,7 @@ class MultiItemTree(BaseTree):
 
         data = b""
         for item in chunk:
-            if item is bytes:
+            if type(item) is bytes:
                 data += item
             else:
                 data += serializer.serialize(item, size)
@@ -1232,10 +1175,10 @@ class MultiItemTree(BaseTree):
         for overflow_node in self._traverse_overflow(first_overflow_page):
             self._mem.del_node(overflow_node)
 
-    def _get_value_from_record(self, record: Record) -> bytes:
-        return self._read_from_overflow(record.overflow_page, record.value)
+    def _get_value_from_record(self, record: Record) -> list:
+        return self._read_from_overflow(record.overflow_page, int.from_bytes(record.value, ENDIAN))
 
-    def traverse(self, key) -> list:
+    def traverse(self, key) -> MultiItemIterator:
         """Like get but returns an iterator."""
         with self._mem.read_transaction:
             node = self._search_in_tree(key, self._root_node)
@@ -1250,7 +1193,7 @@ class MultiItemTree(BaseTree):
 
     def _iterate_overflow(self, first_overflow_page: int, count: int):
         """Collect all values of an overflow chain."""
-        size = self._tree_conf.item_size
+        """size = self._tree_conf.item_size
         serializer = self._tree_conf.serializer
 
         batch = self.OverflowNode().max_payload // size
@@ -1266,4 +1209,16 @@ class MultiItemTree(BaseTree):
             rest -= batch
 
         if rest != 0:
-            raise ValueError("Failed reading all values")
+            raise ValueError("Failed reading all values")"""
+        size = self._tree_conf.item_size
+        serializer = self._tree_conf.serializer
+
+        for overflow_node in self._traverse_overflow(first_overflow_page):
+            data = overflow_node.smallest_entry.data
+            length = len(data)
+            for item_offset in range(0, length, size):
+                yield serializer.deserialize(data[item_offset:item_offset+size])
+                count -= 1
+
+        if count != 0:
+            raise ValueError("Failed reading all values, %s values left" % count)
