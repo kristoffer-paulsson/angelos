@@ -283,6 +283,16 @@ class TestMultiItemTree(TestCase):
         # Skip protected method
         pass
 
+    def test_error(self):
+        try:
+            key = uuid.uuid4()
+            self.tree.insert(key, [])
+            self.tree.checkpoint()
+
+            self.tree.get(key)
+        except Exception as e:
+            self.fail(e)
+
     def test_insert(self):
         try:
             keys = list(self.data.keys())

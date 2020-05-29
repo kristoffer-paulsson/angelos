@@ -939,7 +939,8 @@ class MultiItemTree(BaseTree):
             except ValueError:
                 length = len(value)
                 value = tuple(value)
-                first_overflow_page = self._create_overflow(value)
+                first_overflow_page = self._create_overflow(value) if value else None
+
                 record = self.Record(
                     key,
                     value=length.to_bytes(OTHERS_BYTES, byteorder=ENDIAN),
@@ -967,12 +968,20 @@ class MultiItemTree(BaseTree):
             except ValueError:
                 raise ValueError("Record to update doesn't exist")
             else:
-                record.overflow_page, record.value = self._update_overflow(
-                    record.overflow_page,
-                    int.from_bytes(record.value, ENDIAN),
-                    insertions,
-                    deletions
-                )
+                length = int.from_bytes(record.value, ENDIAN)
+                if length:
+                    record.overflow_page, record.value = self._update_overflow(
+                        record.overflow_page,
+                        int.from_bytes(record.value, ENDIAN),
+                        insertions,
+                        deletions
+                    )
+                else:
+                    length = len(insertions)
+                    # insertions = tuple(insertions)
+                    record.value = length.to_bytes(OTHERS_BYTES, byteorder=ENDIAN)
+                    record.overflow_page = self._create_overflow(tuple(insertions))
+
                 self._mem.set_node(node)
 
     def batch_insert(self, iterable: Iterable):
@@ -986,9 +995,13 @@ class MultiItemTree(BaseTree):
             except ValueError:
                 return default
             else:
-                rv = self._get_value_from_record(record)
-                assert isinstance(rv, list)
-                return rv
+                length = int.from_bytes(record.value, ENDIAN)
+                if length:
+                    rv = self._get_value_from_record(record)
+                    assert isinstance(rv, list)
+                    return rv
+                else:
+                    return list()
 
     def delete(self, key, default=None) -> bytes:
         with self._mem.read_transaction:
@@ -998,8 +1011,25 @@ class MultiItemTree(BaseTree):
             except ValueError:
                 pass
             else:
+                length = int.from_bytes(record.value, ENDIAN)
+                if length:
+                    self._delete_overflow(record.overflow_page)
                 node.remove_entry(key)
                 self._mem.set_node(node)
+
+    def clear(self, key):
+        with self._mem.read_transaction:
+            node = self._search_in_tree(key, self._root_node)
+            try:
+                record = node.get_entry(key)
+            except ValueError:
+                pass
+            else:
+                length = int.from_bytes(record.value, ENDIAN)
+                if length:
+                    self._delete_overflow(record.overflow_page)
+                    record.overflow_page = None
+                    self._mem.set_node(node)
 
     def _create_overflow(self, value: tuple) -> int:
         size = self._tree_conf.item_size
@@ -1019,7 +1049,7 @@ class MultiItemTree(BaseTree):
             chunk = value[batch_idx*batch:batch_idx*batch+batch]
             data_write = b""
             for item in chunk:
-                if item is bytes:
+                if isinstance(item, bytes):
                     data_write += item
                 else:
                     data_write += serializer.serialize(item, size)
@@ -1060,6 +1090,7 @@ class MultiItemTree(BaseTree):
         rv = list()
         rest = count
         for overflow_node in self._traverse_overflow(first_overflow_page):
+
             chunk = overflow_node.smallest_entry.data[0:batch*size]
             for item_idx in range(min(batch, rest)):
                 item = chunk[item_idx*size:item_idx*size+size]
@@ -1077,7 +1108,7 @@ class MultiItemTree(BaseTree):
         serializer = self._tree_conf.serializer
 
         for item in insertions:
-            if type(item) is bytes:
+            if isinstance(item, bytes):
                 yield item
             else:
                 yield serializer.serialize(item, size)
@@ -1101,7 +1132,7 @@ class MultiItemTree(BaseTree):
 
         data = b""
         for item in chunk:
-            if type(item) is bytes:
+            if isinstance(item, bytes):
                 data += item
             else:
                 data += serializer.serialize(item, size)

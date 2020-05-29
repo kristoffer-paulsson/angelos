@@ -5,9 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive implementation."""
-import copy
 import datetime
-import enum
 import functools
 import hashlib
 import os
@@ -15,15 +13,16 @@ import re
 import struct
 import time
 import uuid
+from pathlib import PurePath
 from typing import Union
 
-from archive7.fs import FileSystemStreamManager
 from libangelos.error import ArchiveInvalidFile
+from libangelos.error import Error
 from libangelos.misc import SharedResource
 from libangelos.utils import Util
 
-from error import Error
-from fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
+from archive7.fs import FileSystemStreamManager
+from archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
 
 
 class Header:
@@ -33,19 +32,21 @@ class Header:
 
     FORMAT = "!8scHHbbb16s16s16s16sQ256s"
 
-    def __init__(self, owner: uuid.UUID, identity: uuid.UUID = None, node: uuid.UUID = None, domain: uuid.UUID = None,
-                 title: Union[bytes, bytearray] = None, type: int = None, role: int = None, use: int = None,
-                 major: int = 2, minor: int = 0):
+    def __init__(
+            self, owner: uuid.UUID, identity: uuid.UUID = None, node: uuid.UUID = None, domain: uuid.UUID = None,
+            title: Union[bytes, bytearray] = None, type_: int = None, role: int = None, use: int = None,
+            major: int = 2, minor: int = 0, created: datetime.datetime = None
+    ):
         self.major = major,
         self.minor = minor,
-        self.type = type,
+        self.type = type_,
         self.role = role,
         self.use = use,
         self.id = identity,
         self.owner = owner,
         self.domain = domain,
         self.node = node,
-        self.created = datetime.datetime.now(),
+        self.created = created if created else datetime.datetime.now(),
         self.title = title,
 
     def __bytes__(self):
@@ -55,9 +56,9 @@ class Header:
             b"a",
             2,
             0,
-            self.type if not isinstance(self.type, type(None)) else 0,
-            self.role if not isinstance(self.role, type(None)) else 0,
-            self.use if not isinstance(self.use, type(None)) else 0,
+            self.type if not self.type else 0,
+            self.role if not self.role else 0,
+            self.use if not self.use else 0,
             self.id.bytes if isinstance(self.id, uuid.UUID) else uuid.uuid4().bytes,
             self.owner.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
             self.domain.bytes if isinstance(self.domain, uuid.UUID) else b"\x00" * 16,
@@ -67,18 +68,18 @@ class Header:
                 if isinstance(self.created, datetime.datetime)
                 else time.mktime(datetime.datetime.now().timetuple())
             ),
-            self.title[:256] if isinstance(self.title, (bytes, bytearray)) else b"\x00" * 256,
+            self.title[:256] if isinstance(self.title, (bytes, bytearray)) else b"\x00" * 256
         )
 
     @staticmethod
-    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+    def meta_unpack(data: Union[bytes, bytearray]) -> "Header":
         metadata = struct.unpack(Header.FORMAT, data)
 
         if metadata[0] != b"archive7" or metadata[1] != b"a":
             raise RuntimeError("Invalid format")
 
         return Header(
-            type=metadata[4],
+            type_=metadata[4],
             role=metadata[5],
             use=metadata[6],
             identity=uuid.UUID(bytes=metadata[7]),
@@ -110,7 +111,7 @@ class Archive7(SharedResource):
 
     @staticmethod
     def setup(filename: str, secret: bytes, owner: uuid.UUID = None, node: uuid.UUID = None, title: str = None,
-              domain: uuid.UUID = None, type: int = None, role: int = None, use: int = None):
+              domain: uuid.UUID = None, type_: int = None, role: int = None, use: int = None):
         """Create a new archive.
 
         Args:
@@ -126,7 +127,7 @@ class Archive7(SharedResource):
                 Title or name of the archive
             domain (uuid.UUID):
                 Angelos domain UUID
-            type (int):
+            type_ (int):
                 Facade type
             role (int):
                 Node role
@@ -138,12 +139,13 @@ class Archive7(SharedResource):
 
         """
         header = Header(
-            owner=owner, node=node, title=title.encode(),
-            domain=domain, type=type, role=role, use=use
+            owner=owner, node=node, title=title.encode() if title else title,
+            domain=domain, type_=type_, role=role, use=use
         )
 
         archive = Archive7(filename, secret)
-        archive.meta = bytes(header)
+        archive._Archive7__manager.meta = bytes(header)
+        archive._Archive7__manager.save_meta()
         return archive
 
     @staticmethod
@@ -180,7 +182,8 @@ class Archive7(SharedResource):
 
     def stats(self):
         """Archive stats."""
-        return Header.meta_unpack(self.__manager.meta)
+        size = struct.calcsize(Header.FORMAT)
+        return Header.meta_unpack(self.__manager.meta[:size])
 
     async def info(self, *args, **kwargs):
         return await self._run(functools.partial(self.__info, *args, **kwargs))
@@ -435,28 +438,9 @@ class Archive7(SharedResource):
             name        The full path and name of new directory
             returns     the entry ID
         """
-        paths = self.ioc.hierarchy.paths
-
-        if dirname in paths.keys():
-            return paths[dirname]
-
-        subpath = []
-        while len(dirname) and dirname not in paths.keys():
-            dirname, name = os.path.split(dirname)
-            subpath.append(name)
-
-        subpath.reverse()
-        pid = paths[dirname]
-        entries = self.ioc.entries
-
-        for newdir in subpath:
-            entry = EntryRecord.dir(
-                name=name, parent=pid, user=user, group=group, perms=perms
-            )
-            entries.add(entry)
-            pid = entry.id
-
-        return entry.id
+        dirname, name = os.path.split(dirname)
+        parent = self.__manager.resolve_path(PurePath(dirname))
+        return self.__manager.create_entry(TYPE_DIR, name, parent, user=user, group=group, perms=perms)
 
     async def mkfile(self, *args, **kwargs):
         return await self._run(functools.partial(self.__mkfile, *args, **kwargs))
@@ -950,6 +934,6 @@ class Archive7(SharedResource):
 
             return query
 
-    def __del__(self):
-        """Destructor."""
-        self.close()
+    # def __del__(self):
+    #    """Destructor."""
+    #    self.close()

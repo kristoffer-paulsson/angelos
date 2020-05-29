@@ -12,9 +12,9 @@ import struct
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections import Iterator
+from collections.abc import Iterator
 from pathlib import PurePath
-from typing import Union, _T_co
+from typing import Union
 
 from archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject, DATA_SIZE
 from bplustree.serializer import UUIDSerializer
@@ -31,7 +31,7 @@ class EntryRecord:
 
     __slots__ = ["type", "id", "parent", "owner", "stream", "created", "modified", "size", "length", "compression",
                  "deleted", "name", "user", "group", "perms"]
-    FORMAT = "!c16s16s16s16qqQQQ?256s32s16sH"
+    FORMAT = "!c16s16s16s16sqqQQQ?256s32s16sH"
 
     COMP_NONE = 0
     COMP_ZIP = 1
@@ -114,7 +114,7 @@ class EntryRecord:
             modified: datetime.datetime = None, user: str = None, group: str = None, perms: int = None):
         kwargs = {
             "type": TYPE_DIR,
-            "id": uuid.uuid4(),
+            "identity": uuid.uuid4(),
             "created": datetime.datetime.now(),
             "modified": datetime.datetime.now(),
             "name": name.encode("utf-8")[:256],
@@ -144,7 +144,7 @@ class EntryRecord:
 
         kwargs = {
             "type": TYPE_LINK,
-            "id": uuid.uuid4(),
+            "identity": uuid.uuid4(),
             "owner": link,
             "created": datetime.datetime.now(),
             "modified": datetime.datetime.now(),
@@ -174,7 +174,7 @@ class EntryRecord:
 
         kwargs = {
             "type": TYPE_FILE,
-            "id": uuid.uuid4(),
+            "identity": uuid.uuid4(),
             "stream": stream,
             "created": datetime.datetime.now(),
             "modified": datetime.datetime.now(),
@@ -234,7 +234,7 @@ class EntryRegistry(Registry):
 class PathRecord:
     """Record for parent id and entry name."""
 
-    __slots__ = ["id", "key"]
+    __slots__ = ["id", "type"]
 
     FORMAT = "!c16s"
 
@@ -425,11 +425,11 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
     STREAM_LISTINGS_WAL = 8
 
     def __init__(self, filename: str, secret: bytes):
-        DynamicMultiStreamManager.__init__(self, filename, secret)
         self.__descriptors = dict()
         self.__entries = None
         self.__paths = None
         self.__listings = None
+        DynamicMultiStreamManager.__init__(self, filename, secret)
 
     def __start(self):
         self.__entries = EntryRegistry(self)
@@ -439,10 +439,10 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
     def __install(self):
         entry = EntryRecord.dir(name="root", parent=uuid.UUID(int=0))
         entry.id = uuid.UUID(int=0)
-        path = PathRecord.path(identity=entry.id, parent=entry.parent, name=entry.name)
+        path = PathRecord.path(entry.type, entry.id)
 
         self.__entries.tree.insert(key=entry.id, value=bytes(entry))
-        self.__paths.tree.insert(key=path.key, value=bytes(path))
+        self.__paths.tree.insert(key=uuid.uuid5(entry.parent, entry.name.decode()), value=bytes(path))
         self.__listings.tree.insert(key=entry.id, value=set())
 
     def _setup(self):
@@ -466,8 +466,8 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         return uuid.uuid5(entry.parent, entry.name)
 
     def __follow_link(self, identity: uuid.UUID) -> EntryRecord:
-        link = EntryRecord.meta_unpack(self.__entries.tree.search(identity))
-        return EntryRecord.meta_unpack(self.__entries.tree.search(link.owner))
+        link = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        return EntryRecord.meta_unpack(self.__entries.tree.get(link.owner))
 
     def resolve_path(self, filename: PurePath, follow_link: bool = False) -> uuid.UUID:
         """Resolve a path by walking it.
@@ -489,7 +489,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         try:
             for part in filename.parts[1:]:
                 key = uuid.uuid5(parent, part)
-                path = PathRecord.meta_unpack(self.__paths.tree.search(key))
+                path = PathRecord.meta_unpack(self.__paths.tree.get(key))
                 if follow_link and path.type == TYPE_LINK:
                     entry = self.__follow_link(path.id)
                     parent = entry.parent
@@ -500,11 +500,11 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         else:
             return parent
 
-    def create_entry(self, type: bytes, name: str, parent: uuid.UUID = uuid.UUID(int=0), **kwargs) -> uuid.UUID:
+    def create_entry(self, type_: bytes, name: str, parent: uuid.UUID = uuid.UUID(int=0), **kwargs) -> uuid.UUID:
         """Create a new entry: file, directory or link.
 
         Args:
-            type (bytes):
+            type_ (bytes):
                 Type of entry.
             name (str):
                 Entry name
@@ -522,12 +522,12 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         if self.__paths.tree.get(path_key) is not None:
             raise KeyError("Key already exists in paths")
 
-        if type == TYPE_DIR:
+        if type_ == TYPE_DIR:
             entry = EntryRecord.dir(name=name, parent=parent, **kwargs)
-            self.__listings.tree.update(key=entry.parent, value=set([entry.id.bytes]))
-        elif type == TYPE_FILE:
+            self.__listings.tree.update(key=entry.parent, insertions=[entry.id.bytes])
+        elif type_ == TYPE_FILE:
             entry = EntryRecord.file(name=name, parent=parent, **kwargs)
-        elif type == TYPE_LINK:
+        elif type_ == TYPE_LINK:
             target = self.__entries.tree.get(kwargs.get("owner"))
 
             if target is None:

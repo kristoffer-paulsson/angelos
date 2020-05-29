@@ -271,12 +271,16 @@ class FileMemory:
         value_size = int.from_bytes(
             data[end_key_size:end_value_size], ENDIAN
         )
-        end_freelist_start_page = end_value_size + PAGE_REFERENCE_BYTES
+        end_item_size = end_value_size + OTHERS_BYTES
+        item_size = int.from_bytes(
+            data[end_value_size:end_item_size], ENDIAN
+        )
+        end_freelist_start_page = end_item_size + PAGE_REFERENCE_BYTES
         self._freelist_start_page = int.from_bytes(
-            data[end_value_size:end_freelist_start_page], ENDIAN
+            data[end_item_size:end_freelist_start_page], ENDIAN
         )
         self._tree_conf = TreeConf(
-            page_size, order, key_size, value_size, self._tree_conf.serializer
+            page_size, order, key_size, value_size, item_size, self._tree_conf.serializer
         )
         self._root_node_page = root_node_page
         return root_node_page, self._tree_conf
@@ -290,13 +294,14 @@ class FileMemory:
         if tree_conf is None:
             tree_conf = self._tree_conf
 
-        length = 2 * PAGE_REFERENCE_BYTES + 4 * OTHERS_BYTES
+        length = 2 * PAGE_REFERENCE_BYTES + 5 * OTHERS_BYTES
         data = (
                 root_node_page.to_bytes(PAGE_REFERENCE_BYTES, ENDIAN) +
                 tree_conf.page_size.to_bytes(OTHERS_BYTES, ENDIAN) +
                 tree_conf.order.to_bytes(OTHERS_BYTES, ENDIAN) +
                 tree_conf.key_size.to_bytes(OTHERS_BYTES, ENDIAN) +
                 tree_conf.value_size.to_bytes(OTHERS_BYTES, ENDIAN) +
+                tree_conf.item_size.to_bytes(OTHERS_BYTES, ENDIAN) +
                 self._freelist_start_page.to_bytes(PAGE_REFERENCE_BYTES, ENDIAN) +
                 bytes(tree_conf.page_size - length)
         )

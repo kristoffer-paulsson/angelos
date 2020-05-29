@@ -403,8 +403,8 @@ class TrashStream(InternalStream):
         self._end = block.position
         self._count += 1
 
-        self._manager.save_block(last_blk)
-        self._manager.save_block(block)
+        self._manager.save_block(last_blk.position, last_blk)
+        self._manager.save_block(block.position, block)
         self._manager.save_meta()
 
     def pop_block(self) -> StreamBlock:
@@ -432,7 +432,7 @@ class TrashStream(InternalStream):
         self._end = prev_blk.position
         self._count -= 1
 
-        self._manager.save_block(prev_blk)
+        self._manager.save_block(prev_blk.position, prev_blk)
         self._manager.save_meta()
 
         return last_blk
@@ -552,7 +552,7 @@ class VirtualFileObject(BaseFileObject):
 class Registry(ABC):
     """B+Tree registry and wal wrapper"""
 
-    __slots__ = ["__tree", "__cnt", "__manager"]
+    __slots__ = ["_tree", "__cnt", "_manager"]
 
     def __init__(self, manager: "DynamicMultiStreamManager"):
         self.__cnt = 0
@@ -662,8 +662,6 @@ class StreamRegistry(Registry):
         return self._tree.get(identity)
 
 
-
-
 class StreamManager(ABC):
     """Stream manager handles streams with their blocks and provides transparent encryption.
 
@@ -687,7 +685,7 @@ class StreamManager(ABC):
         self.__secret = secret
         self.__box = libnacl.secret.SecretBox(secret)
         self.__count = 0
-        self.__meta = bytearray(b"\x00" * (DATA_SIZE - (self.SPECIAL_STREAM_COUNT * DataStream.SIZE)))
+        self.__meta = None
         self.__blocks = [None for _ in range(max(self.SPECIAL_BLOCK_COUNT, 1))]
         self.__internal = [None for _ in range(self.SPECIAL_STREAM_COUNT)]
         self._streams = dict()
@@ -704,11 +702,15 @@ class StreamManager(ABC):
 
             for i in range(max(self.SPECIAL_BLOCK_COUNT, 1)):
                 self.__blocks[i] = self.load_block(i)
+            self.__meta = memoryview(self.__blocks[self.BLOCK_META].data)
 
             streams_data = self.__load_meta()
             for i in range(self.SPECIAL_STREAM_COUNT):
                 metadata = DataStream.meta_unpack(streams_data[i])
-                stream = InternalStream(self, self.load_block(metadata[1]), *metadata)
+                if i:
+                    stream = InternalStream(self, self.load_block(metadata[1]), *metadata)
+                else:
+                    stream = TrashStream(self, self.load_block(metadata[1]), *metadata)
                 if stream.identity.int != i:
                     raise RuntimeError("Corrupt internal stream identifier, %s." % stream.identity)
                 self.__internal[i] = stream
@@ -722,19 +724,26 @@ class StreamManager(ABC):
 
             for i in range(max(self.SPECIAL_BLOCK_COUNT, 1)):
                 self.__blocks[i] = self.new_block()
+            self.__meta = memoryview(self.__blocks[self.BLOCK_META].data)
 
             for i in range(self.SPECIAL_STREAM_COUNT):
                 identity = uuid.UUID(int=i)
                 block = self.new_block()
                 block.index = 0
                 block.stream = identity
-                stream = InternalStream(self, block, identity, begin=block.position, end=block.position, count=1)
+                if i:
+                    stream = InternalStream(self, block, identity, begin=block.position, end=block.position, count=1)
+                else:
+                    stream = TrashStream(self, block, identity, begin=block.position, end=block.position, count=1)
                 self.__internal[i] = stream
                 self._streams[identity] = stream
 
             self.__save_meta()
             self._setup()
             self.__created = True
+
+    def _internal_stream(self, idx: int):
+        return InternalStream
 
     @property
     def closed(self):
@@ -760,28 +769,19 @@ class StreamManager(ABC):
             self.__closed = True
 
     def __load_meta(self):
-        block = self.special_block(self.BLOCK_META)
-        stream_size = DataStream.SIZE * self.SPECIAL_STREAM_COUNT
-        self.__meta = block.data[0:DATA_SIZE - stream_size]
-        data = block.data[DATA_SIZE - stream_size:DATA_SIZE]
         stream_data = list()
-
-        for i in range(self.SPECIAL_STREAM_COUNT):
-            chunk = data[i * DataStream.SIZE:i * DataStream.SIZE + DataStream.SIZE]
-            stream_data.append(chunk)
-
+        offset = DATA_SIZE - DataStream.SIZE * self.SPECIAL_STREAM_COUNT
+        for i in range(offset, DATA_SIZE, DataStream.SIZE):
+            stream_data.append(self.__meta[i:i+DataStream.SIZE])
         return stream_data
 
     def __save_meta(self):
-        data = b""
-        block = self.special_block(self.BLOCK_META)
-        stream_size = DataStream.SIZE * self.SPECIAL_STREAM_COUNT
-
+        offset = DATA_SIZE - DataStream.SIZE * self.SPECIAL_STREAM_COUNT
         for i in range(self.SPECIAL_STREAM_COUNT):
-            data += bytes(self.special_stream(i))
+            pos = i * DataStream.SIZE
+            self.__meta[offset+pos:offset+pos+DataStream.SIZE] = bytes(self.special_stream(i))
 
-        block.data[DATA_SIZE - stream_size:DATA_SIZE] = data[0:stream_size]
-        block.data[0:DATA_SIZE - stream_size] = self.__meta[0:DATA_SIZE - stream_size]
+        block = self.special_block(self.BLOCK_META)
         self.save_block(block.index, block)
 
     def save_meta(self):
@@ -790,11 +790,11 @@ class StreamManager(ABC):
 
     @property
     def meta(self) -> bytes:
-        return self.__meta
+        return self.__meta.tobytes()
 
     @meta.setter
     def meta(self, meta: bytes):
-        self.__meta = meta
+        self.__meta[0:len(meta)] = meta[:]
 
     def special_block(self, position: int):
         """Receive one of the 8 reserved special blocks."""
