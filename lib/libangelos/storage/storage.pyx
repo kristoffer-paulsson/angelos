@@ -9,7 +9,7 @@ import atexit
 import os
 import uuid
 
-from libangelos.archive7 import Archive7
+from archive7 import Archive7
 from libangelos.facade.base import BaseFacade, FacadeExtension
 
 

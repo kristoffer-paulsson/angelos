@@ -472,6 +472,10 @@ class BaseTree(ABC):
                  key_size: int = 8, value_size: int = 32, cache_size: int = 64,
                  serializer: Optional[Serializer] = None):
         self._tree_conf = self._conf(page_size, key_size, value_size, serializer)
+
+        if self._tree_conf.order < 4:
+            raise RuntimeError("The order must be at least 4, try increase page size.")
+
         self._create_partials()
         self._mem = FileMemory(file_db, file_journal, self._tree_conf, cache_size=cache_size)
         try:
@@ -493,7 +497,6 @@ class BaseTree(ABC):
         with self._mem.write_transaction:
             if not self._is_open:
                 raise OSError("Tree is already closed")
-                return
 
             self._mem.close()
             self._is_open = False
@@ -611,7 +614,6 @@ class BaseTree(ABC):
 
     def __repr__(self):
         return '<BPlusTree: {} {}>'.format(self.__filename, self._tree_conf)
-
 
     def _initialize_empty_tree(self):
         self._root_node_page = self._mem.next_available_page
@@ -740,6 +742,8 @@ class BaseTree(ABC):
             parent.insert_entry(ref)
             self._split_parent(parent)
 
+        assert len(old_node.entries) > 0 and len(new_node.entries) > 0
+
         self._mem.set_node(old_node)
         self._mem.set_node(new_node)
 
@@ -815,7 +819,7 @@ class SingleItemTree(BaseTree):
             try:
                 record = node.get_entry(key)
             except ValueError:
-                raise ValueError("Record to update doesn't exist")
+                raise ValueError("Key doesn't exist")
             else:
                 record.value = value
                 record.overflow_page = None
@@ -865,13 +869,13 @@ class SingleItemTree(BaseTree):
             try:
                 record = node.get_entry(key)
             except ValueError:
-                return default
+                return None
             else:
                 rv = self._get_value_from_record(record)
                 assert isinstance(rv, bytes)
                 return rv
 
-    def delete(self, key, default=None) -> bytes:
+    def delete(self, key, default=None):
         with self._mem.read_transaction:
             node = self._search_in_tree(key, self._root_node)
             try:
@@ -978,7 +982,6 @@ class MultiItemTree(BaseTree):
                     )
                 else:
                     length = len(insertions)
-                    # insertions = tuple(insertions)
                     record.value = length.to_bytes(OTHERS_BYTES, byteorder=ENDIAN)
                     record.overflow_page = self._create_overflow(tuple(insertions))
 
@@ -993,7 +996,7 @@ class MultiItemTree(BaseTree):
             try:
                 record = node.get_entry(key)
             except ValueError:
-                return default
+                return None
             else:
                 length = int.from_bytes(record.value, ENDIAN)
                 if length:
@@ -1003,7 +1006,7 @@ class MultiItemTree(BaseTree):
                 else:
                     return list()
 
-    def delete(self, key, default=None) -> bytes:
+    def delete(self, key, default=None):
         with self._mem.read_transaction:
             node = self._search_in_tree(key, self._root_node)
             try:
@@ -1224,23 +1227,6 @@ class MultiItemTree(BaseTree):
 
     def _iterate_overflow(self, first_overflow_page: int, count: int):
         """Collect all values of an overflow chain."""
-        """size = self._tree_conf.item_size
-        serializer = self._tree_conf.serializer
-
-        batch = self.OverflowNode().max_payload // size
-        batch_cnt = count // batch
-        batch_cnt += 1 if bool(count % batch) else 0
-
-        rv = list()
-        rest = count
-        for overflow_node in self._traverse_overflow(first_overflow_page):
-            chunk = overflow_node.smallest_entry.data[0:batch*size]
-            for item_idx in range(min(batch, rest)):
-                yield chunk[item_idx*size:item_idx*size+size]
-            rest -= batch
-
-        if rest != 0:
-            raise ValueError("Failed reading all values")"""
         size = self._tree_conf.item_size
         serializer = self._tree_conf.serializer
 

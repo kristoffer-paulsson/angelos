@@ -375,7 +375,7 @@ class WAL:
     def checkpoint(self):
         """Transfer the modified data back to the tree and close the WAL."""
         if self._not_committed_pages:
-            logger.warning("Closing WAL with uncommitted data, discarding it")
+            logger.warning("Closing WAL with uncommitted data, discarding it: %s" % self._fd.name)
 
         for page, page_start in self._committed_pages.items():
             page_data = read_from_file(

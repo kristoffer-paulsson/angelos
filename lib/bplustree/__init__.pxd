@@ -5,10 +5,10 @@
 # This file is distributed under the terms of the MIT license.
 #
 
-from bplustree.tree import BPlusTree
-from bplustree.serializer import (
-    IntSerializer, StrSerializer, UUIDSerializer, DatetimeUTCSerializer
-)
-from .const import VERSION
+# from bplustree.tree import BPlusTree
+# from bplustree.serializer import (
+#    IntSerializer, StrSerializer, UUIDSerializer, DatetimeUTCSerializer
+#)
+# from .const import VERSION
 
-__version__ = VERSION
+#__version__ = VERSION

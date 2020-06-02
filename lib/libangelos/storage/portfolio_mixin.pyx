@@ -11,7 +11,7 @@ import logging
 import uuid
 from typing import Tuple, List, Set, Any
 
-from libangelos.archive7 import Entry
+from archive7 import EntryRecord
 from libangelos.document.types import StatementT, DocumentT
 from libangelos.error import Error
 from libangelos.helper import Glue

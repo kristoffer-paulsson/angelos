@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional
 
 from libangelos.storage.portfolio_mixin import PortfolioMixin
 from libangelos.storage.storage import StorageFacadeExtension
-from libangelos.archive7 import Entry, Archive7
+from archive7 import EntryRecord, Archive7
 from libangelos.const import Const
 from libangelos.helper import Glue, Globber
 from libangelos.policy.portfolio import PrivatePortfolio, PortfolioPolicy

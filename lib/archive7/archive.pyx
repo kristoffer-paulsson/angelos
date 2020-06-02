@@ -5,6 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive implementation."""
+import copy
 import datetime
 import functools
 import hashlib
@@ -23,6 +24,8 @@ from libangelos.utils import Util
 
 from archive7.fs import FileSystemStreamManager
 from archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
+
+# FIXME: Move compression, size and length to stream level.
 
 
 class Header:
@@ -199,6 +202,11 @@ class Archive7(SharedResource):
             File entry from registry
 
         """
+        identity = self.__manager.resolve_path(PurePath(filename))
+        if not identity:
+            raise OSError("File not found")
+
+        return self.__manager.search_entry(identity)
 
     async def glob(self, *args, **kwargs):
         return await self._run(functools.partial(self.__glob, *args, **kwargs))
@@ -253,185 +261,93 @@ class Archive7(SharedResource):
     async def move(self, *args, **kwargs):
         return await self._run(functools.partial(self.__move, *args, **kwargs))
 
-    def __move(self, src, dest):
+    def __move(self, filename: str, dirname: str):
         """Move file/dir to another directory."""
-        ops = self.ioc.operations
-
-        dirname, name = os.path.split(src)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(name, pid)
-        did = ops.get_pid(dest)
-        ops.is_available(name, did)
-
-        entry = entry._asdict()
-        entry["parent"] = did
-        entry = EntryRecord(**entry)
-        self.ioc.entries.update(entry, idx)
+        identity = self.__manager.resolve_path(PurePath(filename))
+        if not identity:
+            raise OSError("File not found")
+        parent = self.__manager.resolve_path(PurePath(dirname))
+        if not identity:
+            raise OSError("Destination directory not found")
+        self.__manager.change_parent(identity, parent)
 
     async def chmod(self, *args, **kwargs):
         return await self._run(functools.partial(self.__chmod, *args, **kwargs))
 
     def __chmod(
             self,
-            path,
-            id=None,
-            owner=None,
-            deleted=None,
-            user=None,
-            group=None,
-            perms=None,
+            filename: str,
+            # id: uuid.UUID = None,
+            owner: uuid.UUID = None,
+            deleted: bool = None,
+            user: str = None,
+            group: str = None,
+            perms: int = None,
     ):
         """Update ID/owner or deleted status for an entry."""
-        ops = self.ioc.operations
+        identity = self.__manager.resolve_path(PurePath(filename))
+        if not identity:
+            raise OSError("File not found")
 
-        dirname, name = os.path.split(path)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(name, pid)
-
-        entry = entry._asdict()
-        if id:
-            entry["id"] = id
-        if owner:
-            entry["owner"] = owner
-        if deleted:
-            entry["deleted"] = deleted
-        if user:
-            entry["user"] = user
-        if group:
-            entry["group"] = group
-        if perms:
-            entry["perms"] = perms
-        entry = EntryRecord(**entry)
-        self.ioc.entries.update(entry, idx)
+        self.__manager.update_entry(
+            identity, owner=owner, deleted=deleted,
+            user=user, group=group, perms=perms
+        )
 
     async def remove(self, *args, **kwargs):
         return await self._run(functools.partial(self.__remove, *args, **kwargs))
 
-    def __remove(self, filename, mode=None):
+    def __remove(self, filename: str, mode: int = None):
         """Remove file or dir."""
-        ops = self.ioc.operations
-        entries = self.ioc.entries
-
-        dirname, name = os.path.split(filename)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(name, pid)
-
-        # Check for unsupported types
-        if entry.type not in (
-                TYPE_FILE,
-                TYPE_DIR,
-                TYPE_LINK,
-        ):
-            raise Util.exception(
-                Error.AR7_WRONG_ENTRY, {"type": entry.type, "id": entry.id}
-            )
-
-        # If directory is up for removal, check that it is empty or abort
-        if entry.type == TYPE_DIR:
-            cidx = entries.search(Archive7.Query().parent(entry.id))
-            if len(cidx):
-                raise Util.exception(Error.AR7_NOT_EMPTY, {"index": cidx})
-
-        if not mode:
-            mode = self.__delete
-
-        if mode == Archive7.Delete.ERASE:
-            if entry.type == TYPE_FILE:
-                entries.update(
-                    EntryRecord.empty(
-                        offset=entry.offset,
-                        size=entries._sector(entry.size),
-                    ),
-                    idx,
-                )
-            elif entry.type in (TYPE_DIR, TYPE_LINK):
-                entries.update(EntryRecord.blank(), idx)
-        elif mode == Archive7.Delete.SOFT:
-            entry = entry._asdict()
-            entry["deleted"] = True
-            entry["modified"] = datetime.datetime.now()
-            entry = EntryRecord(**entry)
-            self.ioc.entries.update(entry, idx)
-        elif mode == Archive7.Delete.HARD:
-            if entry.type == TYPE_FILE:
-                if not entries.find_blank():
-                    entries.make_blanks()
-                bidx = entries.get_blank()
-                entries.update(
-                    EntryRecord.empty(
-                        offset=entry.offset,
-                        size=entries._sector(entry.size),
-                    ),
-                    bidx,
-                )
-                entry = entry._asdict()
-                entry["deleted"] = True
-                entry["modified"] = datetime.datetime.now()
-                entry["size"] = 0
-                entry["length"] = 0
-                entry["offset"] = 0
-                entry = EntryRecord(**entry)
-                self.ioc.entries.update(entry, idx)
-            elif entry.type in (TYPE_DIR, TYPE_LINK):
-                entry = entry._asdict()
-                entry["deleted"] = True
-                entry["modified"] = datetime.datetime.now()
-                entry = EntryRecord(**entry)
-                self.ioc.entries.update(entry, idx)
-        else:
-            raise Util.exception(
-                Error.AR7_INVALID_DELMODE, {"mode": self.__delete}
-            )
+        identity = self.__manager.resolve_path(PurePath(filename))
+        if not identity:
+            raise OSError("File not found")
+        self.__manager.delete_entry(identity, mode if mode is not None else self.__delete)
 
     async def rename(self, *args, **kwargs):
         return await self._run(functools.partial(self.__rename, *args, **kwargs))
 
-    def __rename(self, path, dest):
+    def __rename(self, filename: str, dest: str):
         """Rename file or directory."""
-        ops = self.ioc.operations
-        entries = self.ioc.entries
+        identity = self.__manager.resolve_path(PurePath(filename))
+        if not identity:
+            raise OSError("File not found")
+        self.__manager.change_name(identity, dest)
 
-        dirname, name = os.path.split(path)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(name, pid)
-        ops.is_available(dest, pid)
-
-        entry = entry._asdict()
-        entry["name"] = bytes(dest, "utf-8")
-        entry = EntryRecord(**entry)
-        entries.update(entry, idx)
-
-    def isdir(self, dirname):
+    def isdir(self, dirname: str) -> bool:
         """Check if a path is a known directory."""
-        if dirname[0] is not "/":
-            dirname = "/" + dirname
-        if dirname[-1] is "/":
-            dirname = dirname[:-1]
-        return dirname in self.ioc.hierarchy.paths.keys()
-
-    def __is_type(self, filename, etype):
-        try:
-            ops = self.ioc.operations
-
-            dirname, name = os.path.split(filename)
-            pid = ops.get_pid(dirname)
-            entry, idx = ops.find_entry(name, pid)
-            return True if entry.type == etype else False
-        except (ArchiveInvalidFile,):
+        identity = self.__manager.resolve_path(PurePath(dirname), True)
+        if not identity:
             return False
+        entry = self.__manager.search_entry(identity)
+        return entry.type == TYPE_DIR
 
-    def isfile(self, filename):
+    def isfile(self, filename: str) -> bool:
         """Check if a path is a known file."""
-        return self.__is_type(filename, TYPE_FILE)
+        identity = self.__manager.resolve_path(PurePath(filename), True)
+        if not identity:
+            return False
+        entry = self.__manager.search_entry(identity)
+        return entry.type == TYPE_FILE
 
-    def islink(self, filename):
-        """Check if a path is a known file."""
-        return self.__is_type(filename, TYPE_LINK)
+    def islink(self, filename: str) -> bool:
+        """Check if a path is a known link."""
+        identity = self.__manager.resolve_path(PurePath(filename), False)
+        if not identity:
+            return False
+        entry = self.__manager.search_entry(identity)
+        return entry.type == TYPE_LINK
 
     async def mkdir(self, *args, **kwargs):
         return await self._run(functools.partial(self.__mkdir, *args, **kwargs))
 
-    def __mkdir(self, dirname, user=None, group=None, perms=None):
+    def __mkdir(
+            self,
+            dirname: str,
+            user: str = None,
+            group: str = None,
+            perms: int = None
+    ) -> uuid.UUID:
         """
         Make a new directory and super directories if missing.
 
@@ -440,99 +356,81 @@ class Archive7(SharedResource):
         """
         dirname, name = os.path.split(dirname)
         parent = self.__manager.resolve_path(PurePath(dirname))
-        return self.__manager.create_entry(TYPE_DIR, name, parent, user=user, group=group, perms=perms)
+        if not parent:
+            raise OSError("Parent directory not found")
+        return self.__manager.create_entry(
+            TYPE_DIR, name, parent, user=user, group=group, perms=perms
+        )
 
     async def mkfile(self, *args, **kwargs):
         return await self._run(functools.partial(self.__mkfile, *args, **kwargs))
 
     def __mkfile(
             self,
-            filename,
-            data,
-            created=None,
-            modified=None,
-            owner=None,
-            parent=None,
-            id=None,
-            compression=EntryRecord.COMP_NONE,
-            user=None,
-            group=None,
-            perms=None
-    ):
+            filename: str,
+            data: bytes,
+            created: datetime.datetime = None,
+            modified: datetime.datetime = None,
+            owner: uuid.UUID = None,
+            parent: uuid.UUID = None,
+            id: uuid.UUID = None,
+            compression: int = EntryRecord.COMP_NONE,
+            user: str = None,
+            group: str = None,
+            perms: int = None
+    ) -> uuid.UUID:
         """Create a new file."""
-        ops = self.ioc.operations
         dirname, name = os.path.split(filename)
-        pid = None
-
-        if parent:
-            ids = self.ioc.hierarchy.ids
-            if parent not in ids.keys():
-                raise Util.exception(
-                    Error.AR7_PATH_INVALID, {"parent": parent}
-                )
-            pid = parent
-        elif dirname:
-            pid = ops.get_pid(dirname)
-
-        ops.is_available(name, pid)
-
-        length = len(data)
-        digest = hashlib.sha1(data).digest()
-        if compression and data:
-            data = ops.zip(data, compression)
-        size = len(data)
-
-        entry = EntryRecord.file(
+        parent = self.__manager.resolve_path(PurePath(dirname))
+        if not parent:
+            raise OSError("Parent directory not found")
+        identity = self.__manager.create_entry(
+            type_=TYPE_FILE,
             name=name,
-            size=size,
-            offset=0,
-            digest=digest,
-            id=id,
-            parent=pid,
+            size=0,
+            stream=uuid.UUID(int=0),
+            parent=parent,
+            identity=id,
             owner=owner,
             created=created,
             modified=modified,
-            length=length,
             compression=compression,
             user=user,
             group=group,
             perms=perms,
         )
 
-        return self.ioc.entries.add(entry, data)
+        vfd = self.__manager.open(identity, "wb")
+        vfd.write(data)
+        vfd.close()
+        return identity
 
     async def link(self, *args, **kwargs):
         return await self._run(functools.partial(self.__link, *args, **kwargs))
 
     def __link(
             self,
-            path,
-            link,
-            created=None,
-            modified=None,
-            user=None,
-            group=None,
-            perms=None
-    ):
+            filename: str,
+            target: str,
+            created: datetime.datetime = None,
+            modified: datetime.datetime = None,
+            user: str = None,
+            group: str = None,
+            perms: int = None
+    ) -> uuid.UUID:
         """Create a new link to file or directory."""
-        ops = self.ioc.operations
-        dirname, name = os.path.split(path)
-        pid = ops.get_pid(dirname)
-        ops.is_available(name, pid)
-
-        ldir, lname = os.path.split(link)
-        lpid = ops.get_pid(ldir)
-        target, tidx = ops.find_entry(lname, lpid)
-
-        if target.type == TYPE_LINK:
-            raise Util.exception(
-                Error.AR7_LINK_2_LINK, {"path": path, "link": target}
-            )
-
-        entry = EntryRecord.link(
+        dirname, name = os.path.split(filename)
+        parent = self.__manager.resolve_path(PurePath(dirname))
+        if not parent:
+            raise OSError("Parent directory not found")
+        owner = self.__manager.resolve_path(PurePath(target))
+        if not owner:
+            raise OSError("Target not found")
+        return self.__manager.create_entry(
+            type_=TYPE_LINK,
             name=name,
-            link=target.id,
-            parent=pid,
+            parent=parent,
+            owner=owner,
             created=created,
             modified=modified,
             user=user,
@@ -540,118 +438,39 @@ class Archive7(SharedResource):
             perms=perms,
         )
 
-        return self.ioc.entries.add(entry)
-
-    async def save(self, *args, **kwargs):
+    async def save(self, *args, **kwargs) -> uuid.UUID:
         return await self._run(functools.partial(self.__save, *args, **kwargs))
 
-    def __save(self, filename, data, compression=EntryRecord.COMP_NONE, modified=None):
+    def __save(
+            self, filename: str, data: bytes, compression: int = EntryRecord.COMP_NONE,
+            modified: datetime.datetime = None
+    ):
         """Update a file with new data."""
         if not modified:
             modified = datetime.datetime.now()
 
-        ops = self.ioc.operations
-        entries = self.ioc.entries
-
-        if not entries.find_blank():
-            entries.make_blanks()
-
-        dirname, name = os.path.split(filename)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(
-            name, pid, (TYPE_FILE, TYPE_LINK)
-        )
-
-        if entry.type == TYPE_LINK:
-            entry, idx = ops.follow_link(entry)
-
-        length = len(data)
-        digest = hashlib.sha1(data).digest()
-        if compression and data:
-            data = ops.zip(data, compression)
-        size = len(data)
-
-        osize = entries._sector(entry.size)
-        nsize = entries._sector(size)
-
-        if osize < nsize:
-            empty = EntryRecord.empty(offset=entry.offset, size=osize)
-            last = entries.get_entry(entries.get_thithermost())
-            new_offset = entries._sector(last.offset + last.size)
-            ops.write_data(new_offset, data + ops.filler(data))
-
-            entry = entry._asdict()
-            entry["digest"] = digest
-            entry["offset"] = new_offset
-            entry["size"] = size
-            entry["length"] = length
-            entry["modified"] = modified
-            entry["compression"] = compression
-            entry = EntryRecord(**entry)
-            entries.update(entry, idx)
-
-            bidx = entries.get_blank()
-            entries.update(empty, bidx)
-        elif osize == nsize:
-            ops.write_data(entry.offset, data + ops.filler(data))
-
-            entry = entry._asdict()
-            entry["digest"] = digest
-            entry["size"] = size
-            entry["length"] = length
-            entry["modified"] = modified
-            entry["compression"] = compression
-            entry = EntryRecord(**entry)
-            entries.update(entry, idx)
-        elif osize > nsize:
-            ops.write_data(entry.offset, data + ops.filler(data))
-            old_offset = entry.offset
-
-            entry = entry._asdict()
-            entry["digest"] = digest
-            entry["size"] = size
-            entry["length"] = length
-            entry["modified"] = modified
-            entry["compression"] = compression
-            if not size:  # If data is b''
-                entry["offset"] = 0
-            entry = EntryRecord(**entry)
-            entries.update(entry, idx)
-
-            empty = EntryRecord.empty(
-                offset=entries._sector(old_offset + nsize),
-                size=osize - nsize,
-            )
-            bidx = entries.get_blank()
-            entries.update(empty, bidx)
+        identity = self.__manager.resolve_path(PurePath(filename), True)
+        if not identity:
+            raise OSError("File not found")
+        vfd = self.__manager.open(identity, "wb")
+        vfd.write(data)
+        vfd.seek(0, os.SEEK_END)
+        vfd.truncate()
+        vfd.close()
+        self.__manager.update_entry(identity, modified=modified)
+        return identity
 
     async def load(self, *args, **kwargs):
         return await self._run(functools.partial(self.__load, *args, **kwargs))
 
-    def __load(self, filename):
+    def __load(self, filename: str) -> bytes:
         """Load data from a file."""
-        ops = self.ioc.operations
-
-        dirname, name = os.path.split(filename)
-        pid = ops.get_pid(dirname)
-        entry, idx = ops.find_entry(
-            name, pid, (TYPE_FILE, TYPE_LINK)
-        )
-
-        if entry.type == TYPE_LINK:
-            entry, idx = ops.follow_link(entry)
-
-        data = self.ioc.operations.load_data(entry)
-
-        if entry.compression and data:
-            data = ops.unzip(data, entry.compression)
-
-        if entry.digest != hashlib.sha1(data).digest():
-            raise Util.exception(
-                Error.AR7_DIGEST_INVALID,
-                {"filename": filename, "id": entry.id},
-            )
-
+        identity = self.__manager.resolve_path(PurePath(filename), True)
+        if not identity:
+            raise OSError("File not found")
+        vfd = self.__manager.open(identity, "rb")
+        data = vfd.read()
+        vfd.close()
         return data
 
     class Query:

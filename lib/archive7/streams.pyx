@@ -742,9 +742,6 @@ class StreamManager(ABC):
             self._setup()
             self.__created = True
 
-    def _internal_stream(self, idx: int):
-        return InternalStream
-
     @property
     def closed(self):
         return self.__closed
@@ -1036,11 +1033,11 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
             Success of deleting data stream.
 
         """
-        metadata = DataStream.meta_unpack(self.__registry.update(identity))
+        metadata = DataStream.meta_unpack(self.__registry.search(identity))
         if metadata[0] != identity:
             raise OSError("Identity doesn't match stream %s" % identity)
-        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
-        self.__registry.trash(stream)
-        del stream
+        # stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        self.recycle(self.load_block(metadata[1]))
+        # del stream
         self.__registry.unregister(identity)
         return True

@@ -21,7 +21,7 @@ import sys
 import uuid
 
 import libnacl
-from libangelos.archive7 import Archive7, Entry
+from archive7 import Archive7, EntryRecord
 from libangelos.error import ArchiveInvalidSeek
 
 BYTES_SUF = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")

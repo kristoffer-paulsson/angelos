@@ -11,7 +11,7 @@ from typing import List
 
 from libangelos.const import Const
 from libangelos.policy.portfolio import PortfolioPolicy
-from libangelos.archive7 import Entry, Archive7
+from archive7 import EntryRecord, Archive7
 from libangelos.helper import Glue, Globber
 from libangelos.storage.storage import StorageFacadeExtension
 
