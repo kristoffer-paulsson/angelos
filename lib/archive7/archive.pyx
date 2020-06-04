@@ -357,7 +357,7 @@ class Archive7(SharedResource):
         dirname, name = os.path.split(dirname)
         parent = self.__manager.resolve_path(PurePath(dirname))
         if not parent:
-            raise OSError("Parent directory not found")
+            raise OSError("Parent directory not found: %s" % dirname)
         return self.__manager.create_entry(
             TYPE_DIR, name, parent, user=user, group=group, perms=perms
         )

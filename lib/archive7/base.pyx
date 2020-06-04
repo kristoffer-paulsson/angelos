@@ -5,9 +5,33 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Base classes."""
-
+import struct
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from io import RawIOBase, SEEK_SET, SEEK_END
+
+BLOCK_SIZE = 4096
+DATA_SIZE = 4008
+MAX_UINT32 = 2 ** 32
+
+FORMAT_BLOCK = "!iiI16s20s4008s"
+SIZE_BLOCK = struct.calcsize(FORMAT_BLOCK)
+FORMAT_STREAM = "!16siiIQH"
+SIZE_STREAM = struct.calcsize(FORMAT_STREAM)
+
+BlockTuple = namedtuple("BlockTuple", "previous next index stream digest data")
+
+
+class BlockError(Exception):
+    """Exception for block error."""
+
+
+class StreamError(Exception):
+    """Exception for stream error."""
+
+
+class StreamManagerError(Exception):
+    """Exception for stream manager error."""
 
 
 class BaseFileObject(ABC, RawIOBase):

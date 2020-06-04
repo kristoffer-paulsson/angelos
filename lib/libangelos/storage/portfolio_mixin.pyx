@@ -11,7 +11,7 @@ import logging
 import uuid
 from typing import Tuple, List, Set, Any
 
-from archive7 import EntryRecord
+from archive7.fs import EntryRecord
 from libangelos.document.types import StatementT, DocumentT
 from libangelos.error import Error
 from libangelos.helper import Glue
@@ -49,7 +49,7 @@ class PortfolioMixin:
            return self.archive.save(
                 filename=filename,
                 data=PortfolioPolicy.serialize(doc),
-                compression=Entry.COMP_NONE
+                compression=EntryRecord.COMP_NONE
             )
         else:
             created, updated, owner = Glue.doc_save(doc)
@@ -60,7 +60,7 @@ class PortfolioMixin:
                 created=created,
                 modified=updated,
                 owner=owner,
-                compression=Entry.COMP_NONE,
+                compression=EntryRecord.COMP_NONE,
             )
 
     async def update_portfolio( # FIXME: Make sure it follows policy
@@ -453,7 +453,7 @@ class PortfolioMixin:
                     created=created,
                     modified=updated,
                     owner=owner,
-                    compression=Entry.COMP_NONE
+                    compression=EntryRecord.COMP_NONE
                 )
             )
 

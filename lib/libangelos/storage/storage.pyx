@@ -9,7 +9,8 @@ import atexit
 import os
 import uuid
 
-from archive7 import Archive7
+from archive7.archive import Archive7
+from archive7.fs import Delete
 from libangelos.facade.base import BaseFacade, FacadeExtension
 
 
@@ -23,7 +24,7 @@ class StorageFacadeExtension(FacadeExtension):
     INIT_HIERARCHY = ("/",)
     INIT_FILES = ()
 
-    def __init__(self, facade: BaseFacade, home_dir: str, secret: bytes, delete=Archive7.Delete.HARD):
+    def __init__(self, facade: BaseFacade, home_dir: str, secret: bytes, delete=Delete.HARD):
         """Initialize the Storage extension."""
         FacadeExtension.__init__(self, facade)
         self.__archive = Archive7.open(self.filename(home_dir), secret, delete)
@@ -71,7 +72,7 @@ class StorageFacadeExtension(FacadeExtension):
             node=node,
             domain=domain,
             title=cls.ATTRIBUTE[0],
-            _type=vtype,
+            type_=vtype,
             role=vrole,
             use=cls.USEFLAG[0],
         )

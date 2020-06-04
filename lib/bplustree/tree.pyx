@@ -771,7 +771,7 @@ class SingleItemTree(BaseTree):
         serializer: Optional[Serializer] = None
     ) -> TreeConf:
         return TreeConf(
-            page_size, page_size // (value_size+24), key_size, value_size, value_size,
+            page_size, page_size // (value_size + 24), key_size, value_size, value_size,
             serializer or IntSerializer()
         )
 
@@ -972,11 +972,11 @@ class MultiItemTree(BaseTree):
             except ValueError:
                 raise ValueError("Record to update doesn't exist")
             else:
-                length = int.from_bytes(record.value, ENDIAN)
+                length = record.value if type(record.value) is int else int.from_bytes(record.value, ENDIAN)
                 if length:
                     record.overflow_page, record.value = self._update_overflow(
                         record.overflow_page,
-                        int.from_bytes(record.value, ENDIAN),
+                        length,
                         insertions,
                         deletions
                     )

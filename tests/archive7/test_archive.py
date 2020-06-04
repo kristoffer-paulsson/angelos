@@ -12,6 +12,37 @@ from archive7.fs import EntryRecord
 
 from angelossim.support import run_async
 
+INIT_HIERARCHY = (
+    "/cache",
+    "/cache/msg",
+    # Contact profiles and links based on directory.
+    "/contacts",
+    "/contacts/favorites",
+    "/contacts/friends",
+    "/contacts/all",
+    "/contacts/blocked",
+    # Issued statements by the vaults entity
+    "/issued",
+    "/issued/verified",
+    "/issued/trusted",
+    "/issued/revoked",
+    # Messages, ingoing and outgoung correspondence
+    "/messages",
+    "/messages/inbox",
+    "/messages/read",
+    "/messages/drafts",
+    "/messages/outbox",
+    "/messages/sent",
+    "/messages/spam",
+    "/messages/trash",
+    # Networks, for other hosts that are trusted
+    "/networks",
+    # Preferences by the owning entity.
+    "/settings",
+    "/settings/nodes",
+    "/portfolios",
+)
+
 
 class BaseArchiveTestCase(TestCase):
     @classmethod
@@ -267,6 +298,22 @@ class TestArchive7(BaseArchiveTestCase):
             archive = Archive7.setup(self.filename, self.secret)
             self.assertIsInstance(await archive.mkfile(filename, data), uuid.UUID)
             self.assertEqual(await archive.load(filename), data)
+            archive.close()
+        except Exception as e:
+            self.fail(e)
+
+    @run_async
+    async def test_mkdir_error(self):
+        try:
+            archive = Archive7.setup(self.filename, self.secret)
+            for i in INIT_HIERARCHY:
+                print(i)
+                self.assertIsInstance(await archive.mkdir(i), uuid.UUID)
+
+            print("#### TEST ####")
+            for i in INIT_HIERARCHY:
+                print(i)
+                self.assertTrue(archive.isdir(i))
             archive.close()
         except Exception as e:
             self.fail(e)

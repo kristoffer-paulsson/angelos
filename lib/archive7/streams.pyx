@@ -19,9 +19,7 @@ from archive7.base import BaseFileObject
 from bplustree.serializer import UUIDSerializer
 from bplustree.tree import SingleItemTree
 
-BLOCK_SIZE = 4096
-DATA_SIZE = 4008
-MAX_UINT32 = 2 ** 32
+from base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError
 
 
 class StreamBlock:
@@ -40,8 +38,8 @@ class StreamBlock:
 
     __slots__ = ["__position", "previous", "next", "index", "stream", "digest", "data"]
 
-    FORMAT = "!iiI16s20s4008s"
-    SIZE = struct.calcsize("!iiI16s20s4008s")
+    FORMAT = FORMAT_BLOCK
+    SIZE = SIZE_BLOCK
 
     def __init__(self, position: int, previous: int = -1, next: int = -1, index: int = 0,
                  stream: uuid.UUID = uuid.UUID(int=0),
@@ -57,6 +55,13 @@ class StreamBlock:
 
         if block:
             self.load_meta(block)
+
+        if self.next == self.__position or self.previous == self.__position:
+            raise BlockError(
+                "Block header self-referencing; position: %s, next: %s, previous: %s" % (
+                    self.__position, self.next, self.previous
+                )
+            )
 
     @property
     def position(self) -> int:
@@ -81,11 +86,26 @@ class StreamBlock:
             self.previous, self.next, self.index, stream, self.digest, data
         ) = struct.unpack(StreamBlock.FORMAT, block)
         if hashlib.sha1(self.data).digest() != self.digest:
-            valid = False
+            raise BlockError("Corrupt data, digest mismatch; position %s")
 
         self.stream = uuid.UUID(bytes=stream)
         self.data[:] = data[:]
-        return valid
+
+    @staticmethod
+    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+        """
+
+        Args:
+            data (Union[bytes, bytearray]):
+                Data to be unpacked
+
+        Returns (tuple):
+            Unpacked tuple
+
+        """
+        metadata = struct.unpack(StreamBlock.FORMAT, data)
+        stream = uuid.UUID(bytes=metadata[3])
+        return metadata[0:2] + (stream,) + metadata[4:5]
 
     def __bytes__(self) -> bytes:
         return struct.pack(
@@ -119,12 +139,12 @@ class BaseStream:  # (Iterable, Reversible):
 
     COMP_NONE = 0
 
-    FORMAT = "!16siiIQH"
-    SIZE = struct.calcsize("!16siiIQH")
+    FORMAT = FORMAT_STREAM
+    SIZE = SIZE_STREAM
 
     def __init__(
-        self, manager: "StreamManager", block: StreamBlock, identity: uuid.UUID, begin: int = -1,
-        end: int = -1, count: int = 0, length: int = 0, compression: int = 0
+            self, manager: "StreamManager", block: StreamBlock, identity: uuid.UUID, begin: int = -1,
+            end: int = -1, count: int = 0, length: int = 0, compression: int = 0
     ):
         self._manager = manager
         self._block = block
@@ -269,8 +289,12 @@ class BaseStream:  # (Iterable, Reversible):
             return False
         else:
             self.save()
+            print("Old", to, self._block.index, self._block.position, self._block.next, self._block.previous,
+                  self._block.stream)
             block = self._manager.load_block(to)
             self._block = block
+            print("New", to, self._block.index, self._block.position, self._block.next, self._block.previous,
+                  self._block.stream)
             return True
 
     def extend(self) -> bool:
@@ -308,13 +332,13 @@ class BaseStream:  # (Iterable, Reversible):
         """
         index = length // DATA_SIZE
         offset = length % DATA_SIZE
-        remnant = DATA_SIZE - offset
+        rest = DATA_SIZE - offset
 
         self.save()
         if self.wind(index) != index:
             raise OSError("Couldn't truncate, winding problem.")
 
-        self._block.data[offset:] = b"\x00" * remnant
+        self._block.data[offset:] = b"\x00" * rest
         self.save(True)
 
         self._end = self._block.position
@@ -351,11 +375,13 @@ class BaseStream:  # (Iterable, Reversible):
 
         if self._block.index < index:  # Go forward
             while self.next():
+                print("Forward", self._block.index)
                 if self._block.index == index:
                     pos = index
                     break
         elif self._block.index > index:  # Go backward
             while self.previous():
+                print("Backward", self._block.index)
                 if self._block.index == index:
                     pos = index
                     break
@@ -540,7 +566,7 @@ class VirtualFileObject(BaseFileObject):
                 self._stream.length(self._position - self.__end)
                 self.__end = self._position
 
-            if self.__offset >= DATA_SIZE:  # Load next or new block
+            if self.__offset == DATA_SIZE:  # Load next or new block
                 if not self._stream.next():
                     if not self._stream.extend():
                         raise OSError("Out of space.")
@@ -769,14 +795,14 @@ class StreamManager(ABC):
         stream_data = list()
         offset = DATA_SIZE - DataStream.SIZE * self.SPECIAL_STREAM_COUNT
         for i in range(offset, DATA_SIZE, DataStream.SIZE):
-            stream_data.append(self.__meta[i:i+DataStream.SIZE])
+            stream_data.append(self.__meta[i:i + DataStream.SIZE])
         return stream_data
 
     def __save_meta(self):
         offset = DATA_SIZE - DataStream.SIZE * self.SPECIAL_STREAM_COUNT
         for i in range(self.SPECIAL_STREAM_COUNT):
             pos = i * DataStream.SIZE
-            self.__meta[offset+pos:offset+pos+DataStream.SIZE] = bytes(self.special_stream(i))
+            self.__meta[offset + pos:offset + pos + DataStream.SIZE] = bytes(self.special_stream(i))
 
         block = self.special_block(self.BLOCK_META)
         self.save_block(block.index, block)

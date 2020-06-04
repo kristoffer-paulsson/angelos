@@ -11,9 +11,10 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional
 
+from archive7.archive import TYPE_LINK, Archive7
+from archive7.fs import EntryRecord
 from libangelos.storage.portfolio_mixin import PortfolioMixin
 from libangelos.storage.storage import StorageFacadeExtension
-from archive7 import EntryRecord, Archive7
 from libangelos.const import Const
 from libangelos.helper import Glue, Globber
 from libangelos.policy.portfolio import PrivatePortfolio, PortfolioPolicy
@@ -32,7 +33,6 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     USEFLAG = (Const.A_USE_VAULT,)
 
     INIT_HIERARCHY = (
-        "/",
         "/cache",
         "/cache/msg",
         # Contact profiles and links based on directory.
@@ -64,8 +64,8 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     )
 
     INIT_FILES = (
-        ("/settings/preferences.ini", b"# Empty"),
-        ("/settings/networks.csv", b"# Empty")
+        ("/settings/preferences.ini", b""),
+        ("/settings/networks.csv", b"")
     )
 
     NODES = "/settings/nodes"
@@ -121,7 +121,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             owner=owner,
             created=created,
             modified=updated,
-            compression=Entry.COMP_NONE
+            compression=EntryRecord.COMP_NONE
         )
 
     async def delete(self, filename: str):
@@ -281,7 +281,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             else:
                 name = ids[entry.parent] + "/" + filename
 
-            if follow and entry.type == Entry.TYPE_LINK:
+            if follow and entry.type == TYPE_LINK:
                 link, _ = ops.follow_link(entry)
                 resultset[link.id] = fields(name, link)
             else:

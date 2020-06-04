@@ -21,7 +21,8 @@ import sys
 import uuid
 
 import libnacl
-from archive7 import Archive7, EntryRecord
+from archive7.archive import Archive7
+from archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
 from libangelos.error import ArchiveInvalidSeek
 
 BYTES_SUF = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
@@ -92,7 +93,7 @@ def run_test(args, parser):
         ids = arch.ioc.hierarchy.ids
 
         idxs = entries.search(
-            Archive7.Query().type(Entry.TYPE_FILE).deleted(False), True
+            Archive7.Query().type(TYPE_FILE).deleted(False), True
         )
 
         for i in idxs:
@@ -182,20 +183,20 @@ def __run_list(arch: Archive7, args, parser):
     for i in idxs:
         idx, entry = i
 
-        if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
-            continue
+        # if entry.type in [TYPE_BLANK, Entry.TYPE_EMPTY]:
+        #     continue
 
         if entry.parent.int == 0:
             filename = "/" + str(entry.name, "utf-8")
         else:
             filename = ids[entry.parent] + "/" + str(entry.name, "utf-8")
 
-        if entry.type == Entry.TYPE_FILE:
+        if entry.type == TYPE_FILE:
             files += 1
             size += entry.length
-        elif entry.type == Entry.TYPE_DIR:
+        elif entry.type == TYPE_DIR:
             dirs += 1
-        elif entry.type == Entry.TYPE_LINK:
+        elif entry.type == TYPE_LINK:
             links += 1
 
         if args.verbose:
@@ -241,8 +242,8 @@ def run_extract(args, parser):
         for i in idxs:
             idx, entry = i
 
-            if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
-                continue
+            # if entry.type in [Entry.TYPE_BLANK, Entry.TYPE_EMPTY]:
+            #    continue
 
             if entry.parent.int == 0:
                 filename = "/" + str(entry.name, "utf-8")
@@ -251,7 +252,7 @@ def run_extract(args, parser):
 
             realname = os.path.join(curdir, filename[1:])
 
-            if entry.type == Entry.TYPE_DIR:
+            if entry.type == TYPE_DIR:
                 try:
                     dirname = realname
                     if not os.path.isdir(dirname):
@@ -261,7 +262,7 @@ def run_extract(args, parser):
                         (str(e) + ", failed creating directory",)
                     )
 
-            elif entry.type == Entry.TYPE_FILE:
+            elif entry.type == TYPE_FILE:
                 try:
                     dirname = os.path.dirname(realname)
                     if not os.path.isdir(dirname):
@@ -296,7 +297,7 @@ def run_extract(args, parser):
                 if corruption:
                     valid = False
 
-            elif entry.type == Entry.TYPE_LINK:
+            elif entry.type == TYPE_LINK:
                 continue
 
             if args.verbose:
@@ -351,9 +352,9 @@ async def run_create(args, parser):
     key = get_key(args, True)
 
     if args.zip:
-        compression = Entry.COMP_BZIP2
+        compression = EntryRecord.COMP_BZIP2
     else:
-        compression = Entry.COMP_NONE
+        compression = EntryRecord.COMP_NONE
 
     suflen = len(archive) - len("".join(pathlib.Path(archive).suffixes))
     archive = archive[:suflen] + ENDING_SUF

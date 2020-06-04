@@ -6,6 +6,7 @@
 #
 import enum
 import io
+import logging
 from logging import getLogger
 import os
 import platform
@@ -449,6 +450,7 @@ class WAL:
                 page.to_bytes(PAGE_REFERENCE_BYTES, ENDIAN) +
                 page_data
         )
+
         self._fd.seek(0, io.SEEK_END)
         write_to_file(self._fd, data)
         self._index_frame(frame_type, page, self._fd.tell() - self._page_size)

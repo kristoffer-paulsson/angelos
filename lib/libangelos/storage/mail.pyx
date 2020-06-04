@@ -9,9 +9,9 @@ import uuid
 
 from typing import List
 
+from archive7.fs import EntryRecord
 from libangelos.const import Const
 from libangelos.policy.portfolio import PortfolioPolicy
-from archive7 import EntryRecord, Archive7
 from libangelos.helper import Glue, Globber
 from libangelos.storage.storage import StorageFacadeExtension
 
@@ -56,7 +56,7 @@ class MailStorage(StorageFacadeExtension):
             owner=owner,
             created=created,
             modified=updated,
-            compression=Entry.COMP_NONE
+            compression=EntryRecord.COMP_NONE
         )
     async def delete(self, filename):
         """Remove a document at a certain location."""
