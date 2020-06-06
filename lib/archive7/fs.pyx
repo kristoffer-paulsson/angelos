@@ -16,11 +16,10 @@ from collections.abc import Iterator
 from pathlib import PurePath
 from typing import Union
 
+from archive7.base import DATA_SIZE
 from archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject
-from base import DATA_SIZE
 from bplustree.serializer import UUIDSerializer
 from bplustree.tree import SingleItemTree, MultiItemTree
-
 
 TYPE_FILE = b"f"  # Represents a file
 TYPE_LINK = b"l"  # Represents a link

@@ -75,6 +75,12 @@ class TestBaseStream(TestCase):
     def test_extend(self):
         self.fail()
 
+    def test_push(self):
+        self.fail()
+
+    def test_pop(self):
+        self.fail()
+
     def test_truncate(self):
         self.fail()
 
@@ -87,14 +93,6 @@ class TestBaseStream(TestCase):
 
 class TestInternalStream(TestCase):
     def test_close(self):
-        self.fail()
-
-
-class TestTrashStream(TestCase):
-    def test_push_block(self):
-        self.fail()
-
-    def test_pop_block(self):
         self.fail()
 
 

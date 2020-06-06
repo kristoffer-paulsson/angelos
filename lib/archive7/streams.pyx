@@ -15,11 +15,16 @@ from os import SEEK_CUR, SEEK_SET, SEEK_END
 from typing import Union
 
 import libnacl.secret
-from archive7.base import BaseFileObject
+from archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError, \
+    StreamError, BaseFileObject, StreamManagerError
 from bplustree.serializer import UUIDSerializer
 from bplustree.tree import SingleItemTree
 
-from base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError
+BLANK_DATA = b"\x00" * DATA_SIZE
+BLANK_BLOCK = struct.pack(
+    FORMAT_BLOCK, -1, -1, 0, uuid.UUID(int=0).bytes,
+    hashlib.sha1(BLANK_DATA).digest(), BLANK_DATA
+)
 
 
 class StreamBlock:
@@ -57,18 +62,14 @@ class StreamBlock:
             self.load_meta(block)
 
         if self.next == self.__position or self.previous == self.__position:
-            raise BlockError(
-                "Block header self-referencing; position: %s, next: %s, previous: %s" % (
-                    self.__position, self.next, self.previous
-                )
-            )
+            raise BlockError("Block header self-referencing; %s" % self)
 
     @property
     def position(self) -> int:
         """Expose stream block position in file."""
         return self.__position
 
-    def load_meta(self, block: bytes) -> bool:
+    def load_meta(self, block: bytes):
         """Unpack a block of bytes into its components and populate the fields
 
         Args:
@@ -79,17 +80,17 @@ class StreamBlock:
             True if the loaded data is not corrupt else False
 
         """
-        valid = True
         data = None
         stream = None
         (
             self.previous, self.next, self.index, stream, self.digest, data
         ) = struct.unpack(StreamBlock.FORMAT, block)
-        if hashlib.sha1(self.data).digest() != self.digest:
-            raise BlockError("Corrupt data, digest mismatch; position %s")
 
         self.stream = uuid.UUID(bytes=stream)
         self.data[:] = data[:]
+
+        if hashlib.sha1(self.data).digest() != self.digest:
+            raise BlockError("Corrupt data, digest mismatch; position %s" % self.__position)
 
     @staticmethod
     def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
@@ -116,6 +117,11 @@ class StreamBlock:
             self.stream.bytes,
             hashlib.sha1(self.data).digest(),
             self.data
+        )
+
+    def __repr__(self):
+        return '<{}: position={} previous={} next={} index={} stream={}, digest={}>'.format(
+            self.__class__.__name__, self.__position, self.previous, self.next, self.index, self.stream, self.digest
         )
 
 
@@ -167,6 +173,11 @@ class BaseStream:  # (Iterable, Reversible):
     def manager(self):
         """Expose stream manager."""
         return self._manager
+
+    @property
+    def block(self):
+        """Expose current block."""
+        return self._block
 
     @property
     def data(self):
@@ -289,12 +300,8 @@ class BaseStream:  # (Iterable, Reversible):
             return False
         else:
             self.save()
-            print("Old", to, self._block.index, self._block.position, self._block.next, self._block.previous,
-                  self._block.stream)
             block = self._manager.load_block(to)
             self._block = block
-            print("New", to, self._block.index, self._block.position, self._block.next, self._block.previous,
-                  self._block.stream)
             return True
 
     def extend(self) -> bool:
@@ -307,20 +314,50 @@ class BaseStream:  # (Iterable, Reversible):
         if self._block.next != -1:
             return False
         else:
-            block = self._manager.new_block()
-            block.index = self._count  # The current count is the same as the new index
-            block.stream = self._identity
-            block.previous = self._block.position
-            block.next = -1
-            self._block.next = block.position
-            self._end = block.position
-            self._count += 1  # Update the count after indexing
-            self.save()
-            self._block = block
+            self.push(self._manager.new_block())
             return True
 
+    def push(self, block: StreamBlock):
+        if not block:
+            raise ValueError("Can not push a non-block on stream.")
+        if self._block.next != -1:
+            raise StreamError("Can only push at the end of the stream.")
+
+        block.index = self._count  # The current count is the same as the new index
+        block.stream = self._identity
+        block.previous = self._block.position
+        block.next = -1
+        self._block.next = block.position
+        self._end = block.position
+        self._count += 1  # Update the count after indexing
+
+        self._manager.save_block(self._block.position, self._block)
+        self._manager.save_block(block.position, block)
+
+        self._block = block
+
+    def pop(self) -> StreamBlock:
+        if self._block.next != -1:
+            raise StreamError("Can only pop from the end of the stream.")
+        if self._block.previous == -1:
+            raise StreamError("Can not pop last block off of stream.")
+
+        block = self._manager.load_block(self._block.previous)
+        block.next = -1
+        self._end = block.position
+        self._count -= 1  # Update the count after indexing
+
+        popped = self._block
+        self._block = block
+
+        popped.load_meta(BLANK_BLOCK)
+        self._manager.save_block(block.position, block)
+        self._manager.save_block(popped.position, popped)
+
+        return popped
+
     def truncate(self, length: int) -> int:
-        """Truncate the stream to a certian length and recycle blocks.
+        """Truncate the stream to a certain length and recycle blocks.
 
         Args:
             length (int):
@@ -331,31 +368,12 @@ class BaseStream:  # (Iterable, Reversible):
 
         """
         index = length // DATA_SIZE
-        offset = length % DATA_SIZE
-        rest = DATA_SIZE - offset
 
-        self.save()
-        if self.wind(index) != index:
-            raise OSError("Couldn't truncate, winding problem.")
+        self.__step(self._end)
+        while self._block.index > index:
+            self._manager.recycle(self.pop())
 
-        self._block.data[offset:] = b"\x00" * rest
-        self.save(True)
-
-        self._end = self._block.position
-        self._count = self._block.index + 1
         self._length = length
-
-        if self._block.next != -1:
-            next = self._block.next
-
-            self._block.next = -1
-            self.save(True)
-
-            block = self._manager.load_block(next)
-            # block.previous = -1
-            # self._manager.save_block(block.position, block)
-            self._manager.recycle(block)
-
         return length
 
     def wind(self, index: int) -> int:
@@ -369,28 +387,29 @@ class BaseStream:  # (Iterable, Reversible):
             New block index.
 
         """
+        if not (0 <= index < self._count):
+            raise StreamError("Index out of bounds, %s of %s." % (index, self._count))
 
-        pos = -1
-        current = self._block
+        # pos = -1
+        # current = self._block
 
         if self._block.index < index:  # Go forward
             while self.next():
-                print("Forward", self._block.index)
                 if self._block.index == index:
                     pos = index
                     break
         elif self._block.index > index:  # Go backward
             while self.previous():
-                print("Backward", self._block.index)
                 if self._block.index == index:
                     pos = index
                     break
 
-        if pos == -1:
-            self._block = current
-            pos = current.index
+        # if pos == -1:
+        #    self._block = current
+        #    pos = current.index
 
-        return pos
+        # return pos
+        return self._block.index
 
     @abstractmethod
     def close(self):
@@ -404,65 +423,6 @@ class InternalStream(BaseStream):
     def close(self):
         """Save block."""
         self.save()
-
-
-class TrashStream(InternalStream):
-
-    def push_block(self, block: StreamBlock):
-        """Push a block at end of stream.
-
-        Args:
-            block (StreamBlock):
-                Block to push.
-
-        """
-        if self._end == self._block.position:
-            last_blk = self._block
-        else:
-            last_blk = self._manager.load_block(self._end)
-
-        last_blk.next = block.position
-        block.previous = last_blk.position
-        block.next = -1
-        block.stream = self._identity
-        block.index = self._count
-        self._end = block.position
-        self._count += 1
-
-        self._manager.save_block(last_blk.position, last_blk)
-        self._manager.save_block(block.position, block)
-        self._manager.save_meta()
-
-    def pop_block(self) -> StreamBlock:
-        """Pop block off the end of stream.
-
-        Returns (StreamBlock):
-            Popped block.
-
-        """
-        if not self._count > 1:
-            return None
-
-        if self._end == self._block.position:
-            last_blk = self._block
-        else:
-            last_blk = self._manager.load_block(self._end)
-
-        if last_blk.previous == self._block.position:
-            prev_blk = self._block
-        else:
-            prev_blk = self._manager.load_block(last_blk.previous)
-
-        last_blk.previous = -1
-        prev_blk.next = -1
-        self._end = prev_blk.position
-        self._count -= 1
-
-        self._manager.save_block(prev_blk.position, prev_blk)
-        self._manager.save_meta()
-
-        return last_blk
-
 
 class DataStream(BaseStream):
     """Stream for general use."""
@@ -723,7 +683,7 @@ class StreamManager(ABC):
             self.__file.seek(0, os.SEEK_END)
             length = self.__file.tell()
             if length % BLOCK_SIZE:
-                raise OSError("Archive length uneven to block size.")
+                raise StreamManagerError("Archive length uneven to block size.")
             self.__count = length // BLOCK_SIZE
 
             for i in range(max(self.SPECIAL_BLOCK_COUNT, 1)):
@@ -733,12 +693,9 @@ class StreamManager(ABC):
             streams_data = self.__load_meta()
             for i in range(self.SPECIAL_STREAM_COUNT):
                 metadata = DataStream.meta_unpack(streams_data[i])
-                if i:
-                    stream = InternalStream(self, self.load_block(metadata[1]), *metadata)
-                else:
-                    stream = TrashStream(self, self.load_block(metadata[1]), *metadata)
+                stream = InternalStream(self, self.load_block(metadata[1]), *metadata)
                 if stream.identity.int != i:
-                    raise RuntimeError("Corrupt internal stream identifier, %s." % stream.identity)
+                    raise StreamManagerError("Corrupt internal stream identifier, %s." % stream.identity)
                 self.__internal[i] = stream
                 self._streams[stream.identity] = stream
 
@@ -757,10 +714,7 @@ class StreamManager(ABC):
                 block = self.new_block()
                 block.index = 0
                 block.stream = identity
-                if i:
-                    stream = InternalStream(self, block, identity, begin=block.position, end=block.position, count=1)
-                else:
-                    stream = TrashStream(self, block, identity, begin=block.position, end=block.position, count=1)
+                stream = InternalStream(self, block, identity, begin=block.position, end=block.position, count=1)
                 self.__internal[i] = stream
                 self._streams[identity] = stream
 
@@ -834,16 +788,17 @@ class StreamManager(ABC):
 
         """
         block = self.reuse()
-        if block:
-            block.data[0:DATA_SIZE] = b"\x00" * DATA_SIZE
-        else:
+
+        if not block:
             offset = self.__file.seek(0, os.SEEK_END)
             index = offset // BLOCK_SIZE
             block = StreamBlock(position=index)
             self.__count += 1
-        length = self.__file.write(self.__box.encrypt(bytes(block)))
-        if length != BLOCK_SIZE:
-            raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+
+            length = self.__file.write(self.__box.encrypt(bytes(block)))
+            if length != BLOCK_SIZE:
+                raise StreamManagerError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+
         return block
 
     def load_block(self, index: int) -> StreamBlock:
@@ -857,12 +812,12 @@ class StreamManager(ABC):
             Loaded block a stream block.
 
         """
-        if not index < self.__count:
-            raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
+        if not (0 <= index < self.__count):
+            raise StreamManagerError("Index out of bounds, %s of %s." % (index, self.__count))
         position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
         if position != offset:
-            raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
+            raise StreamManagerError("Failed to seek for position %s, ended at %s." % (position, offset))
         return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
 
     def save_block(self, index: int, block: StreamBlock):
@@ -875,26 +830,26 @@ class StreamManager(ABC):
                 Block to save to file.
 
         """
-        if not index < self.__count:
-            raise IndexError("Index out of bounds, %s of %s." % (index, self.__count))
+        if not (0 <= index < self.__count):
+            raise StreamManagerError("Index out of bounds, %s of %s." % (index, self.__count))
         if index != block.position:
-            raise IndexError("Index %s and position %s are not the same." % (index, block.position))
+            raise StreamManagerError("Index %s and position %s are not the same." % (index, block.position))
         position = index * BLOCK_SIZE
         offset = self.__file.seek(position)
         if not position == offset:
-            raise OSError("Failed to seek for position %s, ended at %s." % (position, offset))
+            raise StreamManagerError("Failed to seek for position %s, ended at %s." % (position, offset))
         length = self.__file.write(self.__box.encrypt(bytes(block)))
         self.__file.flush()
         os.fsync(self.__file.fileno())
         if length != BLOCK_SIZE:
-            raise OSError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+            raise StreamManagerError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
     def special_stream(self, position: int):
         """Receive one of the 3 reserved special streams."""
         if 0 <= position < self.SPECIAL_STREAM_COUNT:
             return self.__internal[position]
         else:
-            raise IndexError("Index must be between 0 and %s, was %s." % (self.SPECIAL_STREAM_COUNT, position))
+            raise StreamManagerError("Index must be between 0 and %s, was %s." % (self.SPECIAL_STREAM_COUNT, position))
 
     def _setup(self):
         pass
@@ -938,7 +893,7 @@ class FixedMultiStreamManager(StreamManager):
 
     STREAM_TRASH = 0
 
-    def recycle(self, chain: StreamBlock):
+    def recycle(self, block: StreamBlock):
         """Recycle a truncated chain of blocks from a stream.
 
         Args:
@@ -947,13 +902,8 @@ class FixedMultiStreamManager(StreamManager):
 
         """
         trash = self.special_stream(self.STREAM_TRASH)
-
-        while chain.next != -1:
-            block = chain
-            chain = self.load_block(chain.next)
-            trash.push_block(block)
-
-        trash.push_block(chain)
+        trash.push(block)
+        self.save_meta()
 
     def reuse(self) -> StreamBlock:
         """Get a recycled block if any available.
@@ -965,7 +915,12 @@ class FixedMultiStreamManager(StreamManager):
         trash = self.special_stream(self.STREAM_TRASH)
         if not trash:
             return None
-        return trash.pop_block()
+
+        try:
+            block = trash.pop()
+            return block
+        except StreamError:
+            return None
 
 
 class DynamicMultiStreamManager(FixedMultiStreamManager):
@@ -1022,13 +977,13 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
 
         """
         if identity in self._streams.keys():
-            raise OSError("Already opened")
+            raise StreamManagerError("Already opened")
         data = self.__registry.search(identity)
         if not data:
-            raise OSError("Identity doesn't exist %s" % identity)
+            raise StreamManagerError("Identity doesn't exist %s" % identity)
         metadata = DataStream.meta_unpack(data)
         if metadata[0] != identity:
-            raise OSError("Identity doesn't match stream %s" % identity)
+            raise StreamManagerError("Identity doesn't match stream %s" % identity)
         stream = DataStream(self, self.load_block(metadata[1]), *metadata)
         self._streams[identity] = stream
         return stream
@@ -1042,7 +997,7 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
 
         """
         if stream.identity not in self._streams:
-            raise OSError("Stream not known to be open.")
+            raise StreamManagerError("Stream not known to be open.")
         stream.save()
         self.__registry.update(stream)
         del self._streams[stream.identity]
@@ -1061,9 +1016,11 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
         """
         metadata = DataStream.meta_unpack(self.__registry.search(identity))
         if metadata[0] != identity:
-            raise OSError("Identity doesn't match stream %s" % identity)
-        # stream = DataStream(self, self.load_block(metadata[1]), *metadata)
-        self.recycle(self.load_block(metadata[1]))
-        # del stream
+            raise StreamManagerError("Identity doesn't match stream %s" % identity)
+
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        stream.truncate(0)
+        self.recycle(stream.block)
         self.__registry.unregister(identity)
+
         return True

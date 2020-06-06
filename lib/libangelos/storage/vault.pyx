@@ -56,7 +56,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         "/messages/spam",
         "/messages/trash",
         # Networks, for other hosts that are trusted
-        "/networks"
+        "/networks",
         # Preferences by the owning entity.
         "/settings",
         "/settings/nodes",

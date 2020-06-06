@@ -1,4 +1,4 @@
-import datetime
+import io
 import logging
 import os
 import sys
@@ -8,40 +8,28 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from archive7.archive import Archive7
+from archive7.base import BlockTuple
 from archive7.fs import EntryRecord
+from archive7.operations import BlockProcessor, CorruptDataFilter, InvalidMetaFilter, SyncDecryptor
 
 from angelossim.support import run_async
 
-INIT_HIERARCHY = (
-    "/cache",
-    "/cache/msg",
-    # Contact profiles and links based on directory.
-    "/contacts",
-    "/contacts/favorites",
-    "/contacts/friends",
-    "/contacts/all",
-    "/contacts/blocked",
-    # Issued statements by the vaults entity
-    "/issued",
-    "/issued/verified",
-    "/issued/trusted",
-    "/issued/revoked",
-    # Messages, ingoing and outgoung correspondence
-    "/messages",
-    "/messages/inbox",
-    "/messages/read",
-    "/messages/drafts",
-    "/messages/outbox",
-    "/messages/sent",
-    "/messages/spam",
-    "/messages/trash",
-    # Networks, for other hosts that are trusted
-    "/networks",
-    # Preferences by the owning entity.
-    "/settings",
-    "/settings/nodes",
-    "/portfolios",
-)
+
+class TestBlockProcessor(BlockProcessor):
+    def __init__(self, fileobj: io.FileIO, secret: bytes):
+        BlockProcessor.__init__(self, fileobj, SyncDecryptor(secret))
+
+    def _filters(self):
+        return (
+            CorruptDataFilter(),
+            InvalidMetaFilter()
+        )
+
+    def process(self, position: int, block: BlockTuple, result: tuple):
+        if result[0]:
+            print("Block %s has corrupt data" % position)
+        if result[1]:
+            print("Block %s self-referencing pointers" % position)
 
 
 class BaseArchiveTestCase(TestCase):
@@ -49,7 +37,7 @@ class BaseArchiveTestCase(TestCase):
     def setUpClass(cls) -> None:
         """Setup test class with a facade and ten contacts."""
         tracemalloc.start()
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+        logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
         cls.secret = os.urandom(32)
 
@@ -75,6 +63,14 @@ class TestHeader(TestCase):
 
 
 class TestArchive7(BaseArchiveTestCase):
+    def analyze(self):
+        fileobj = open(self.filename, "rb+")
+        processor = TestBlockProcessor(fileobj, self.secret)
+        processor.run()
+        for f in processor.filter:
+            self.assertFalse(f.data)
+        fileobj.close()
+
     def test_setup(self):
         try:
             archive = Archive7.setup(self.filename, self.secret)
@@ -159,7 +155,7 @@ class TestArchive7(BaseArchiveTestCase):
     async def test_chmod(self):
         try:
             archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkfile("/first.bin", os.urandom(2**18))
+            await archive.mkfile("/first.bin", os.urandom(2 ** 18))
             await archive.chmod(
                 "/first.bin", owner=uuid.UUID(int=3),
                 deleted=False, user="tester", group="tester", perms=0o755
@@ -173,7 +169,7 @@ class TestArchive7(BaseArchiveTestCase):
         try:
             archive = Archive7.setup(self.filename, self.secret)
             await archive.mkdir("/first")
-            await archive.mkfile("/first/second.bin", os.urandom(2**18))
+            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
             self.assertTrue(archive.isdir("/first"))
             self.assertTrue(archive.isfile("/first/second.bin"))
@@ -189,7 +185,7 @@ class TestArchive7(BaseArchiveTestCase):
         try:
             archive = Archive7.setup(self.filename, self.secret)
             await archive.mkdir("/first")
-            await archive.mkfile("/first/second.bin", os.urandom(2**18))
+            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
             self.assertTrue(archive.isdir("/first"))
             self.assertTrue(archive.isfile("/first/second.bin"))
@@ -206,7 +202,7 @@ class TestArchive7(BaseArchiveTestCase):
             archive = Archive7.setup(self.filename, self.secret)
             await archive.mkdir("/first")
             await archive.mkdir("/first/second")
-            await archive.mkfile("/first/third.bin", os.urandom(2**18))
+            await archive.mkfile("/first/third.bin", os.urandom(2 ** 18))
 
             self.assertTrue(archive.isdir("/first"))
             self.assertTrue(archive.isdir("/first/second"))
@@ -221,15 +217,16 @@ class TestArchive7(BaseArchiveTestCase):
             archive = Archive7.setup(self.filename, self.secret)
             await archive.mkdir("/first")
             await archive.mkdir("/first/second")
-            await archive.mkfile("/first/second.bin", os.urandom(2**18))
+            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
             self.assertFalse(archive.isfile("/first"))
             self.assertFalse(archive.isfile("/first/second"))
             self.assertTrue(archive.isfile("/first/second.bin"))
             archive.close()
+
+            self.analyze()
         except Exception as e:
             self.fail(e)
-
 
     @run_async
     async def test_islink(self):
@@ -243,6 +240,8 @@ class TestArchive7(BaseArchiveTestCase):
             self.assertTrue(archive.isfile("/first/second.bin"))
             self.assertTrue(archive.islink("/first/third"))
             archive.close()
+
+            self.analyze()
         except Exception as e:
             self.fail(e)
 
@@ -254,6 +253,8 @@ class TestArchive7(BaseArchiveTestCase):
             self.assertIsInstance(await archive.mkdir("/first/second"), uuid.UUID)
             self.assertIsInstance(await archive.mkdir("/first/second/third"), uuid.UUID)
             archive.close()
+
+            self.analyze()
         except Exception as e:
             self.fail(e)
 
@@ -261,8 +262,10 @@ class TestArchive7(BaseArchiveTestCase):
     async def test_mkfile(self):
         try:
             archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkfile("/first.bin", os.urandom(2**20)), uuid.UUID)
+            self.assertIsInstance(await archive.mkfile("/first.bin", os.urandom(2 ** 20)), uuid.UUID)
             archive.close()
+
+            self.analyze()
         except Exception as e:
             self.fail(e)
 
@@ -274,6 +277,8 @@ class TestArchive7(BaseArchiveTestCase):
             self.assertIsInstance(await archive.mkfile("/first/second.bin", os.urandom(2 ** 18)), uuid.UUID)
             self.assertIsInstance(await archive.link("/first/third", "/first/second.bin"), uuid.UUID)
             archive.close()
+
+            self.analyze()
         except Exception as e:
             self.fail(e)
 
@@ -283,16 +288,18 @@ class TestArchive7(BaseArchiveTestCase):
             filename = "/first.bin"
 
             archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkfile(filename, os.urandom(2**20)), uuid.UUID)
-            self.assertIsInstance(await archive.save(filename, os.urandom(2**19)), uuid.UUID)
+            self.assertIsInstance(await archive.mkfile(filename, os.urandom(2 ** 20)), uuid.UUID)
+            self.assertIsInstance(await archive.save(filename, os.urandom(2 ** 19)), uuid.UUID)
             archive.close()
+
+            self.analyze()
         except Exception as e:
             self.fail(e)
 
     @run_async
     async def test_load(self):
         try:
-            data = os.urandom(2**20)
+            data = os.urandom(2 ** 20)
             filename = "/first.bin"
 
             archive = Archive7.setup(self.filename, self.secret)
@@ -302,18 +309,3 @@ class TestArchive7(BaseArchiveTestCase):
         except Exception as e:
             self.fail(e)
 
-    @run_async
-    async def test_mkdir_error(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            for i in INIT_HIERARCHY:
-                print(i)
-                self.assertIsInstance(await archive.mkdir(i), uuid.UUID)
-
-            print("#### TEST ####")
-            for i in INIT_HIERARCHY:
-                print(i)
-                self.assertTrue(archive.isdir(i))
-            archive.close()
-        except Exception as e:
-            self.fail(e)

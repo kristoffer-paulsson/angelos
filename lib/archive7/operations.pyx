@@ -14,9 +14,7 @@ from io import FileIO, SEEK_END
 from typing import Union, Generator
 
 import libnacl.secret
-from archive7.base import BLOCK_SIZE
-
-from base import FORMAT_BLOCK, BlockTuple
+from archive7.base import BLOCK_SIZE, FORMAT_BLOCK, BlockTuple
 
 
 class StreamIterator(Iterator):
@@ -26,7 +24,7 @@ class StreamIterator(Iterator):
         self._fd = fileobj
 
         self._fd.seek(0, SEEK_END)
-        length = self.__file.tell()
+        length = self._fd.tell()
 
         if length % BLOCK_SIZE:
             raise OSError("Archive length uneven to block size.")
@@ -36,7 +34,7 @@ class StreamIterator(Iterator):
         if generator:
             self._generator = generator
         else:
-            self._generator = range(self._count)
+            self._generator = iter(range(self._count))
 
     @property
     def position(self) -> int:

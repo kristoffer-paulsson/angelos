@@ -61,17 +61,32 @@ def write_to_file(file_fd: io.FileIO, data: bytes):
     while written < length_to_write:
         written += file_fd.write(data[written:])
 
-def read_from_file(file_fd: io.FileIO, start: int, stop: int) -> bytes:
+def _read_from_file(file_fd: io.FileIO, start: int, stop: int) -> bytes:
+    print("Start", start, stop)
     length = stop - start
     assert length >= 0
     file_fd.seek(start)
     data = bytes()
     while file_fd.tell() < stop:
+        print("While", file_fd.tell(), stop, stop - file_fd.tell())
         read_data = file_fd.read(stop - file_fd.tell())
+        print("Length", len(read_data))
         if read_data == b'':
             raise ReachedEndOfFile('Read until the end of file')
         data += read_data
     assert len(data) == length
+    return data
+
+def read_from_file(file_fd: io.FileIO, start: int, stop: int) -> bytes:
+    length = stop - start
+    assert length >= 0
+    to = file_fd.seek(start)
+    assert to == start
+    data = file_fd.read(length)
+    if data == b'':
+        raise ReachedEndOfFile('Read until the end of file')
+    assert len(data) == length
+
     return data
 
 
