@@ -41,6 +41,7 @@ clean:
 	find ./lib -name \*.so -type f -delete
 	find ./lib -name \*.dylib -type f -delete
 	find ./lib -name \*.dll -type f -delete
+	find ./lib -name \*.c -type f -delete
 	rm -fr ./docs/html/
 	rm -fr ./docs/doctrees/
 

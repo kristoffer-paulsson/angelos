@@ -19,6 +19,7 @@
 /logo/
 *.egg-info/
 /.buildozer/
+/usr/
 # /.idea/
 
 .DS_Store

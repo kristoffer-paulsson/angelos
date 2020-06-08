@@ -5,19 +5,77 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Angelos build script."""
+import os
+import re
 from glob import glob
 from os import path
-from setuptools import setup
+from setuptools import setup, Extension
 from Cython.Build import cythonize
 
-
 base_dir = path.abspath(path.dirname(__file__))
+
+
+class LibraryScanner:
+    """Scan directories for Cython *.pyx files and configure extensions to build."""
+
+    def __init__(self, base_path: str, globlist: list = None, pkgdata: dict = None, data: dict = None):
+        self.__base_path = base_path
+        self.__globlist = globlist if globlist else ["**.pyx"]
+        self.__pkgdata = pkgdata if pkgdata else {}
+        self.__data = data if data else {
+            "compiler_directives": {
+                "language_level": 3,
+                "embedsignature": True
+            }
+        }
+
+    def scan(self) -> list:
+        """Build list of Extensions to be cythonized."""
+        glob_result = list()
+        for pattern in self.__globlist:
+            glob_path = os.path.join(self.__base_path, pattern)
+            glob_result += glob(glob_path, recursive=True)
+
+        extensions = list()
+        for module in glob_result:
+            package = re.sub('/', '.', module[len(self.__base_path)+1:-4])
+            data = self.__pkgdata[package] if package in self.__pkgdata else {}
+            core = {"name": package, "sources": [module]}
+            kwargs = {**self.__data, **data, **core}
+            extensions.append(Extension(**kwargs))
+
+        return extensions
+
 
 with open(path.join(base_dir, 'README.md')) as desc:
     long_description = desc.read()
 
 with open(path.join(base_dir, 'version.py')) as version:
     exec(version.read())
+
+globlist = [
+    "bplustree/**.pyx",
+    "archive7/**.pyx",
+    "libangelos/**.pyx",
+    "libangelos/**/*.pyx",
+    "angelos/**.pyx",
+    "angelos/**/*.pyx"
+]
+
+pkgdata = {
+    "libangelos.library.nacl": {
+        "extra_objects": ["usr/local/lib/libsodium.a"]
+    }
+}
+
+coredata = {
+    "build_dir": "build",
+    "compiler_directives": {
+        "language_level": 3,
+        "embedsignature": True
+    }
+}
+
 
 setup(
     name="angelos",
@@ -71,21 +129,27 @@ setup(
     python_requires='~=3.7',
     setup_requires=[
         'cython', 'pyinstaller', 'sphinx', 'sphinx_rtd_theme',
-        'kivy', 'kivymd', 'libnacl', 'plyer', 'asyncssh',
-        'keyring', 'msgpack'],
+        'libnacl', 'plyer', 'asyncssh', 'keyring', 'msgpack'],
     install_requires=[],
     # namespace_packages=['angelos', 'eidon'],
     packages=['libangelos', 'angelos', 'eidon', 'angelossim', 'bplustree', 'archive7'],
     package_dir={'': 'lib'},
     scripts=glob('bin/*'),
-    ext_modules=cythonize(
-        glob('lib/libangelos/**.pyx', recursive=True) +
-        glob('lib/libangelos/**/*.pyx', recursive=True) +
-        glob('lib/angelos/**.pyx', recursive=True) +
-        glob('lib/angelos/**/*.pyx', recursive=True) +
-        glob('lib/bplustree/**.pyx', recursive=True) +
-        glob('lib/archive7/**.pyx', recursive=True),
-        gdb_debug=True,
-        build_dir="build", compiler_directives={
-            'language_level': 3, 'embedsignature': True})
+    ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan())
 )
+
+"""ext_modules=cythonize(
+    glob('lib/bplustree/**.pyx', recursive=True) +
+    glob('lib/archive7/**.pyx', recursive=True) +
+    glob('lib/libangelos/**.pyx', recursive=True) +
+    glob('lib/libangelos/**/*.pyx', recursive=True) +
+    glob('lib/angelos/**.pyx', recursive=True) +
+    glob('lib/angelos/**/*.pyx', recursive=True),
+    build_dir="build",
+    extra_objects=["libsodium.a"],
+    compiler_directives={
+        'language_level': 3, 'embedsignature': True})"""
+
+
+
+
