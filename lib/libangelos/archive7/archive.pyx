@@ -22,8 +22,8 @@ from libangelos.error import Error
 from libangelos.misc import SharedResource
 from libangelos.utils import Util
 
-from archive7.fs import FileSystemStreamManager
-from archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
+from libangelos.archive7.fs import FileSystemStreamManager
+from libangelos.archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
 
 # FIXME: Move compression, size and length to stream level.
 

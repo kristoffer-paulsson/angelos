@@ -14,10 +14,11 @@ from abc import abstractmethod, ABC
 from os import SEEK_CUR, SEEK_SET, SEEK_END
 from typing import Union
 
-import libnacl.secret
 from archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError, \
     StreamError, BaseFileObject, StreamManagerError
 from bplustree.serializer import UUIDSerializer
+from libangelos.library.nacl import SecretBox
+
 from bplustree.tree import SingleItemTree
 
 BLANK_DATA = b"\x00" * DATA_SIZE
@@ -669,7 +670,7 @@ class StreamManager(ABC):
         self.__closed = False
         self.__file = None
         self.__secret = secret
-        self.__box = libnacl.secret.SecretBox(secret)
+        self.__box = SecretBox(secret)
         self.__count = 0
         self.__meta = None
         self.__blocks = [None for _ in range(max(self.SPECIAL_BLOCK_COUNT, 1))]

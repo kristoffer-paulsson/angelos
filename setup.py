@@ -38,7 +38,7 @@ class LibraryScanner:
 
         extensions = list()
         for module in glob_result:
-            package = re.sub('/', '.', module[len(self.__base_path)+1:-4])
+            package = re.sub("/", ".", module[len(self.__base_path)+1:-4])
             data = self.__pkgdata[package] if package in self.__pkgdata else {}
             core = {"name": package, "sources": [module]}
             kwargs = {**self.__data, **data, **core}
@@ -47,15 +47,14 @@ class LibraryScanner:
         return extensions
 
 
-with open(path.join(base_dir, 'README.md')) as desc:
+with open(path.join(base_dir, "README.md")) as desc:
     long_description = desc.read()
 
-with open(path.join(base_dir, 'version.py')) as version:
+with open(path.join(base_dir, "version.py")) as version:
     exec(version.read())
 
 globlist = [
     "bplustree/**.pyx",
-    "archive7/**.pyx",
     "libangelos/**.pyx",
     "libangelos/**/*.pyx",
     "angelos/**.pyx",
@@ -70,6 +69,7 @@ pkgdata = {
 
 coredata = {
     "build_dir": "build",
+    "cython_c_in_temp": True,
     "compiler_directives": {
         "language_level": 3,
         "embedsignature": True
@@ -80,12 +80,12 @@ coredata = {
 setup(
     name="angelos",
     version=__version__,  # noqa F821
-    license='MIT',
-    description='A safe messaging system',
+    license="MIT",
+    description="A safe messaging system",
     author=__author__,  # noqa F821
     author_email=__author_email__,  # noqa F821
     long_description=long_description,  # noqa F821
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
     url=__url__,  # noqa F821
     # project_urls={
     #    "Bug Tracker": "https://bugs.example.com/HelloWorld/",
@@ -93,62 +93,50 @@ setup(
     #    "Source Code": "https://code.example.com/HelloWorld/",
     # }
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Environment :: Console',
-        'Environment :: Handhelds/PDA\'s',
-        # 'Environment :: MacOS X',
-        # 'Environment :: Win32 (MS Windows)',
-        'Environment :: No Input/Output (Daemon)',
-        # 'Environment :: X11 Applications :: Gnome',
-        'Framework :: AsyncIO',
-        'Intended Audience :: Developers',
-        # 'Intended Audience :: End Users/Desktop',
-        'Intended Audience :: Information Technology',
-        'Intended Audience :: Religion',
-        'Intended Audience :: System Administrators',
-        'Intended Audience :: Telecommunications Industry',
-        'License :: OSI Approved :: MIT License',
-        'Operating System :: MacOS :: MacOS X',
-        'Operating System :: Microsoft :: Windows',
-        'Operating System :: POSIX',
-        # 'Programming Language :: C',
-        'Programming Language :: Cython',
-        'Programming Language :: Python :: 3.7',
-        'Topic :: Communications :: Chat',
-        'Topic :: Communications :: Email',
-        'Topic :: Communications :: File Sharing',
-        'Topic :: Documentation',
-        'Topic :: Internet',
-        'Topic :: Religion',
-        'Topic :: Security',
-        'Topic :: System :: Archiving',
-        'Topic :: Utilities',
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Environment :: Handhelds/PDA\'s",
+        # "Environment :: MacOS X",
+        # "Environment :: Win32 (MS Windows)",
+        "Environment :: No Input/Output (Daemon)",
+        # "Environment :: X11 Applications :: Gnome",
+        "Framework :: AsyncIO",
+        "Intended Audience :: Developers",
+        # "Intended Audience :: End Users/Desktop",
+        "Intended Audience :: Information Technology",
+        "Intended Audience :: Religion",
+        "Intended Audience :: System Administrators",
+        "Intended Audience :: Telecommunications Industry",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX",
+        # "Programming Language :: C",
+        "Programming Language :: Cython",
+        "Programming Language :: Python :: 3.7",
+        "Topic :: Communications :: Chat",
+        "Topic :: Communications :: Email",
+        "Topic :: Communications :: File Sharing",
+        "Topic :: Documentation",
+        "Topic :: Internet",
+        "Topic :: Religion",
+        "Topic :: Security",
+        "Topic :: System :: Archiving",
+        "Topic :: Utilities",
     ],
     zip_safe=False,
-    test_suite='tests',
-    python_requires='~=3.7',
+    test_suite="tests",
+    python_requires="~=3.7",
     setup_requires=[
-        'cython', 'pyinstaller', 'sphinx', 'sphinx_rtd_theme',
-        'libnacl', 'plyer', 'asyncssh', 'keyring', 'msgpack'],
+        "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
+        "plyer", "asyncssh", "keyring", "msgpack"],
     install_requires=[],
-    # namespace_packages=['angelos', 'eidon'],
-    packages=['libangelos', 'angelos', 'eidon', 'angelossim', 'bplustree', 'archive7'],
-    package_dir={'': 'lib'},
-    scripts=glob('bin/*'),
+    # namespace_packages=["angelos", "eidon"],
+    packages=["libangelos", "angelos", "eidon", "angelossim", "bplustree"],
+    package_dir={"": "lib"},
+    scripts=glob("bin/*"),
     ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan())
 )
-
-"""ext_modules=cythonize(
-    glob('lib/bplustree/**.pyx', recursive=True) +
-    glob('lib/archive7/**.pyx', recursive=True) +
-    glob('lib/libangelos/**.pyx', recursive=True) +
-    glob('lib/libangelos/**/*.pyx', recursive=True) +
-    glob('lib/angelos/**.pyx', recursive=True) +
-    glob('lib/angelos/**/*.pyx', recursive=True),
-    build_dir="build",
-    extra_objects=["libsodium.a"],
-    compiler_directives={
-        'language_level': 3, 'embedsignature': True})"""
 
 
 

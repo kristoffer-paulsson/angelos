@@ -15,7 +15,8 @@ import string
 import uuid
 from tempfile import TemporaryDirectory
 
-import libnacl
+from libangelos.library.nacl import SecretBox
+
 from libangelos.storage.portfolio_mixin import PortfolioMixin
 from libangelos.const import Const
 from libangelos.document.document import DocType
@@ -174,7 +175,7 @@ class Generate:
             Encryption key
 
         """
-        return libnacl.secret.SecretBox().sk
+        return SecretBox().sk
 
 
 class Introspection:

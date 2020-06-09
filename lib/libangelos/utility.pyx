@@ -20,7 +20,8 @@ import re
 import sys
 import uuid
 
-import libnacl
+from libangelos.library.nacl import SecretBox
+
 from archive7.archive import Archive7
 from archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
 from libangelos.error import ArchiveInvalidSeek
@@ -61,7 +62,7 @@ def get_key(args, generate=False):
         return binascii.unhexlify(key)
     elif len(key) == 0 and generate:
         out("\nGenerate encryption key!\n")
-        key = libnacl.secret.SecretBox().sk
+        key = SecretBox().sk
         out(
             "The new encryption key is:\n"
             + "\033[32m%s\033[0m\n(\033[36;5mMake a backup!\033[0m)\n"

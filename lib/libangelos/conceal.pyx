@@ -26,8 +26,8 @@ import math
 import os
 import struct
 
-import libnacl.secret
 from libangelos.error import Error
+from libangelos.library.nacl import SecretBox
 from libangelos.utils import Util
 
 
@@ -67,7 +67,7 @@ class ConcealIO(io.RawIOBase):
 
         fcntl.flock(self._fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-        self._box = libnacl.secret.SecretBox(secret)
+        self._box = SecretBox(secret)
         self._count = int(
             os.fstat(self._fd.fileno()).st_size / ConcealIO.TOT_SIZE
         )

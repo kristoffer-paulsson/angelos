@@ -13,8 +13,8 @@ from collections.abc import Iterator
 from io import FileIO, SEEK_END
 from typing import Union, Generator
 
-import libnacl.secret
 from archive7.base import BLOCK_SIZE, FORMAT_BLOCK, BlockTuple
+from libangelos.library.nacl import SecretBox, CryptoBox
 
 
 class StreamIterator(Iterator):
@@ -97,7 +97,7 @@ class SyncEncryptor(EncryptorBase):
     """Synchronous NaCl encryption."""
 
     def __init__(self, secret: bytes):
-        EncryptorBase.__init__(self, libnacl.secret.SecretBox(secret))
+        EncryptorBase.__init__(self, SecretBox(secret))
 
     def encrypt(self, data: Union[bytes, bytearray]) -> bytes:
         """Synchronously encrypt data"""
@@ -108,7 +108,7 @@ class SyncDecryptor(DecryptorBase):
     """Synchronous NaCl decryption."""
 
     def __init__(self, secret: bytes):
-        DecryptorBase.__init__(self, libnacl.secret.SecretBox(secret))
+        DecryptorBase.__init__(self, SecretBox(secret))
 
     def decrypt(self, data: Union[bytes, bytearray]) -> bytes:
         """Synchronously decrypt data"""
@@ -119,7 +119,7 @@ class AsyncEncryptor(EncryptorBase):
     """Asynchronous NaCl encryption."""
 
     def __init__(self, secret: bytes, public: bytes):
-        EncryptorBase.__init__(self, libnacl.public.Box(secret, public))
+        EncryptorBase.__init__(self, CryptoBox(secret, public))
 
     def encrypt(self, data: Union[bytes, bytearray]) -> bytes:
         """Asynchronously encrypt data"""
@@ -130,7 +130,7 @@ class AsyncDecryptor(DecryptorBase):
     """Asynchronous NaCl decryption."""
 
     def __init__(self, secret: bytes, public: bytes):
-        DecryptorBase.__init__(self, libnacl.public.Box(secret, public))
+        DecryptorBase.__init__(self, CryptoBox(secret, public))
 
     def decrypt(self, data: Union[bytes, bytearray]) -> bytes:
         """Asynchronously decrypt data"""

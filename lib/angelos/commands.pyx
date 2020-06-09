@@ -13,7 +13,7 @@ import os
 import signal
 import time
 
-import libnacl
+from libangelos.library.nacl import SecretBox
 from libangelos.misc import Misc
 
 from angelos.cmd import Command, Option
@@ -193,7 +193,7 @@ documents and connect to the nodes on the current domain network.
                 ip = await self.do_ip()
 
                 # Generate master key
-                secret = libnacl.secret.SecretBox().sk
+                secret = SecretBox().sk
                 self._io << (
                     "This is the Master key for this entity.\n"
                     + "Make a backup, don't loose it!\n\n"

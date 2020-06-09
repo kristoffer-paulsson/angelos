@@ -14,7 +14,7 @@ import math
 import re
 import sys
 
-import libnacl.secret
+from libangelos.library.nacl import SecretBox
 
 BYTES_SUF = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 ENDING_SUF = (".ar7", ".log.ar7", ".tar.ar7")
@@ -53,7 +53,7 @@ def get_key(args, generate=False):
         return binascii.unhexlify(key)
     elif len(key) == 0 and generate:
         out("\nGenerate encryption key!\n")
-        key = libnacl.secret.SecretBox().sk
+        key = SecretBox().sk
         out(
             "The new encryption key is:\n"
             + "\033[32m%s\033[0m\n(\033[36;5mMake a backup!\033[0m)\n"

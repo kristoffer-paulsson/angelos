@@ -8,7 +8,7 @@
 import base64
 import sys
 
-import libnacl
+from libangelos.library.nacl import SecretBox
 
 from libangelos.policy.policy import Policy
 
@@ -33,7 +33,7 @@ else:
 class KeyLoader(Policy):
     @staticmethod
     def new():
-        return libnacl.secret.SecretBox().sk
+        return SecretBox().sk
 
     @staticmethod
     def set(master, key=None):
@@ -41,7 +41,7 @@ class KeyLoader(Policy):
             key = KeyLoader.new()
 
         set_key("Λόγῳ", "angelos-conceal", base64.b64encode(key).decode())
-        box = libnacl.secret.SecretBox(key)
+        box = SecretBox(key)
 
         set_key(
             "Λόγῳ", "angelos-masterkey", base64.b64encode(
@@ -50,7 +50,7 @@ class KeyLoader(Policy):
     @staticmethod
     def get():
         key = base64.b64decode(get_key("Λόγῳ", "angelos-conceal"))
-        box = libnacl.secret.SecretBox(key)
+        box = SecretBox(key)
         master = base64.b64decode(get_key("Λόγῳ", "angelos-masterkey"))
         master_key = box.decrypt(master)
         return master_key

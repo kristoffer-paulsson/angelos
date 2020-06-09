@@ -7,9 +7,10 @@
 """Module docstring."""
 import datetime
 
-import libnacl.dual
 from libangelos.document.entities import PrivateKeys, Keys, Person, Ministry, Church
 from libangelos.document.types import EntityT
+from libangelos.library.nacl import DualSecret
+
 from libangelos.policy.crypto import Crypto
 from libangelos.policy.policy import Policy
 from libangelos.policy.portfolio import PrivatePortfolio
@@ -28,7 +29,7 @@ class BaseEntityPolicy(Policy):
 
     @staticmethod
     def _generate(klass, entity_data: EntityDataT) -> PrivatePortfolio:
-        box = libnacl.dual.DualSecret()
+        box = DualSecret()
 
         entity = klass(nd=entity_data._asdict())
         entity.issuer = entity.id
@@ -98,7 +99,7 @@ class BaseEntityPolicy(Policy):
     @staticmethod
     def newkeys(portfolio: PrivatePortfolioABC) -> bool:
         """Issue a new pair of keys"""
-        box = libnacl.dual.DualSecret()
+        box = DualSecret()
 
         new_pk = PrivateKeys(
             nd={

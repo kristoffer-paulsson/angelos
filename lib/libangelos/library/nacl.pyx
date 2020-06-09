@@ -89,7 +89,7 @@ class SecretBox(BaseKey):
         self._sk = key
 
     def encrypt(self, message: bytes) -> bytes:
-        nonce = self._rand_nonce()
+        nonce = BaseKey.rand_nonce()
         pad = b"\x00" * SIZE_SECRETBOX_ZERO + message
         pad_len = len(pad)
         crypto = b"\x00" * pad_len
@@ -111,7 +111,6 @@ class SecretBox(BaseKey):
 
 
 class Signer(BaseKey):
-
     def __init__(self, seed: bytes = None):
         BaseKey.__init__(self)
 
@@ -119,7 +118,7 @@ class Signer(BaseKey):
             if len(seed) != SIZE_SIGN_SEED:
                 raise ValueError("Invalid seed bytes")
         else:
-            seed = self._randombytes(SIZE_SIGN_SEED)
+            seed = BaseKey.randombytes(SIZE_SIGN_SEED)
 
         sk = b"\00" * SIZE_SIGN_SECRETKEY
         vk = b"\00" * SIZE_SIGN_PUBLICKEY
@@ -176,7 +175,7 @@ class PublicKey(BaseKey):
         if len(pk) != SIZE_BOX_PUBLICKEY:
             raise ValueError("Passed in invalid public key")
 
-        self.pk = pk
+        self._pk = pk
 
 
 class SecretKey(BaseKey):
@@ -199,10 +198,10 @@ class SecretKey(BaseKey):
 
 
 class DualSecret(BaseKey):
-    def __init__(self, secret_key: bytes = None, seed: bytes = None):
+    def __init__(self, sk: bytes = None, seed: bytes = None):
         BaseKey.__init__(self)
 
-        self.__crypt = SecretKey(secret_key)
+        self.__crypt = SecretKey(sk)
         self.__signer = Signer(seed)
 
         self._sk = self.__crypt.sk
@@ -217,7 +216,7 @@ class DualSecret(BaseKey):
         return self.__signer.signature(message)
 
 
-class Box:
+class CryptoBox:
     def __init__(self, sk: Union[SecretKey, DualSecret], pk: PublicKey):
         sk = sk.sk
         pk = pk.pk
@@ -226,7 +225,6 @@ class Box:
             k = b"\x00" * SIZE_BOX_BEFORENM
             fail = crypto_box_beforenm(k, pk, sk)
             if fail:
-                # raise CryptError('Unable to compute shared key')
                 raise RuntimeError("Unable to compute shared key")
             self._k = k
 
@@ -244,11 +242,11 @@ class Box:
     def decrypt(self, crypto: bytes) -> bytes:
         nonce = crypto[:SIZE_BOX_NONCE]
         crypto = crypto[SIZE_BOX_NONCE:]
-
         pad = b"\x00" * SIZE_BOX_BOXZERO + crypto
         pad_len = len(pad)
         message = b"\x00" * pad_len
         fail = crypto_box_open_afternm(message, pad, pad_len, nonce, self._k)
         if fail:
             raise RuntimeError("Unable to decrypt message")
+
         return message[SIZE_BOX_ZERO:]

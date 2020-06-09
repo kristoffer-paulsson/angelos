@@ -6,11 +6,10 @@
 #
 """Module docstring."""
 import base64
-
-import libnacl.sign
 import asyncssh
 
 from asyncssh.public_key import register_public_key_alg
+from libangelos.library.nacl import Signer, Verifier
 
 from libangelos.utils import Util
 
@@ -38,14 +37,14 @@ class NaClPrivateKey(BaseKey):
     def construct(cls, seed):
         """Construct an NaCl public key."""
         Util.is_type(seed, bytes)
-        box = libnacl.sign.Signer(seed)
+        box = Signer(seed)
 
         return cls(box.seed, box)
 
     @classmethod
     def generate(cls):
         """Generate a new NaCl private key."""
-        box = libnacl.sign.Signer()
+        box = Signer()
 
         return cls(box.seed, box)
 
@@ -66,7 +65,7 @@ class NaClPublicKey(BaseKey):
     def construct(cls, verify):
         """Construct an NaCl public key."""
         Util.is_type(verify, bytes)
-        box = libnacl.sign.Verifier(verify.hex())
+        box = Verifier(verify)
 
         return cls(verify, box)
 

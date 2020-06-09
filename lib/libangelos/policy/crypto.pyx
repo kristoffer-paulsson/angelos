@@ -5,11 +5,11 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Conceal/unveal algorithms."""
-import libnacl
 import datetime
 
 from typing import Set, List, Union
 
+from libangelos.library.nacl import CryptoBox, Signer, Verifier
 from libangelos.utils import Util
 from libangelos.document.types import DocumentT
 from libangelos.document.entities import Keys
@@ -139,7 +139,7 @@ class Crypto:
         if today > keys.expires:
             raise RuntimeError("The receiving keys has expired")
 
-        return libnacl.public.Box(
+        return CryptoBox(
             sender.privkeys.secret, keys.public
         ).encrypt(data)
 
@@ -172,7 +172,7 @@ class Crypto:
         if today > keys.expires:
             raise RuntimeError("The concealing keys has expired")
 
-        return libnacl.public.Box(
+        return CryptoBox(
             receiver.privkeys.secret, keys.public
         ).decrypt(data)
 
@@ -210,7 +210,7 @@ class Crypto:
         data = bytes(signer.entity.id.bytes) + Crypto.document_data(
             document, exclude
         )
-        signature = libnacl.sign.Signer(signer.privkeys.seed).signature(data)
+        signature = Signer(signer.privkeys.seed).signature(data)
 
         if multiple:
             if not document.signature:
@@ -226,7 +226,7 @@ class Crypto:
     @staticmethod
     def __verifier(signature: Union[bytes, list], data: bytes, keys: Keys):
         """Verify data and signature(s) against a public key."""
-        verifier = libnacl.sign.Verifier(keys.verify.hex())
+        verifier = Verifier(keys.verify)
 
         for signature in signature if isinstance(signature, list) else [signature]:
             try:
@@ -300,7 +300,7 @@ class Crypto:
             data = bytes(document.issuer.bytes) + Crypto.document_data(
                 document, exclude
             )
-            verifier = libnacl.sign.Verifier(keys.verify.hex())
+            verifier = Verifier(keys.verify)
 
             # Exchange the verifier loop to this one!
             for signature in document.signature if isinstance(document.signature, list) else [document.signature]:
@@ -360,7 +360,7 @@ class Crypto:
             + bytes(signer.entity.id.bytes)
             + Crypto.document_data(header)
         )
-        signature = libnacl.sign.Signer(signer.privkeys.seed).signature(data)
+        signature = Signer(signer.privkeys.seed).signature(data)
 
         header.signature = signature
         return header
@@ -392,7 +392,7 @@ class Crypto:
                     "Header/Keys issuer or Entity id doesn't match"
                 )
 
-            verifier = libnacl.sign.Verifier(keys.verify.hex())
+            verifier = Verifier(keys.verify)
 
             try:
                 verifier.verify(header.signature + data)
