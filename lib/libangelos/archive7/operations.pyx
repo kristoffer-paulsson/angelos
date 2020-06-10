@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from io import FileIO, SEEK_END
 from typing import Union, Generator
 
-from archive7.base import BLOCK_SIZE, FORMAT_BLOCK, BlockTuple
+from libangelos.archive7.base import BLOCK_SIZE, FORMAT_BLOCK, BlockTuple
 from libangelos.library.nacl import SecretBox, CryptoBox
 
 

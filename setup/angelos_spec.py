@@ -33,7 +33,7 @@ def angelos_import(path):
 extra_import = [  # Internal python packages
     "asyncio", "dataclasses", "logging.config", "uuid", "fcntl", "csv"
 
-    ] + ["asyncssh", "msgpack", "libnacl.sign", "libnacl.secret", "plyer",
+    ] + ["asyncssh", "msgpack", "plyer",
     "plyer.platforms", "plyer.platforms.macosx",
     "plyer.platforms.macosx.uniqueid"
     ] + angelos_import("lib/libangelos") + angelos_import("lib/angelos")

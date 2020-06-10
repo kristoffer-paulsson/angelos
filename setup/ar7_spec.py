@@ -10,9 +10,8 @@ import os
 
 dirname = os.path.abspath(os.curdir)
 hidden_imports = [
-    'uuid', 'pathlib', 'libnacl', 'angelos.archive.archive7', 'angelos.ioc',
-    'angelos.utils', 'angelos.error', 'angelos.archive.conceal', 'fcntl',
-    'libnacl.secret']
+    'uuid', 'pathlib', 'angelos.archive.archive7', 'angelos.ioc',
+    'angelos.utils', 'angelos.error', 'angelos.archive.conceal', 'fcntl']
 
 SPEC = """# -*- mode: python -*-
 

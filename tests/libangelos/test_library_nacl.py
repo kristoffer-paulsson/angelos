@@ -233,7 +233,6 @@ class TestCryptoBox(TestCase):
             evert_box = CryptoBox(evert, PublicKey(bengt.pk))
 
             encrypted = bengt_box.encrypt(message)
-            decrypted = evert_box.decrypt(encrypted)
             self.assertNotEqual(message, encrypted)
             self.assertIs(
                 len(encrypted),

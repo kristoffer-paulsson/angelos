@@ -14,7 +14,7 @@ from abc import abstractmethod, ABC
 from os import SEEK_CUR, SEEK_SET, SEEK_END
 from typing import Union
 
-from archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError, \
+from libangelos.archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError, \
     StreamError, BaseFileObject, StreamManagerError
 from bplustree.serializer import UUIDSerializer
 from libangelos.library.nacl import SecretBox
@@ -776,7 +776,7 @@ class StreamManager(ABC):
 
     def special_block(self, position: int):
         """Receive one of the 8 reserved special blocks."""
-        if 0 <= position <= 7:
+        if 0 <= position <= self.SPECIAL_BLOCK_COUNT:
             return self.__blocks[position]
         else:
             raise IndexError("Index must be between 0 and 7, was %s." % position)
@@ -945,6 +945,361 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
 
     def __init__(self, filename: str, secret: bytes):
         StreamManager.__init__(self, filename, secret)
+        self.__registry = StreamRegistry(self)
+
+    def _close(self):
+        self.__registry.close()
+
+    def new_stream(self) -> DataStream:
+        """Create a new data stream.
+
+        Returns (DataStream):
+            The new data stream created.
+
+        """
+        identity = uuid.uuid4()
+        block = self.new_block()
+        block.index = 0
+        block.stream = identity
+        stream = DataStream(self, block, identity, begin=block.position, end=block.position, count=1)
+        self.__registry.register(stream)
+        self._streams[stream.identity] = stream
+        return stream
+
+    def open_stream(self, identity: uuid.UUID) -> DataStream:
+        """Open an existing data stream.
+
+        Args:
+            identity (uuid.UUID):
+                Data stream number.
+
+        Returns (DataStream):
+            The opened data stream object.
+
+        """
+        if identity in self._streams.keys():
+            raise StreamManagerError("Already opened")
+        data = self.__registry.search(identity)
+        if not data:
+            raise StreamManagerError("Identity doesn't exist %s" % identity)
+        metadata = DataStream.meta_unpack(data)
+        if metadata[0] != identity:
+            raise StreamManagerError("Identity doesn't match stream %s" % identity)
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        self._streams[identity] = stream
+        return stream
+
+    def close_stream(self, stream: DataStream) -> bool:
+        """Close an open data stream.
+
+        Args:
+            stream (DataStream):
+                Data stream object being saved.
+
+        """
+        if stream.identity not in self._streams:
+            raise StreamManagerError("Stream not known to be open.")
+        stream.save()
+        self.__registry.update(stream)
+        del self._streams[stream.identity]
+        del stream
+
+    def del_stream(self, identity: uuid.UUID) -> bool:
+        """Delete data stream from file.
+
+        Args:
+            identity (uuid.UUID):
+                Data stream number to be erased.
+
+        Returns (bool):
+            Success of deleting data stream.
+
+        """
+        metadata = DataStream.meta_unpack(self.__registry.search(identity))
+        if metadata[0] != identity:
+            raise StreamManagerError("Identity doesn't match stream %s" % identity)
+
+        stream = DataStream(self, self.load_block(metadata[1]), *metadata)
+        stream.truncate(0)
+        self.recycle(stream.block)
+        self.__registry.unregister(identity)
+
+        return True
+
+
+class BaseStreamManager(ABC):
+    SPECIAL_BLOCK_COUNT = 0
+    SPECIAL_STREAM_COUNT = 0
+
+    BLOCK_META = 0
+
+    @property
+    def closed(self):
+        pass
+
+    @property
+    def created(self):
+        pass
+
+    @abstractmethod
+    def close(self):
+        pass
+
+    @abstractmethod
+    def save_meta(self):
+        pass
+
+    @property
+    def meta(self) -> bytes:
+        return self.__meta.tobytes()
+
+    @meta.setter
+    def meta(self, meta: bytes):
+        self.__meta[0:len(meta)] = meta[:]
+
+    @abstractmethod
+    def special_block(self, position: int):
+        pass
+
+    @abstractmethod
+    def new_block(self) -> StreamBlock:
+        pass
+
+    @abstractmethod
+    def load_block(self, index: int) -> StreamBlock:
+        pass
+
+    @abstractmethod
+    def save_block(self, index: int, block: StreamBlock):
+        pass
+
+    @abstractmethod
+    def special_stream(self, position: int):
+        pass
+
+    @abstractmethod
+    def _setup(self):
+        pass
+
+    @abstractmethod
+    def _open(self):
+        pass
+
+    @abstractmethod
+    def _close(self):
+        pass
+
+    @abstractmethod
+    def recycle(self, chain: StreamBlock) -> bool:
+        pass
+
+    @abstractmethod
+    def reuse(self) -> StreamBlock:
+        pass
+
+
+class HollowStreamManager(BaseStreamManager):
+    SPECIAL_BLOCK_COUNT = 1
+    SPECIAL_STREAM_COUNT = 1
+
+    STREAM_TRASH = 0
+
+    def __init__(self, filename: str, secret: bytes):
+        self.__created = False
+        self.__filename = filename
+        self.__closed = False
+        self.__file = None
+        self.__secret = secret
+        self.__box = SecretBox(secret)
+        self.__count = 0
+        self.__meta = None
+        self.__blocks = [None for _ in range(max(self.SPECIAL_BLOCK_COUNT, 1))]
+        self.__internal = [None for _ in range(self.SPECIAL_STREAM_COUNT)]
+        self._streams = dict()
+
+        if os.path.isfile(filename):
+            # Open and use file
+            self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
+            fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.__file.seek(0, os.SEEK_END)
+            length = self.__file.tell()
+            if length % BLOCK_SIZE:
+                raise StreamManagerError("Archive length uneven to block size.")
+            self.__count = length // BLOCK_SIZE
+
+            for i in range(max(self.SPECIAL_BLOCK_COUNT, 1)):
+                self.__blocks[i] = self.load_block(i)
+            self.__meta = memoryview(self.__blocks[self.BLOCK_META].data)
+
+            streams_data = self.__load_meta()
+            for i in range(self.SPECIAL_STREAM_COUNT):
+                metadata = DataStream.meta_unpack(streams_data[i])
+                stream = InternalStream(self, self.load_block(metadata[1]), *metadata)
+                if stream.identity.int != i:
+                    raise StreamManagerError("Corrupt internal stream identifier, %s." % stream.identity)
+                self.__internal[i] = stream
+                self._streams[stream.identity] = stream
+
+        else:
+            # Setup file before using
+            self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
+            fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            for i in range(max(self.SPECIAL_BLOCK_COUNT, 1)):
+                self.__blocks[i] = self.new_block()
+            self.__meta = memoryview(self.__blocks[self.BLOCK_META].data)
+
+            for i in range(self.SPECIAL_STREAM_COUNT):
+                identity = uuid.UUID(int=i)
+                block = self.new_block()
+                block.index = 0
+                block.stream = identity
+                stream = InternalStream(self, block, identity, begin=block.position, end=block.position, count=1)
+                self.__internal[i] = stream
+                self._streams[identity] = stream
+
+            self.__save_meta()
+            self.__created = True
+
+    @property
+    def closed(self):
+        return self.__closed
+
+    @property
+    def created(self):
+        return self.__created
+
+    def close(self):
+        pass
+
+    def __load_meta(self):
+        stream_data = list()
+        offset = DATA_SIZE - DataStream.SIZE * self.SPECIAL_STREAM_COUNT
+        for i in range(offset, DATA_SIZE, DataStream.SIZE):
+            stream_data.append(self.__meta[i:i + DataStream.SIZE])
+        return stream_data
+
+    def __save_meta(self):
+        offset = DATA_SIZE - DataStream.SIZE * self.SPECIAL_STREAM_COUNT
+        for i in range(self.SPECIAL_STREAM_COUNT):
+            pos = i * DataStream.SIZE
+            self.__meta[offset + pos:offset + pos + DataStream.SIZE] = bytes(self.special_stream(i))
+
+        block = self.special_block(self.BLOCK_META)
+        self.save_block(block.index, block)
+
+    def save_meta(self):
+        """Save meta information."""
+        self.__save_meta()
+
+    @property
+    def meta(self) -> bytes:
+        return self.__meta.tobytes()
+
+    @meta.setter
+    def meta(self, meta: bytes):
+        self.__meta[0:len(meta)] = meta[:]
+
+    def special_block(self, position: int):
+        if 0 <= position <= self.SPECIAL_BLOCK_COUNT:
+            return self.__blocks[position]
+        else:
+            raise IndexError("Index must be between 0 and 7, was %s." % position)
+
+    def new_block(self):
+        block = self.reuse()
+
+        if not block:
+            offset = self.__file.seek(0, os.SEEK_END)
+            index = offset // BLOCK_SIZE
+            block = StreamBlock(position=index)
+            self.__count += 1
+
+            length = self.__file.write(self.__box.encrypt(bytes(block)))
+            if length != BLOCK_SIZE:
+                raise StreamManagerError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+
+        return block
+
+    def load_block(self, index: int):
+        if not (0 <= index < self.__count):
+            raise StreamManagerError("Index out of bounds, %s of %s." % (index, self.__count))
+        position = index * BLOCK_SIZE
+        offset = self.__file.seek(position)
+        if position != offset:
+            raise StreamManagerError("Failed to seek for position %s, ended at %s." % (position, offset))
+        return StreamBlock(position=index, block=self.__box.decrypt(self.__file.read(BLOCK_SIZE)))
+
+    def save_block(self, index: int, block: StreamBlock):
+        if not (0 <= index < self.__count):
+            raise StreamManagerError("Index out of bounds, %s of %s." % (index, self.__count))
+        if index != block.position:
+            raise StreamManagerError("Index %s and position %s are not the same." % (index, block.position))
+        position = index * BLOCK_SIZE
+        offset = self.__file.seek(position)
+        if not position == offset:
+            raise StreamManagerError("Failed to seek for position %s, ended at %s." % (position, offset))
+        length = self.__file.write(self.__box.encrypt(bytes(block)))
+        self.__file.flush()
+        os.fsync(self.__file.fileno())
+        if length != BLOCK_SIZE:
+            raise StreamManagerError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+
+    def special_stream(self, position: int):
+        """Receive one of the 3 reserved special streams."""
+        if 0 <= position < self.SPECIAL_STREAM_COUNT:
+            return self.__internal[position]
+        else:
+            raise StreamManagerError("Index must be between 0 and %s, was %s." % (self.SPECIAL_STREAM_COUNT, position))
+
+    def _setup(self):
+        pass
+
+    def _open(self):
+        pass
+
+    def _close(self):
+        pass
+
+    def recycle(self, block: StreamBlock):
+        """Recycle a truncated chain of blocks from a stream.
+
+        Args:
+            chain (StreamBlock):
+                Block and chain that will be recycled
+
+        """
+        trash = self.special_stream(self.STREAM_TRASH)
+        trash.push(block)
+        self.save_meta()
+
+    def reuse(self) -> StreamBlock:
+        """Get a recycled block if any available.
+
+        Returns (StreamBlock):
+            Block to be reused or None
+
+        """
+        trash = self.special_stream(self.STREAM_TRASH)
+        if not trash:
+            return None
+
+        try:
+            block = trash.pop()
+            return block
+        except StreamError:
+            return None
+
+
+class MultiHollowStreamManager(HollowStreamManager):
+    SPECIAL_BLOCK_COUNT = 1
+    SPECIAL_STREAM_COUNT = 3
+
+    STREAM_INDEX = 1
+    STREAM_INDEX_WAL = 2
+
+    def __init__(self, filename: str, secret: bytes):
+        HollowStreamManager.__init__(self, filename, secret)
         self.__registry = StreamRegistry(self)
 
     def _close(self):

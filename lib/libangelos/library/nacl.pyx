@@ -82,11 +82,12 @@ class SecretBox(BaseKey):
     def __init__(self, key: bytes = None):
         BaseKey.__init__(self)
 
-        if key is None:
-            key = self._salsa_key()
-        if len(key) != SIZE_SECRETBOX_KEY:
-            raise ValueError('Invalid key')
         self._sk = key
+
+        if self._sk is None:
+            self._sk = self._salsa_key()
+        if len(self._sk) != SIZE_SECRETBOX_KEY:
+            raise ValueError('Invalid key')
 
     def encrypt(self, message: bytes) -> bytes:
         nonce = BaseKey.rand_nonce()
@@ -114,22 +115,20 @@ class Signer(BaseKey):
     def __init__(self, seed: bytes = None):
         BaseKey.__init__(self)
 
-        if seed:
-            if len(seed) != SIZE_SIGN_SEED:
+        self._seed = seed
+
+        if self._seed:
+            if len(self._seed) != SIZE_SIGN_SEED:
                 raise ValueError("Invalid seed bytes")
         else:
-            seed = BaseKey.randombytes(SIZE_SIGN_SEED)
+            self._seed = BaseKey.randombytes(SIZE_SIGN_SEED)
 
-        sk = b"\00" * SIZE_SIGN_SECRETKEY
-        vk = b"\00" * SIZE_SIGN_PUBLICKEY
+        self._sk = b"\00" * SIZE_SIGN_SECRETKEY
+        self._vk = b"\00" * SIZE_SIGN_PUBLICKEY
 
-        fail = crypto_sign_seed_keypair(vk, sk, seed)
+        fail = crypto_sign_seed_keypair(self._vk, self._sk, self._seed)
         if fail:
             raise RuntimeError("Failed to generate keypair from seed")
-
-        self._seed = seed
-        self._sk = sk
-        self._vk = vk
 
     def sign(self, message):
         cdef unsigned long long *sig_len = NULL
@@ -182,19 +181,17 @@ class SecretKey(BaseKey):
     def __init__(self, sk: bytes = None):
         BaseKey.__init__(self)
 
-        pk = b"\x00" * SIZE_BOX_PUBLICKEY
+        self._sk = sk
+        self._pk = b"\x00" * SIZE_BOX_PUBLICKEY
 
-        if sk is None:
-            sk = b"\x00" * SIZE_BOX_SECRETKEY
-            crypto_box_keypair(pk, sk)
-        elif len(sk) == SIZE_BOX_SECRETKEY:
-            if crypto_scalarmult_base(pk, sk):
+        if self._sk is None:
+            self._sk = b"\x00" * SIZE_BOX_SECRETKEY
+            crypto_box_keypair(self._pk, self._sk)
+        elif len(self._sk) == SIZE_BOX_SECRETKEY:
+            if crypto_scalarmult_base(self._pk, self._sk):
                 raise RuntimeError("Failed to compute scalar product")
         else:
             raise ValueError("Passed in invalid secret key")
-
-        self._pk = pk
-        self._sk = sk
 
 
 class DualSecret(BaseKey):
@@ -222,11 +219,10 @@ class CryptoBox:
         pk = pk.pk
 
         if pk and sk:
-            k = b"\x00" * SIZE_BOX_BEFORENM
-            fail = crypto_box_beforenm(k, pk, sk)
+            self._k = b"\x00" * SIZE_BOX_BEFORENM
+            fail = crypto_box_beforenm(self._k, pk, sk)
             if fail:
                 raise RuntimeError("Unable to compute shared key")
-            self._k = k
 
     def encrypt(self, message: bytes) -> bytes:
         nonce = BaseKey.rand_nonce()
