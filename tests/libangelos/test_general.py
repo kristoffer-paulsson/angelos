@@ -10,7 +10,7 @@ from unittest import TestCase
 from bplustree.serializer import UUIDSerializer
 from libangelos.archive7.base import DATA_SIZE
 
-from bplustree.tree import SingleItemTree
+from libangelos.bplustree.tree import SingleItemTree
 from libangelos.archive7.streams import HollowStreamManager, MultiHollowStreamManager, VirtualFileObject, \
     DynamicMultiStreamManager
 
@@ -184,7 +184,7 @@ class TestBPlusTree(TestCase):
             tree = SingleItemTree(
                 open(os.path.join(self.home, "database.db"), "wb+"),
                 open(os.path.join(self.home, "journal.db"), "wb+"),
-                page_size=512,
+                page_size=1024,
                 key_size=self.key_size,
                 value_size=self.value_size,
                 cache_size=64,
@@ -199,6 +199,53 @@ class TestBPlusTree(TestCase):
                 bank.add(key)
 
             tree.close()
+
+        except Exception as e:
+            self.fail(e)
+
+    def test_fuzz(self):
+        try:
+            bank = set()
+            tree = SingleItemTree(
+                open(os.path.join(self.home, "database.db"), "wb+"),
+                open(os.path.join(self.home, "journal.db"), "wb+"),
+                page_size=1024,
+                key_size=self.key_size,
+                value_size=self.value_size,
+                cache_size=64,
+                serializer=UUIDSerializer()
+            )
+
+            for _ in range(20000):
+
+                if len(bank) < 10000:
+                    print("Insert")
+                    key = uuid.UUID(bytes=os.urandom(self.key_size))
+                    value = os.urandom(self.value_size)
+                    tree.insert(key, value)
+                    tree.checkpoint()
+                    bank.add(key)
+                    continue
+
+                key = random.choice(list(bank))
+                op = random.randrange(3)
+
+                if op == 0:
+                    tree.get(key)
+                elif op == 1:
+                    tree.update(key, os.urandom(self.value_size))
+                    tree.checkpoint()
+                elif op == 2:
+                    tree.delete(key)
+                    tree.checkpoint()
+                    bank.remove(key)
+
+            for i in bank:
+                tree.delete(i)
+                tree.checkpoint()
+
+            tree.close()
+            print(os.stat(os.path.join(self.home, "database.db")).st_size)
 
         except Exception as e:
             self.fail(e)
