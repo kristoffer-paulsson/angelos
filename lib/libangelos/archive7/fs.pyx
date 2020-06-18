@@ -16,10 +16,11 @@ from collections.abc import Iterator
 from pathlib import PurePath
 from typing import Union
 
+from bplustree.tree import SingleItemTree
 from libangelos.archive7.base import DATA_SIZE
 from libangelos.archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject
-from bplustree.serializer import UUIDSerializer
-from bplustree.tree import SingleItemTree, MultiItemTree
+
+from libangelos.archive7.tree import SimpleBTree, MultiBTree
 
 TYPE_FILE = b"f"  # Represents a file
 TYPE_LINK = b"l"  # Represents a link
@@ -215,19 +216,14 @@ class EntryRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return SingleItemTree(
+        return SimpleBTree(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_ENTRIES),
                 "entries", "wb+"
             ),
-            VirtualFileObject(
-                self._manager.special_stream(FileSystemStreamManager.STREAM_ENTRIES_WAL),
-                "wal", "wb+"
-            ),
-            page_size=DATA_SIZE,
+            order=DATA_SIZE // struct.calcsize(EntryRecord.FORMAT),
             key_size=16,
-            value_size=struct.calcsize(EntryRecord.FORMAT),
-            serializer=UUIDSerializer()
+            value_size=struct.calcsize(EntryRecord.FORMAT)
         )
 
 
@@ -277,14 +273,9 @@ class PathRegistry(Registry):
                 self._manager.special_stream(FileSystemStreamManager.STREAM_PATHS),
                 "paths", "wb+"
             ),
-            VirtualFileObject(
-                self._manager.special_stream(FileSystemStreamManager.STREAM_PATHS_WAL),
-                "wal", "wb+"
-            ),
-            page_size=DATA_SIZE // 4,
+            order=DATA_SIZE // struct.calcsize(PathRecord.FORMAT) // 4,
             key_size=16,
-            value_size=struct.calcsize(PathRecord.FORMAT),
-            serializer=UUIDSerializer()
+            value_size=struct.calcsize(PathRecord.FORMAT)
         )
 
 
@@ -317,19 +308,14 @@ class ListingRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return MultiItemTree(
+        return MultiBTree(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_LISTINGS),
                 "listings", "wb+"
             ),
-            VirtualFileObject(
-                self._manager.special_stream(FileSystemStreamManager.STREAM_LISTINGS_WAL),
-                "wal", "wb+"
-            ),
-            page_size=DATA_SIZE // 4,
+            page_size=DATA_SIZE // struct.calcsize(ListingRecord.FORMAT) // 4,
             key_size=16,
             value_size=struct.calcsize(ListingRecord.FORMAT),
-            serializer=UUIDSerializer()
         )
 
 

@@ -14,12 +14,11 @@ from abc import abstractmethod, ABC
 from os import SEEK_CUR, SEEK_SET, SEEK_END
 from typing import Union
 
-from libangelos.archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, BlockError, \
-    StreamError, BaseFileObject, StreamManagerError
-from bplustree.serializer import UUIDSerializer
+from libangelos.archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, \
+    BlockError, StreamError, BaseFileObject, StreamManagerError
 from libangelos.library.nacl import SecretBox
 
-from bplustree.tree import SingleItemTree
+from libangelos.archive7.tree import SimpleBTree
 
 BLANK_DATA = b"\x00" * DATA_SIZE
 BLANK_BLOCK = struct.pack(
@@ -425,6 +424,7 @@ class InternalStream(BaseStream):
         """Save block."""
         self.save()
 
+
 class DataStream(BaseStream):
     """Stream for general use."""
 
@@ -571,19 +571,14 @@ class StreamRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return SingleItemTree(
+        return SimpleBTree(
             VirtualFileObject(
                 self._manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX),
                 "main", "wb+"
             ),
-            VirtualFileObject(
-                self._manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX_WAL),
-                "wal", "wb+"
-            ),
-            page_size=DATA_SIZE // 4,
+            order=DATA_SIZE // DataStream.SIZE,
             key_size=16,
-            value_size=DataStream.SIZE,
-            serializer=UUIDSerializer()
+            value_size=DataStream.SIZE
         )
 
     def register(self, stream: DataStream) -> int:
@@ -798,7 +793,8 @@ class StreamManager(ABC):
 
             length = self.__file.write(self.__box.encrypt(bytes(block)))
             if length != BLOCK_SIZE:
-                raise StreamManagerError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+                raise StreamManagerError(
+                    "Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
         return block
 
@@ -1217,7 +1213,8 @@ class HollowStreamManager(BaseStreamManager):
 
             length = self.__file.write(self.__box.encrypt(bytes(block)))
             if length != BLOCK_SIZE:
-                raise StreamManagerError("Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
+                raise StreamManagerError(
+                    "Failed writing full block, wrote %s bytes instead of %s." % (length, BLOCK_SIZE))
 
         return block
 

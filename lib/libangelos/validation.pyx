@@ -209,7 +209,7 @@ class Journal:
         if failed:
             self.__failed.append(id(entry))
 
-    def print(self):
+    def printj(self):
         return "{0}\n{1}{2}".format(
             Util.headline("POLICY REPORT", "(Begin)"),
             self,
