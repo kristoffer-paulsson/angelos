@@ -10,6 +10,7 @@ import functools
 import io
 import itertools
 import math
+import os
 import struct
 import uuid
 from abc import ABC, abstractmethod
@@ -17,7 +18,12 @@ from collections import namedtuple
 from collections.abc import Mapping
 from contextlib import ContextDecorator, AbstractContextManager
 from contextvars import ContextVar
-from typing import Union, Iterator, Iterable, Generator
+from typing import Union, Iterator, Iterable, Generator, Type
+
+
+class EntryNotFound(RuntimeWarning):
+    """Entry not found in node based on key."""
+    pass
 
 
 class DataLoaderDumper(ABC):
@@ -35,7 +41,7 @@ class DataLoaderDumper(ABC):
 
 
 Configuration = namedtuple(
-    "Configuration", "order key_size value_size item_size page_size meta node reference record blob")
+    "Configuration", "order ref_order value_size item_size page_size meta node reference record blob")
 
 
 class Comparable:
@@ -257,9 +263,9 @@ class HierarchyNode(Node, DataLoaderDumper):
             self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1, parent: Node = None):
         self.parent = parent
         self.entries = list()
-        self.min = 0
+        # self.min = 0
+        # self.max = 0
         Node.__init__(self, conf, data, page)
-        self.max = self._conf.order
 
     def is_not_full(self) -> bool:
         """Can entries be added."""
@@ -310,7 +316,7 @@ class HierarchyNode(Node, DataLoaderDumper):
         i = bisect.bisect_left(self.entries, HierarchyNode.comparator)
 
         if i >= len(self.entries) or self.entries[i] != HierarchyNode.comparator:
-            raise ValueError('No entry for key {}'.format(key))
+            raise EntryNotFound('No entry for key {}'.format(key))
 
         return i
 
@@ -332,10 +338,14 @@ class HierarchyNode(Node, DataLoaderDumper):
 
         if kind != self.NODE_KIND:
             raise TypeError("Can not load data for wrong node type")
-        if count > self._conf.order:
-            raise ValueError("Page has a higher count than the current order")
 
-        size = self._conf.record.size if self.NODE_KIND in (b"C", b"S") else self._conf.reference.size
+        # if count > self._conf.order:
+        #     raise ValueError("Page has a higher count than the current order")
+
+        if count > self.max:
+            raise ValueError("Page has a higher count than the current order %s" % self.max)
+
+        size = self._conf.record.size if self.NODE_KIND in (b"L", b"S") else self._conf.reference.size
 
         if size * count + self._conf.node.size > self._conf.page_size:
             raise ValueError("Entry count higher than fits in page data")
@@ -360,7 +370,7 @@ class HierarchyNode(Node, DataLoaderDumper):
     def __repr__(self):
         return "<{}: page={} next={} parent={} min={} max={} count={}>".format(
             self.__class__.__name__, self.page, self.next, self.parent,
-            self.min, self.max, self.parent
+            self.min, self.max, len(self.entries)
         )
 
 
@@ -369,13 +379,25 @@ class RecordNode(HierarchyNode):
 
     __slots__ = []
 
-    NODE_KIND = b"C"
     ENTRY_CLASS = Record
 
     def __init__(
             self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1, parent: Node = None):
+        self.max = conf.order
         HierarchyNode.__init__(self, conf, data, page, next_, parent)
-        self.min = math.ceil(self._conf.order / 2) - 1
+
+
+class LeafNode(RecordNode):
+    """Node class that is used as leaf node of records."""
+
+    __slots__ = []
+
+    NODE_KIND = b"L"
+
+    def __init__(
+            self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1, parent: Node = None):
+        self.min = math.ceil(conf.order / 2) - 1
+        RecordNode.__init__(self, conf, data, page, next_, parent)
 
 
 class StartNode(RecordNode):
@@ -387,12 +409,12 @@ class StartNode(RecordNode):
 
     def __init__(
             self, conf: Configuration, data: bytes = None, page: int = None, parent: Node = None):
-        RecordNode.__init__(self, conf, data, page, parent=parent)
         self.min = 0
+        RecordNode.__init__(self, conf, data, page, parent=parent)
 
     def convert(self):
         """Convert start node to normal node."""
-        node = RecordNode(self._conf, page=self.page)
+        node = LeafNode(self._conf, page=self.page)
         node.entries = self.entries
         return node
 
@@ -406,6 +428,7 @@ class ReferenceNode(HierarchyNode):
 
     def __init__(
             self, conf: Configuration, data: bytes = None, page: int = None, parent: Node = None):
+        self.max = conf.ref_order
         HierarchyNode.__init__(self, conf, data, page, parent=parent)
 
 
@@ -418,9 +441,8 @@ class StructureNode(ReferenceNode):
 
     def __init__(
             self, conf: Configuration, data: bytes = None, page: int = None, parent: Node = None):
-
+        self.min = math.ceil(conf.ref_order / 2)
         ReferenceNode.__init__(self, conf, data, page, parent)
-        self.min = math.ceil(self._conf.order / 2)
 
     def length(self) -> int:
         """Entries count."""
@@ -457,8 +479,8 @@ class RootNode(ReferenceNode):
 
     def __init__(
             self, conf: Configuration, data: bytes = None, page: int = None, parent: Node = None):
-        ReferenceNode.__init__(self, conf, data, page, parent)
         self.min = 2
+        ReferenceNode.__init__(self, conf, data, page, parent)
 
     def convert(self):
         """Convert root node to structure node."""
@@ -476,9 +498,9 @@ class Pager(Mapping):
         self.__meta = meta
         self.__pages = 0
 
-        length = self._fd.seek(0, io.SEEK_END)
+        length = max(self._fd.seek(0, io.SEEK_END) - self.__meta, 0)
         if length:
-            if self.__size % length:
+            if length % self.__size:
                 raise OSError("File of uneven length compared to page size of %s bytes" % self.__size)
             self.__pages = length // self.__size
         else:
@@ -594,45 +616,41 @@ class Transact(ContextDecorator, AbstractContextManager):
 class Tree(ABC):
     """Base tree class."""
 
+    FORMAT_META = struct.Struct("!ciiIII")  # Meta, kind, root, empty, order, ref_order, value_size
+    FORMAT_NODE = struct.Struct("!siI")  # Node: type, next, count
+    FORMAT_REFERENCE = struct.Struct("!ii16s")  # Reference, before, after, key
+    FORMAT_BLOB = struct.Struct("!I")
+
+    TREE_KIND = None
+
     NODE_KINDS = {
         DataNode.NODE_KIND: DataNode,
         EmptyNode.NODE_KIND: EmptyNode,
-        RecordNode.NODE_KIND: RecordNode,
+        LeafNode.NODE_KIND: LeafNode,
         StartNode.NODE_KIND: StartNode,
         StructureNode.NODE_KIND: StructureNode,
         RootNode.NODE_KIND: RootNode
     }
 
-    def __init__(self, fileobj: io.FileIO, order: int, key_size: int, value_size: int):
+    def __init__(self, fileobj: io.FileIO, conf: Configuration):
         self.__root = -1  # Page number for tree root node
         self.__empty = -1  # Page number of recycled page stack start
 
-        self._conf = self._config(order, key_size, value_size)
+        self._conf = conf
         self._pager = Pager(fileobj, self._conf.page_size, self._conf.meta.size)
 
         if len(self._pager):
-            o, ks, vs = self._meta_load()
-            if o != order or ks != key_size or vs != value_size:
+            k, o, ro, vs = self._meta_load()
+            if self.TREE_KIND != k or o != conf.order or ro != conf.ref_order or vs != conf.value_size:
                 raise RuntimeError("Class configuration doesn't match saved tree.")
         else:
             self._initialize()
 
-    def _config(self, order: int, key_size: int, value_size: int) -> Configuration:
+    @classmethod
+    @abstractmethod
+    def config(cls, order: int, value_size: int) -> Configuration:
         """Generate configuration class."""
-
-        if order < 4:
-            raise OSError("Order can never be less than 4.")
-
-        meta = struct.Struct("!iiIII")  # Meta, root, empty, order, key_size, value_size
-        node = struct.Struct("!siI")  # Node: type, next, count
-        reference = struct.Struct("!II" + str(key_size) + "s")  # Reference, before, after, key
-        record = struct.Struct("!I" + str(key_size) + "s" + str(value_size) + "s")  # Record: page, key, value
-        blob = struct.Struct("!I")
-
-        return Configuration(
-            order, key_size, value_size, value_size, order * record.size + node.size, meta,
-            node, reference, record, blob
-        )
+        pass
 
     def close(self):
         """Close memory."""
@@ -669,13 +687,17 @@ class Tree(ABC):
 
     def _meta_load(self) -> tuple:
         """Load meta-data."""
-        self.__root, self.__empty, order, key_size, value_size = self._conf.meta.unpack()
-        return order, key_size, value_size
+        (
+            kind, self.__root, self.__empty, order, ref_order, value_size
+        ) = self._conf.meta.unpack(self._pager.meta())
+        return kind, order, ref_order, value_size
 
     def _meta_save(self):
         """Save meta-data."""
         self._pager.meta(self._conf.meta.pack(
-            self.__root, self.__empty, self._conf.order, self._conf.key_size, self._conf.value_size))
+            self.TREE_KIND, self.__root, self.__empty,
+            self._conf.order, self._conf.ref_order, self._conf.value_size
+        ))
 
     def _new_page(self) -> int:
         page = self._unshift_empty()
@@ -728,9 +750,9 @@ class Tree(ABC):
 
         return node
 
-    def _left_record_node(self) -> Union[StartNode, RecordNode]:
+    def _left_record_node(self) -> Union[StartNode, LeafNode]:
         node = self.__root_node()
-        while not isinstance(node, (StartNode, RecordNode)):
+        while not isinstance(node, (StartNode, LeafNode)):
             node = self._get_node(node.least_entry().before)
         return node
 
@@ -740,7 +762,7 @@ class Tree(ABC):
         return zip(a, b)
 
     def _search(self, key: uuid.UUID, node: Node) -> Node:
-        if isinstance(node, (StartNode, RecordNode)):
+        if isinstance(node, (StartNode, LeafNode)):
             return node
 
         page = None
@@ -801,7 +823,7 @@ class Tree(ABC):
 
     def _cleave_node(self, node: HierarchyNode):
         parent = node.parent
-        sliver = RecordNode(self._conf, page=self._new_page(), next_=node.next)
+        sliver = LeafNode(self._conf, page=self._new_page(), next_=node.next)
         entries = node.split_entries()
         sliver.entries = entries
         reference = Reference(self._conf, key=sliver.least_key(), before=node.page, after=sliver.page)
@@ -891,25 +913,31 @@ class Tree(ABC):
     def _get_value_from_record(self, record: Record) -> bytes:
         pass
 
+    @classmethod
+    def factory(cls, fileobj: io.FileIO, order: int, value_size: int) -> "Tree":
+        """Create a new BTree instance."""
+        return cls(fileobj, cls.config(order, value_size))
+
 
 class SimpleBTree(Tree):
     """BTree that handles single item values."""
 
-    def _config(self, order: int, key_size: int, value_size: int) -> Configuration:
+    TREE_KIND = b"S"
+
+    @classmethod
+    def config(cls, order: int, value_size: int) -> Configuration:
         """Generate configuration class."""
 
         if order < 4:
             raise OSError("Order can never be less than 4.")
 
-        meta = struct.Struct("!iiIII")  # Meta, root, empty, order, key_size, value_size
-        node = struct.Struct("!siI")  # Node: type, next, count
-        reference = struct.Struct("!ii" + str(key_size) + "s")  # Reference, before, after, key
-        record = struct.Struct("!i" + str(key_size) + "s" + str(value_size) + "s")  # Record: page, key, value
-        blob = struct.Struct("!I")
+        record = struct.Struct("!i16s{}s".format(value_size))  # Record: page, key, value
+        ref_order = math.ceil(order * record.size / cls.FORMAT_REFERENCE.size)
+        page_size = cls.FORMAT_NODE.size + ref_order * cls.FORMAT_REFERENCE.size
 
         return Configuration(
-            order, key_size, value_size, 0, order * record.size + node.size, meta,
-            node, reference, record, blob
+            order, ref_order, value_size, 0, page_size, cls.FORMAT_META,
+            cls.FORMAT_NODE, cls.FORMAT_REFERENCE, record, cls.FORMAT_BLOB
         )
 
     def insert(self, key: uuid.UUID, value: bytes):
@@ -927,7 +955,7 @@ class SimpleBTree(Tree):
 
         try:
             node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             record = Record(self._conf, key=key, value=value)
 
             if node.is_not_full():
@@ -954,7 +982,7 @@ class SimpleBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             raise ValueError("Key doesn't exist")
         else:
             record.value = value
@@ -970,7 +998,7 @@ class SimpleBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             return None
         else:
             return self._get_value_from_record(record)
@@ -985,7 +1013,7 @@ class SimpleBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             pass
         else:
             node.delete_entry(key)
@@ -1014,22 +1042,22 @@ class MultiItemIterator(collections.abc.Iterator):
 class MultiBTree(Tree):
     """BTree that handles multi-item values."""
 
-    def _config(self, order: int, key_size: int, value_size: int) -> Configuration:
+    TREE_KIND = b"M"
+
+    @classmethod
+    def config(cls, order: int, value_size: int) -> Configuration:
         """Generate configuration class."""
 
         if order < 4:
             raise OSError("Order can never be less than 4.")
 
-        meta = struct.Struct("!iiIII")  # Meta, root, empty, order, key_size, value_size
-        node = struct.Struct("!siI")  # Node: type, next, count
-        reference = struct.Struct("!ii" + str(key_size) + "s")  # Reference, before, after, key
-        # record = struct.Struct("!i" + str(key_size) + "s" + str(4) + "s")  # Record: page, key, value
-        record = struct.Struct("!i" + str(key_size) + "sI")  # Record: page, key, value
-        blob = struct.Struct("!I")
+        record = struct.Struct("!i16sI")  # Record: page, key, value
+        ref_order = math.ceil(order * record.size / cls.FORMAT_REFERENCE.size)
+        page_size = cls.FORMAT_NODE.size + ref_order * cls.FORMAT_REFERENCE.size
 
         return Configuration(
-            order, key_size, 4, value_size, order * record.size + node.size, meta,
-            node, reference, record, blob
+            order, ref_order, 4, value_size, page_size, cls.FORMAT_META,
+            cls.FORMAT_NODE, cls.FORMAT_REFERENCE, record, cls.FORMAT_BLOB
         )
 
     def insert(self, key: uuid.UUID, value: Union[set, list]):
@@ -1046,7 +1074,7 @@ class MultiBTree(Tree):
         # Check if a record with the key already exists
         try:
             node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             length = len(value)
             value = tuple(value)
             page = self._create_overflow(value) if value else None
@@ -1083,7 +1111,7 @@ class MultiBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             raise ValueError("Record to update doesn't exist")
         else:
             # length = record.value if type(record.value) is int else int.from_bytes(record.value, ENDIAN)
@@ -1114,7 +1142,7 @@ class MultiBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             return list()
         else:
             # length = int.from_bytes(record.value, ENDIAN)
@@ -1134,7 +1162,7 @@ class MultiBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             pass
         else:
             # length = int.from_bytes(record.value, ENDIAN)
@@ -1154,7 +1182,7 @@ class MultiBTree(Tree):
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
-        except ValueError:
+        except EntryNotFound:
             pass
         else:
             # length = int.from_bytes(record.value, ENDIAN)
@@ -1351,3 +1379,65 @@ class MultiBTree(Tree):
 
         if count != 0:
             raise ValueError("Failed reading all values, %s values left" % count)
+
+
+class TreeAnalyzer:
+    """Analyzer class that analyzes existing trees."""
+
+    def __init__(self, fileobj: io.FileIO, tree_cls: Type[Tree]):
+        # kind, root, empty, order, ref_order, value_size
+        kind, _, _, order, ref_order, value_size = self.load_meta(fileobj)
+
+        if tree_cls.TREE_KIND != kind:
+            raise TypeError(
+                "Wrong tree class type, expected %s but got %s" % (tree_cls.TREE_KIND, bytes([kind])))
+
+        self.conf = tree_cls.config(order, value_size)
+        self.pager = Pager(fileobj, self.conf.page_size, self.conf.meta.size)
+
+        if len(self.pager):
+            if tree_cls.TREE_KIND != kind or order != self.conf.order or \
+                    ref_order != self.conf.ref_order or value_size != self.conf.value_size:
+                raise RuntimeError("Class configuration doesn't match saved tree.")
+
+    def load_meta(self, fileobj: io.FileIO) -> tuple:
+        """Load meta information about tree."""
+        fileobj.seek(0)
+        return Tree.FORMAT_META.unpack(fileobj.read(Tree.FORMAT_META.size))
+
+    def iterator(self):
+        """Iterator for pages which yields (page, data)."""
+        for page in range(len(self.pager)):
+            yield page, self.pager[page]
+
+    def iterate_records(self, node: RecordNode):
+        """Iterator for entries in a record node"""
+        for record in node.entries:
+            yield record
+
+    def kind_from_data(self, data: bytes) -> bytes:
+        """Extract node kind."""
+        return bytes([data[0]])
+
+    def page_to_node(self, page: int, data: bytes) -> Node:
+        """Structure node from data."""
+        node = Tree.NODE_KINDS[bytes([data[0]])](self.conf, data, page)
+        return node
+
+    def records(self):
+        """Iterate all records."""
+        for page, data in self.iterator():
+            if self.kind_from_data(data) in (b"L", b"S"):
+                node = self.page_to_node(page, data)
+                for record in self.iterate_records(node):
+                    yield record
+
+    def references(self):
+        """Iterate all references."""
+        for page, data in self.iterator():
+            if self.kind_from_data(data) in (b"F", b"R"):
+                node = self.page_to_node(page, data)
+                for reference in self.iterate_reference(node):
+                    yield reference
+
+

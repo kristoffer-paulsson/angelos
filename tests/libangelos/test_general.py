@@ -173,7 +173,7 @@ class TestBPlusTree(TestCase):
         self.dir = TemporaryDirectory()
         self.home = self.dir.name
         self.key_size = 16
-        self.value_size = 32
+        self.value_size = 64
 
     def tearDown(self) -> None:
         """Tear down after the test."""
@@ -215,9 +215,9 @@ class TestBPlusTree(TestCase):
                 value_size=self.value_size,
             )
 
-            for iteration in range(20000):
+            for iteration in range(1000000):
 
-                if len(bank) < 10000:
+                if len(bank) < 100000:
                     key = uuid.UUID(bytes=os.urandom(self.key_size))
                     print("Insert", key)
                     value = os.urandom(self.value_size)
