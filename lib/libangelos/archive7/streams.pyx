@@ -934,11 +934,9 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
 
     __slots__ = ["__registry"]
 
-    SPECIAL_BLOCK_COUNT = 1
-    SPECIAL_STREAM_COUNT = 3
+    SPECIAL_STREAM_COUNT = 2
 
     STREAM_INDEX = 1
-    STREAM_INDEX_WAL = 2
 
     def __init__(self, filename: str, secret: bytes):
         StreamManager.__init__(self, filename, secret)

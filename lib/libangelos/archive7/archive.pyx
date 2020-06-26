@@ -5,10 +5,8 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive implementation."""
-import copy
 import datetime
 import functools
-import hashlib
 import os
 import re
 import struct
@@ -17,12 +15,10 @@ import uuid
 from pathlib import PurePath
 from typing import Union
 
-from libangelos.error import ArchiveInvalidFile
+from libangelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, EntryRecord, TYPE_FILE
 from libangelos.error import Error
 from libangelos.misc import SharedResource
 from libangelos.utils import Util
-
-from libangelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, EntryRecord, TYPE_FILE
 
 
 # FIXME: Move compression, size and length to stream level.
@@ -40,17 +36,17 @@ class Header:
             title: Union[bytes, bytearray] = None, type_: int = None, role: int = None, use: int = None,
             major: int = 2, minor: int = 0, created: datetime.datetime = None
     ):
-        self.major = major,
-        self.minor = minor,
-        self.type = type_,
-        self.role = role,
-        self.use = use,
-        self.id = identity,
-        self.owner = owner,
-        self.domain = domain,
-        self.node = node,
-        self.created = created if created else datetime.datetime.now(),
-        self.title = title,
+        self.major = major
+        self.minor = minor
+        self.type = type_
+        self.role = role
+        self.use = use
+        self.id = identity
+        self.owner = owner
+        self.domain = domain
+        self.node = node
+        self.created = created if created else datetime.datetime.now()
+        self.title = title
 
     def __bytes__(self):
         return struct.pack(
@@ -59,19 +55,19 @@ class Header:
             b"a",
             2,
             0,
-            self.type if not self.type else 0,
-            self.role if not self.role else 0,
-            self.use if not self.use else 0,
+            self.type if self.type else 0,
+            self.role if self.role else 0,
+            self.use if self.use else 0,
             self.id.bytes if isinstance(self.id, uuid.UUID) else uuid.uuid4().bytes,
-            self.owner.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
-            self.domain.bytes if isinstance(self.domain, uuid.UUID) else b"\x00" * 16,
-            self.node.bytes if isinstance(self.node, uuid.UUID) else b"\x00" * 16,
+            self.owner.bytes if isinstance(self.owner, uuid.UUID) else bytes(16),
+            self.domain.bytes if isinstance(self.domain, uuid.UUID) else bytes(16),
+            self.node.bytes if isinstance(self.node, uuid.UUID) else bytes(16),
             int(
                 time.mktime(self.created.timetuple())
                 if isinstance(self.created, datetime.datetime)
                 else time.mktime(datetime.datetime.now().timetuple())
             ),
-            self.title[:256] if isinstance(self.title, (bytes, bytearray)) else b"\x00" * 256
+            self.title[:256] if isinstance(self.title, (bytes, bytearray)) else bytes(256)
         )
 
     @staticmethod
@@ -224,8 +220,6 @@ class Archive7(SharedResource):
             group=None
     ):
         """Glob the file system in the archive."""
-        entries = self.ioc.entries
-        ids = self.ioc.hierarchy.ids
 
         sq = Archive7.Query(pattern=name)
         if id:

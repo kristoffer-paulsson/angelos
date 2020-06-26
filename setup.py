@@ -54,7 +54,6 @@ with open(path.join(base_dir, "version.py")) as version:
     exec(version.read())
 
 globlist = [
-    "bplustree/**.pyx",
     "libangelos/**.pyx",
     "libangelos/**/*.pyx",
     "angelos/**.pyx",
@@ -132,7 +131,7 @@ setup(
         "plyer", "asyncssh", "keyring", "msgpack"],
     install_requires=[],
     # namespace_packages=["angelos", "eidon"],
-    packages=["libangelos", "angelos", "eidon", "angelossim", "bplustree"],
+    packages=["libangelos", "angelos", "eidon", "angelossim"],
     package_dir={"": "lib"},
     scripts=glob("bin/*"),
     ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan())

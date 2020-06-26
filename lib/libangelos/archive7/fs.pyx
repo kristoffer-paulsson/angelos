@@ -182,7 +182,7 @@ class EntryRecord:
         }
 
         if identity:
-            kwargs.setdefault("id", identity)
+            kwargs.setdefault("identity", identity)
         if parent:
             kwargs.setdefault("parent", parent)
         if owner:
@@ -396,17 +396,11 @@ class HierarchyTraverser(Iterator):
 
 class FileSystemStreamManager(DynamicMultiStreamManager):
     """Stream management with all necessary registries for a filesystem and entry management."""
-    SPECIAL_BLOCK_COUNT = 1
-    SPECIAL_STREAM_COUNT = 9
+    SPECIAL_STREAM_COUNT = 5
 
-    STREAM_ENTRIES = 3
-    STREAM_ENTRIES_WAL = 4
-
-    STREAM_PATHS = 5
-    STREAM_PATHS_WAL = 6
-
-    STREAM_LISTINGS = 7
-    STREAM_LISTINGS_WAL = 8
+    STREAM_ENTRIES = 2
+    STREAM_PATHS = 3
+    STREAM_LISTINGS = 4
 
     def __init__(self, filename: str, secret: bytes):
         self.__descriptors = dict()

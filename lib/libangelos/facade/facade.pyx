@@ -191,13 +191,7 @@ class Facade:
     }, )
 
     @staticmethod
-    async def setup(
-            home_dir: str,
-            secret: bytes,
-            role: int,
-            server: bool,
-            portfolio: PrivatePortfolio
-    ) -> BaseFacade:
+    async def setup(home_dir: str, secret: bytes, role: int, server: bool, portfolio: PrivatePortfolio) -> BaseFacade:
         """Set up facade from scratch."""
         vault_role = Facade._check_role(role)
         vault_type = Facade._check_type(portfolio, server)
