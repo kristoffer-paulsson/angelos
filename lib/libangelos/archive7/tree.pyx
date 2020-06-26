@@ -6,12 +6,13 @@
 
 import bisect
 import collections
+import datetime
 import functools
 import io
 import itertools
 import math
-import os
 import struct
+import time
 import uuid
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -19,6 +20,8 @@ from collections.abc import Mapping
 from contextlib import ContextDecorator, AbstractContextManager
 from contextvars import ContextVar
 from typing import Union, Iterator, Iterable, Generator, Type
+
+from libangelos.utils import Util
 
 
 class EntryNotFound(RuntimeWarning):
@@ -41,7 +44,7 @@ class DataLoaderDumper(ABC):
 
 
 Configuration = namedtuple(
-    "Configuration", "order ref_order value_size item_size page_size meta node reference record blob")
+    "Configuration", "order ref_order item_order value_size item_size page_size meta node reference record blob comparator")
 
 
 class Comparable:
@@ -85,8 +88,11 @@ class Record(Entry, Comparable):
 
     def __init__(
             self, conf: Configuration, data: bytes = None, key: uuid.UUID = None,
-            value: bytes = None, page: int = -1
+            value: Union[bytes, int] = None, page: int = -1
     ):
+        if value is type(tuple):
+            raise TypeError("Value cant be tuple")
+
         Entry.__init__(self, conf, data)
 
         if not data:
@@ -95,16 +101,23 @@ class Record(Entry, Comparable):
             self.page = page
 
         if self.page is None:
-            raise RuntimeError()
+            raise RuntimeError("Page index not set")
 
     def load(self, data: bytes):
         """Unpack data consisting of page number, key and value."""
-        self.page, key, self.value = self._conf.record.unpack(data)
+        self.page, key, self.value, cs = self._conf.record.unpack(data)
+        value = self.value.to_bytes(4, "big") if isinstance(self.value, int) else self.value
+        if bytes([sum(key+value) & 0xFF]) != cs:
+            raise RuntimeError("Record checksum mismatch")
         self.key = uuid.UUID(bytes=key)
 
     def dump(self) -> bytes:
         """Packing data consisting of page number, key and value."""
-        return self._conf.record.pack(self.page, self.key.bytes, self.value)
+        value = self.value.to_bytes(4, "big") if isinstance(self.value, int) else self.value
+        return self._conf.record.pack(
+            self.page, self.key.bytes, self.value,
+            bytes([sum(self.key.bytes+value) & 0xFF])
+        )
 
 
 class Reference(Entry, Comparable):
@@ -136,18 +149,31 @@ class Blob(Entry):
 
     __slots__ = ["data"]
 
-    def __init__(self, conf: Configuration, data: bytes = None):
-        self.data = None
+    def __init__(self, conf: Configuration, data: bytes, items: list = list()):
+        self.items = items
         Entry.__init__(self, conf, data)
 
     def load(self, data: bytes):
         """Load data into storage."""
-        size = self._conf.blob.unpack_from(data[self._conf.blob.size:])
-        self.data = bytearray(data[self._conf.blob.size: size])
+        count = self._conf.blob.unpack_from(data[:self._conf.blob.size])[0]
+
+        if count > self._conf.item_order:
+            raise RuntimeError("Item count higher than specified order.")
+
+        size = self._conf.item_size
+        for offset in range(self._conf.blob.size, size * count, size):
+            self.items.append(data[offset:offset+size])
 
     def dump(self) -> bytes:
         """Dump data from storage."""
-        return self._conf.blob.pack(len(self.data)) + bytes(self.data)
+        if len(self.items) > self._conf.item_order:
+            raise RuntimeError("Item count higher than specified order.")
+
+        data = self._conf.blob.pack(len(self.items))
+        for item in self.items:
+            data += item
+
+        return data
 
 
 class Comparator(Comparable):
@@ -182,7 +208,7 @@ class Node:
         return "<{}: page={} next={}>".format(self.__class__.__name__, self.page, self.next)
 
 
-class StackNode(Node, DataLoaderDumper):
+class StackNode(Node):
     """Node class for nodes that are part of a stack."""
 
     __slots__ = []
@@ -191,6 +217,20 @@ class StackNode(Node, DataLoaderDumper):
 
     def __init__(self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1):
         Node.__init__(self, conf, data, page, next_)
+
+
+class DataNode(StackNode, DataLoaderDumper):
+    """Node class for arbitrary data."""
+
+    __slots__ = ["blob"]
+
+    NODE_KIND = b"D"
+    ENTRY_CLASS = Blob
+    MAX_ENTRIES = 1
+
+    def __init__(self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1):
+        StackNode.__init__(self, conf, data, page, next_)
+        self.blob = None
 
     def load(self, data: bytes):
         """Unpack data consisting of node meta and entries."""
@@ -204,44 +244,72 @@ class StackNode(Node, DataLoaderDumper):
         if count > self.MAX_ENTRIES:
             raise ValueError("Page has a higher count than the allowed order")
 
-        if self.NODE_KIND == b"D":
-            size = self._conf.blob.unpack_from(data[self._conf.node.size:])
+        size = self._conf.blob.unpack_from(data[self._conf.node.size:])[0]
 
-            if (self._conf.node.size + self._conf.blob + size) > self._conf.page_size:
-                raise ValueError("Blob size larger than fits in page data")
+        if (self._conf.node.size + self._conf.blob.size + size) > self._conf.page_size:
+            raise ValueError("Blob size larger than fits in page data")
 
-            self.blob = self.ENTRY_CLASS(self._conf, data[self._conf.node.size: self._conf.blob + size])
+        self.blob = self.ENTRY_CLASS(self._conf, data[self._conf.node.size: self._conf.blob.size + size])
 
     def dump(self) -> bytes:
         """Packing data consisting of node meta and entries."""
-        data = self._conf.node.pack(self.NODE_KIND, self.next, len(self.entries))
-
-        if self.NODE_KIND == b"D":
-            data += self.blob.dump()
+        data = self._conf.node.pack(self.NODE_KIND, self.next, 1 if self.blob else 0)
+        data += self.blob.dump()
 
         if not len(data) < self._conf.page_size:
             raise ValueError("Data larger than page size")
         else:
-            data += b"\00" * (self._conf.page_size - len(data))
+            data += bytes(self._conf.page_size - len(data))
 
-        return bytes(data)
+        return data
 
 
-class DataNode(Node):
-    """Node class for arbitrary data."""
+class ItemsNode(StackNode, DataLoaderDumper):
+    """Node class for recycled nodes."""
 
-    __slots__ = ["blob"]
+    __slots__ = []
 
-    NODE_KIND = b"D"
-    ENTRY_CLASS = Blob
-    MAX_ENTRIES = 1
+    NODE_KIND = b"I"
 
     def __init__(self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1):
+        self.items = list()
         StackNode.__init__(self, conf, data, page, next_)
-        self.blob = None
+
+    def load(self, data: bytes):
+        """Unpack data consisting of node meta and entries."""
+
+        if len(data) != self._conf.page_size:
+            raise ValueError("Page data is not of set page size")
+
+        kind, self.next, count = self._conf.node.unpack(data[:self._conf.node.size])
+
+        if kind != self.NODE_KIND:
+            raise TypeError("Can not load data for wrong node type")
+        if count > self._conf.item_order:
+            raise RuntimeError("Item count higher than specified order.")
+
+        size = self._conf.item_size
+        for offset in range(self._conf.node.size, count * size + self._conf.node.size, size):
+            self.items.append(data[offset:offset+size])
+
+    def dump(self) -> bytes:
+        """Packing data consisting of node meta and entries."""
+        if len(self.items) > self._conf.item_order:
+            raise RuntimeError("Item count higher than specified order.")
+
+        data = self._conf.node.pack(self.NODE_KIND, self.next, len(self.items))
+
+        for item in self.items:
+            if len(item) != self._conf.item_size:
+                raise RuntimeError("Item not of item size %s" % self._conf.item_size)
+
+            data += item
+
+        data += bytes(self._conf.page_size - len(data))
+        return data
 
 
-class EmptyNode(Node):
+class EmptyNode(StackNode, DataLoaderDumper):
     """Node class for recycled nodes."""
 
     __slots__ = []
@@ -251,20 +319,33 @@ class EmptyNode(Node):
     def __init__(self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1):
         StackNode.__init__(self, conf, data, page, next_)
 
+    def load(self, data: bytes):
+        """Unpack data consisting of node meta and entries."""
+        if len(data) != self._conf.page_size:
+            raise ValueError("Page data is not of set page size")
+
+        kind, self.next, _ = self._conf.node.unpack(data[:self._conf.node.size])
+
+        if kind != self.NODE_KIND:
+            raise TypeError("Can not load data for wrong node type")
+
+    def dump(self) -> bytes:
+        """Packing data consisting of node meta and entries."""
+        data = self._conf.node.pack(self.NODE_KIND, self.next, 0)
+        data += bytes(self._conf.page_size - len(data))
+
+        return data
+
 
 class HierarchyNode(Node, DataLoaderDumper):
     """Node class for managing the btree hierarchy."""
 
     __slots__ = ["parent", "entries", "max", "min"]
 
-    comparator = Comparator()
-
     def __init__(
             self, conf: Configuration, data: bytes = None, page: int = None, next_: int = -1, parent: Node = None):
         self.parent = parent
         self.entries = list()
-        # self.min = 0
-        # self.max = 0
         Node.__init__(self, conf, data, page)
 
     def is_not_full(self) -> bool:
@@ -275,19 +356,19 @@ class HierarchyNode(Node, DataLoaderDumper):
         """Can entries be deleted."""
         return self.length() > self.min
 
-    def least_entry(self):
+    def least_entry(self) -> Entry:
         """Get least entry"""
         return self.entries[0]
 
-    def least_key(self):
+    def least_key(self) -> uuid.UUID:
         """Get least key"""
         return self.least_entry().key
 
-    def largest_entry(self):
+    def largest_entry(self) -> Entry:
         """Get largest entry"""
         return self.entries[-1]
 
-    def largest_key(self):
+    def largest_key(self) -> uuid.UUID:
         """Get largest key"""
         return self.largest_entry().key
 
@@ -312,10 +393,11 @@ class HierarchyNode(Node, DataLoaderDumper):
         return self.entries[self._find_by_key(key)]
 
     def _find_by_key(self, key: uuid.UUID) -> int:
-        HierarchyNode.comparator.key = key
-        i = bisect.bisect_left(self.entries, HierarchyNode.comparator)
+        comparator = self._conf.comparator
+        comparator.key = key
+        i = bisect.bisect_left(self.entries, comparator)
 
-        if i >= len(self.entries) or self.entries[i] != HierarchyNode.comparator:
+        if i >= len(self.entries) or self.entries[i] != comparator:
             raise EntryNotFound('No entry for key {}'.format(key))
 
         return i
@@ -327,6 +409,8 @@ class HierarchyNode(Node, DataLoaderDumper):
             RuntimeError("At least 4 entries in order to split a node")
         rest = self.entries[length // 2:]
         self.entries = self.entries[:length // 2]
+        if len(rest) + len(self.entries) != length:
+            raise RuntimeError("The total number of entries is different")
         return rest
 
     def load(self, data: bytes):
@@ -455,19 +539,14 @@ class StructureNode(ReferenceNode):
         """
         HierarchyNode.insert_entry(self, entry)
         i = self.entries.index(entry)
-        if i > 0:
-            prev = self.entries[i - 1]
-            prev.after = entry.before
+        pidx = i-1
+        nidx = i+1
 
-        if i + 1 > len(self.entries):
-            self.entries[i + 1].before = entry.after
+        if pidx >= 0:
+            self.entries[pidx].after = entry.before
 
-        # try:
-        #    next_ = self.entries[i + 1]
-        # except IndexError:
-        #    pass
-        # else:
-        #    next_.before = entry.after
+        if nidx < len(self.entries):
+            self.entries[nidx].before = entry.after
 
 
 class RootNode(ReferenceNode):
@@ -625,6 +704,7 @@ class Tree(ABC):
 
     NODE_KINDS = {
         DataNode.NODE_KIND: DataNode,
+        ItemsNode.NODE_KIND: ItemsNode,
         EmptyNode.NODE_KIND: EmptyNode,
         LeafNode.NODE_KIND: LeafNode,
         StartNode.NODE_KIND: StartNode,
@@ -664,6 +744,7 @@ class Tree(ABC):
 
         if kind not in self.NODE_KINDS.keys():
             raise TypeError("Unknown node type: %s" % kind)
+
         return self.NODE_KINDS[kind](self._conf, data=data, page=page)
 
     def _set_node(self, node: Node):
@@ -716,9 +797,9 @@ class Tree(ABC):
         if self.__empty == -1:
             return None
         else:
-            node = self.get_node(self.__empty)
+            node = self._get_node(self.__empty)
             self.__empty = node.next
-            self.meta_save()
+            self._meta_save()
             return node.page
 
     def _recycle(self, page: int):
@@ -750,9 +831,9 @@ class Tree(ABC):
 
         return node
 
-    def _left_record_node(self) -> Union[StartNode, LeafNode]:
-        node = self.__root_node()
-        while not isinstance(node, (StartNode, LeafNode)):
+    def _left_record_node(self) -> RecordNode:
+        node = self._root_node()
+        while not isinstance(node, RecordNode):
             node = self._get_node(node.least_entry().before)
         return node
 
@@ -761,18 +842,16 @@ class Tree(ABC):
         next(b, None)
         return zip(a, b)
 
-    def _search(self, key: uuid.UUID, node: Node) -> Node:
-        if isinstance(node, (StartNode, LeafNode)):
+    def _search(self, key: uuid.UUID, node: HierarchyNode) -> HierarchyNode:
+        if isinstance(node, RecordNode):  # RecordNode has LeafNode and StartNode as subclasses
             return node
 
         page = None
 
         if key < node.least_key():
             page = node.least_entry().before
-
         elif node.largest_key() <= key:
             page = node.largest_entry().after
-
         else:
             for ref_a, ref_b in self._pairs(node.entries):
                 if ref_a.key <= key < ref_b.key:
@@ -797,7 +876,7 @@ class Tree(ABC):
         if part.start is None:
             node = self._left_record_node()
         else:
-            node = self._search(part.start, self.__root_node())
+            node = self._search(part.start, self._root_node())
 
         while True:
             for entry in node.entries:
@@ -821,11 +900,10 @@ class Tree(ABC):
         self._meta_save()
         self._set_node(node)
 
-    def _cleave_node(self, node: HierarchyNode):
+    def _cleave_node(self, node: RecordNode):  # node: HierarchyNode):
         parent = node.parent
         sliver = LeafNode(self._conf, page=self._new_page(), next_=node.next)
-        entries = node.split_entries()
-        sliver.entries = entries
+        sliver.entries = node.split_entries()
         reference = Reference(self._conf, key=sliver.least_key(), before=node.page, after=sliver.page)
 
         if isinstance(node, StartNode):
@@ -846,7 +924,7 @@ class Tree(ABC):
         self._set_node(node)
         self._set_node(sliver)
 
-    def _cleave_parent(self, node: Node):
+    def _cleave_parent(self, node: ReferenceNode):  # node: Node):
         parent = node.parent
         sliver = StructureNode(self._conf, page=self._new_page())
         sliver.entries = node.split_entries()
@@ -914,9 +992,9 @@ class Tree(ABC):
         pass
 
     @classmethod
-    def factory(cls, fileobj: io.FileIO, order: int, value_size: int) -> "Tree":
+    def factory(cls, fileobj: io.FileIO, order: int, value_size: int, page_size: int = None) -> "Tree":
         """Create a new BTree instance."""
-        return cls(fileobj, cls.config(order, value_size))
+        return cls(fileobj, cls.config(order, value_size, page_size))
 
 
 class SimpleBTree(Tree):
@@ -925,19 +1003,25 @@ class SimpleBTree(Tree):
     TREE_KIND = b"S"
 
     @classmethod
-    def config(cls, order: int, value_size: int) -> Configuration:
+    def config(cls, order: int, value_size: int, page_size: int = None) -> Configuration:
         """Generate configuration class."""
 
         if order < 4:
             raise OSError("Order can never be less than 4.")
 
-        record = struct.Struct("!i16s{}s".format(value_size))  # Record: page, key, value
+        record = struct.Struct("!i16s{}sc".format(value_size))  # Record: page, key, value, checksum
         ref_order = math.ceil(order * record.size / cls.FORMAT_REFERENCE.size)
-        page_size = cls.FORMAT_NODE.size + ref_order * cls.FORMAT_REFERENCE.size
+        ps = cls.FORMAT_NODE.size + ref_order * cls.FORMAT_REFERENCE.size
+
+        if page_size:
+            if ps > page_size:
+                raise RuntimeError("Page size is to small, %s is needed" % ps)
+        else:
+            page_size = ps
 
         return Configuration(
-            order, ref_order, value_size, 0, page_size, cls.FORMAT_META,
-            cls.FORMAT_NODE, cls.FORMAT_REFERENCE, record, cls.FORMAT_BLOB
+            order, ref_order, 0, value_size, 0, page_size, cls.FORMAT_META,
+            cls.FORMAT_NODE, cls.FORMAT_REFERENCE, record, cls.FORMAT_BLOB, Comparator()
         )
 
     def insert(self, key: uuid.UUID, value: bytes):
@@ -1045,19 +1129,26 @@ class MultiBTree(Tree):
     TREE_KIND = b"M"
 
     @classmethod
-    def config(cls, order: int, value_size: int) -> Configuration:
+    def config(cls, order: int, value_size: int, page_size: int = None) -> Configuration:
         """Generate configuration class."""
 
         if order < 4:
             raise OSError("Order can never be less than 4.")
 
-        record = struct.Struct("!i16sI")  # Record: page, key, value
-        ref_order = math.ceil(order * record.size / cls.FORMAT_REFERENCE.size)
-        page_size = cls.FORMAT_NODE.size + ref_order * cls.FORMAT_REFERENCE.size
+        ps = cls.FORMAT_NODE.size + order * value_size
+        record = struct.Struct("!i16sIc")  # Record: page, key, value, checksum
+        rec_order = (ps - cls.FORMAT_NODE.size) // record.size
+        ref_order = (ps - cls.FORMAT_NODE.size) // cls.FORMAT_REFERENCE.size
+
+        if page_size:
+            if ps > page_size:
+                raise RuntimeError("Page size is to small, %s is needed" % ps)
+        else:
+            page_size = ps
 
         return Configuration(
-            order, ref_order, 4, value_size, page_size, cls.FORMAT_META,
-            cls.FORMAT_NODE, cls.FORMAT_REFERENCE, record, cls.FORMAT_BLOB
+            rec_order, ref_order, order, 4, value_size, page_size, cls.FORMAT_META,
+            cls.FORMAT_NODE, cls.FORMAT_REFERENCE, record, cls.FORMAT_BLOB, Comparator()
         )
 
     def insert(self, key: uuid.UUID, value: Union[set, list]):
@@ -1067,22 +1158,18 @@ class MultiBTree(Tree):
         :param value:
         :return:
         """
-
-        # with self._mem.write_transaction:
         node = self._search(key, self._root_node())
 
-        # Check if a record with the key already exists
         try:
             node.get_entry(key)
         except EntryNotFound:
             length = len(value)
             value = tuple(value)
-            page = self._create_overflow(value) if value else None
+            page = self._create_overflow(value) if value else -1
 
-            record = self.Record(
+            record = Record(
                 self._conf,
                 key=key,
-                # value=length.to_bytes(4, byteorder="big"),
                 value=length,
                 page=page
             )
@@ -1107,27 +1194,21 @@ class MultiBTree(Tree):
         if not insertions and not deletions:
             return
 
-        # with self._mem.write_transaction:
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
         except EntryNotFound:
             raise ValueError("Record to update doesn't exist")
         else:
-            # length = record.value if type(record.value) is int else int.from_bytes(record.value, ENDIAN)
-            # length = int.from_bytes(record.value, ENDIAN)
-            length = record.value
-            if length:
-                record.page, record.value = self._update_overflow(
+            if record.value > 0:
+                record.page, record.value = self._update_items(
                     record.page,
-                    length,
+                    record.value,
                     insertions,
                     deletions
                 )
             else:
-                length = len(insertions)
-                # record.value = length.to_bytes(4, byteorder="big")
-                record.value = length
+                record.value = len(insertions)
                 record.page = self._create_overflow(tuple(insertions))
 
             self._set_node(node)
@@ -1138,16 +1219,13 @@ class MultiBTree(Tree):
         :param key:
         :return:
         """
-        # with self._mem.read_transaction:
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
         except EntryNotFound:
             return list()
         else:
-            # length = int.from_bytes(record.value, ENDIAN)
-            length = record.value
-            if length:
+            if record.value > 0:
                 return self._get_value_from_record(record)
             else:
                 return list()
@@ -1158,18 +1236,15 @@ class MultiBTree(Tree):
         :param key:
         :return:
         """
-        # with self._mem.read_transaction:
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
         except EntryNotFound:
             pass
         else:
-            # length = int.from_bytes(record.value, ENDIAN)
-            length = record.value
-            if length:
-                self._delete_overflow(record.page)
-            node.remove_entry(key)
+            if record.value > 0:
+                self._delete_node_chain(record.page)
+            node.delete_entry(key)
             self._set_node(node)
 
     def clear(self, key: uuid.UUID):
@@ -1178,123 +1253,75 @@ class MultiBTree(Tree):
         :param key:
         :return:
         """
-        # with self._mem.read_transaction:
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
         except EntryNotFound:
             pass
         else:
-            # length = int.from_bytes(record.value, ENDIAN)
             length = record.value
             if length:
-                self._delete_overflow(record.page)
-                record.page = None
+                self._delete_node_chain(record.page)
+                record.page = -1
                 self._set_node(node)
 
     def _create_overflow(self, value: tuple) -> int:
-        size = self._conf.item_size
-        count = len(value)
+        first = self._new_page()
+        current = ItemsNode(self._conf, page=first)
+        current.items = set(value[0:self._conf.item_order])
 
-        batch = (self._conf.page_size - self._conf.node.size + self._conf.blob.size) // size
-        batch_cnt = count // batch
-        batch_cnt += 1 if bool(count % batch) else 0
+        for offset in range(self._conf.item_order, len(value), self._conf.item_order):
+            coming = ItemsNode(self._conf, page=self._new_page())
+            coming.items = list(value[offset:offset+self._conf.item_order])
+            current.next = coming.page
+            self._set_node(current)
+            current = coming
 
-        first_page = self._new_page()
-        next_page = first_page
+        self._set_node(current)
+        return first
 
-        for batch_idx in range(batch_cnt):
-            current_page = next_page
-
-            chunk = value[batch_idx * batch:batch_idx * batch + batch]
-            data_write = b""
-            for item in chunk:
-                data_write += item
-
-            if batch_idx == batch_cnt - 1:
-                next_page = None
-            else:
-                next_page = self._new_page()
-
-            data_node = DataNode(self._conf, page=current_page, next_=next_page)
-            data_node.blob = Blob(data=data_write)
-            self._set_node(data_node)
-
-        return first_page
-
-    def _traverse_overflow(self, first_page: int):
-        """Yield all Nodes of an overflow chain."""
-        next_page = first_page
+    def _traverse_nodes(self, page: int):
+        """Yield all Nodes of an item node chain."""
+        coming = page
         while True:
-            data_node = self._get_node(next_page)
-            yield data_node
+            node = self._get_node(coming)
+            yield node
 
-            next_page = data_node.next_page
-            if next_page is None:
+            coming = node.next
+            if coming is -1:
                 break
 
-    def _read_from_overflow(self, first_page: int, count: int) -> list:
-        """Collect all values of an overflow chain."""
-        size = self._conf.item_size
-
-        batch = (self._conf.page_size - self._conf.node.size + self._conf.blob.size) // size
-        batch_cnt = count // batch
-        batch_cnt += 1 if bool(count % batch) else 0
-
+    def _read_from_chain(self, page: int, count: int) -> list:
+        """Collect all values of an item node chain."""
         value = list()
         rest = count
-        for data_node in self._traverse_overflow(first_page):
+        for node in self._traverse_nodes(page):
+            rest -= len(node.items)
+            value += node.items
 
-            chunk = data_node.least_entry().data[0:batch * size]
-            for item_idx in range(min(batch, rest)):
-                item = chunk[item_idx * size:item_idx * size + size]
-                value.append(item)
-            rest -= batch
-
-        if len(value) != count:
-            raise ValueError("The list length didn't match the count")
+        if rest != 0:
+            raise ValueError("The list length didn't match the count %s" % rest)
 
         return value
 
-    def _iterate_from_overflow(self, first_page: int, count: int, insertions: list = list()):
-        """Collect all values of an overflow chain."""
-        size = self._conf.item_size
-
+    def _iterate_items(self, first: int, count: int, insertions: list = list()):
+        """Collect all values of an item node chain."""
+        rest = count + len(insertions)
         for item in insertions:
+            rest -= 1
             yield item
 
-        for data_node in self._traverse_overflow(first_page):
-            data = data_node.smallest_entry.data
-            length = len(data)
-            for item_offset in range(0, length, size):
-                yield data[item_offset:item_offset + size]
-                count -= 1
-            self._del_node(data_node)
+        for node in self._traverse_nodes(first):
+            for item in node.items:
+                rest -= 1
+                yield item
+            self._del_node(node)
 
-        if count != 0:
-            raise ValueError("Failed reading all values, %s values left" % count)
+        if rest != 0:
+            raise ValueError("Failed reading all values, %s values left" % rest)
 
-    def _add_overflow(self, next_page: int, chunk: list, is_last: bool = False) -> int:
-        size = self._conf.item_size
-        current_page = next_page
-
-        data = b""
-        for item in chunk:
-            data += item
-
-        if is_last:
-            next_page = None
-        else:
-            next_page = self._new_page()
-
-        data_node = DataNode(self._conf, page=current_page, next_=next_page)
-        data_node.blob = Blob(data=data)
-        self._set_node(data_node)
-
-        return next_page
-
-    def _update_overflow(
-            self, first_page: int, count: int,
+    def _update_items(
+            self, page: int, count: int,
             insertions: list = list(), deletions: set = set()
     ):
         """Insert and delete items to/from value.
@@ -1315,78 +1342,62 @@ class MultiBTree(Tree):
             New page and count
 
         """
-        size = self._conf.item_size
+        batch = list()
+        cnt = 0
 
-        batch = (self._conf.page_size - self._conf.node.size + self._conf.blob.size) // size
-        batch_cnt = count // batch
-        batch_cnt += 1 if bool(count % batch) else 0
-
-        new_first_page = self._new_page()
-        next_page = new_first_page
-
-        chunk = list()
-        length = 0
-        new_count = 0
-        for item in self._iterate_from_overflow(first_page, count, insertions):
+        for item in self._iterate_items(page, count, insertions):
             if item not in deletions:
-                chunk.append(item)
-                length += 1
-                new_count += 1
+                batch.append(item)
+                cnt += 1
 
-            if length == batch:
-                next_page = self._add_overflow(next_page, chunk)
-                chunk = list()
-                length = 0
+        first = self._create_overflow(tuple(batch))
 
-        if length > 0:
-            self._add_overflow(next_page, chunk, True)
+        return first, cnt
 
-        return new_first_page, new_count
-
-    def _delete_overflow(self, first_page: int):
+    def _delete_node_chain(self, first_page: int):
         """Delete all Nodes in an overflow chain."""
-        for node in self._traverse_overflow(first_page):
+        for node in self._traverse_nodes(first_page):
             self._del_node(node)
 
     def _get_value_from_record(self, record: Record) -> list:
-        # return self._read_from_overflow(record.page, int.from_bytes(record.value, ENDIAN))
-        return self._read_from_overflow(record.page, record.value)
+        return self._read_from_chain(record.page, record.value)
 
     def traverse(self, key) -> MultiItemIterator:
         """Like get but returns an iterator."""
-        # with self._mem.read_transaction:
         node = self._search(key, self._root_node())
         try:
             record = node.get_entry(key)
         except ValueError:
             return None
         else:
-            # count = int.from_bytes(record.value, ENDIAN)
             count = record.value
             generator = (functools.partial(self._iterate_overflow, record.page, count)())
             return MultiItemIterator(generator, count)
 
-    def _iterate_overflow(self, first_page: int, count: int):
+    def _iterate_overflow(self, page: int, count: int):
         """Collect all values of an overflow chain."""
         size = self._conf.item_size
 
-        for data_node in self._traverse_overflow(first_page):
-            data = data_node.least_entry().data
-            length = len(data)
-            for item_offset in range(0, length, size):
-                yield data[item_offset:item_offset + size]
+        for node in self._traverse_nodes(page):
+            for item in node.items:
+                yield item
                 count -= 1
 
         if count != 0:
             raise ValueError("Failed reading all values, %s values left" % count)
 
 
+NodeCount = namedtuple("NodeCount", "rec_cnt ref_cnt rec_node_pages ref_node_pages data_node_pages empty_node_pages unknown_node_pages")
+RecordBundle = namedtuple("RecordBundle", "keys pairs")
+
+
 class TreeAnalyzer:
     """Analyzer class that analyzes existing trees."""
 
     def __init__(self, fileobj: io.FileIO, tree_cls: Type[Tree]):
-        # kind, root, empty, order, ref_order, value_size
-        kind, _, _, order, ref_order, value_size = self.load_meta(fileobj)
+        self.fileobj = fileobj
+        self.klass = tree_cls
+        kind, self.root, self.empty, order, ref_order, value_size = self._load_meta(fileobj)
 
         if tree_cls.TREE_KIND != kind:
             raise TypeError(
@@ -1400,10 +1411,39 @@ class TreeAnalyzer:
                     ref_order != self.conf.ref_order or value_size != self.conf.value_size:
                 raise RuntimeError("Class configuration doesn't match saved tree.")
 
-    def load_meta(self, fileobj: io.FileIO) -> tuple:
+    def _load_meta(self, fileobj: io.FileIO) -> tuple:
         """Load meta information about tree."""
         fileobj.seek(0)
         return Tree.FORMAT_META.unpack(fileobj.read(Tree.FORMAT_META.size))
+
+    def print_stats(self):
+        """Print BTree meta and statistics information."""
+        stats = self.counter()
+        tmpl = "{:<24s} {}\n"
+        eol = "\n"
+        output = Util.headline(
+            "BTree meta statistics", barrier="=") + eol + \
+                 "{} {}\n".format("File:", self.fileobj.name) + \
+                 "{:<24s} {} ({})\n".format("BTree type:", self.klass.__name__, self.klass.TREE_KIND.decode()) + \
+                 tmpl.format("Page size:", self.conf.page_size) + \
+                 tmpl.format("Value size:", self.conf.value_size) + \
+                 tmpl.format("Records/page max:", self.conf.order) + \
+                 tmpl.format("Record size:", self.conf.record.size) + \
+                 tmpl.format("References/page max:", self.conf.ref_order) + \
+                 tmpl.format("Reference size:", self.conf.reference.size) + \
+                 tmpl.format("Tree root index:", self.root) + \
+                 tmpl.format("Empty list index:", self.empty) + \
+                 tmpl.format("Page count:", len(self.pager)) + \
+                 tmpl.format("Records count:", stats.rec_cnt) + \
+                 tmpl.format("References count:", stats.ref_cnt) + \
+                 tmpl.format("Record node count:", len(stats.rec_node_pages)) + \
+                 tmpl.format("Reference node count:", len(stats.ref_node_pages)) + \
+                 tmpl.format("Data node count:", len(stats.data_node_pages)) + \
+                 tmpl.format("Empty node count:", len(stats.empty_node_pages)) + \
+                 tmpl.format("Unknown node count:", len(stats.unknown_node_pages)) + \
+                 Util.headline("End", barrier="=") + eol
+
+        print(output)
 
     def iterator(self):
         """Iterator for pages which yields (page, data)."""
@@ -1439,5 +1479,84 @@ class TreeAnalyzer:
                 node = self.page_to_node(page, data)
                 for reference in self.iterate_reference(node):
                     yield reference
+
+    def counter(self) -> NodeCount:
+        """Count nodes and entries for statistics."""
+        rec_cnt = 0
+        ref_cnt = 0
+        rec_node_pages = set()
+        ref_node_pages = set()
+        data_node_pages = set()
+        empty_node_pages = set()
+        unknown_node_pages = set()
+
+        for page, data in self.iterator():
+            kind, next_, count = Tree.FORMAT_NODE.unpack(data[:Tree.FORMAT_NODE.size])
+
+            if kind in (b"L", b"S"):  # Records
+                rec_cnt += count
+                rec_node_pages.add(page)
+            elif kind in (b"F", b"R"):  # References
+                ref_cnt += count
+                ref_node_pages.add(page)
+            elif kind in (b"D",):  # Data
+                data_node_pages.add(page)
+            elif kind in (b"E",):  # Empty
+                empty_node_pages.add(page)
+            else:
+                unknown_node_pages.add(page)
+
+        return NodeCount(
+            rec_cnt, ref_cnt, rec_node_pages, ref_node_pages,
+            data_node_pages, empty_node_pages, unknown_node_pages
+        )
+
+    def load_pairs(self) -> RecordBundle:
+        """Load key/value-pairs"""
+        keys = set()
+        pairs = dict()
+
+        for record in self.records():
+            keys.add(record.key)
+            pairs[record.key] = record.value
+
+        return RecordBundle(keys, pairs)
+
+    def scanner(self, keys:set = set()) -> NodeCount:
+        """Print the page where a record is found by key."""
+
+        for page, data in self.iterator():
+            if self.kind_from_data(data) in (b"L", b"S"):
+                node = self.page_to_node(page, data)
+                for record in self.iterate_records(node):
+                    if record.key in keys:
+                        print(record.key, node.page, type(node), "Is here")
+
+
+class TreeRescue:
+    """Rescue BTree by reading from TreeAnalyzer but inserting to new file."""
+
+    def __init__(self, fileobj: io.FileIO, tree_cls: Type[Tree]):
+        self.analyzer = TreeAnalyzer(fileobj, tree_cls)
+
+    def rescue(self, database: io.FileIO):
+        """Scans the btree and outputs a rescue copy to database."""
+        print("Preparing rescue of BTree database.")
+
+        stats = self.analyzer.counter()
+        print("Preparing to copy and sort {} records.".format(stats.rec_cnt))
+        tree = self.analyzer.klass.factory(
+            database, self.analyzer.conf.order, self.analyzer.conf.value_size)
+
+        iteration = 0
+        stamp = time.time()
+        for record in self.analyzer.records():
+            iteration += 1
+            tree.insert(record.key, record.value)
+            if iteration % 5000 == 0:
+                print("Copied and sorted {} records at {}".format(iteration, Util.hours(time.time() - stamp)))
+
+        print("Done copying and sorting records")
+        tree.pager.close()
 
 

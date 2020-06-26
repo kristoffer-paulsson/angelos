@@ -16,10 +16,8 @@ from collections.abc import Iterator
 from pathlib import PurePath
 from typing import Union
 
-from bplustree.tree import SingleItemTree
 from libangelos.archive7.base import DATA_SIZE
 from libangelos.archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject
-
 from libangelos.archive7.tree import SimpleBTree, MultiBTree
 
 TYPE_FILE = b"f"  # Represents a file
@@ -216,14 +214,14 @@ class EntryRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return SimpleBTree(
+        return SimpleBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_ENTRIES),
                 "entries", "wb+"
             ),
-            order=DATA_SIZE // struct.calcsize(EntryRecord.FORMAT),
-            key_size=16,
-            value_size=struct.calcsize(EntryRecord.FORMAT)
+            order=9,
+            value_size=struct.calcsize(EntryRecord.FORMAT),
+            page_size=DATA_SIZE
         )
 
 
@@ -268,14 +266,14 @@ class PathRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return SingleItemTree(
+        return SimpleBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_PATHS),
                 "paths", "wb+"
             ),
-            order=DATA_SIZE // struct.calcsize(PathRecord.FORMAT) // 4,
-            key_size=16,
-            value_size=struct.calcsize(PathRecord.FORMAT)
+            order=104,
+            value_size=struct.calcsize(PathRecord.FORMAT),
+            page_size=DATA_SIZE
         )
 
 
@@ -308,14 +306,14 @@ class ListingRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return MultiBTree(
+        return MultiBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_LISTINGS),
                 "listings", "wb+"
             ),
-            page_size=DATA_SIZE // struct.calcsize(ListingRecord.FORMAT) // 4,
-            key_size=16,
+            order=159,
             value_size=struct.calcsize(ListingRecord.FORMAT),
+            page_size=DATA_SIZE
         )
 
 

@@ -14,6 +14,7 @@ import asyncio
 import importlib
 import os
 import sys
+import datetime
 from asyncio import Task
 from typing import _GenericAlias, Callable
 
@@ -293,14 +294,7 @@ class Util:
     @staticmethod
     def hours(seconds):
         """Docstring"""
-        if seconds > 24 * 3600:
-            return "{:>7.2}d".format(float(seconds / (24 * 3600)))
-        else:
-            seconds = int(seconds)
-            hour = int(seconds / 3600)
-            mins = int(seconds / 60)
-            secs = seconds - hour * 3600 - mins * 60
-            return "{:}:{:02}:{:02}".format(hour, mins, secs)
+        datetime.timedelta(seconds=seconds)
 
     @staticmethod
     def headline(title: str, filler: str = "", barrier = "-"):

@@ -46,9 +46,10 @@ class StreamBlock:
     FORMAT = FORMAT_BLOCK
     SIZE = SIZE_BLOCK
 
-    def __init__(self, position: int, previous: int = -1, next: int = -1, index: int = 0,
-                 stream: uuid.UUID = uuid.UUID(int=0),
-                 block: bytes = None):
+    def __init__(
+            self, position: int, previous: int = -1, next: int = -1, index: int = 0,
+            stream: uuid.UUID = uuid.UUID(int=0), block: bytes = None
+    ):
         self.__position = position
 
         self.previous = previous
@@ -571,14 +572,14 @@ class StreamRegistry(Registry):
     __slots__ = []
 
     def _init_tree(self):
-        return SimpleBTree(
+        return SimpleBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(DynamicMultiStreamManager.STREAM_INDEX),
                 "main", "wb+"
             ),
-            order=DATA_SIZE // DataStream.SIZE,
-            key_size=16,
-            value_size=DataStream.SIZE
+            order=67,
+            value_size=DataStream.SIZE,
+            page_size=DATA_SIZE
         )
 
     def register(self, stream: DataStream) -> int:
