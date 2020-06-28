@@ -12,9 +12,9 @@ import struct
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterable
 from pathlib import PurePath
-from typing import Union
+from typing import Union, Iterator
 
 from libangelos.archive7.base import DATA_SIZE
 from libangelos.archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject
@@ -23,6 +23,7 @@ from libangelos.archive7.tree import SimpleBTree, MultiBTree
 TYPE_FILE = b"f"  # Represents a file
 TYPE_LINK = b"l"  # Represents a link
 TYPE_DIR = b"d"  # Represents a directory
+TYPE_ERR = b"e"  # Represent a missing entry
 
 
 class EntryRecord:
@@ -207,6 +208,18 @@ class EntryRecord:
 
         return EntryRecord(**kwargs)
 
+    @staticmethod
+    def err(identity: uuid.UUID, parent: uuid.UUID):
+        """Generate entry for file link."""
+
+        kwargs = {
+            "type": TYPE_ERR,
+            "identity": identity,
+            "parent": parent
+        }
+
+        return EntryRecord(**kwargs)
+
 
 class EntryRegistry(Registry):
     """Registry for all file, link and directory entries."""
@@ -311,7 +324,7 @@ class ListingRegistry(Registry):
                 self._manager.special_stream(FileSystemStreamManager.STREAM_LISTINGS),
                 "listings", "wb+"
             ),
-            order=159,
+            order=248,
             value_size=struct.calcsize(ListingRecord.FORMAT),
             page_size=DATA_SIZE
         )
@@ -348,45 +361,46 @@ class Delete(enum.IntEnum):
     ERASE = 3  # Replace file with empty block
 
 
-class HierarchyTraverser(Iterator):
+class HierarchyTraverser(Iterable):
     """Traverse the file system hierarchy at a defined starting point."""
 
     def __init__(self, identity: uuid.UUID, entries: EntryRegistry, paths: PathRegistry, listings: ListingRegistry):
         self.__identity = identity
-        self.__generators = list()
         self.__segments = list()
 
         self.__entries = entries
         self.__paths = paths
         self.__listings = listings
 
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        item = None
-        try:
-            if not self.__generators:
-                item = self.__identity.bytes
-            else:
-                item = next(self.__generators[-1])
-        except StopIteration:
-            if self.__generators:
-                self.__generators.pop()
-                self.__segments.pop()
-
-            if not self.__generators:
-                raise StopIteration()
+    def _get_entry(self, item: uuid.UUID):
+        meta = self.__entries.tree.get(key=item)
+        if meta:
+            return EntryRecord.meta_unpack(meta)
         else:
-            entry = EntryRecord.meta_unpack(
-                self.__entries.tree.get(
-                    uuid.UUID(bytes=item)))
+            return EntryRecord.err(item, None)
 
-            if entry.type == TYPE_DIR:
-                self.__generators.append(self.__listings.tree.traverse(self.__identity))
-                self.__segments.append(entry.name)
+    def _iterate_dir(self, record: EntryRecord):
+        self.__segments.append(record.name.decode())
+        yield record, "/" + os.path.join(*self.__segments)[5:]
+        for item in self.__listings.tree.traverse(record.id):
+            entry = self._get_entry(uuid.UUID(bytes=item))
+            if entry.type == TYPE_ERR:
+                entry.parent = record.id
+                yield entry, "/" + os.path.join(*self.__segments, "<error>")[5:]
+            elif entry.type != TYPE_DIR:
+                yield entry, "/" + os.path.join(*self.__segments, entry.name.decode())[5:]
+            else:
+                for entry2, path in self._iterate_dir(entry):
+                    yield entry2, path
+        self.__segments.pop()
 
-            return entry
+    def __iter__(self):
+        entry = self._get_entry(self.__identity)
+        if entry.type != TYPE_DIR:
+            yield entry, "/" + os.path.join(*self.__segments, entry.name.decode())[5:]
+        else:
+            for entry2, path in self._iterate_dir(entry):
+                yield entry2, path
 
     @property
     def path(self) -> str:
@@ -444,8 +458,8 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         return uuid.uuid5(entry.parent, entry.name.decode())
 
     def __follow_link(self, identity: uuid.UUID) -> EntryRecord:
-        link = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
-        return EntryRecord.meta_unpack(self.__entries.tree.get(link.owner))
+        link = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        return EntryRecord.meta_unpack(self.__entries.tree.get(key=link.owner))
 
     def resolve_path(self, filename: PurePath, follow_link: bool = False) -> uuid.UUID:
         """Resolve a path by walking it.
@@ -465,8 +479,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
 
         parent = uuid.UUID(int=0)
         for part in filename.parts[1:]:
-            key = uuid.uuid5(parent, part)
-            metadata = self.__paths.tree.get(key)
+            metadata = self.__paths.tree.get(key=uuid.uuid5(parent, part))
             if not metadata:
                 return None
             path = PathRecord.meta_unpack(metadata)
@@ -497,16 +510,16 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         """
         path_key = uuid.uuid5(parent, name)
 
-        if self.__paths.tree.get(path_key) is not None:
+        if self.__paths.tree.get(key=path_key) is not None:
             raise KeyError("Key already exists in paths")
 
         if type_ == TYPE_DIR:
             entry = EntryRecord.dir(name=name, parent=parent, **kwargs)
-            self.__listings.tree.update(key=entry.parent, insertions=[entry.id.bytes])
+            self.__listings.tree.insert(key=entry.id, value=set())
         elif type_ == TYPE_FILE:
             entry = EntryRecord.file(name=name, parent=parent, **kwargs)
         elif type_ == TYPE_LINK:
-            target = self.__entries.tree.get(kwargs.get("owner"))
+            target = self.__entries.tree.get(key=kwargs.get("owner"))
             del kwargs["owner"]
 
             if target is None:
@@ -519,13 +532,10 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         else:
             raise ValueError("Entry type is unknown")
 
+
         self.__entries.tree.insert(key=entry.id, value=bytes(entry))
         self.__paths.tree.insert(key=path_key, value=bytes(PathRecord.path(entry.type, entry.id)))
-        self.__listings.tree.insert(key=entry.id, value=set())
-
-        self.__entries.tree.checkpoint()
-        self.__paths.tree.checkpoint()
-        self.__listings.tree.checkpoint()
+        self.__listings.tree.update(key=entry.parent, insertions=[entry.id.bytes])
 
         return entry.id
 
@@ -552,7 +562,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 Unix permissions
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
 
         if entry is None:
             raise KeyError("Entry doesn't exist")
@@ -570,8 +580,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         if perms:
             entry.perms = min(0o777, max(0o000, perms))
 
-        self.__entries.tree.update(entry.id, bytes(entry))
-        self.__entries.tree.checkpoint()
+        self.__entries.tree.update(key=entry.id, value=bytes(entry))
 
     def delete_entry(self, identity: uuid.UUID, delete: int):
         """Delete entry according to level.
@@ -583,42 +592,41 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 Delete level
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
 
         if entry is None:
             raise KeyError("Entry doesn't exist")
 
         if entry.type == TYPE_DIR:
-            if self.__listings.tree.get(entry.id):
+            if self.__listings.tree.get(key=entry.id):
                 raise OSError("Can't delete directory because of files")
 
         if delete == Delete.SOFT:
             entry.deleted = True
-            self.__entries.tree.update(entry.id, entry)
+            self.__entries.tree.update(key=entry.id, value=bytes(entry))
         elif delete == Delete.HARD:
             entry.deleted = True
             if entry.stream.int != 0:
                 self.del_stream(entry.stream)
                 self.stream = None
-            self.__entries.tree.update(entry.id, entry)
+            self.__entries.tree.update(key=entry.id, value=bytes(entry))
         elif delete == Delete.ERASE:
             if entry.stream.int != 0:
                 self.del_stream(entry.stream)
                 entry.stream = None
 
-            self.__listings.tree.update(entry.parent, deletions=set(entry.id.bytes))
-            self.__listings.tree.delete(entry.id)
-            self.__paths.tree.delete(uuid.uuid5(entry.parent, entry.name.decode()))
-            self.__entries.tree.delete(entry.id)
+            self.__listings.tree.update(key=entry.parent, deletions=set(entry.id.bytes))
+            self.__listings.tree.delete(key=entry.id)
+            self.__paths.tree.delete(key=uuid.uuid5(entry.parent, entry.name.decode()))
+            self.__entries.tree.delete(key=entry.id)
         else:
             raise ValueError("Delete level unknown")
 
-        self.__entries.tree.checkpoint()
-        self.__paths.tree.checkpoint()
-        self.__listings.tree.checkpoint()
-
     def search_entry(self, identity: uuid.UUID) -> EntryRecord:
-        return EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        meta = self.__entries.tree.get(key=identity)
+        if not meta:
+            raise ValueError("No entry for %s" % identity)
+        return EntryRecord.meta_unpack(meta)
 
     def change_parent(self, identity: uuid.UUID, parent: uuid.UUID):
         """Change parent of an entry i.e. changing directory.
@@ -630,34 +638,30 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 New parent UUID number
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
         if entry is None:
             raise KeyError("Entry doesn't exist")
 
-        new_parent = EntryRecord.meta_unpack(self.__entries.tree.get(parent))
+        new_parent = EntryRecord.meta_unpack(self.__entries.tree.get(key=parent))
         if new_parent is None:
             raise KeyError("Parent entry doesn't exist")
 
         if new_parent.type != TYPE_DIR:
             raise OSError("New parent is not a directory")
 
-        if self.__paths.tree.get(uuid.uuid5(parent, entry.name.decode())) is not None:
+        if self.__paths.tree.get(key=uuid.uuid5(parent, entry.name.decode())) is not None:
             raise KeyError("Key already exists in paths")
 
-        self.__listings.tree.update(new_parent.id, insertions=[entry.id.bytes])
-        self.__listings.tree.update(entry.parent, deletions=set(entry.id.bytes))
+        self.__listings.tree.update(key=new_parent.id, insertions=[entry.id.bytes])
+        self.__listings.tree.update(key=entry.parent, deletions=set([entry.id.bytes]))
 
         self.__paths.tree.insert(
-            uuid.uuid5(new_parent.id, entry.name.decode()),
+            key=uuid.uuid5(new_parent.id, entry.name.decode()),
             value=bytes(PathRecord(entry.type, entry.id)))
-        self.__paths.tree.delete(uuid.uuid5(entry.parent, entry.name.decode()))
+        self.__paths.tree.delete(key=uuid.uuid5(entry.parent, entry.name.decode()))
 
         entry.parent = parent
-        self.__entries.tree.update(entry.id, bytes(entry))
-
-        self.__entries.tree.checkpoint()
-        self.__paths.tree.checkpoint()
-        self.__listings.tree.checkpoint()
+        self.__entries.tree.update(key=entry.id, value=bytes(entry))
 
     def change_name(self, identity: uuid.UUID, name: str):
         """Change name of an entry.
@@ -669,24 +673,21 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 New name to change to
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
         if entry is None:
             raise KeyError("Entry doesn't exist")
 
         path_key = uuid.uuid5(entry.parent, name)
-        if self.__paths.tree.get(path_key) is not None:
+        if self.__paths.tree.get(key=path_key) is not None:
             raise KeyError("Key already exists in paths")
 
         self.__paths.tree.insert(
-            uuid.uuid5(entry.parent, name),
+            key=uuid.uuid5(entry.parent, name),
             value=bytes(PathRecord(entry.type, entry.id))
         )
         self.__paths.tree.delete(uuid.uuid5(entry.parent, entry.name.decode()))
         entry.name = name.encode("utf-8")[:256]
-        self.__entries.tree.update(identity, bytes(entry))
-
-        self.__entries.tree.checkpoint()
-        self.__paths.tree.checkpoint()
+        self.__entries.tree.update(key=identity, value=bytes(entry))
 
     def open(self, identity: uuid.UUID, mode: str = "r") -> FileObject:
         """Open a file stream as a file object.
@@ -704,7 +705,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         if identity in self.__descriptors.keys():
             raise OSError("File already open.")
 
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(identity))
+        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
 
         if not entry.type == TYPE_FILE:
             raise OSError("Record not of type file.")
@@ -715,8 +716,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         if entry.stream.int == 0:
             stream = self.new_stream()
             entry.stream = stream.identity
-            self.__entries.tree.update(entry.id, bytes(entry))
-            self.__entries.tree.checkpoint()
+            self.__entries.tree.update(key=entry.id, value=bytes(entry))
         else:
             stream = self.open_stream(entry.stream)
 
@@ -752,8 +752,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         Returns (Iterator):
             Iterator that traverses the hierarchy
         """
-        iterator = HierarchyTraverser(directory, self.__entries, self.__paths, self.__listings)
-        return iterator
+        return iter(HierarchyTraverser(directory, self.__entries, self.__paths, self.__listings))
 
 
 class FilesystemMixin(ABC):

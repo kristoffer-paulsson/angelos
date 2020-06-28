@@ -9,7 +9,9 @@ import datetime
 import io
 import logging
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
+
+from libangelos.archive7.fs import TYPE_FILE
 
 from archive7.archive import TYPE_LINK, Archive7
 from archive7.fs import EntryRecord
@@ -187,7 +189,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             link: bool = False,
             limit: int = 0,
             deleted: Optional[bool] = None,
-            fields = lambda name, entry: name
+            fields: Callable = lambda name, entry: name
     ) -> Dict[uuid.UUID, Any]:
         """Searches for a files in the storage.
 
@@ -223,7 +225,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
                 Returns:
 
                 """
-                q.type((b"f", b"l") if link else b"f").deleted(deleted)
+                q.type((TYPE_FILE, TYPE_LINK) if link else TYPE_FILE).deleted(deleted)
                 if modified:
                     q.modified(modified)
                 if created:
@@ -232,21 +234,28 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
                     q.owner(owner)
                 return q
 
-            return await self.archive.execute(
-                self._callback_search,
-                pattern,
-                query,
-                fields,
-                limit,
-                link
-            )
+            resultset = dict()
+            count = 0
+            async for entry, path in self.archive.search(query(Archive7.Query(pattern=pattern))):
+
+                if link and entry.type == TYPE_LINK:
+                    followed = self.archive._Archive7__manager._FileSystemStreamManager__follow_link(entry.id)
+                    resultset[link.id] = fields(path, followed)
+                else:
+                    resultset[entry.id] = fields(path, entry)
+
+                count += 1
+                if count == limit:
+                    break
+
+            return resultset
         except Exception as e:
             logging.exception(e)
 
     def _callback_search(
             self,
             pattern,
-            query = lambda q: q.type(b"f"),
+            query = lambda q: q.type(TYPE_FILE),
             fields = lambda name, entry: name,
             limit = 0,
             follow = False
@@ -268,13 +277,10 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             A dictionary of results indexed by ID.
 
         """
-        idxs = self.archive.ioc.entries.search(query(Archive7.Query(pattern=pattern)))
-        ids = self.archive.ioc.hierarchy.ids
-        ops = self.archive.ioc.operations
 
-        resultset = dict()
+        """resultset = dict()
         count = 0
-        for _, entry in idxs:
+        async for entry, path in self.archive.search(query(Archive7.Query(pattern=pattern)):
             filename = entry.name.decode()
             if entry.parent.int == 0:
                 name = "/" + filename
@@ -291,7 +297,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             if count == limit:
                 break
 
-        return resultset
+        return resultset"""
 
     async def search_docs(
             self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1

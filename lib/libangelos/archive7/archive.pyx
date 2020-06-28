@@ -5,6 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive implementation."""
+import asyncio
 import datetime
 import functools
 import os
@@ -15,13 +16,15 @@ import uuid
 from pathlib import PurePath
 from typing import Union
 
-from libangelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, EntryRecord, TYPE_FILE
+from libangelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, EntryRecord, TYPE_FILE, \
+    HierarchyTraverser
 from libangelos.error import Error
-from libangelos.misc import SharedResource
+from libangelos.misc import SharedResourceMixin
 from libangelos.utils import Util
 
 
 # FIXME: Move compression, size and length to stream level.
+from archive7.fs import Delete
 
 
 class Header:
@@ -92,14 +95,14 @@ class Header:
         )
 
 
-class Archive7(SharedResource):
+class Archive7(SharedResourceMixin):
     """Archive main class and high level API."""
 
-    def __init__(self, filename: str, secret: bytes, delete: int = 3):
+    def __init__(self, filename: str, secret: bytes, delete: int = Delete.ERASE):
         """Init archive using a file object and set delete mode."""
-        SharedResource.__init__(self)
+        SharedResourceMixin.__init__(self)
         self.__closed = False
-        self.__delete = delete if delete else Archive7.Delete.ERASE
+        self.__delete = delete
         self.__manager = FileSystemStreamManager(filename, secret)
 
     def __enter__(self):
@@ -204,10 +207,10 @@ class Archive7(SharedResource):
 
         return self.__manager.search_entry(identity)
 
-    async def glob(self, *args, **kwargs):
-        return await self._run(functools.partial(self.__glob, *args, **kwargs))
+    # async def glob(self, *args, **kwargs):
+    #    return await self._run(functools.partial(self.__glob, *args, **kwargs))
 
-    def __glob(
+    async def glob(
             self,
             name="*",
             id=None,
@@ -238,17 +241,10 @@ class Archive7(SharedResource):
             sq.user(user)
         if group:
             sq.group(group)
-        idxs = entries.search(sq)
 
         files = set()
-        for i in idxs:
-            idx, entry = i
-            filename = entry.name.decode()
-            if entry.parent.int == 0:
-                name = "/" + filename
-            else:
-                name = ids[entry.parent] + "/" + filename
-            files.add(name)
+        async for entry, path in self.search(sq):
+            files.add(path)
 
         return files
 
@@ -261,7 +257,7 @@ class Archive7(SharedResource):
         if not identity:
             raise OSError("File not found")
         parent = self.__manager.resolve_path(PurePath(dirname))
-        if not identity:
+        if not parent:
             raise OSError("Destination directory not found")
         self.__manager.change_parent(identity, parent)
 
@@ -296,7 +292,7 @@ class Archive7(SharedResource):
         identity = self.__manager.resolve_path(PurePath(filename))
         if not identity:
             raise OSError("File not found")
-        self.__manager.delete_entry(identity, mode if mode is not None else self.__delete)
+        self.__manager.delete_entry(identity, mode if mode else self.__delete)
 
     async def rename(self, *args, **kwargs):
         return await self._run(functools.partial(self.__rename, *args, **kwargs))
@@ -308,7 +304,10 @@ class Archive7(SharedResource):
             raise OSError("File not found")
         self.__manager.change_name(identity, dest)
 
-    def isdir(self, dirname: str) -> bool:
+    async def isdir(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__isdir, *args, **kwargs))
+
+    def __isdir(self, dirname: str) -> bool:
         """Check if a path is a known directory."""
         identity = self.__manager.resolve_path(PurePath(dirname), True)
         if not identity:
@@ -316,7 +315,10 @@ class Archive7(SharedResource):
         entry = self.__manager.search_entry(identity)
         return entry.type == TYPE_DIR
 
-    def isfile(self, filename: str) -> bool:
+    async def isfile(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__isfile, *args, **kwargs))
+
+    def __isfile(self, filename: str) -> bool:
         """Check if a path is a known file."""
         identity = self.__manager.resolve_path(PurePath(filename), True)
         if not identity:
@@ -324,7 +326,10 @@ class Archive7(SharedResource):
         entry = self.__manager.search_entry(identity)
         return entry.type == TYPE_FILE
 
-    def islink(self, filename: str) -> bool:
+    async def islink(self, *args, **kwargs):
+        return await self._run(functools.partial(self.__islink, *args, **kwargs))
+
+    def __islink(self, filename: str) -> bool:
         """Check if a path is a known link."""
         identity = self.__manager.resolve_path(PurePath(filename), False)
         if not identity:
@@ -448,7 +453,6 @@ class Archive7(SharedResource):
             raise OSError("File not found")
         vfd = self.__manager.open(identity, "wb")
         vfd.write(data)
-        vfd.seek(0, os.SEEK_END)
         vfd.truncate()
         vfd.close()
         self.__manager.update_entry(identity, modified=modified)
@@ -467,6 +471,31 @@ class Archive7(SharedResource):
         vfd.close()
         return data
 
+    async def search(self, query: "Archive7.Query"):
+        """Search is an async generator that iterates over the file system hierarchy.
+
+        Use accordingly:
+        query = Archive.Query()
+        async for entry, path in archive.search(query):
+            pass
+        """
+        evaluator = query.build()
+        traverser = self.__manager.traverse_hierarchy(uuid.UUID(int=0))
+
+        while True:
+            entry, path = await self._wild(functools.partial(self.__search, traverser=traverser))
+            if not entry:
+                break
+            if evaluator(entry, path):
+                yield entry, path
+
+    def __search(self, traverser: HierarchyTraverser) -> tuple:
+        """Load data from a file."""
+        try:
+            return next(traverser)
+        except StopIteration:
+            return None, None
+
     class Query:
         """Low level query API."""
 
@@ -478,23 +507,10 @@ class Archive7(SharedResource):
         def __init__(self, pattern="*"):
             """Init a query."""
             self.__type = (TYPE_FILE, TYPE_DIR, TYPE_LINK)
-            self.__file_regex = None
-            self.__dir_regex = None
+            self.__path_regex = None
             if not pattern == "*":
-                filename = (
-                    re.escape(os.path.basename(pattern))
-                    .replace("\*", ".*")
-                    .replace("\?", ".")
-                )
-                dirname = (
-                    re.escape(os.path.dirname(pattern))
-                    .replace("\*", ".*")
-                    .replace("\?", ".")
-                )
-                if filename:
-                    self.__file_regex = re.compile(bytes(filename, "utf-8"))
-                if dirname:
-                    self.__dir_regex = re.compile(dirname)
+                path = re.escape(pattern).replace("\*", ".*").replace("\?", ".")
+                self.__path_regex = re.compile(path)
             self.__id = None
             self.__parent = None
             self.__owner = None
@@ -518,10 +534,10 @@ class Archive7(SharedResource):
                 self.__type = (_type,)
             return self
 
-        def id(self, id=None):
+        def id(self, identity=None):
             """Search for ID."""
-            Util.is_type(id, uuid.UUID)
-            self.__id = id
+            Util.is_type(identity, uuid.UUID)
+            self.__id = identity
             return self
 
         def parent(self, parent, operand="="):
@@ -624,18 +640,9 @@ class Archive7(SharedResource):
 
         def build(self, paths=None):
             """Generate the search query function."""
-            if self.__dir_regex and paths:
-                parents = []
-                for key, value in paths.items():
-                    if bool(self.__dir_regex.match(key)):
-                        parents.append(value)
-                self.parent(tuple(parents))
 
             def _type_in(x):
                 return x.type in self.__type
-
-            def _name_match(x):
-                return bool(self.__file_regex.match(x.name))
 
             def _id_is(x):
                 return self.__id.int == x.id.int
@@ -693,8 +700,6 @@ class Archive7(SharedResource):
 
             qualifiers = [_type_in]
 
-            if self.__file_regex:
-                qualifiers.append(_name_match)
             if self.__id:
                 qualifiers.append(_id_is)
             if self.__parent:
@@ -739,14 +744,15 @@ class Archive7(SharedResource):
                 elif self.__group[1] == "≠":
                     qualifiers.append(_group_not)
 
-            def query(x):
+            def query(rec, path):
+                """Evaluate entry and path against criteria."""
+                if self.__path_regex:
+                    if not bool(self.__path_regex.match(path)):
+                        return False
+
                 for q in qualifiers:
-                    if not q(x[1]):
+                    if not q(rec):
                         return False
                 return True
 
             return query
-
-    # def __del__(self):
-    #    """Destructor."""
-    #    self.close()

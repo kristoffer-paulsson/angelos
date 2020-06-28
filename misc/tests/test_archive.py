@@ -7,6 +7,8 @@ This file is distributed under the terms of the MIT license.
 
 Tests for Archive7."""
 import sys
+from unittest import TestCase
+
 sys.path.append('../angelos')  # noqa
 
 import testing
@@ -22,7 +24,6 @@ import libnacl.secret
 from lipsum import LIPSUM_LINES, LIPSUM_PATH
 from support import filesize
 from angelos.archive.archive7 import Archive7, Entry
-
 
 """
 TODO
@@ -74,7 +75,7 @@ class TestArchive(testing.TestCase):
 
         with Archive7.setup(self.filename, self.secret, owner=self.owner):
             pass
-        self.assertEqual(512*33, filesize(self.filename), 'Wrong filesize.')
+        self.assertEqual(512 * 33, filesize(self.filename), 'Wrong filesize.')
 
     def test_02_mkdir(self):
         """Open archive and write directory tree."""
@@ -238,3 +239,5 @@ class TestArchive(testing.TestCase):
 
 if __name__ == '__main__':
     testing.main(argv=['first-arg-is-ignored'])
+
+

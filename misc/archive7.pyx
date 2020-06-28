@@ -32,7 +32,7 @@ from abc import ABC
 from libangelos.conceal import ConcealIO
 from libangelos.error import Error, ArchiveInvalidFile
 from libangelos.ioc import Container, ContainerAware
-from libangelos.misc import SharedResource
+from libangelos.misc import SharedResourceMixin
 from libangelos.utils import Util
 
 
@@ -494,14 +494,14 @@ class Entry(
         )
 
 
-class Archive7(ContainerAware, SharedResource):
+class Archive7(ContainerAware, SharedResourceMixin):
     """Archive main class and high level API."""
 
     BLOCK_SIZE = 512
 
     def __init__(self, fileobj, delete=3):
         """Init archive using a file object and set delete mode."""
-        SharedResource.__init__(self)
+        SharedResourceMixin.__init__(self)
         self.__closed = False
         self.__file = fileobj
         self.__size = os.path.getsize(self.__file.name)

@@ -7,15 +7,8 @@
 """Module docstring."""
 
 from libangelos.api.contact import ContactAPI
-from libangelos.api.mailbox import MailboxAPI
-from libangelos.api.replication import ReplicationAPI
+from libangelos.api.crud import CrudAPI
 from libangelos.api.settings import SettingsAPI
-from libangelos.storage.ftp import FtpStorage
-from libangelos.storage.home import HomeStorage
-from libangelos.storage.mail import MailStorage
-from libangelos.storage.pool import PoolStorage
-from libangelos.storage.routing import RoutingStorage
-from libangelos.storage.vault import VaultStorage
 from libangelos.const import Const
 from libangelos.data.client import ClientData
 from libangelos.data.portfolio import PortfolioData
@@ -26,7 +19,14 @@ from libangelos.facade.base import BaseFacade
 from libangelos.policy.portfolio import PrivatePortfolio
 from libangelos.task.contact_sync import ContactPortfolioSyncTask
 
-from libangelos.api.crud import CrudAPI
+from libangelos.api.mailbox import MailboxAPI
+from libangelos.api.replication import ReplicationAPI
+from libangelos.storage.ftp import FtpStorage
+from libangelos.storage.home import HomeStorage
+from libangelos.storage.mail import MailStorage
+from libangelos.storage.pool import PoolStorage
+from libangelos.storage.routing import RoutingStorage
+from libangelos.storage.vault import VaultStorage
 from libangelos.task.network_index import NetworkIndexerTask
 
 

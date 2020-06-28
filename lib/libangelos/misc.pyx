@@ -85,39 +85,47 @@ class Loop:
             logging.error(exc, exc_info=True)
 
 
-class SharedResource:
+class SharedResourceMixin:
+    """Shared resource is a class that must be shared between threads but must be guaranteed synchronous
+    execution. This class is a mixin and all sensitive methods in the main class should be private to
+    the outside world, then be called via a public proxy function that calls the _run method. All calls
+    via the _run method is handled in a thread pool executor linearly.
     """
 
-    """
     def __init__(self):
         self.__pool = ThreadPoolExecutor(max_workers=1)
 
     def __del__(self):
         self.__pool.shutdown()
 
-    async def execute(self, callback, *args, **kwargs):
-        """
+    async def execute(self, callback: Callable, *args, **kwargs) -> Any:
+        """Execute a callable method within a thread pool executor.
 
         Args:
-            callback:
+            callback (Callable):
+                A callable method.
             *args:
+                Passes on whatever arguments.
             *kwargs:
+                Passes on whatever keyword arguments.
 
-        Returns:
+        Returns (Any):
+            Whatever the callback returns.
 
         """
         return await self._run(functools.partial(callback, *args, **kwargs))
 
-    async def _run(self, callback):
-        """
+    async def _run(self, callback: Callable) -> Any:
+        """Protected method for executing a multi-thread sensitive private method.
+
+        This method handles internal exceptions by logging them and re-raise them.
 
         Args:
-            callback:
-            resource:
-            *args:
-            **kwargs:
+            callback (callable):
+                Method that is multi-thread sensitive.
 
-        Returns:
+        Returns (Any):
+            Whatever return value from inner sensitive method.
 
         """
         await asyncio.sleep(0)
@@ -126,6 +134,22 @@ class SharedResource:
         except Exception as e:
             logging.error(e, exc_info=True)
             raise RuntimeError(e)
+
+    async def _wild(self, callback: Callable) -> Any:
+        """Protected method for executing a multi-thread sensitive private method.
+
+        This method handles internal exceptions by logging them and re-raise them.
+
+        Args:
+            callback (callable):
+                Method that is multi-thread sensitive.
+
+        Returns (Any):
+            Whatever return value from inner sensitive method.
+
+        """
+        await asyncio.sleep(0)
+        return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
 
 
 @dataclass

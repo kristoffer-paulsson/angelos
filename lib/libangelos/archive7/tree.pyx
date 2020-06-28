@@ -805,17 +805,6 @@ class Tree(ABC):
     def _recycle(self, page: int):
         self._shift_empty(page)
 
-    def do_wal(self):
-        """Read and execute journal"""
-        pass
-
-    def checkpoint(self):
-        """Write commit transaction into the tree."""
-        # with self._mem.write_transaction:
-        self.do_wal()
-
-        # TODO: Fix this function
-
     def _initialize(self):
         """Initialize a tree for the first time."""
         self.__root = self._new_page()
@@ -1109,9 +1098,9 @@ class SimpleBTree(Tree):
 
 class MultiItemIterator(collections.abc.Iterator):
     """Iterator that iterates over a multi item generator."""
-    def __init__(self, generator: Generator, count: int):
-        self.__count = count
-        self.__generator = generator
+    def __init__(self, tree: Tree, record: Record):
+        self.__count = record.value
+        self.__generator = iter(tree._iterate_items(record.page, record.value))
 
     def __iter__(self):
         return self
@@ -1135,10 +1124,16 @@ class MultiBTree(Tree):
         if order < 4:
             raise OSError("Order can never be less than 4.")
 
-        ps = cls.FORMAT_NODE.size + order * value_size
+        total = order * value_size
         record = struct.Struct("!i16sIc")  # Record: page, key, value, checksum
-        rec_order = (ps - cls.FORMAT_NODE.size) // record.size
-        ref_order = (ps - cls.FORMAT_NODE.size) // cls.FORMAT_REFERENCE.size
+        rec_order = math.ceil(total / record.size)
+        ref_order = math.ceil(total / cls.FORMAT_REFERENCE.size)
+
+        ps = cls.FORMAT_NODE.size + max(
+            order * value_size,
+            rec_order * record.size,
+            ref_order * cls.FORMAT_REFERENCE.size
+        )
 
         if page_size:
             if ps > page_size:
@@ -1304,7 +1299,7 @@ class MultiBTree(Tree):
 
         return value
 
-    def _iterate_items(self, first: int, count: int, insertions: list = list()):
+    def _consume_items(self, first: int, count: int, insertions: list = list()):
         """Collect all values of an item node chain."""
         rest = count + len(insertions)
         for item in insertions:
@@ -1345,7 +1340,7 @@ class MultiBTree(Tree):
         batch = list()
         cnt = 0
 
-        for item in self._iterate_items(page, count, insertions):
+        for item in self._consume_items(page, count, insertions):
             if item not in deletions:
                 batch.append(item)
                 cnt += 1
@@ -1368,13 +1363,14 @@ class MultiBTree(Tree):
         try:
             record = node.get_entry(key)
         except ValueError:
-            return None
+            return list()
         else:
-            count = record.value
-            generator = (functools.partial(self._iterate_overflow, record.page, count)())
-            return MultiItemIterator(generator, count)
+            if record.value > 0:
+                return MultiItemIterator(self, record)
+            else:
+                return list()
 
-    def _iterate_overflow(self, page: int, count: int):
+    def _iterate_items(self, page: int, count: int):
         """Collect all values of an overflow chain."""
         size = self._conf.item_size
 
