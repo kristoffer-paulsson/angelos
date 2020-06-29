@@ -46,7 +46,6 @@ class ContactPortfolioSyncTask(TaskFacadeExtension):
         self._progress(1.0)
         
     async def __link(self, path, eid):
-        await self.facade.storage.vault.link(
-            path + str(eid),
-            self.facade.storage.vault.PATH_PORTFOLIOS[0] + str(eid) + "/" + str(eid) + ".ent"
-        )
+        filename = path + str(eid)
+        target = self.facade.storage.vault.PATH_PORTFOLIOS[0] + str(eid) + "/" + str(eid) + ".ent"
+        await self.facade.storage.vault.link(filename, target)

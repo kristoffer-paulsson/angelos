@@ -510,11 +510,8 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 self._serverfile.data += data
 
             data = self._serverfile.data
-            if not (
-                len(data) == self._serverfile.size
-                and hashlib.sha1(data).digest() == self._serverfile.digest
-            ):
-                raise Error(reason='File digest mismatch', code=1)
+            if not len(data) == self._serverfile.size:
+                raise Error(reason='File size mismatch', code=1)
 
             await self.client.ioc.facade.api.replication.save_file(
                 self.client.preset, self._serverfile, self._action
@@ -564,7 +561,6 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 None,
                 String(self._chunk),
                 UInt32(self._clientfile.pieces),
-                String(self._clientfile.digest),
                 String(self._clientfile.filename),
                 String(self._clientfile.created.isoformat()),
                 String(self._clientfile.modified.isoformat()),
@@ -691,7 +687,6 @@ class ReplicatorClientHandler(ReplicatorHandler):
         if meta == "meta":
             self._serverfile.pieces = packet.get_uint32()
             self._serverfile.size = packet.get_uint32()
-            self._serverfile.digest = packet.get_string()
 
             self._serverfile.filename = packet.get_string().decode()
             self._serverfile.created = datetime.datetime.fromisoformat(
@@ -920,7 +915,6 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 String("meta"),
                 UInt32(self._serverfile.pieces),
                 UInt32(self._serverfile.size),
-                String(self._serverfile.digest),
                 String(self._serverfile.filename),
                 String(self._serverfile.created.isoformat()),
                 String(self._serverfile.modified.isoformat()),
@@ -969,7 +963,6 @@ class ReplicatorServerHandler(ReplicatorHandler):
         if _type == "meta":
             # Get meta from loaded file
             self._clientfile.pieces = packet.get_uint32()
-            self._clientfile.digest = packet.get_string()
 
             self._clientfile.filename = packet.get_string().decode()
             self._clientfile.created = datetime.datetime.fromisoformat(
@@ -1311,12 +1304,8 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 rpiece = piece + 1
                 self._clientfile.data += data
 
-            if not (
-                len(self._clientfile.data) == self._clientfile.size
-                and hashlib.sha1(
-                    self._clientfile.data).digest() == self._clientfile.digest
-            ):
-                raise Error(reason='File digest mismatch', code=1)
+            if not len(self._clientfile.data) == self._clientfile.size:
+                raise Error(reason='File size mismatch', code=1)
 
             await self._server.ioc.facade.api.replication.save_file(
                 self._preset, self._clientfile, self._action

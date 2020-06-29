@@ -94,14 +94,18 @@ class ContactAPI(ApiFacadeExtension):
 
         """
         archive = self.facade.storage.vault.archive
-        def check():
-            """Check the states."""
-            return (
-                archive.islink(self.PATH_FAVORITES[0] + str(eid)),
-                archive.islink(self.PATH_FRIENDS[0] + str(eid)),
-                archive.islink(self.PATH_BLOCKED[0] + str(eid))
-            )
-        return await archive.execute(check)
+        # def check():
+        #    """Check the states."""
+        #    favorites = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+        #    friends = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+        #    blocked = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+        #    return favorites, friends, blocked
+        # return await archive.execute(check)
+
+        favorites = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+        friends = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+        blocked = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+        return favorites, friends, blocked
 
     async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all blocked entities.
@@ -133,13 +137,17 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to block.
             """
-            if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
-            if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
-            if archive.islink(self.PATH_ALL[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_ALL[0], eid)
-            if not archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            if not is_link:
                 await self.__link(self.PATH_BLOCKED[0], eid)
 
         return await self.gather(*[do_block(entity) for entity in entities])
@@ -163,9 +171,11 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to unblock.
             """
-            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
-            if not archive.islink(self.PATH_ALL[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            if not is_link:
                 await self.__link(self.PATH_ALL[0], eid)
 
         return await self.gather(*[do_unblock(entity) for entity in entities])
@@ -200,11 +210,14 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to friend.
             """
-            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
-            if not archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            if not is_link:
                 await self.__link(self.PATH_FRIENDS[0], eid)
-            if not archive.islink(self.PATH_ALL[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            if not is_link:
                 await self.__link(self.PATH_ALL[0], eid)
 
         return await self.gather(*[do_friend(entity) for entity in entities])
@@ -228,7 +241,8 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to unfriend.
             """
-            if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
 
         return await self.gather(*[do_unfriend(entity) for entity in entities])
@@ -261,11 +275,14 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to favorite.
             """
-            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
-            if not archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            if not is_link:
                 await self.__link(self.PATH_FAVORITES[0], eid)
-            if not archive.islink(self.PATH_ALL[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            if not is_link:
                 await self.__link(self.PATH_ALL[0], eid)
 
         return await self.gather(*[do_favorite(entity) for entity in entities])
@@ -289,7 +306,8 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to unfavorite.
             """
-            if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
 
         return await self.gather(*[do_unfavorite(entity) for entity in entities])
@@ -313,13 +331,17 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to remove.
             """
-            if archive.islink(self.PATH_FAVORITES[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
-            if archive.islink(self.PATH_FRIENDS[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
-            if archive.islink(self.PATH_ALL[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_ALL[0], eid)
-            if archive.islink(self.PATH_BLOCKED[0] + str(eid)):
+            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
 
         return await self.gather(*[do_remove(entity) for entity in entities])

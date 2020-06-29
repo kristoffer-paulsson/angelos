@@ -109,7 +109,6 @@ class ReplicationAPI(ApiFacadeExtension):
 
         file_info.pieces = int(math.ceil(entry.length / CHUNK_SIZE))
         file_info.size = entry.length
-        file_info.digest = entry.digest
 
         file_info.filename = entry.name
         file_info.created = entry.created

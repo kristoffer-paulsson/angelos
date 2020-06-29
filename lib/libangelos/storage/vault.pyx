@@ -122,8 +122,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             id=file_id,
             owner=owner,
             created=created,
-            modified=updated,
-            compression=EntryRecord.COMP_NONE
+            modified=updated
         )
 
     async def delete(self, filename: str):
@@ -216,88 +215,31 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
 
         """
         try:
-            def query(q):
-                """
+            sq = Archive7.Query(pattern=pattern)
+            sq.type((TYPE_FILE, TYPE_LINK) if link else TYPE_FILE).deleted(deleted)
+            if modified:
+                sq.modified(modified)
+            if created:
+                sq.created(created)
+            if owner:
+                sq.owner(owner)
 
-                Args:
-                    q:
-
-                Returns:
-
-                """
-                q.type((TYPE_FILE, TYPE_LINK) if link else TYPE_FILE).deleted(deleted)
-                if modified:
-                    q.modified(modified)
-                if created:
-                    q.created(created)
-                if owner:
-                    q.owner(owner)
-                return q
-
-            resultset = dict()
+            result = dict()
             count = 0
-            async for entry, path in self.archive.search(query(Archive7.Query(pattern=pattern))):
-
+            async for entry, path in self.archive.search(sq):
                 if link and entry.type == TYPE_LINK:
                     followed = self.archive._Archive7__manager._FileSystemStreamManager__follow_link(entry.id)
-                    resultset[link.id] = fields(path, followed)
+                    result[link.id] = fields(path, followed)
                 else:
-                    resultset[entry.id] = fields(path, entry)
+                    result[entry.id] = fields(path, entry)
 
                 count += 1
                 if count == limit:
                     break
 
-            return resultset
+            return result
         except Exception as e:
             logging.exception(e)
-
-    def _callback_search(
-            self,
-            pattern,
-            query = lambda q: q.type(TYPE_FILE),
-            fields = lambda name, entry: name,
-            limit = 0,
-            follow = False
-    ) -> dict:
-        """Internal search function that searches for files.
-
-        Note:
-            Don't access this method directly. you must use a proxy.
-
-        Args:
-            pattern (str):
-                Search pattern for the file path.
-            query (lambda):
-                Lambda function that builds the query after the pattern is set.
-            fields (lambda):
-                Lambda function that formats each row.
-
-        Returns (dict):
-            A dictionary of results indexed by ID.
-
-        """
-
-        """resultset = dict()
-        count = 0
-        async for entry, path in self.archive.search(query(Archive7.Query(pattern=pattern)):
-            filename = entry.name.decode()
-            if entry.parent.int == 0:
-                name = "/" + filename
-            else:
-                name = ids[entry.parent] + "/" + filename
-
-            if follow and entry.type == TYPE_LINK:
-                link, _ = ops.follow_link(entry)
-                resultset[link.id] = fields(name, link)
-            else:
-                resultset[entry.id] = fields(name, entry)
-
-            count += 1
-            if count == limit:
-                break
-
-        return resultset"""
 
     async def search_docs(
             self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
@@ -329,7 +271,8 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """
         filename = "/settings/" + name
         data = text.getvalue().encode()
-        if self.archive.isfile(filename):
+        is_file = await self.archive.isfile(filename)
+        if is_file:
             return await self.archive.save(filename, data)
         else:
             return await self.archive.mkfile(filename, data, owner=self.facade.data.portfolio.entity.id)
@@ -344,7 +287,8 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
 
         """
         filename = "/settings/" + name
-        if self.archive.isfile(filename):
+        is_file = await self.archive.isfile(filename)
+        if is_file:
             data = await self.archive.load(filename)
             return io.StringIO(data.decode())
         return io.StringIO()

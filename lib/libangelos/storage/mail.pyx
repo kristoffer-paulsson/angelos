@@ -56,7 +56,6 @@ class MailStorage(StorageFacadeExtension):
             owner=owner,
             created=created,
             modified=updated,
-            compression=EntryRecord.COMP_NONE
         )
     async def delete(self, filename):
         """Remove a document at a certain location."""

@@ -37,19 +37,20 @@ class PortfolioMixin:
         """Glob a list of all files in a portfolio."""
         return await self.archive.glob(name="{dir}/*".format(dir=path), owner=owner)
 
-    def portfolio_exists_not(self, path: str, eid: uuid.UUID):
+    async def portfolio_exists_not(self, path: str, eid: uuid.UUID):
         """Check that portfolio exists."""
-        if not self.archive.isdir(path):
+        is_dir = await self.archive.isdir(path)
+        if not is_dir:
             raise Util.exception(Error.PORTFOLIO_EXISTS_NOT, {
                 "portfolio": eid})
 
-    def write_file(self, filename: str, doc: DocumentT):
+    async def write_file(self, filename: str, doc: DocumentT):
         """Write a document to the current archive."""
-        if self.archive.isfile(filename):
+        is_file = await self.archive.isfile(filename)
+        if is_file:
            return self.archive.save(
                 filename=filename,
                 data=PortfolioPolicy.serialize(doc),
-                compression=EntryRecord.COMP_NONE
             )
         else:
             created, updated, owner = Glue.doc_save(doc)
@@ -60,7 +61,6 @@ class PortfolioMixin:
                 created=created,
                 modified=updated,
                 owner=owner,
-                compression=EntryRecord.COMP_NONE,
             )
 
     async def update_portfolio( # FIXME: Make sure it follows policy
@@ -390,7 +390,7 @@ class PortfolioMixin:
                         dir="{0}{1}".format(self.PATH_PORTFOLIOS[0], doc.owner),
                         file=doc.id,
                     )
-                    ops.append(self.write_file(filename, doc))
+                    ops.append(await self.write_file(filename, doc))
                 else:
                     rejected.add(doc)
 
@@ -430,7 +430,8 @@ class PortfolioMixin:
 
         """
         dirname = self.portfolio_path(portfolio.entity.id)
-        if self.archive.isdir(dirname):
+        is_dir = await self.archive.isdir(dirname)
+        if is_dir:
             raise Util.exception(Error.PORTFOLIO_ALREADY_EXISTS, {
                 "portfolio": portfolio.entity.id})
 
@@ -453,7 +454,6 @@ class PortfolioMixin:
                     created=created,
                     modified=updated,
                     owner=owner,
-                    compression=EntryRecord.COMP_NONE
                 )
             )
 
@@ -478,7 +478,7 @@ class PortfolioMixin:
 
         """
         dirname = self.portfolio_path(eid)
-        self.portfolio_exists_not(dirname, eid)
+        await self.portfolio_exists_not(dirname, eid)
 
         result = await self.portfolio_files(dirname, owner=eid)
 
@@ -538,7 +538,7 @@ class PortfolioMixin:
         """
         eid = portfolio.entity.id
         dirname = self.portfolio_path(eid)
-        self.portfolio_exists_not(dirname, eid)
+        await self.portfolio_exists_not(dirname, eid)
 
         result = await self.portfolio_files(dirname, owner=eid)
 
@@ -598,7 +598,7 @@ class PortfolioMixin:
 
         This method expects policies to be applied."""
         dirname = self.portfolio_path(portfolio.entity.id)
-        self.portfolio_exists_not(dirname, portfolio.entity.id)
+        await self.portfolio_exists_not(dirname, portfolio.entity.id)
 
         ops = list()
         issuer, owner = portfolio.to_sets()
@@ -606,7 +606,7 @@ class PortfolioMixin:
 
         for doc in save:
             filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
-            ops.append(self.write_file(filename, doc))
+            ops.append(await self.write_file(filename, doc))
 
         return await self.gather(*ops)
 
@@ -626,7 +626,7 @@ class PortfolioMixin:
                 "portfolio": eid})
 
         dirname = self.portfolio_path(eid)
-        self.portfolio_exists_not(dirname, eid)
+        await self.portfolio_exists_not(dirname, eid)
 
         files = await self.portfolio_files(dirname)
 

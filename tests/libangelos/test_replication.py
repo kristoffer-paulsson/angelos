@@ -193,7 +193,6 @@ class TestFullReplication(BaseTestNetwork):
                 len(await self.server.app.ioc.facade.storage.mail.search()), 0,
                 "Server should have zero (0) letters in its routing mail box after Client 2 connected."
             )
-
             mail2 = await self.client2.app.ioc.facade.api.mailbox.open_envelope(inbox.pop())
             self.assertEqual(mail.body, mail2.body, "Checking that the sent mail equals the received mail.")
 

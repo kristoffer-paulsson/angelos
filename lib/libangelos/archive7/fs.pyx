@@ -29,9 +29,9 @@ TYPE_ERR = b"e"  # Represent a missing entry
 class EntryRecord:
     """Header for the Archive 7 format."""
 
-    __slots__ = ["type", "id", "parent", "owner", "stream", "created", "modified", "size", "length", "compression",
+    __slots__ = ["type", "id", "parent", "owner", "stream", "created", "modified", "length",
                  "deleted", "name", "user", "group", "perms"]
-    FORMAT = "!c16s16s16s16sqqQQQ?256s32s16sH"
+    FORMAT = "!c16s16s16s16sqqQ?256s32s16sH"
 
     COMP_NONE = 0
     COMP_ZIP = 1
@@ -41,9 +41,9 @@ class EntryRecord:
     def __init__(self, type: bytes = b"f", identity: uuid.UUID = uuid.uuid4(), parent: uuid.UUID = uuid.UUID(int=0),
                  owner: uuid.UUID = uuid.UUID(int=0), stream: uuid.UUID = uuid.UUID(int=0),
                  created: datetime.datetime = datetime.datetime.fromtimestamp(0),
-                 modified: datetime.datetime = datetime.datetime.fromtimestamp(0), size: int = None, length: int = None,
-                 compression: int = 0, deleted: bool = False, name: Union[bytes, bytearray] = None,
-                 user: Union[bytes, bytearray] = None, group: Union[bytes, bytearray] = None, perms: int = 0o755):
+                 modified: datetime.datetime = datetime.datetime.fromtimestamp(0), length: int = None,
+                 deleted: bool = False, name: Union[bytes, bytearray] = None, user: Union[bytes, bytearray] = None,
+                 group: Union[bytes, bytearray] = None, perms: int = 0o755):
         self.type = type  # Entry type
         self.id = identity  # File id
         self.parent = parent  # File id of parent directory or link to target
@@ -51,9 +51,7 @@ class EntryRecord:
         self.stream = stream  # UUID of underlying stream
         self.created = created  # Created date/time timestamp
         self.modified = modified  # Modified date/time timestamp
-        self.size = size  # File size (compressed)
         self.length = length  # Data length (uncompressed)
-        self.compression = compression  # Applied compression
         self.deleted = deleted  # Deleted marker
         self.name = name  # File name
         self.user = user  # Unix user
@@ -78,9 +76,7 @@ class EntryRecord:
                 if isinstance(self.modified, datetime.datetime)
                 else time.mktime(datetime.datetime.now().timetuple())
             ),
-            self.size if isinstance(self.size, int) else 0,
             self.length if isinstance(self.length, int) else 0,
-            self.compression if isinstance(self.compression, int) else EntryRecord.COMP_NONE,
             self.deleted if isinstance(self.deleted, bool) else False,
             self.name[:256] if isinstance(self.name, (bytes, bytearray)) else b"\x00" * 256,
             self.user[:32] if isinstance(self.user, (bytes, bytearray)) else b"\x00" * 32,
@@ -99,14 +95,12 @@ class EntryRecord:
             stream=uuid.UUID(bytes=metadata[4]),
             created=datetime.datetime.fromtimestamp(metadata[5]),
             modified=datetime.datetime.fromtimestamp(metadata[6]),
-            size=metadata[7],
-            length=metadata[8],
-            compression=metadata[9],
-            deleted=metadata[10],
-            name=metadata[11].strip(b"\x00"),
-            user=metadata[12].strip(b"\x00"),
-            group=metadata[13].strip(b"\x00"),
-            perms=int(metadata[14]),
+            length=metadata[7],
+            deleted=metadata[8],
+            name=metadata[9].strip(b"\x00"),
+            user=metadata[10].strip(b"\x00"),
+            group=metadata[11].strip(b"\x00"),
+            perms=int(metadata[12]),
         )
 
     @staticmethod
@@ -121,19 +115,19 @@ class EntryRecord:
         }
 
         if parent:
-            kwargs.setdefault("parent", parent)
+            kwargs["parent"] = parent
         if owner:
-            kwargs.setdefault("owner", owner)
+            kwargs["owner"] = owner
         if created:
-            kwargs.setdefault("created", created)
+            kwargs["created"] = created
         if modified:
-            kwargs.setdefault("modified", modified)
+            kwargs["modified"] = modified
         if user:
-            kwargs.setdefault("user", user.encode("utf-8")[:32])
+            kwargs["user"] = user.encode("utf-8")[:32]
         if group:
-            kwargs.setdefault("group", group.encode("utf-8")[:16])
+            kwargs["group"] = group.encode("utf-8")[:16]
         if perms:
-            kwargs.setdefault("perms", perms)
+            kwargs["perms"] = perms
 
         return EntryRecord(**kwargs)
 
@@ -152,24 +146,24 @@ class EntryRecord:
         }
 
         if parent:
-            kwargs.setdefault("parent", parent)
+            kwargs["parent"] = parent
         if created:
-            kwargs.setdefault("created", created)
+            kwargs["created"] = created
         if modified:
-            kwargs.setdefault("modified", modified)
+            kwargs["modified"] = modified
         if user:
-            kwargs.setdefault("user", user.encode("utf-8")[:32])
+            kwargs["user"] = user.encode("utf-8")[:32]
         if group:
-            kwargs.setdefault("group", group.encode("utf-8")[:16])
+            kwargs["group"] = group.encode("utf-8")[:16]
         if perms:
-            kwargs.setdefault("perms", perms)
+            kwargs["perms"] = perms
 
         return EntryRecord(**kwargs)
 
     @staticmethod
-    def file(name: str, size: int, stream: uuid.UUID, identity: uuid.UUID = None, parent: uuid.UUID = None,
+    def file(name: str, stream: uuid.UUID, identity: uuid.UUID = None, parent: uuid.UUID = None,
              owner: uuid.UUID = None, created: datetime.datetime = None, modified: datetime.datetime = None,
-             compression: int = None, length: int = None, user: str = None, group: str = None, perms: int = None):
+             length: int = None, user: str = None, group: str = None, perms: int = None):
         """Entry header for file."""
 
         kwargs = {
@@ -178,33 +172,27 @@ class EntryRecord:
             "stream": stream,
             "created": datetime.datetime.now(),
             "modified": datetime.datetime.now(),
-            "size": size,
             "name": name.encode("utf-8")[:256],
         }
 
         if identity:
-            kwargs.setdefault("identity", identity)
+            kwargs["identity"] = identity
         if parent:
-            kwargs.setdefault("parent", parent)
+            kwargs["parent"] = parent
         if owner:
-            kwargs.setdefault("owner", owner)
+            kwargs["owner"] = owner
         if created:
-            kwargs.setdefault("created", created)
+            kwargs["created"] = created
         if modified:
-            kwargs.setdefault("modified", modified)
+            kwargs["modified"] = modified
         if user:
-            kwargs.setdefault("user", user.encode("utf-8")[:32])
+            kwargs["user"] = user.encode("utf-8")[:32]
         if group:
-            kwargs.setdefault("group", group.encode("utf-8")[:16])
+            kwargs["group"] = group.encode("utf-8")[:16]
         if perms:
-            kwargs.setdefault("perms", perms)
-        if compression and length:
-            if 1 <= compression <= 3 and not isinstance(length, int):
-                raise RuntimeError("Invalid compression type")
-            kwargs.setdefault("compression", compression)
-            kwargs.setdefault("length", length)
-        else:
-            kwargs.setdefault("length", size)
+            kwargs["perms"] = perms
+        if length:
+            kwargs["length"] = length
 
         return EntryRecord(**kwargs)
 

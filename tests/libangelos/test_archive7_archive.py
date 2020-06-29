@@ -1,6 +1,7 @@
 import copy
 import os
 import random
+import uuid
 from tempfile import TemporaryDirectory
 from unittest.case import TestCase
 
@@ -20,7 +21,6 @@ class TestArchive7(TestCase):
         cls.dir = TemporaryDirectory()
         cls.secret = os.urandom(32)
         cls.filename = os.path.join(cls.dir.name, "test.ar7")
-        print(cls.filename)
         if os.path.exists(cls.filename):
             raise OSError("File shouldn't be there.")
         cls.owner = Generate.uuid()
@@ -225,7 +225,7 @@ class TestArchive7(TestCase):
             globed = await self.archive.glob()
             files = list(self.files.keys())
             links = list(self.links.keys())
-            total = set(LIPSUM_PATH + ["/"] + list(self.files.keys()) + list(self.links.keys()))
+            total = set(LIPSUM_PATH + ["/"] + files + links)
             # print(
             #    len(LIPSUM_PATH),
             #    len(globed),

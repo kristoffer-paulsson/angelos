@@ -9,7 +9,7 @@ import datetime
 
 from typing import Set, List, Union
 
-from libangelos.library.nacl import CryptoBox, Signer, Verifier
+from libangelos.library.nacl import CryptoBox, Signer, Verifier, SecretKey, PublicKey
 from libangelos.utils import Util
 from libangelos.document.types import DocumentT
 from libangelos.document.entities import Keys
@@ -140,7 +140,7 @@ class Crypto:
             raise RuntimeError("The receiving keys has expired")
 
         return CryptoBox(
-            sender.privkeys.secret, keys.public
+            SecretKey(sender.privkeys.secret), PublicKey(keys.public)
         ).encrypt(data)
 
     @staticmethod
@@ -173,7 +173,7 @@ class Crypto:
             raise RuntimeError("The concealing keys has expired")
 
         return CryptoBox(
-            receiver.privkeys.secret, keys.public
+            SecretKey(receiver.privkeys.secret), PublicKey(keys.public)
         ).decrypt(data)
 
     @staticmethod

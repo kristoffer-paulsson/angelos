@@ -38,7 +38,8 @@ class CrudAPI(ApiFacadeExtension):
         """
         parts = Misc.urlparse(url)
         storage = getattr(self.facade.storage, parts["hostname"], None)
-        if storage.archive.isfile(parts["path"]):
+        is_file = await storage.archive.isfile(parts["path"])
+        if is_file:
             raise OSError("%s already exists in %s" % (parts["path"], parts["hostname"]))
 
         await storage.archive.mkfile(parts["path", data])
@@ -57,7 +58,8 @@ class CrudAPI(ApiFacadeExtension):
         """
         parts = Misc.urlparse(url)
         storage = getattr(self.facade.storage, parts["hostname"], None)
-        if not storage.archive.isfile(parts["path"]):
+        is_file = await storage.archive.isfile(parts["path"])
+        if not is_file:
             raise OSError("%s not found in %s" % (parts["path"], parts["hostname"]))
 
         return await storage.archive.load(parts["path"])
@@ -77,7 +79,8 @@ class CrudAPI(ApiFacadeExtension):
         """
         parts = Misc.urlparse(url)
         storage = getattr(self.facade.storage, parts["hostname"], None)
-        if not storage.archive.isfile(parts["path"]):
+        is_file = await storage.archive.isfile(parts["path"])
+        if not is_file:
             raise OSError("%s not found in %s" % (parts["path"], parts["hostname"]))
 
         await storage.archive.save(parts["path"], data)
@@ -96,7 +99,8 @@ class CrudAPI(ApiFacadeExtension):
         """
         parts = Misc.urlparse(url)
         storage = getattr(self.facade.storage, parts["hostname"], None)
-        if not storage.archive.isfile(parts["path"]):
+        is_file = await storage.archive.isfile(parts["path"])
+        if not is_file:
             raise OSError("%s not found in %s" % (parts["path"], parts["hostname"]))
 
         await storage.archive.remove(parts["path"])
@@ -115,7 +119,8 @@ class CrudAPI(ApiFacadeExtension):
         """
         parts = Misc.urlparse(url)
         storage = getattr(self.facade.storage, parts["hostname"], None)
-        if not storage.archive.isdir(parts["path"]):
+        is_dir = await storage.archive.isdir(parts["path"])
+        if not is_dir:
             raise OSError("%s not found in %s" % (parts["path"], parts["hostname"]))
 
         return await storage.search(

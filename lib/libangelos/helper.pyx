@@ -10,6 +10,8 @@ import datetime
 import logging
 import uuid
 
+from libangelos.archive7.fs import TYPE_FILE
+
 from archive7.archive import Archive7
 from libangelos.policy.portfolio import PortfolioPolicy
 from libangelos.utils import Util
@@ -130,39 +132,27 @@ class Globber:
         return files
 
     @staticmethod
-    async def syncro(archive: Archive7, *args, **kwargs):
-        return await archive.execute(Globber.__syncro, archive, *args, **kwargs)
-
-    @staticmethod
-    def __syncro(
+    async def syncro(
             archive: Archive7,
             path: str = "/",
             owner: uuid.UUID = None,
             modified: datetime.datetime = None,
             cmp_uuid: bool = False,
     ):
-        pid = archive.ioc.operations.get_pid(path)
         sq = Archive7.Query()
-        sq.parent(pid)
+        sq.parent((await archive.info(path)).id)
         if owner:
             sq.owner(owner)
         if modified:
             sq.modified(modified)
-        sq.type(b"f")
-        idxs = archive.ioc.entries.search(sq)
-        ids = archive.ioc.hierarchy.ids
+        sq.type(TYPE_FILE)
 
         files = {}
-        for i in idxs:
-            idx, entry = i
-            if entry.parent.int == 0:
-                name = "/" + str(entry.name, "utf-8")
-            else:
-                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
+        async for entry, path in archive.search(sq):
             if cmp_uuid:
-                files[entry.id] = (name, entry.modified, entry.deleted)
+                files[entry.id] = (path, entry.modified, entry.deleted)
             else:
-                files[name] = (entry.id, entry.modified, entry.deleted)
+                files[path] = (entry.id, entry.modified, entry.deleted)
 
         return files
 
@@ -188,22 +178,11 @@ class Globber:
         return files
 
     @staticmethod
-    async def path(archive: Archive7, *args, **kwargs):
-        return await archive.execute(Globber.__path, archive, *args, **kwargs)
-
-    @staticmethod
-    def __path(archive: Archive7, path: str = "*"):
-        sq = Archive7.Query(path).type(b"f")
-        idxs = archive.ioc.entries.search(sq)
-        ids = archive.ioc.hierarchy.ids
+    async def path(archive: Archive7, path: str = "*"):
+        sq = Archive7.Query(path).type(TYPE_FILE)
 
         files = []
-        for i in idxs:
-            idx, entry = i
-            if entry.parent.int == 0:
-                name = "/" + str(entry.name, "utf-8")
-            else:
-                name = ids[entry.parent] + "/" + str(entry.name, "utf-8")
-            files.append((name, entry.id, entry.created))
+        async for entry, path in archive.search(sq):
+            files.append((path, entry.id, entry.created))
 
         return files

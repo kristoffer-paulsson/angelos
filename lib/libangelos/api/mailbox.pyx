@@ -32,13 +32,13 @@ class MailboxAPI(ApiFacadeExtension):
 
     ATTRIBUTE = ("mailbox",)
 
-    PATH_INBOX = ("/messages/inbox/",)
-    PATH_OUTBOX = ("/messages/outbox/",)
-    PATH_READ = ("/messages/read/",)
-    PATH_DRAFT = ("/messages/drafts/",)
-    PATH_TRASH = ("/messages/trash/",)
-    PATH_SENT = ("/messages/sent/",)
-    PATH_CACHE = ("/cache/msg/",)
+    PATH_INBOX = ("/messages/inbox",)
+    PATH_OUTBOX = ("/messages/outbox",)
+    PATH_READ = ("/messages/read",)
+    PATH_DRAFT = ("/messages/drafts",)
+    PATH_TRASH = ("/messages/trash",)
+    PATH_SENT = ("/messages/sent",)
+    PATH_CACHE = ("/cache/msg",)
 
     def __init__(self, facade: BaseFacade):
         """Initialize the Mail.
@@ -469,7 +469,8 @@ class MailboxAPI(ApiFacadeExtension):
                 dir=path.rstrip("/"), file=message_id
             )
             archive = self.facade.storage.vault.archive
-            if archive.isfile(filename):
+            is_file = await archive.isfile(filename)
+            if is_file:
                 await archive.move(filename, MailboxAPI.PATH_TRASH[0])
                 break
 
@@ -485,7 +486,8 @@ class MailboxAPI(ApiFacadeExtension):
             filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_TRASH[0], file=message_id
             )
-            if archive.isfile(filename):
+            is_file = await archive.isfile(filename)
+            if is_file:
                 await archive.remove(filename)
 
     async def mail_to_inbox(
@@ -708,7 +710,8 @@ class MailboxAPI(ApiFacadeExtension):
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
         )
         archive = self.facade.storage.vault.archive
-        if archive.isfile(filename):
+        is_file = await archive.isfile(filename)
+        if is_file:
             await archive.remove(filename)
 
     async def save_outbox(self, envelope: Envelope):
@@ -726,6 +729,8 @@ class MailboxAPI(ApiFacadeExtension):
             ),
             envelope,
         )
+        if result != envelope.id:
+            raise RuntimeError("{}, {}".format(result, envelope.id))
 
     async def save_sent(self, message: Mail):
         """Save a message to sent folder for archiving.

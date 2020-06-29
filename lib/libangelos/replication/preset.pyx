@@ -26,7 +26,6 @@ class FileSyncInfo:
         self.deleted = None
         self.pieces = 0
         self.size = 0
-        self.digest = b""
         self.filename = ""
         self.created = datetime.datetime(1, 1, 1)
         self.modified = datetime.datetime(1, 1, 1)

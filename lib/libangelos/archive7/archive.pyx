@@ -5,7 +5,6 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive implementation."""
-import asyncio
 import datetime
 import functools
 import os
@@ -16,15 +15,12 @@ import uuid
 from pathlib import PurePath
 from typing import Union
 
-from libangelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, EntryRecord, TYPE_FILE, \
+from libangelos.archive7.fs import Delete
+from libangelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, TYPE_FILE, \
     HierarchyTraverser
 from libangelos.error import Error
 from libangelos.misc import SharedResourceMixin
 from libangelos.utils import Util
-
-
-# FIXME: Move compression, size and length to stream level.
-from archive7.fs import Delete
 
 
 class Header:
@@ -373,7 +369,6 @@ class Archive7(SharedResourceMixin):
             owner: uuid.UUID = None,
             parent: uuid.UUID = None,
             id: uuid.UUID = None,
-            compression: int = EntryRecord.COMP_NONE,
             user: str = None,
             group: str = None,
             perms: int = None
@@ -381,19 +376,19 @@ class Archive7(SharedResourceMixin):
         """Create a new file."""
         dirname, name = os.path.split(filename)
         parent = self.__manager.resolve_path(PurePath(dirname))
+
         if not parent:
             raise OSError("Parent directory not found")
+
         identity = self.__manager.create_entry(
             type_=TYPE_FILE,
             name=name,
-            size=0,
             stream=uuid.UUID(int=0),
             parent=parent,
             identity=id,
             owner=owner,
             created=created,
             modified=modified,
-            compression=compression,
             user=user,
             group=group,
             perms=perms,
@@ -440,10 +435,7 @@ class Archive7(SharedResourceMixin):
     async def save(self, *args, **kwargs) -> uuid.UUID:
         return await self._run(functools.partial(self.__save, *args, **kwargs))
 
-    def __save(
-            self, filename: str, data: bytes, compression: int = EntryRecord.COMP_NONE,
-            modified: datetime.datetime = None
-    ):
+    def __save(self, filename: str, data: bytes, modified: datetime.datetime = None):
         """Update a file with new data."""
         if not modified:
             modified = datetime.datetime.now()
