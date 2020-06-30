@@ -396,7 +396,9 @@ class Archive7(SharedResourceMixin):
 
         vfd = self.__manager.open(identity, "wb")
         vfd.write(data)
+        length = vfd.stream.length()
         vfd.close()
+        self.__manager.update_entry(identity, length=length)
         return identity
 
     async def link(self, *args, **kwargs):
@@ -446,8 +448,9 @@ class Archive7(SharedResourceMixin):
         vfd = self.__manager.open(identity, "wb")
         vfd.write(data)
         vfd.truncate()
+        length = vfd.stream.length()
         vfd.close()
-        self.__manager.update_entry(identity, modified=modified)
+        self.__manager.update_entry(identity, modified=modified, length=length)
         return identity
 
     async def load(self, *args, **kwargs):

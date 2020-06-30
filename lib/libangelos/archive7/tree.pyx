@@ -6,8 +6,6 @@
 
 import bisect
 import collections
-import datetime
-import functools
 import io
 import itertools
 import math
@@ -19,7 +17,7 @@ from collections import namedtuple
 from collections.abc import Mapping
 from contextlib import ContextDecorator, AbstractContextManager
 from contextvars import ContextVar
-from typing import Union, Iterator, Iterable, Generator, Type
+from typing import Union, Iterator, Iterable, Type
 
 from libangelos.utils import Util
 
@@ -107,7 +105,7 @@ class Record(Entry, Comparable):
         """Unpack data consisting of page number, key and value."""
         self.page, key, self.value, cs = self._conf.record.unpack(data)
         value = self.value.to_bytes(4, "big") if isinstance(self.value, int) else self.value
-        if bytes([sum(key+value) & 0xFF]) != cs:
+        if not Util.verify_checksum(key+value, cs):
             raise RuntimeError("Record checksum mismatch")
         self.key = uuid.UUID(bytes=key)
 
@@ -116,7 +114,7 @@ class Record(Entry, Comparable):
         value = self.value.to_bytes(4, "big") if isinstance(self.value, int) else self.value
         return self._conf.record.pack(
             self.page, self.key.bytes, self.value,
-            bytes([sum(self.key.bytes+value) & 0xFF])
+            Util.generate_checksum(self.key.bytes+value)
         )
 
 

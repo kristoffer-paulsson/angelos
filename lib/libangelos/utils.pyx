@@ -16,7 +16,7 @@ import os
 import sys
 import datetime
 from asyncio import Task
-from typing import _GenericAlias, Callable
+from typing import _GenericAlias, Callable, Union
 
 from libangelos.error import ERROR_INFO
 
@@ -304,6 +304,16 @@ class Util:
         offset = int(79 / 2 - len(title) / 2)
         return line[:offset] + title + line[offset + len(title):]
 
+    @staticmethod
+    def generate_checksum(data: Union[bytes, bytearray]) -> bytes:
+        """Generate a checksum out of the entered data."""
+        return bytes([sum(data) & 0xFF])
+
+    @staticmethod
+    def verify_checksum(data: Union[bytes, bytearray], checksum: bytes) -> bool:
+        """Verify the checksum out of the entered data."""
+        return bytes([sum(data) & 0xFF]) == checksum
+
 
 class FactoryInterface:
     """Docstring"""
@@ -312,3 +322,62 @@ class FactoryInterface:
     def factory(cls, **kwargs):
         """Docstring"""
         return cls(kwargs["io"])
+
+
+class Checksum:
+    """Generate and check checksum based on introspection of data stream."""
+
+    def __init__(self):
+        self.__sum = 0
+
+    def introspect(self, stream: Union[bytes, bytearray]):
+        """Build checksum based on a stream with multiple data chunks."""
+        self.__sum += sum(stream)
+
+    def checksum(self, length: int = 1) -> bytes:
+        """Generate a checksum of certain byte size."""
+        return (self.__sum & int.from_bytes(b"\xFF" * length, "big")).to_bytes(length, "big")
+
+    def check(self, sum: bytes) -> bool:
+        """Compare introspected sum with given sum."""
+        return self.checksum(len(sum)) == sum
+
+
+
+
+class StateMachine:
+    """A class that can hold a single state at a time."""
+
+    def __init__(self):
+        self.__state = None
+
+
+class SingleState(StateMachine):
+    """A state machine that allows switching between states."""
+
+    def __init__(self, states: list):
+        StateMachine.__init__(self)
+        self.__options = states
+
+    def goto(self, state: str):
+        """Go to another state that is available"""
+        if state not in self.__options:
+            raise RuntimeError("State {} not among options".format(state))
+        self.__state = state
+
+
+class EventState(SingleState):
+    """A state machine that triggers an event at state change."""
+
+    def __init__(self, states: list):
+        SingleState.__init__(self, states)
+        self.__condition = asyncio.Condition()
+
+    def goto(self, state: str):
+        """Go to another state and trigger an event."""
+        SingleState.goto(self, str)
+        self.__condition.notify_all()
+
+    async def wait_for(self, predicate):
+        """Wait for a state to happen."""
+        await self.__condition.predicate(predicate)

@@ -23,10 +23,10 @@ class Address(BaseDocument):
     """Short summary."""
     care_of = StringField(required=False)
     house = StringField(required=False)
-    house_number = StringField(required=False)
+    number = StringField(required=False)
     road = StringField(required=False)
     postcode = StringField(required=False)
-    neighbourhood = StringField(required=False)
+    neighborhood = StringField(required=False)
     village = StringField(required=False)
     town = StringField(required=False)
     suburb = StringField(required=False)

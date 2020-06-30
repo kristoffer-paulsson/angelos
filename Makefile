@@ -5,22 +5,20 @@ AR7_IMPORT = uuid pathlib
 default:
 
 init:
-	mkdir -p libangelos
-	mkdir -p libangelos/archive
-	mkdir -p libangelos/client
-	mkdir -p libangelos/client/ui
-	mkdir -p libangelos/data
-	mkdir -p libangelos/document
-	mkdir -p libangelos/dummy
-	mkdir -p libangelos/facade
-	mkdir -p libangelos/operation
-	mkdir -p libangelos/policy
-	mkdir -p libangelos/replication
-	mkdir -p libangelos/server
-	mkdir -p libangelos/ssh
-	mkdir -p angelos
-	mkdir -p bplustree
-	mkdir -p archive7
+	# mkdir -p libangelos
+	# mkdir -p libangelos/archive
+	# mkdir -p libangelos/client
+	# mkdir -p libangelos/client/ui
+	# mkdir -p libangelos/data
+	# mkdir -p libangelos/document
+	# mkdir -p libangelos/dummy
+	# mkdir -p libangelos/facade
+	# mkdir -p libangelos/operation
+	# mkdir -p libangelos/policy
+	# mkdir -p libangelos/replication
+	# mkdir -p libangelos/server
+	# mkdir -p libangelos/ssh
+	# mkdir -p angelos
 	pip install -r requirements.txt
 	python setup.py develop
 

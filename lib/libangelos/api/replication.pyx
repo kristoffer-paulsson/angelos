@@ -120,6 +120,7 @@ class ReplicationAPI(ApiFacadeExtension):
         file_info.perms = entry.perms if entry.perms else file_info.perms
 
         file_info.data = await storage.archive.load(full_path)
+
         return True
 
     async def del_file(self, preset: Preset, file_info: FileSyncInfo) -> bool:

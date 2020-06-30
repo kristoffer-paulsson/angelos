@@ -395,9 +395,6 @@ class BaseStream:  # (Iterable, Reversible):
         if not (0 <= index < self._count):
             raise StreamError("Index out of bounds, %s of %s." % (index, self._count))
 
-        # pos = -1
-        # current = self._block
-
         if self._block.index < index:  # Go forward
             while self.next():
                 if self._block.index == index:
@@ -409,11 +406,6 @@ class BaseStream:  # (Iterable, Reversible):
                     pos = index
                     break
 
-        # if pos == -1:
-        #    self._block = current
-        #    pos = current.index
-
-        # return pos
         return self._block.index
 
     @abstractmethod
@@ -450,6 +442,11 @@ class VirtualFileObject(BaseFileObject):
         self.__offset = 0
         self.__end = stream.length()
         BaseFileObject.__init__(self, filename, mode)
+
+    @property
+    def stream(self) -> DataStream:
+        """Expose the internal data stream."""
+        return self._stream
 
     def _close(self):
         self._stream.close()

@@ -426,7 +426,7 @@ class NewPrivatePortfolio(NewPortfolio):
         return self._get_subset(Node)
 
 
-@dataclass
+# @dataclass
 class Statements:
     """
     Statement portfolio
@@ -434,9 +434,9 @@ class Statements:
     Portfolio of Statement documents.
     """
 
-    verified: Set[Verified]
-    trusted: Set[Trusted]
-    revoked: Set[Revoked]
+    # verified: Set[Verified]
+    # trusted: Set[Trusted]
+    # revoked: Set[Revoked]
 
     def __init__(self, *args):
         """Init statement with empty values."""
@@ -448,7 +448,7 @@ class Statements:
         return self.verified | self.trusted | self.revoked
 
 
-@dataclass
+# @dataclass
 class Portfolio(PortfolioABC):
     """
     Document portfolio.
@@ -458,12 +458,12 @@ class Portfolio(PortfolioABC):
     and operations that are related.
     """
 
-    entity: EntityT
-    profile: ProfileT
-    keys: Set[Keys]
-    network: Network
-    issuer: Statements
-    owner: Statements
+    # entity: EntityT
+    # profile: ProfileT
+    # keys: Set[Keys]
+    # network: Network
+    # issuer: Statements
+    # owner: Statements
 
     def __init__(self):
         """Init portfolio with empty values."""
@@ -616,13 +616,13 @@ class Portfolio(PortfolioABC):
         return True
 
 
-@dataclass
+# @dataclass
 class PrivatePortfolio(Portfolio, PrivatePortfolioABC):
     """Adds private keys to Document portfolio."""
 
-    privkeys: PrivateKeys
-    domain: Domain
-    nodes: Set[Node]
+    # privkeys: PrivateKeys
+    # domain: Domain
+    # nodes: Set[Node]
 
     def __init__(self):
         """Init private portfolio with empty values."""

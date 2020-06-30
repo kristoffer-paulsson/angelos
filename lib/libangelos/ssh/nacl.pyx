@@ -72,7 +72,6 @@ class NaClPublicKey(BaseKey):
     def verify(self, data, sig):
         """Verify the signature on a block of data."""
         try:
-            #print(data, type(data), sig, type(sig))
             self._box.verify(sig.get_remaining_payload() + data)
             return True
         except ValueError:

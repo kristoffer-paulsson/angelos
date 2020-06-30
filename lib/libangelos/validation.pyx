@@ -379,14 +379,6 @@ class BasePolicyApplier(ABC):
     def _applier(self) -> bool:
         self._setup()
         success = all([cls.apply(self) for cls in self.__class__.mro()[3:-3] if hasattr(cls, "apply")])
-        # success = True
-        # print("Classes:", self.__class__.mro()[3:-3])
-        # for cls in self.__class__.mro()[3:-3]:
-        #    print("Found:", cls)
-        #    if hasattr(cls, "apply"):
-        #        print("Run:", cls)
-        #        success = success if cls.apply(self) else False
-
         self._clean()
         return success
 

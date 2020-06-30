@@ -1198,9 +1198,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
             elif self._action == Actions.SER_DELETE:
                 await self.delete()
             else:
-                raise Error(
-                    reason="Unkown action '%s'" % self._action,
-                    code=1)
+                raise Error(reason="Unkown action '%s'" % self._action, code=1)
 
             crash = False
         except Exception as e:

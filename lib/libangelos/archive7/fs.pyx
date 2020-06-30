@@ -529,7 +529,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
 
     def update_entry(
         self, identity: uuid.UUID, owner: uuid.UUID = None, modified: datetime.datetime = None,
-        deleted: bool = None, user: str = None, group: str = None, perms: int = None
+        length: int = None, deleted: bool = None, user: str = None, group: str = None, perms: int = None
     ):
         """Update certain fields in a entry.
 
@@ -540,6 +540,8 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 Entry owner UUID number
             modified (datetime.datetime):
                 New modified datetime
+            length (int):
+                Length of data
             deleted (bool):
                 Deleted or not
             user (str):
@@ -559,6 +561,8 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
             entry.owner = owner
         if modified:
             entry.modified = modified
+        if length:
+            entry.length = length
         if deleted:
             entry.deleted = deleted
         if user:
