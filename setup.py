@@ -223,13 +223,12 @@ setup(
         "Topic :: Utilities",
     ],
     zip_safe=False,
-    test_suite="tests",
     python_requires="~=3.7",
-    setup_requires=[
+    install_requires=[
         "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
-        "plyer", "asyncssh", "keyring", "msgpack"],
-    install_requires=[],
-    # namespace_packages=["angelos", "eidon"],
+        "plyer", "asyncssh", "keyring", "msgpack"
+    ],
+    tests_require=[],
     packages=["libangelos", "angelos", "eidon", "angelossim"],
     package_dir={"": "lib"},
     scripts=glob("bin/*"),
