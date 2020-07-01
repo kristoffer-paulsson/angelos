@@ -2,7 +2,6 @@ cython
 pyinstaller
 sphinx
 sphinx_rtd_theme
-libnacl
 plyer
 asyncssh
 keyring

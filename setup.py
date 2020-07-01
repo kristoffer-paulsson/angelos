@@ -7,12 +7,109 @@
 """Angelos build script."""
 import os
 import re
+import subprocess
+import tarfile
+import tempfile
+
+import urllib
+from abc import ABC, abstractmethod
 from glob import glob
 from os import path
 from setuptools import setup, Extension
+from setuptools.command.install import install as setup_install
 from Cython.Build import cythonize
 
 base_dir = path.abspath(path.dirname(__file__))
+
+
+class VendorLibrary(ABC):
+    """Base class for downloading and installing a third party library."""
+
+    NAME = "vendor_name"
+    DOWNLOAD = "https://download.url/whatever.tar.gz"
+    LOCALFILE = "library_name.tar.gz"
+    INTERNAL = "library-root"
+
+    @abstractmethod
+    def download(self):
+        """Download source tarball."""
+        pass
+
+    @abstractmethod
+    def extract(self):
+        """Extract source file."""
+        pass
+
+    @abstractmethod
+    def build(self):
+        """Build sources."""
+        pass
+
+    @abstractmethod
+    def install(self):
+        """Install binaries."""
+        pass
+
+    @abstractmethod
+    def close(self):
+        """Clean up temporary files."""
+        pass
+
+
+class VendorLibsodium(VendorLibrary):
+    """Libsodium installer."""
+
+    NAME = "libsodium"
+    DOWNLOAD = "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz"
+    LOCALFILE = "libsodium.tar.gz"
+    INTERNAL = "libsodium-stable"
+
+    def __init__(self, base_dir: str):
+        self._base = base_dir
+        self._temp = tempfile.TemporaryDirectory()
+        self._archive = os.path.join(self._temp.name, self.LOCALFILE)
+        self._target = os.path.join(self._temp.name, self.NAME)
+        self._work = os.path.join(self._temp.name, self.NAME, self.INTERNAL)
+
+    def download(self):
+        """Download sources tarball."""
+        urllib.request.urlretrieve(self.DOWNLOAD, self._archive)
+
+    def extract(self):
+        """Extract source file."""
+        tar = tarfile.open(self._archive)
+        tar.extractall(self._target)
+        tar.close()
+
+    def build(self):
+        """Build sources."""
+        subprocess.check_call("./configure", cwd=self._work, shell=True)
+        subprocess.check_call("make && make check", cwd=self._work, shell=True)
+
+    def install(self):
+        """Install binaries."""
+        subprocess.check_call("make install DESTDIR=$(cd {}; pwd)".format(self._base), cwd=self._work, shell=True)
+
+    def close(self):
+        """Clean up temporary files."""
+        self._temp.cleanup()
+
+
+class VendorInstall(setup_install):
+    """Install third party vendor libraries."""
+
+    LIBRARIES = (VendorLibsodium,)
+
+    def run(self):
+        """Install vendors."""
+        setup_install.run(self)
+        for vendor_library in self.LIBRARIES:
+            library = vendor_library(base_dir)
+            library.download()
+            library.extract()
+            library.build()
+            library.install()
+            library.close()
 
 
 class LibraryScanner:
@@ -77,6 +174,7 @@ coredata = {
 
 
 setup(
+    cmdclass={"install": VendorInstall},
     name="angelos",
     version=__version__,  # noqa F821
     license="MIT",
