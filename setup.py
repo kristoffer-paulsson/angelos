@@ -102,7 +102,6 @@ class VendorInstall(setup_install):
 
     def run(self):
         """Install vendors."""
-        setup_install.run(self)
         for vendor_library in self.LIBRARIES:
             library = vendor_library(base_dir)
             library.download()
@@ -110,6 +109,8 @@ class VendorInstall(setup_install):
             library.build()
             library.install()
             library.close()
+
+        setup_install.run(self)
 
 
 class LibraryScanner:
