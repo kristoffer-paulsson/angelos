@@ -7,11 +7,12 @@
 """Operations regarding mail, messages and envelope handling."""
 import uuid
 
-from libangelos.operation.operation import Operation
-from libangelos.facade.facade import Facade
-from libangelos.policy.portfolio import PGroup
-from libangelos.policy.message import EnvelopePolicy
 from libangelos.document.types import MessageT
+from libangelos.operation.operation import Operation
+from libangelos.policy.message import EnvelopePolicy
+from libangelos.policy.portfolio import PGroup
+
+from libangelos.facade.facade import Facade
 
 
 class MailOperation(Operation):

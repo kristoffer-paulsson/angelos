@@ -9,7 +9,7 @@ import logging
 from logging.config import dictConfig
 from logging.handlers import RotatingFileHandler
 
-from archive7.streams import VirtualFileObject, SingleStreamManager
+from libangelos.archive7.streams import VirtualFileObject, SingleStreamManager
 from libangelos.const import Const
 from libangelos.utils import Util
 

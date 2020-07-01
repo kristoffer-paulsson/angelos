@@ -10,11 +10,11 @@ from typing import Union
 
 from libangelos.const import Const
 from libangelos.operation.operation import Operation
-from libangelos.policy.types import PersonData, MinistryData, ChurchData
-from libangelos.policy.portfolio import PrivatePortfolio
 from libangelos.policy.crypto import Crypto
-from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from libangelos.policy.domain import DomainPolicy, NodePolicy, NetworkPolicy
+from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
+from libangelos.policy.portfolio import PrivatePortfolio
+from libangelos.policy.types import PersonData, MinistryData, ChurchData
 
 
 class BaseSetupOperation(Operation):

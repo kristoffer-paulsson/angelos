@@ -9,7 +9,6 @@ import collections
 import pprint
 import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass
 from typing import Set, Tuple
 
 import msgpack
@@ -21,10 +20,8 @@ from libangelos.document.messages import Note, Instant, Mail, Share, Report
 from libangelos.document.misc import StoredLetter
 from libangelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
 from libangelos.document.statements import Verified, Trusted, Revoked
-from libangelos.document.types import EntityT, ProfileT, DocumentT
+from libangelos.document.types import DocumentT
 from libangelos.policy.types import PortfolioABC, PrivatePortfolioABC
-
-from libangelos.validation import BaseValidator
 
 
 class PField:

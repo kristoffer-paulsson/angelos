@@ -5,7 +5,6 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Archive utility."""
-import asyncio
 import binascii
 import getpass
 import hashlib

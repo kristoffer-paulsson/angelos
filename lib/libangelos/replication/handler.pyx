@@ -10,12 +10,10 @@ logic and handles the reading/writing and interpretation of replicator packets.
 """
 import asyncio
 import datetime
-import uuid
 import enum
 import logging
-import hashlib
 import math
-
+import uuid
 from typing import Any
 
 from asyncssh import Error
@@ -28,10 +26,10 @@ from asyncssh.packet import (
     String,
     Boolean,
 )
-from libangelos.misc import ThresholdCounter
 from libangelos.error import AngelosException
-from libangelos.replication.preset import Preset, FileSyncInfo
+from libangelos.misc import ThresholdCounter
 
+from libangelos.replication.preset import Preset, FileSyncInfo
 
 VERSION = 1
 

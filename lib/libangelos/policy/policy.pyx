@@ -5,7 +5,7 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Baseclasses for policies."""
-from abc import ABC, abstractmethod
+from abc import ABC
 
 from libangelos.validation import BaseValidator, BaseValidatable
 

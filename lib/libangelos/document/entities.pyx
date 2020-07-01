@@ -5,8 +5,6 @@
 # This file is distributed under the terms of the MIT license.
 #
 """Module docstring."""
-import json
-
 from libangelos.document.document import DocType, Document, ChangeableMixin
 from libangelos.document.entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 from libangelos.document.model import TypeField, BinaryField, SignatureField

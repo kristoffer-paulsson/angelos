@@ -11,15 +11,14 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional, Callable
 
+from libangelos.archive7.archive import TYPE_LINK, Archive7
 from libangelos.archive7.fs import TYPE_FILE
+from libangelos.const import Const
+from libangelos.policy.portfolio import PrivatePortfolio, PortfolioPolicy
 
-from archive7.archive import TYPE_LINK, Archive7
-from archive7.fs import EntryRecord
+from libangelos.helper import Glue, Globber
 from libangelos.storage.portfolio_mixin import PortfolioMixin
 from libangelos.storage.storage import StorageFacadeExtension
-from libangelos.const import Const
-from libangelos.helper import Glue, Globber
-from libangelos.policy.portfolio import PrivatePortfolio, PortfolioPolicy
 
 
 class VaultStorage(StorageFacadeExtension, PortfolioMixin):

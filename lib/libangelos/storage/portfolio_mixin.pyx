@@ -11,10 +11,8 @@ import logging
 import uuid
 from typing import Tuple, List, Set, Any
 
-from archive7.fs import EntryRecord
 from libangelos.document.types import StatementT, DocumentT
 from libangelos.error import Error
-from libangelos.helper import Glue
 from libangelos.policy.accept import EntityKeysPortfolioValidatePolicy, IssuedDocumentPortfolioValidatePolicy, \
     NodePortfolioValidatePolicy, ImportPolicy, ProfileUpdatePortfolioPolicy, NetworkUpdatePortfolioPolicy, \
     StatementImportPortfolioPolicy, EntityUpdatePortfolioPolicy, PrivateKeysImportPortfolioPolicy, \
@@ -22,6 +20,8 @@ from libangelos.policy.accept import EntityKeysPortfolioValidatePolicy, IssuedDo
 from libangelos.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, Portfolio, \
     PField, PGroup, DocSet
 from libangelos.utils import Util
+
+from libangelos.helper import Glue
 
 
 class PortfolioMixin:

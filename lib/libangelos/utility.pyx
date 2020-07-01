@@ -20,11 +20,10 @@ import re
 import sys
 import uuid
 
-from libangelos.library.nacl import SecretBox
-
-from archive7.archive import Archive7
-from archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
+from libangelos.archive7.archive import Archive7
+from libangelos.archive7.fs import TYPE_FILE, TYPE_DIR, TYPE_LINK, EntryRecord
 from libangelos.error import ArchiveInvalidSeek
+from libangelos.library.nacl import SecretBox
 
 BYTES_SUF = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 ENDING_SUF = ".ar7.cnl"

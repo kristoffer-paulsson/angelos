@@ -9,7 +9,6 @@ import base64
 import sys
 
 from libangelos.library.nacl import SecretBox
-
 from libangelos.policy.policy import Policy
 
 if sys.platform.startswith('darwin'):

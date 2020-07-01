@@ -10,9 +10,8 @@ import datetime
 import logging
 import uuid
 
+from libangelos.archive7.archive import Archive7
 from libangelos.archive7.fs import TYPE_FILE
-
-from archive7.archive import Archive7
 from libangelos.policy.portfolio import PortfolioPolicy
 from libangelos.utils import Util
 

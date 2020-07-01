@@ -9,8 +9,8 @@ import atexit
 import os
 import uuid
 
-from archive7.archive import Archive7
-from archive7.fs import Delete
+from libangelos.archive7.archive import Archive7
+from libangelos.archive7.fs import Delete
 from libangelos.facade.base import BaseFacade, FacadeExtension
 
 

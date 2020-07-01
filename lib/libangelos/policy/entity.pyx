@@ -10,7 +10,6 @@ import datetime
 from libangelos.document.entities import PrivateKeys, Keys, Person, Ministry, Church
 from libangelos.document.types import EntityT
 from libangelos.library.nacl import DualSecret
-
 from libangelos.policy.crypto import Crypto
 from libangelos.policy.policy import Policy
 from libangelos.policy.portfolio import PrivatePortfolio

@@ -6,16 +6,15 @@
 #
 """Conceal/unveal algorithms."""
 import datetime
-
 from typing import Set, List, Union
 
-from libangelos.library.nacl import CryptoBox, Signer, Verifier, SecretKey, PublicKey
-from libangelos.utils import Util
-from libangelos.document.types import DocumentT
+from libangelos.document.document import UpdatedMixin
 from libangelos.document.entities import Keys
 from libangelos.document.envelope import Envelope, Header
-from libangelos.document.document import UpdatedMixin
+from libangelos.document.types import DocumentT
+from libangelos.library.nacl import CryptoBox, Signer, Verifier, SecretKey, PublicKey
 from libangelos.policy.portfolio import Portfolio, PrivatePortfolio
+from libangelos.utils import Util
 
 
 class Crypto:

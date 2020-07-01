@@ -13,18 +13,18 @@ import os
 import signal
 
 from angelos.parser import Parser
-from angelos.starter import ConsoleStarter
+from angelos.state import StateMachine
 from angelos.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
 from libangelos.automatic import Automatic
-from libangelos.facade.facade import Facade
 from libangelos.ioc import Container, ContainerAware, Config, Handle, StaticHandle
-from libangelos.logger import LogHandler
 from libangelos.ssh.ssh import SessionManager
-from libangelos.starter import Starter
 from libangelos.utils import Event
 from libangelos.worker import Worker
 
-from .state import StateMachine
+from angelos.starter import ConsoleStarter
+from libangelos.facade.facade import Facade
+from libangelos.logger import LogHandler
+from libangelos.starter import Starter
 
 
 class Configuration(Config, Container):

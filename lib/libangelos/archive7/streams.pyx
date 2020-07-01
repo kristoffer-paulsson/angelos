@@ -16,9 +16,8 @@ from typing import Union
 
 from libangelos.archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, \
     BlockError, StreamError, BaseFileObject, StreamManagerError
-from libangelos.library.nacl import SecretBox
-
 from libangelos.archive7.tree import SimpleBTree
+from libangelos.library.nacl import SecretBox
 
 BLANK_DATA = b"\x00" * DATA_SIZE
 BLANK_BLOCK = struct.pack(
