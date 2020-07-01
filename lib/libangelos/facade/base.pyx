@@ -202,8 +202,8 @@ class BaseFacade:
                     raise RuntimeError(
                         "Extension attribute \"%s\" in \"%s\"already occupied." % (attribute, self.__storages.__name__))
 
-                if os.path.isfile(storage_cls.filename(storage_cls.CONCEAL[0])):
-                    config[attribute] = generator(storage_cls, self.__home_dir, self.__secret)
+                if os.path.isfile(storage_cls.filename(self.__home_dir)):
+                    config[attribute] = generator(storage_cls, self, self.__home_dir, self.__secret)
                 else:
                     storage = await storage_cls.setup(
                         self, self.__home_dir, self.__secret, owner=stats.owner,  node=stats.node, domain=stats.domain)
