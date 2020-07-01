@@ -225,8 +225,13 @@ setup(
     zip_safe=False,
     python_requires="~=3.7",
     install_requires=[
+        # Build tools requirements
         "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
-        "plyer", "asyncssh", "keyring", "msgpack"
+        # Software import requirements
+        "plyer", "asyncssh", "keyring", "msgpack",
+        # Platform specific requirements
+        # [Windows|Linux|Darwin]
+        "macos_keychain; platform_system == 'Darwin'",
     ],
     tests_require=[],
     packages=["libangelos", "angelos", "eidon", "angelossim"],
