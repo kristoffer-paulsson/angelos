@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Module docstring."""
 import asyncio
@@ -29,7 +38,7 @@ class SSHServer(ContainerAware, asyncssh.SSHServer):
     def connection_made(self, conn):
         logging.info("Connection made")
         self._conn = conn
-        conn.send_auth_banner("auth banner")
+        # conn.send_auth_banner("auth banner")
 
     def connection_lost(self, exc):
         if isinstance(exc, type(None)):
@@ -53,8 +62,6 @@ class SSHServer(ContainerAware, asyncssh.SSHServer):
         return True
 
     def validate_public_key(self, username, key):
-        logging.info("Authentication for a user")
-        logging.debug("%s" % username)
         return False  # Security countermeasure
 
     def session_requested(self):

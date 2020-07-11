@@ -1,3 +1,18 @@
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+
 PYI = --log=DEBUG --onefile
 AR7_IMPORT = uuid pathlib
 
@@ -5,20 +20,6 @@ AR7_IMPORT = uuid pathlib
 default:
 
 init:
-	# mkdir -p libangelos
-	# mkdir -p libangelos/archive
-	# mkdir -p libangelos/client
-	# mkdir -p libangelos/client/ui
-	# mkdir -p libangelos/data
-	# mkdir -p libangelos/document
-	# mkdir -p libangelos/dummy
-	# mkdir -p libangelos/facade
-	# mkdir -p libangelos/operation
-	# mkdir -p libangelos/policy
-	# mkdir -p libangelos/replication
-	# mkdir -p libangelos/server
-	# mkdir -p libangelos/ssh
-	# mkdir -p angelos
 	pip install -r requirements.txt
 	python setup.py develop
 
@@ -47,5 +48,5 @@ docs: basic
 	sphinx-apidoc -o docs lib/angelos
 	sphinx-build -M html docs docs
 
-test_document:
-	python -m unittest tests/libangelos/test_document_*.py
+test:
+	python ./tests/test_certified.py

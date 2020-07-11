@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Policy classes for document portfolios."""
 import collections
@@ -296,8 +305,8 @@ class NewPortfolio:
         return docs if docs else set()
 
     def __eq__(self, other):
-        s = self.__documents | self.__additional
-        o = other.documents | other.__additional
+        s = self.__docs | self.__additional
+        o = other.documents() | other.additional()
         return collections.Counter(s) == collections.Counter(o)
 
     def __str__(self):

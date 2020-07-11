@@ -1,16 +1,28 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """SSH Bootstrap code for the Angelos server."""
+import crypt
 import logging
 import os
 import uuid
 
 import asyncssh
 from angelos.cmd import Terminal
+from libangelos.ioc import ContainerAware
+
 from angelos.commands import EnvCommand, QuitCommand, SetupCommand, StartupCommand, ProcessCommand
 from angelos.impexp import ImportCommand, ExportCommand, PortfolioCommand
 from libangelos.const import Const
@@ -47,12 +59,44 @@ class AdminServerProcess(ConsoleServerProcess):
         ConsoleServerProcess.__init__(self, process_factory, sess_mgr, "admin")
 
 
-class BootServer(SSHServer):
+class ConsoleServer(ContainerAware, asyncssh.SSHServer):
+    """SSH server container aware baseclass."""
+
+    def __init__(self, ioc):
+        """Initialize AdminServer."""
+        self._conn = None
+        self._client_keys = None
+        ContainerAware.__init__(self, ioc)
+
+        self._applog = self.ioc.log.app
+
+    def connection_made(self, conn):
+        logging.info("Connection made")
+        self._conn = conn
+        # conn.send_auth_banner("auth banner")
+
+    def begin_auth(self, username):
+        """Authentication is required."""
+        try:
+            key_file = os.path.join(self.ioc.auto.dir.root, "admins.pub")
+            # key_file = os.path.join(os.path.expanduser("~"), ".ssh", "authorized_keys", username + ".pub")
+            self._client_keys = asyncssh.read_public_key_list(key_file)
+        except IOError:
+            self._conn.close()
+
+        return True
+
+    def validate_public_key(self, username, key):
+        """Validate public key."""
+        return key in self._client_keys
+
+
+class BootServer(ConsoleServer):
     """SSH Server for the boot sequence."""
 
     def __init__(self, ioc):
         """Initialize BootServer."""
-        SSHServer.__init__(self, ioc)
+        ConsoleServer.__init__(self, ioc)
 
         vault_file = Util.path(self.ioc.env["dir"].root, Const.CNL_VAULT)
         if os.path.isfile(vault_file):
@@ -61,19 +105,6 @@ class BootServer(SSHServer):
             self._applog.info(
                 "Vault archive NOT found. Initialize setup mode."
             )
-
-    def begin_auth(self, username):
-        """Auth not required."""
-        logging.info("Begin authentication for: %s" % username)
-        return False
-
-    def password_auth_supported(self):
-        """Password validation supported."""
-        return True
-
-    def validate_password(self, username, password):
-        """Any password OK."""
-        return True
 
     def session_requested(self):
         """Start terminal session. Denying SFTP and SCP."""
@@ -102,7 +133,7 @@ class BootServer(SSHServer):
             ).run()
 
 
-class AdminServer(SSHServer):
+class AdminServer(ConsoleServer):
     """SSH Server for the admin console."""
 
     cmds = [
@@ -113,19 +144,6 @@ class AdminServer(SSHServer):
         ProcessCommand,
         PortfolioCommand,
     ]
-
-    def begin_auth(self, username):
-        """Auth not required."""
-        logging.info("Begin authentication for: %s" % username)
-        return False
-
-    def password_auth_supported(self):
-        """Password validation supported."""
-        return True
-
-    def validate_password(self, username, password):
-        """Any password OK."""
-        return True
 
     def session_requested(self):
         """Start terminal session. Denying SFTP and SCP."""

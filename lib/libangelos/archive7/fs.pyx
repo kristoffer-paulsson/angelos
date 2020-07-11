@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2020 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """File system."""
 import datetime
@@ -63,9 +72,9 @@ class EntryRecord:
             EntryRecord.FORMAT,
             self.type,
             self.id.bytes if isinstance(self.id, uuid.UUID) else uuid.uuid4().bytes,
-            self.parent.bytes if isinstance(self.parent, uuid.UUID) else b"\x00" * 16,
-            self.owner.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
-            self.stream.bytes if isinstance(self.owner, uuid.UUID) else b"\x00" * 16,
+            self.parent.bytes if isinstance(self.parent, uuid.UUID) else bytes(16),
+            self.owner.bytes if isinstance(self.owner, uuid.UUID) else bytes(16),
+            self.stream.bytes if isinstance(self.owner, uuid.UUID) else bytes(16),
             int(
                 time.mktime(self.created.timetuple())
                 if isinstance(self.created, datetime.datetime)
@@ -78,9 +87,9 @@ class EntryRecord:
             ),
             self.length if isinstance(self.length, int) else 0,
             self.deleted if isinstance(self.deleted, bool) else False,
-            self.name[:256] if isinstance(self.name, (bytes, bytearray)) else b"\x00" * 256,
-            self.user[:32] if isinstance(self.user, (bytes, bytearray)) else b"\x00" * 32,
-            self.group[:16] if isinstance(self.group, (bytes, bytearray)) else b"\x00" * 16,
+            self.name[:256] if isinstance(self.name, (bytes, bytearray)) else bytes(256),
+            self.user[:32] if isinstance(self.user, (bytes, bytearray)) else bytes(32),
+            self.group[:16] if isinstance(self.group, (bytes, bytearray)) else bytes(16),
             self.perms if isinstance(self.perms, int) else 0o755,
         )
 

@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """A reactive dictionary mixin
 
@@ -42,7 +51,8 @@ class DictionaryMixin:
             settings.add_section(self.SECTION[0])
 
         for key, value in settings.items(self.SECTION[0]):
-            self.__items[key] = ReactiveValue(Misc.from_ini(value))
+            # self.__items[key] = ReactiveValue(Misc.from_ini(value))
+            self.__items[key] = ReactiveValue(value)
 
     def subscribe(self, option: str, observer: ObserverMixin) -> None:
         """Adds a subscriber to said option.

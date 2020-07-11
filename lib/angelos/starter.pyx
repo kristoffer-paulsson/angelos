@@ -1,14 +1,24 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """SSH start logic.
 
 @todo Add return types to Starter functions
 """
 import asyncio
+import os
 
 import asyncssh
 
@@ -80,7 +90,6 @@ class ConsoleStarter(Starter):
             "server_factory": lambda: AdminServer(ioc),
             "host": host,
             "port": port,
-            # "loop": loop,
             "server_host_keys": [
                 asyncssh.import_private_key(SERVER_RSA_PRIVATE)
             ],
@@ -102,7 +111,6 @@ class ConsoleStarter(Starter):
             "server_factory": lambda: BootServer(ioc),
             "host": host,
             "port": port,
-            # "loop": loop,
             "server_host_keys": [
                 asyncssh.import_private_key(SERVER_RSA_PRIVATE)
             ],

@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Mixin for enforcing portfolio policy's before importing."""
 import asyncio
@@ -17,8 +26,8 @@ from libangelos.policy.accept import EntityKeysPortfolioValidatePolicy, IssuedDo
     NodePortfolioValidatePolicy, ImportPolicy, ProfileUpdatePortfolioPolicy, NetworkUpdatePortfolioPolicy, \
     StatementImportPortfolioPolicy, EntityUpdatePortfolioPolicy, PrivateKeysImportPortfolioPolicy, \
     NodeUpdatePortfolioPolicy, DomainUpdatePortfolioPolicy, KeysImportPortfolioPolicy
-from libangelos.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, Portfolio, \
-    PField, PGroup, DocSet
+from libangelos.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, \
+    Portfolio, PField, PGroup, DocSet
 from libangelos.utils import Util
 
 from libangelos.helper import Glue

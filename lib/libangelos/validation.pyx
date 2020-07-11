@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2020 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Validation framework.
 
@@ -68,73 +77,6 @@ report_ctx = ContextVar("report", default=None)
 
 class Report:
     """Validation report that keeps a record of applied policies and failures."""
-
-    NULL_POLICY = (uuid.UUID(int=0).bytes, ord(b'I'), 0)  # Null policy
-    NULL_IDENTITY = uuid.UUID(int=0)
-    POLICY = {b'A': "1A", b'B': "1B", b'C': "2C", b'D': "2D", b'E': "2E", b'F': "3F",
-              b'G': "3G", b'H': "3H", b'J': "3J", b'K': "4K", b'L': "4L", b'M': "4M",
-              b'N': "4N", b'P': "5P", b'Q': "5Q", b'R': "5R", b'S': "5S", b'T': "6T",
-              b'U': "6U", b'V': "6V", b'X': "6X", b'Y': "7Y", b'Z': "7Z"}
-
-    def __init__(self, validator: "BaseValidator"):
-        self.__validator = str(validator)
-        self.__applied = set()
-        self.__failed = set()
-
-    @property
-    def applied(self):
-        """All applied policies."""
-        return self.__applied
-
-    @property
-    def failed(self):
-        """All failed policies."""
-        return self.__failed
-
-    def record(self, identity: uuid.UUID, section: bytes, sn: int, failed: bool = False):
-        """Add a policy record.
-
-        Args:
-            identity (uuid.UUID):
-                The identity of the object having policies checked.
-            section (bytes):
-                Policy section from which layer is calculated.
-            sn (int):
-                Policy chronological serial number.
-            failed (bool):
-                True or False whether the check failed.
-
-        """
-        entry = (identity.bytes, ord(section), sn)
-        self.__applied.add(entry)
-        if failed:
-            self.__failed.add(entry)
-
-    def __str__(self):
-        """Written report of all applied policies and failures."""
-        output = "Report on policies: {0}\n".format(self.__validator)
-        for p in self.__applied:
-            output += "{1}-{2:0>4}:{0!s}  {3}\n".format(
-                uuid.UUID(bytes=p[0]),
-                Report.POLICY[chr(p[1])] if p[1] in Report.POLICY else "0I",
-                p[2],
-                "Failure" if p in self.__failed else "Success"
-            )
-        return output
-
-    def __bool__(self):
-        """State of the report.
-
-        If report has applied policies without failure it's True, but False if empty or with failures.
-        """
-        return bool(self.__applied) and not bool(self.__failed)
-
-
-journal_ctx = ContextVar("journal", default=None)
-
-
-class Journal:
-    """Validation journal that keeps a record of applied policies and failures."""
 
     NULL_POLICY = (uuid.UUID(int=0).bytes, ord(b'I'), 0)  # Null policy
     NULL_IDENTITY = uuid.UUID(int=0)
@@ -209,7 +151,8 @@ class Journal:
         if failed:
             self.__failed.append(id(entry))
 
-    def printj(self):
+    def printr(self):
+        """Print report."""
         return "{0}\n{1}{2}".format(
             Util.headline("POLICY REPORT", "(Begin)"),
             self,
@@ -232,7 +175,7 @@ class Journal:
                 output += "{0} ({1:s}) {0}\n".format((up if p[2] else down), p[1].decode())
             else:
                 output += "{0}-{1:0>4}  {2}\n".format(
-                    Journal.POLICY[chr(p[1])] if p[1] in Journal.POLICY else "0I",
+                    Report.POLICY[chr(p[1])] if p[1] in Report.POLICY else "0I",
                     p[2],
                     "Failure" if id(p) in self.__failed else "Success"
                 )
@@ -252,7 +195,7 @@ class PolicyException(AngelosException):
 
 
 class PolicyBreachException(AngelosException):
-    def __init__(self, message, report: Journal):
+    def __init__(self, message, report: Report):
         super().__init__(message)
         self.report = report
 
@@ -304,19 +247,19 @@ def policy(section, sn, level=None):  # TODO: Write unittest
                 The result from the callable
 
             """
-            journal = journal_ctx.get()
+            report = report_ctx.get()
             if level:
                 level_str = str(level).encode()
-            if isinstance(journal, Journal):
+            if isinstance(report, Report):
                 result = None
-                if level: journal.up(level_str)
+                if level: report.up(level_str)
                 try:
                     result = func(self, *args, **kwargs)
                     failure = False
                 except PolicyException as e:
                     failure = True
-                journal.record(section, sn, failure)
-                if level: journal.down(level_str)
+                report.record(section, sn, failure)
+                if level: report.down(level_str)
                 return result
             else:
                 return func(self, *args, **kwargs)
@@ -334,20 +277,20 @@ class evaluate(ContextDecorator, AbstractContextManager, AbstractAsyncContextMan
     """
 
     def __init__(self, event = None):
-        self.__token = journal_ctx.set(Journal(event))
+        self.__token = report_ctx.set(Report(event))
 
     def __enter__(self):
-        return journal_ctx.get()
+        return report_ctx.get()
 
     async def __aenter__(self):
-        return journal_ctx.get()
+        return report_ctx.get()
 
     def __evaluate(self):
-        journal = journal_ctx.get()
-        journal_ctx.reset(self.__token)
-        if not journal:
-            logging.error("Policy breach found, REPORT: {0}, TIMESTAMP; {1}".format(journal.id, journal.timestamp))
-            raise PolicyBreachException("Policy breach found", journal)
+        report = report_ctx.get()
+        report_ctx.reset(self.__token)
+        if not report:
+            logging.error("Policy breach found, REPORT: {0}, TIMESTAMP; {1}".format(report.id, report.timestamp))
+            raise PolicyBreachException("Policy breach found", report)
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
@@ -411,12 +354,81 @@ class PolicyPerformer(BasePolicyApplier):
         pass
 
 
+#### OLD IMPLEMENTATION THAT IS GOING AWAY ====
+
+rep_ctx = ContextVar("rep", default=None)
+
+
+class Rep:
+    """Validation report that keeps a record of applied policies and failures."""
+
+    NULL_POLICY = (uuid.UUID(int=0).bytes, ord(b'I'), 0)  # Null policy
+    NULL_IDENTITY = uuid.UUID(int=0)
+    POLICY = {b'A': "1A", b'B': "1B", b'C': "2C", b'D': "2D", b'E': "2E", b'F': "3F",
+              b'G': "3G", b'H': "3H", b'J': "3J", b'K': "4K", b'L': "4L", b'M': "4M",
+              b'N': "4N", b'P': "5P", b'Q': "5Q", b'R': "5R", b'S': "5S", b'T': "6T",
+              b'U': "6U", b'V': "6V", b'X': "6X", b'Y': "7Y", b'Z': "7Z"}
+
+    def __init__(self, validator: "BaseValidator"):
+        self.__validator = str(validator)
+        self.__applied = set()
+        self.__failed = set()
+
+    @property
+    def applied(self):
+        """All applied policies."""
+        return self.__applied
+
+    @property
+    def failed(self):
+        """All failed policies."""
+        return self.__failed
+
+    def record(self, identity: uuid.UUID, section: bytes, sn: int, failed: bool = False):
+        """Add a policy record.
+
+        Args:
+            identity (uuid.UUID):
+                The identity of the object having policies checked.
+            section (bytes):
+                Policy section from which layer is calculated.
+            sn (int):
+                Policy chronological serial number.
+            failed (bool):
+                True or False whether the check failed.
+
+        """
+        entry = (identity.bytes, ord(section), sn)
+        self.__applied.add(entry)
+        if failed:
+            self.__failed.add(entry)
+
+    def __str__(self):
+        """Written report of all applied policies and failures."""
+        output = "Report on policies: {0}\n".format(self.__validator)
+        for p in self.__applied:
+            output += "{1}-{2:0>4}:{0!s}  {3}\n".format(
+                uuid.UUID(bytes=p[0]),
+                Rep.POLICY[chr(p[1])] if p[1] in Rep.POLICY else "0I",
+                p[2],
+                "Failure" if p in self.__failed else "Success"
+            )
+        return output
+
+    def __bool__(self):
+        """State of the report.
+
+        If report has applied policies without failure it's True, but False if empty or with failures.
+        """
+        return bool(self.__applied) and not bool(self.__failed)
+
+
 class BaseValidatable(ABC):
     """Object that can be validated according to specific policies and return a report."""
 
     def _checker(
-            self, rules: list, report: Report = None,
-            identity: uuid.UUID = Report.NULL_IDENTITY, attr: str = None
+            self, rules: list, report: Rep = None,
+            identity: uuid.UUID = Rep.NULL_IDENTITY, attr: str = None
     ) -> bool:
         """Internal checker for validating the self._check_* methods.
 
@@ -452,7 +464,7 @@ class BaseValidatable(ABC):
         return valid
 
     @abstractmethod
-    def apply_rules(self, report: Report = None, identity: uuid.UUID = Report.NULL_IDENTITY) -> bool:
+    def apply_rules(self, report: Rep = None, identity: uuid.UUID = Rep.NULL_IDENTITY) -> bool:
         """Apply all the rules defined within.
 
         Example:
@@ -479,7 +491,7 @@ class BaseValidator(ABC):
     def __str__(self):
         return self.__class__.__name__
 
-    def _validator(self, validatable: BaseValidatable, report: Report) -> bool:
+    def _validator(self, validatable: BaseValidatable, report: Rep) -> bool:
         valid = True
         classes = set(validatable.__class__.mro())
 
@@ -489,14 +501,14 @@ class BaseValidator(ABC):
 
         return valid
 
-    def validate(self) -> Report:
+    def validate(self) -> Rep:
         """Validate its own classes that are validatables.
 
         Returns (Report):
             Report with applied and failed policies.
 
         """
-        report = Report(self)
+        report = Rep(self)
         valid = self._validator(self, report)
 
         if valid and len(report.failed):

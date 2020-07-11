@@ -1,12 +1,22 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Commonly used types and functions go here."""
 import datetime
 from abc import ABCMeta
+from collections import namedtuple
 from dataclasses import dataclass
 from typing import Union, List
 
@@ -20,10 +30,9 @@ class PortfolioABC(metaclass=ABCMeta):
 class PrivatePortfolioABC(metaclass=ABCMeta):
     pass
 
-
+"""
 @dataclass
 class PersonData(BaseDataClass):
-    """Initial data for Person document."""
 
     given_name: str
     family_name: str
@@ -39,11 +48,14 @@ class PersonData(BaseDataClass):
             "sex": self.sex,
             "born": self.born,
         }
+"""
+
+PersonData = namedtuple("PersonData", "given_name,family_name,names,sex,born")
 
 
+"""
 @dataclass
 class MinistryData(BaseDataClass):
-    """Initial data for Ministry document."""
 
     ministry: str
     vision: str
@@ -55,11 +67,13 @@ class MinistryData(BaseDataClass):
             "vision": self.vision,
             "founded": self.founded,
         }
+"""
 
+MinistryData = namedtuple("MinistryData", "ministry,vision,founded")
 
+"""
 @dataclass
 class ChurchData(BaseDataClass):
-    """Initial data for Church document."""
 
     city: str
     region: str
@@ -73,6 +87,10 @@ class ChurchData(BaseDataClass):
             "country": self.country,
             "founded": self.founded,
         }
+"""
+
+
+ChurchData = namedtuple("ChurchData", "city,region,country,founded")
 
 
 EntityDataT = Union[PersonData, MinistryData, ChurchData]

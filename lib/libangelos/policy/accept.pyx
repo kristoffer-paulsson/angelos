@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Module docstring."""
 import copy
@@ -25,7 +34,7 @@ from libangelos.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
 from libangelos.policy.policy import Policy, BasePolicy, BasePolicyMixin
 from libangelos.policy.portfolio import Portfolio
 from libangelos.utils import Util
-from libangelos.validation import Report
+from libangelos.validation import Rep as Report
 
 
 class ImportPolicy(Policy):

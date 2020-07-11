@@ -1,8 +1,17 @@
 # cython: language_level=3
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
 #
 """Module docstring."""
 import abc
@@ -36,7 +45,8 @@ class Loop:
     def __init__(self, name=""):
         self.__cnt += 1
         self.__loop = asyncio.new_event_loop()
-        self.__thread = Thread(target=self.__run, daemon=True, name=name if name else "LoopThread-%s" % self.__cnt)
+        self.__thread = Thread(
+            target=self.__run, daemon=True, name=name if name else "LoopThread-{}".format(self.__cnt))
         atexit.register(self.__stop)
         self.__thread.start()
 
@@ -59,10 +69,8 @@ class Loop:
         self.__loop.call_soon_threadsafe(self.__loop.stop)
 
     def run(
-            self,
-            coro: Awaitable,
-            callback: Callable[[concurrent.futures.Future], None] = None,
-            wait=False
+            self, coro: Awaitable,
+            callback: Callable[[concurrent.futures.Future], None] = None, wait=False
     ) -> Any:
         try:
             future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
@@ -260,7 +268,7 @@ class Misc:
         """
         tmp = urlparse(urlstring, scheme="angelos", allow_fragments=False)
         regex = re.match(Misc.REGEX, tmp.netloc).groupdict()
-        merged = {**regex, **tmp._asdict()}
+        merged = {**regex, **dict(tmp._asdict())}
         return {k: merged[k] for k in {"scheme", "hostname", "path", "username", "password", "port"}}
 
     @staticmethod
@@ -357,48 +365,20 @@ class Misc:
             Python value.
 
         """
-        if is_int(value):
+        try:
             return int(value)
-        elif is_float(value):
+        except ValueError:
+            pass
+
+        try:
             return float(value)
-        elif is_bool(value):
-            return to_bool(value)
-        elif is_none(value):
+        except ValueError:
+            pass
+
+        value = value.lower()
+        if value in ("true", "false", "yes", "no", "on", "off"):
+            return value.lower() in ("true", "yes", "on")
+        if value == str(None).lower():
             return None
-        else:
-            return value
 
-
-# ATTRIBUTION
-#
-# The following section is copied from the "localconfig" project:
-# https://github.com/maxzheng/localconfig.git
-# Copyright (c) 2014 maxzheng
-# Licensed under the MIT license
-
-def is_float(value):
-    """Checks if the value is a float """
-    return _is_type(value, float)
-
-def is_int(value):
-    """Checks if the value is an int """
-    return _is_type(value, int)
-
-def is_bool(value):
-    """Checks if the value is a bool """
-    return value.lower() in ['true', 'false', 'yes', 'no', 'on', 'off']
-
-def is_none(value):
-    """Checks if the value is a None """
-    return value.lower() == str(None).lower()
-
-def to_bool(value):
-    """Converts value to a bool """
-    return value.lower() in ['true', 'yes', 'on']
-
-def _is_type(value, t):
-    try:
-        t(value)
-        return True
-    except Exception:
-        return False
+        return value

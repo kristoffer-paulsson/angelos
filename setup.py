@@ -1,15 +1,25 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2018-2019 by:
-# Kristoffer Paulsson <kristoffer.paulsson@talenten.se>
-# This file is distributed under the terms of the MIT license.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+
 """Angelos build script."""
 import os
 import re
-import subprocess
 import tarfile
 import tempfile
+import subprocess
 
 import urllib
 from abc import ABC, abstractmethod
@@ -20,6 +30,14 @@ from setuptools.command.install import install as setup_install
 from Cython.Build import cythonize
 
 base_dir = path.abspath(path.dirname(__file__))
+
+
+class TestRunner(setup_install):
+    """Install third party vendor libraries."""
+
+    def run(self):
+        """Install vendors."""
+        subprocess.check_call("python ./tests/test_certified.py", shell=True)
 
 
 class VendorLibrary(ABC):
@@ -142,6 +160,9 @@ class LibraryScanner:
             kwargs = {**self.__data, **data, **core}
             extensions.append(Extension(**kwargs))
 
+        # TODO: Build one single file
+        #   https://stackoverflow.com/questions/30157363/collapse-multiple-submodules-to-one-cython-extension
+
         return extensions
 
 
@@ -175,7 +196,7 @@ coredata = {
 
 
 setup(
-    cmdclass={"install": VendorInstall},
+    cmdclass={"install": VendorInstall, "test": TestRunner},
     name="angelos",
     version=__version__,  # noqa F821
     license="MIT",
@@ -226,7 +247,7 @@ setup(
     python_requires="~=3.7",
     install_requires=[
         # Build tools requirements
-        "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
+        "tox", "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
         # Software import requirements
         "plyer", "asyncssh", "keyring", "msgpack",
         # Platform specific requirements
