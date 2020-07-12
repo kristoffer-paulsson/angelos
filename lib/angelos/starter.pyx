@@ -18,17 +18,14 @@
 @todo Add return types to Starter functions
 """
 import asyncio
-import os
 
-import asyncssh
-
-from libangelos.starter import Starter
-from libangelos.ioc import Container
 from libangelos.document.entities import Keys
+from libangelos.ioc import Container
 from libangelos.policy.portfolio import PrivatePortfolio
 from libangelos.ssh.ssh import SSHClient, SSHServer
+
 from angelos.console import BootServer, AdminServer
-from angelos.vars import SERVER_RSA_PRIVATE
+from libangelos.starter import Starter
 
 
 class ConsoleStarter(Starter):
@@ -76,7 +73,7 @@ class ConsoleStarter(Starter):
         }
         params = {**params, **self.ALGS}
 
-        return Starter.start_client(params)  # (conn, client)
+        return Starter.start_client(params)
 
     def admin_server(
         self,
@@ -90,9 +87,7 @@ class ConsoleStarter(Starter):
             "server_factory": lambda: AdminServer(ioc),
             "host": host,
             "port": port,
-            "server_host_keys": [
-                asyncssh.import_private_key(SERVER_RSA_PRIVATE)
-            ],
+            "server_host_keys": [ioc.keys.server()],
         }
         params = {**params, **self.SARGS}
         params["allow_pty"] = True
@@ -111,9 +106,7 @@ class ConsoleStarter(Starter):
             "server_factory": lambda: BootServer(ioc),
             "host": host,
             "port": port,
-            "server_host_keys": [
-                asyncssh.import_private_key(SERVER_RSA_PRIVATE)
-            ],
+            "server_host_keys": [ioc.keys.server()],
         }
         params = {**params, **self.SARGS}
         params["allow_pty"] = True

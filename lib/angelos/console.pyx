@@ -71,19 +71,21 @@ class ConsoleServer(ContainerAware, asyncssh.SSHServer):
         self._applog = self.ioc.log.app
 
     def connection_made(self, conn):
-        logging.info("Connection made")
+        """Handle the incoming connection."""
         self._conn = conn
-        # conn.send_auth_banner("auth banner")
+        conn.send_auth_banner("Connection made\n")
 
     def begin_auth(self, username):
         """Authentication is required."""
         try:
-            key_file = os.path.join(self.ioc.auto.dir.root, "admins.pub")
-            # key_file = os.path.join(os.path.expanduser("~"), ".ssh", "authorized_keys", username + ".pub")
-            self._client_keys = asyncssh.read_public_key_list(key_file)
-        except IOError:
+            self._client_keys = self.ioc.keys.list()
+        except IOError as e:
             self._conn.close()
 
+        return True
+
+    def public_key_auth_supported(self):
+        """Turn on support for public key authentication."""
         return True
 
     def validate_public_key(self, username, key):

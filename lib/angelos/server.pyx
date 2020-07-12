@@ -18,9 +18,12 @@ import asyncio
 import collections
 import functools
 import json
+import logging
 import os
 import signal
+from typing import Any
 
+import asyncssh
 from angelos.parser import Parser
 from angelos.state import StateMachine
 from angelos.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
@@ -34,6 +37,105 @@ from angelos.starter import ConsoleStarter
 from libangelos.facade.facade import Facade
 from libangelos.logger import LogHandler
 from libangelos.starter import Starter
+
+
+class AdminKeys:
+    """Load and list admin keys."""
+
+    def __init__(self, env: collections.ChainMap):
+        self.__path_admin = os.path.join(env["dir"].root, "admins.pub")
+        self.__path_server = os.path.join(env["dir"].root, "server")
+        self.__key_list = None
+        self.__key_private = None
+
+    @property
+    def key_admin(self) -> str:
+        """Expose path to key-file."""
+        return self.__path_admin
+
+    @property
+    def key_server(self) -> str:
+        """Expose path to key-file."""
+        return self.__path_server
+
+    def load(self):
+        """Load admin keys."""
+        self.__key_list = asyncssh.read_public_key_list(self.__path_admin)
+
+        if not os.path.isfile(self.__path_server):
+            logging.info("Private key missing, generate new.")
+            self.__key_private = asyncssh.generate_private_key("ssh-rsa")
+            self.__key_private.write_private_key(self.__path_server)
+        else:
+            self.__key_private = asyncssh.read_private_key(self.__path_server)
+
+    def list(self) -> list:
+        """List admin keys."""
+        return self.__key_list
+
+    def server(self) -> Any:
+        """Server private key."""
+        return self.__key_private
+
+
+class Bootstrap:
+    """Bootstraps the server checks that all criteria match."""
+    def __init__(self, env: collections.ChainMap, keys: AdminKeys):
+        self.__critical = False
+        self.__env = env
+        self.__keys = keys
+
+    def __error(self, message: str):
+        """Print a message to screen and in logs."""
+        logging.error(message)
+        print(message)
+        self.__critical = True
+
+    def criteria_root(self):
+        """Check that the root folder exists."""
+        root_dir = self.__env["dir"].root
+
+        if not os.path.isdir(root_dir):
+            self.__error("No root directory.")
+            return
+
+        if not os.access(root_dir, os.W_OK):
+            self.__error("Root directory not writable.")
+            return
+
+    def criteria_admin(self):
+        """Check that there are public keys for admin."""
+        admin_keys_file = self.__keys.key_admin
+
+        if not os.path.isfile(admin_keys_file):
+            self.__error("No admin public keys file.")
+            return
+
+        if not os.stat(admin_keys_file).st_size:
+            self.__error("Admin public keys file is empty.")
+            return
+
+    def criteria_load_keys(self):
+        """Load admin public keys into """
+        self.__keys.load()
+        if not self.__keys.list():
+            self.__error("Failed to load admin public keys.")
+            return
+
+    def match(self) -> bool:
+        """Match all criteria for proceeding operations."""
+
+        self.criteria_root()
+        self.criteria_admin()
+        self.criteria_load_keys()
+
+        if self.__critical:
+            logging.critical("One or several bootstrap criteria failed!")
+            print("Exit")
+            return False
+        else:
+            logging.info("Bootstrap criteria success.")
+            return True
 
 
 class Configuration(Config, Container):
@@ -58,6 +160,8 @@ class Configuration(Config, Container):
             "config": lambda self: collections.ChainMap(
                 CONFIG_IMMUTABLE, self.__load("config.json"), CONFIG_DEFAULT
             ),
+            "bootstrap": lambda self: Bootstrap(self.env, self.keys),
+            "keys": lambda self: AdminKeys(self.env),
             "state": lambda self: StateMachine(self.config["state"]),
             "log": lambda self: LogHandler(self.config["logger"]),
             "session": lambda self: SessionManager(),
@@ -83,6 +187,10 @@ class Server(ContainerAware):
         self._applog = self.ioc.log.app
 
     def _initialize(self):
+        if not self.ioc.bootstrap.match():
+            self.quiter()
+            return
+
         self.ioc.state("running", True)
         loop = self._worker.loop
 

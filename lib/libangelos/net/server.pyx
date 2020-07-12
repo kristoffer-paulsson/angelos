@@ -42,6 +42,25 @@ MODE_INVITE = 3  # Trusted and verified by users or server
 MODE_OPEN = 4  # Verified by user or server
 
 
+
+
+class SessionOptions:
+    """Session access options."""
+
+    ROLE_NONE = 0
+    ROLE_ADMIN = 1
+    ROLE_HOST = 2
+    ROLE_CLIENT = 3
+    ROLE_NODE = 5
+
+    def __init__(self):
+        self.__username = ""
+        self.__issuer = None
+        self.__role = self.ROLE_NONE
+        self.__terminal_access = False
+        self.__systems = dict()
+
+
 class ServerSession(ContainerAware, SSHStreamSession, SSHServerSession):
     """Server session base class."""
 
@@ -103,12 +122,6 @@ class ServerSession(ContainerAware, SSHStreamSession, SSHServerSession):
 
 class Server(ContainerAware, SSHServer):
     """Server base class."""
-
-    WHO_NONE = 0
-    WHO_ADMIN = 1
-    WHO_HOST = 2
-    WHO_CLIENT = 3
-    WHO_NODE = 5
 
     def __init__(
             self, ioc: Container, mode: int = MODE_STRICT,
