@@ -3,8 +3,8 @@ pyinstaller
 sphinx
 sphinx_rtd_theme
 plyer
-asyncssh
+asyncssh~=2.3
 keyring
 msgpack
 pyyaml
-macos-keychain
+# macos-keychain # No platform specific dependencies here

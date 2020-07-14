@@ -21,7 +21,7 @@ from libangelos.error import PortfolioAlreadyExists
 
 from angelos.cmd import Command, Option
 from libangelos.policy.portfolio import PGroup
-from libangelos.policy.print import PrintPolicy
+from libangelos.policy.format import PrintPolicy
 from libangelos.policy.verify import StatementPolicy
 from libangelos.operation.export import ExportImportOperation
 

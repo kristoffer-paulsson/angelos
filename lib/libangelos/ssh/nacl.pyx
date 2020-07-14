@@ -15,11 +15,10 @@
 #
 """Module docstring."""
 import base64
-import asyncssh
 
+import asyncssh
 from asyncssh.public_key import register_public_key_alg
 from libangelos.library.nacl import Signer, Verifier
-
 from libangelos.utils import Util
 
 _algorithm = b"angelos-tongues"
@@ -95,12 +94,16 @@ class NaClPublicKey(BaseKey):
 class NaClKey(asyncssh.SSHKey):
     """SSHKey for NaCl."""
 
+    algorithm = b"angelos-tongues"
+    sig_algorithms = (b"angelos-tongues",)
+    all_sig_algorithms = set(sig_algorithms)
+
     def __init__(self, key):
         """Initialize key."""
         super().__init__(key)
-        self.algorithm = _algorithm
-        self.sig_algorithms = (self.algorithm,)
-        self.all_sig_algorithms = set(self.sig_algorithms)
+        # self.algorithm = _algorithm
+        # self.sig_algorithms = (self.algorithm,)
+        # self.all_sig_algorithms = set(self.sig_algorithms)
 
     def sign_der(self, data, sig_algorithm):
         """Abstract method to compute a DER-encoded signature."""
@@ -171,7 +174,7 @@ class NaClKey(asyncssh.SSHKey):
         return NaClKey(key=NaClPublicKey.construct(keys.verify))
 
 
-register_public_key_alg(_algorithm, NaClKey, (_algorithm,))
+register_public_key_alg(NaClKey.algorithm, NaClKey, NaClKey.algorithm)
 
 
 def make_known_hosts(verify):

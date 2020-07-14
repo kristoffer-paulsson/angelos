@@ -48,7 +48,7 @@ from .portfolio import (
     DOCUMENT_PATH,
     PortfolioPolicy,
 )
-from libangelos.policy.print import PrintPolicy
+from libangelos.policy.format import PrintPolicy
 
 
 __all__ = [

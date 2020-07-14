@@ -22,7 +22,7 @@ from typing import Set, Any, Tuple
 from libangelos.error import Error
 from libangelos.document.types import MessageT
 from libangelos.utils import Util
-from libangelos.policy.print import PrintPolicy
+from libangelos.policy.format import PrintPolicy
 from libangelos.api.api import ApiFacadeExtension
 from libangelos.document.document import DocType
 from libangelos.document.envelope import Envelope

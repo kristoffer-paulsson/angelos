@@ -25,11 +25,25 @@ import urllib
 from abc import ABC, abstractmethod
 from glob import glob
 from os import path
-from setuptools import setup, Extension
+from setuptools import setup, Extension, Command as _Command
 from setuptools.command.install import install as setup_install
 from Cython.Build import cythonize
 
+
 base_dir = path.abspath(path.dirname(__file__))
+
+
+class Command(_Command):
+    user_options = [
+    ]
+
+    def initialize_options(self):
+        """Initialize options"""
+        pass
+
+    def finalize_options(self):
+        """Finalize options"""
+        pass
 
 
 class TestRunner(setup_install):
@@ -102,7 +116,8 @@ class VendorLibsodium(VendorLibrary):
     def build(self):
         """Build sources."""
         subprocess.check_call("./configure", cwd=self._work, shell=True)
-        subprocess.check_call("make && make check", cwd=self._work, shell=True)
+        # CFLAGS='-fPIC -O' CentOS specific only (?)
+        subprocess.check_call("make CFLAGS='-fPIC -O' && make check", cwd=self._work, shell=True)
 
     def install(self):
         """Install binaries."""
@@ -160,10 +175,31 @@ class LibraryScanner:
             kwargs = {**self.__data, **data, **core}
             extensions.append(Extension(**kwargs))
 
+        return extensions
+
+
+class LibraryBuilder(Command):
+    """Build standalone library."""
+
+    def run(self):
+        """Build list of Extensions to be cythonized."""
+        name = "libangelos"
+        base_path = os.path.abspath(os.path.dirname(__file__))
+        glob_result = list()
+        for pattern in [name+"/**.pyx", name+"/**/*.pyx"]:
+            glob_path = os.path.join(".", "lib", pattern)
+            glob_result += glob(glob_path, recursive=True)
+
+        content = "# cython: language_level=3\n"
+        for src_file in glob_result:
+            content += "include \"{}\"\n".format(src_file[6:])
+
+        with open(os.path.join(base_path, "lib", name+".pyx"), "xb+") as output:
+            output.write(content.encode())
+
         # TODO: Build one single file
         #   https://stackoverflow.com/questions/30157363/collapse-multiple-submodules-to-one-cython-extension
 
-        return extensions
 
 
 with open(path.join(base_dir, "README.md")) as desc:
@@ -181,7 +217,8 @@ globlist = [
 
 pkgdata = {
     "libangelos.library.nacl": {
-        "extra_objects": ["usr/local/lib/libsodium.a"]
+        "extra_objects": ["usr/local/lib/libsodium.a"],
+        "include_dirs": [os.path.join(base_dir, "usr", "local", "include")]  # CentOS specific only (?)
     }
 }
 
@@ -196,7 +233,7 @@ coredata = {
 
 
 setup(
-    cmdclass={"install": VendorInstall, "test": TestRunner},
+    cmdclass={"install": VendorInstall, "test": TestRunner, "library": LibraryBuilder},
     name="angelos",
     version=__version__,  # noqa F821
     license="MIT",
@@ -249,7 +286,7 @@ setup(
         # Build tools requirements
         "tox", "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
         # Software import requirements
-        "plyer", "asyncssh", "keyring", "msgpack",
+        "plyer", "asyncssh~=2.3", "keyring", "msgpack",
         # Platform specific requirements
         # [Windows|Linux|Darwin]
         "macos_keychain; platform_system == 'Darwin'",
@@ -258,8 +295,22 @@ setup(
     packages=["libangelos", "angelos", "eidon", "angelossim"],
     package_dir={"": "lib"},
     scripts=glob("bin/*"),
-    ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan())
+    ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan()),
 )
+
+"""ext_modules=cythonize([Extension(
+    name="libangelos",
+    sources=["./lib/libangelos.pyx"],
+    build_dir="build",
+    cython_c_in_temp=True,
+    extra_objects=[
+        "usr/local/lib/libsodium.a"
+    ],
+    compiler_directives={
+        "language_level": 3,
+        "embedsignature": True
+    }
+)])"""
 
 
 
