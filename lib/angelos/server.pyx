@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import signal
+import socket
 from typing import Any
 
 import asyncssh
@@ -96,11 +97,11 @@ class Bootstrap:
         root_dir = self.__env["dir"].root
 
         if not os.path.isdir(root_dir):
-            self.__error("No root directory.")
+            self.__error("No root directory. ({})".format(root_dir))
             return
 
         if not os.access(root_dir, os.W_OK):
-            self.__error("Root directory not writable.")
+            self.__error("Root directory not writable. ({})".format(root_dir))
             return
 
     def criteria_admin(self):
@@ -108,18 +109,32 @@ class Bootstrap:
         admin_keys_file = self.__keys.key_admin
 
         if not os.path.isfile(admin_keys_file):
-            self.__error("No admin public keys file.")
+            self.__error("No admin public keys file. ({})".format(admin_keys_file))
             return
 
         if not os.stat(admin_keys_file).st_size:
-            self.__error("Admin public keys file is empty.")
+            self.__error("Admin public keys file is empty. ({})".format(admin_keys_file))
             return
 
     def criteria_load_keys(self):
         """Load admin public keys into """
-        self.__keys.load()
-        if not self.__keys.list():
-            self.__error("Failed to load admin public keys.")
+        try:
+            self.__keys.load()
+            if not self.__keys.list():
+                self.__error("Failed to load admin public keys.")
+                return
+        except FileNotFoundError:
+            pass
+
+    def criteria_port_access(self):
+        """Try to listen to designated port."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("127.0.0.1", self.__env["opts"].port))
+            s.listen(1)
+            s.close()
+        except PermissionError:
+            self.__error("Permission denied to use port {}".format(self.__env["opts"].port))
             return
 
     def match(self) -> bool:
@@ -128,6 +143,7 @@ class Bootstrap:
         self.criteria_root()
         self.criteria_admin()
         self.criteria_load_keys()
+        self.criteria_port_access()
 
         if self.__critical:
             logging.critical("One or several bootstrap criteria failed!")
@@ -187,11 +203,7 @@ class Server(ContainerAware):
         self._applog = self.ioc.log.app
 
     def _initialize(self):
-        if not self.ioc.bootstrap.match():
-            self.quiter()
-            return
-
-        self.ioc.state("running", True)
+        # self.ioc.state("running", True)
         loop = self._worker.loop
 
         loop.add_signal_handler(
@@ -202,6 +214,7 @@ class Server(ContainerAware):
             signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM)
         )
 
+        self._worker.run_coroutine(self.bootstrap())
         self._worker.run_coroutine(self.boot_server())
         self._worker.run_coroutine(self.admin_server())
         self._worker.run_coroutine(self.clients_server())
@@ -260,6 +273,13 @@ class Server(ContainerAware):
         self._finalize()
 
         self._applog.info("-------- EXITING SERVER --------")
+
+    async def bootstrap(self):
+        """Bootstraps the Angelos server by performing checks before changing state into running."""
+        if not self.ioc.bootstrap.match():
+            raise KeyboardInterrupt()
+        else:
+            self.ioc.state("running", True)
 
     async def admin_server(self):
         try:

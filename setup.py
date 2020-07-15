@@ -28,10 +28,11 @@ from os import path
 from setuptools import setup, Extension, Command as _Command
 from setuptools.command.install import install as setup_install
 from Cython.Build import cythonize
+from Cython.Compiler import Options
 
 
 base_dir = path.abspath(path.dirname(__file__))
-
+Options.embed = "main"
 
 class Command(_Command):
     user_options = [
@@ -61,6 +62,11 @@ class VendorLibrary(ABC):
     DOWNLOAD = "https://download.url/whatever.tar.gz"
     LOCALFILE = "library_name.tar.gz"
     INTERNAL = "library-root"
+
+    @abstractmethod
+    def check(self) -> bool:
+        """Check if already exists."""
+        pass
 
     @abstractmethod
     def download(self):
@@ -103,6 +109,10 @@ class VendorLibsodium(VendorLibrary):
         self._target = os.path.join(self._temp.name, self.NAME)
         self._work = os.path.join(self._temp.name, self.NAME, self.INTERNAL)
 
+    def check(self) -> bool:
+        """Check if already exists."""
+        return os.path.isfile(os.path.join(self._base, "usr", "local", "lib", "libsodium.a"))
+
     def download(self):
         """Download sources tarball."""
         urllib.request.urlretrieve(self.DOWNLOAD, self._archive)
@@ -137,11 +147,12 @@ class VendorInstall(setup_install):
         """Install vendors."""
         for vendor_library in self.LIBRARIES:
             library = vendor_library(base_dir)
-            library.download()
-            library.extract()
-            library.build()
-            library.install()
-            library.close()
+            if not library.check():
+                library.download()
+                library.extract()
+                library.build()
+                library.install()
+                library.close()
 
         setup_install.run(self)
 
@@ -284,7 +295,7 @@ setup(
     python_requires="~=3.7",
     install_requires=[
         # Build tools requirements
-        "tox", "cython", "pyinstaller", "sphinx", "sphinx_rtd_theme",
+        "tox", "cython", "sphinx", "sphinx_rtd_theme",
         # Software import requirements
         "plyer", "asyncssh~=2.3", "keyring", "msgpack",
         # Platform specific requirements
@@ -295,22 +306,29 @@ setup(
     packages=["libangelos", "angelos", "eidon", "angelossim"],
     package_dir={"": "lib"},
     scripts=glob("bin/*"),
-    ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan()),
+    ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan())
 )
 
-"""ext_modules=cythonize([Extension(
-    name="libangelos",
-    sources=["./lib/libangelos.pyx"],
+
+"""
+# TODO
+#   Compile an embedded executable
+# https://stackoverflow.com/questions/46824143/cython-embed-flag-in-setup-py
+# https://stackoverflow.com/questions/31307169/how-to-enable-embed-with-cythonize
+ext_modules=cythonize([Extension(
+    name="angelos",
+    sources=["bin/angelos.pyx"],
     build_dir="build",
     cython_c_in_temp=True,
     extra_objects=[
-        "usr/local/lib/libsodium.a"
+        # "usr/local/lib/libpython3.7m.a"
     ],
     compiler_directives={
         "language_level": 3,
         "embedsignature": True
     }
-)])"""
+)])
+"""
 
 
 

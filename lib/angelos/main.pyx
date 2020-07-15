@@ -13,164 +13,141 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-"""Daemonize starter."""
-import atexit
 import os
 import signal
-import sys
 import time
+from multiprocessing import Process
+from pathlib import Path
 
 from angelos.parser import Parser
 
 
-class Application:
-    """Application wrapper."""
+class PidFile:
+    """Representation of a pid-file in /tmp."""
+
+    def __init__(self, filename: str):
+        self.__filename = Path("/", "tmp", filename + ".pid")
+        self.__running = False
+        self.__pid = 0
+
+        self.get()
+
+    @property
+    def running(self) -> bool:
+        """Running status."""
+        return self.__running
+
+    @property
+    def pid(self) -> int:
+        """Process id."""
+        return self.__pid
+
+    @property
+    def file(self) -> str:
+        """Pid file path."""
+        return str(self.__filename)
+
+    def get(self) -> int:
+        """Get pid from pid-file if any.
+
+        Returns 0 if no pid.
+        """
+        if self.__filename.is_file():
+            with open(self.__filename, "r") as pid_file:
+                self.__pid = int(pid_file.read())
+                self.__running = True
+        else:
+            self.__pid = 0
+            self.__running = False
+
+        return self.__pid
+
+    def put(self, pid: int):
+        """Write pid-file"""
+        if not self.__filename.is_file():
+            with open(self.__filename, "w") as pid_file:
+                pid_file.write(str(pid))
+                self.__pid = pid
+                self.__running = True
+        else:
+            raise RuntimeError("Pid file already exists.")
+
+    def remove(self):
+        """Remove pid-file."""
+        if self.__filename.is_file():
+            self.__filename.unlink()
+            self.__pid = 0
+            self.__running = False
+
+
+class ServerProcess(Process):
 
     def __init__(self):
-        """Initialize wrapper."""
-        self.app = None
+        Process.__init__(self)
+        self.__pid_file = PidFile("angelos")
 
     def run(self):
-        """Start and run application."""
+        """Run server daemon control sequence."""
+        pid = os.fork()
+        if (pid != 0):
+            return
+
+        # os.chdir("/")
+        # os.setsid()
+        # os.umask(0)
+
+        self.__pid_file.put(self.pid)
         from angelos.server import Server
-
         Server().run()
+        self.__pid_file.remove()
 
 
-class Daemonizer:
-    """
-    An Application daemonizer.
+def cmd_start(pid_file):
+    """Start background server process."""
+    if pid_file.running:
+        print("Angelos is already running with pid {}, pid-file {}.".format(
+            pid_file.pid, pid_file.file))
+        return
 
-    Usage: daemonize a subclassed Application class
-    """
+    ServerProcess().start()
 
-    def __init__(
-        self,
-        app,
-        pidfile,
-        stdin="/dev/null",
-        stdout="/dev/null",
-        stderr="/dev/null",
-    ):
-        """Initialize the daemonizer."""
-        self.__app = app
-        self.__stdin = stdin
-        self.__stdout = stdout
-        self.__stderr = stderr
-        self.__pidfile = pidfile
+def cmd_stop(pid_file):
+    """Stop background server process."""
+    if not pid_file.running:
+        print("Angelos has no pid-file.")
+        return
+    try:
+        while True:
+            os.kill(pid_file.pid, signal.SIGTERM)
+            time.sleep(0.1)
+    except ProcessLookupError as e:
+        pass
 
-    def __daemonize(self):
-        try:
-            pid = os.fork()
-            if pid > 0:
-                # exit first parent
-                sys.exit(0)
-        except OSError as e:
-            sys.stderr.write(
-                "fork #1 failed: {:d} ({:})\n".format(e.errno, e.strerror)
-            )
-            sys.exit(1)
+def cmd_runner(pid_file):
+    """Angelos foreground server process."""
+    if pid_file.running:
+        print("Angelos is already running with pid {}, pid-file {}.".format(
+            pid_file.pid, pid_file.file))
+        return
+    try:
+        pid_file.put(os.getpid())
+        from angelos.server import Server
+        Server().run()
+        pid_file.remove()
+    except Exception as e:
+        pid_file.remove()
 
-        # decouple from parent environment
-        os.chdir("/")
-        os.setsid()
-        os.umask(0)
-
-        # do second fork
-        try:
-            pid = os.fork()
-            if pid > 0:
-                # exit from second parent
-                sys.exit(0)
-        except OSError as e:
-            sys.stderr.write(
-                "fork #2 failed: {:d} ({:})\n".format(e.errno, e.strerror)
-            )
-            sys.exit(1)
-
-        # redirect standard file descriptors
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        with open(self.__stdin, "r") as si:
-            os.dup2(si.fileno(), sys.stdin.fileno())
-        with open(self.__stdout, "a+") as so:
-            os.dup2(so.fileno(), sys.stdout.fileno())
-        with open(self.__stderr, "wb+", 0) as se:
-            os.dup2(se.fileno(), sys.stderr.fileno())
-
-        # write pidfile
-        atexit.register(self.__delpid)
-        pid = str(os.getpid())
-        with open(self.__pidfile, "w+") as pidf:
-            pidf.write("{:}\n".format(pid))
-
-    def __delpid(self):
-        os.remove(self.__pidfile)
-
-    def start(self, daemonize=True):
-        """Start the daemon."""
-        # Check for a pidfile to see if the daemon already __runs
-        try:
-            with open(self.__pidfile, "r") as pf:
-                pid = int(pf.read().strip())
-                pf.close()
-        except IOError:
-            pid = None
-
-        if pid:
-            message = "pidfile %s already exist. Daemon already running?\n"
-            sys.stderr.write(message % self.__pidfile)
-            sys.exit(1)
-
-        # Start the daemon
-        if daemonize:
-            self.__daemonize()
-        self.__app.run()
-
-    def stop(self):
-        """Stop the daemon."""
-        # Get the pid from the pidfile
-        try:
-            with open(self.__pidfile, "r") as pf:
-                pid = int(pf.read().strip())
-                pf.close()
-        except IOError:
-            pid = None
-
-        if not pid:
-            message = "pidfile %s does not exist. Daemon not running?\n"
-            sys.stderr.write(message % self.__pidfile)
-            return  # not an error in a restart
-
-        # Try killing the daemon process
-        try:
-            while True:
-                os.kill(pid, signal.SIGTERM)
-                time.sleep(0.1)
-        except OSError as err:
-            err = str(err)
-            if err.find("No such process") > 0:
-                if os.path.exists(self.__pidfile):
-                    os.remove(self.__pidfile)
-            else:
-                print((str(err)))
-                sys.exit(1)
-
-    def restart(self):
-        """Restart the daemon."""
-        self.stop()
-        self.start()
-
-
-def start():
+def start() -> int:
     """Start server application."""
-    app = Application()
     parser = Parser()
+    pid_file = PidFile("angelos")
 
     if parser.args.daemon == "start":
-        Daemonizer(app, "/tmp/angelos.pid").start()
+        cmd_start(pid_file)
     elif parser.args.daemon == "stop":
-        Daemonizer(app, "/tmp/angelos.pid").stop()
+        cmd_stop(pid_file)
+    elif parser.args.daemon == "restart":
+        cmd_stop(pid_file)
+        cmd_start(pid_file)
     else:
-        app.run()
+        cmd_runner(pid_file)

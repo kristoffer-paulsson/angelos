@@ -75,7 +75,7 @@ class BaseKey:
 
     @staticmethod
     def randombytes(unsigned int size) -> bytes:
-        buffer = b"\00" * size
+        buffer = bytes(size)
         randombytes(buffer, size)
         return buffer
 

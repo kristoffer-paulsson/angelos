@@ -36,6 +36,10 @@ class LogHandler:
         self.__app = logging.getLogger(Const.LOG_APP)
         self.__biz = logging.getLogger(Const.LOG_BIZ)
 
+        # self.__err = logging.getLogger("default")
+        # self.__app = logging.getLogger("default")
+        # self.__biz = logging.getLogger("default")
+
     @property
     def err(self):
         """Technical error logger."""

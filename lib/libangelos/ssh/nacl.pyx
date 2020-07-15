@@ -101,9 +101,6 @@ class NaClKey(asyncssh.SSHKey):
     def __init__(self, key):
         """Initialize key."""
         super().__init__(key)
-        # self.algorithm = _algorithm
-        # self.sig_algorithms = (self.algorithm,)
-        # self.all_sig_algorithms = set(self.sig_algorithms)
 
     def sign_der(self, data, sig_algorithm):
         """Abstract method to compute a DER-encoded signature."""

@@ -15,6 +15,7 @@
 #
 """Server argument parser."""
 import argparse
+from pathlib import PurePath
 
 from libangelos.const import Const
 
@@ -49,9 +50,43 @@ class Parser:
         parser.add_argument(
             "-d",
             "--daemon",
-            choices=["start", "stop", "resume", "suspend"],
+            choices=["start", "stop", "restart"],
             dest="daemon",
             default=None,
-            help="run server as a daemon.",
+            help="Run server as background process.",
+        )
+        parser.add_argument(
+            "--root-dir",
+            dest="root_directory",
+            default=None,
+            type=PurePath,
+            help="Server root directory. (/opt/angelos)",
+        )
+        parser.add_argument(
+            "--run-dir",
+            dest="runtime_directory",
+            default=None,
+            type=PurePath,
+            help="Runtime directory. (/run/angelos)",
+        )
+        parser.add_argument(
+            "--state-dir",
+            dest="state_directory",
+            default=None,
+            type=PurePath,
+            help="Server state directory. (/var/lib/angelos)",
+        )
+        parser.add_argument(
+            "--logs-dir",
+            dest="logs_directory",
+            default=None,
+            type=PurePath,
+            help="Logs directory. (/var/log/angelos)",
+        )
+        parser.add_argument(
+            "--conf-dir",
+            dest="config_directory",
+            default=None,
+            help="Configuration directory. (/etc/angelos)",
         )
         return parser
