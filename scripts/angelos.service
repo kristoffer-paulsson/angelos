@@ -12,7 +12,19 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+
+# How to install and test:
+#   >cp angelos.service /etc/systemd/system/angelos.service
+#   >systemctl daemon-reload
+#   >systemctl enable angelos.service
+#   >systemctl restart angelos.service
+#   >systemctl status angelos.service
+[Unit]
+Description = Run the Angelos server
+After = network.target
+
 [Service]
+Type = forking
 User = angelos
 Group = angelos
 
@@ -25,7 +37,10 @@ ConfigurationDirectory = angelos
 
 KeyringMode = private
 
-ExecCondition=
-ExecStart=
-ExecReload=
-ExecStop=
+# ExecCondition=
+ExecStart = angelos -d start
+ExecStop = angelos -d stop
+ExecReload = angelos -d restart
+
+[Install]
+WantedBy=default.target
