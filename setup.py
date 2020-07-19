@@ -30,9 +30,9 @@ from setuptools.command.install import install as setup_install
 from Cython.Build import cythonize
 from Cython.Compiler import Options
 
-
 base_dir = path.abspath(path.dirname(__file__))
 Options.embed = "main"
+
 
 class Command(_Command):
     user_options = [
@@ -160,11 +160,11 @@ class VendorInstall(setup_install):
 class LibraryScanner:
     """Scan directories for Cython *.pyx files and configure extensions to build."""
 
-    def __init__(self, base_path: str, globlist: list = None, pkgdata: dict = None, data: dict = None):
+    def __init__(self, base_path: str, glob: list = None, extra: dict = None, basic: dict = None):
         self.__base_path = base_path
-        self.__globlist = globlist if globlist else ["**.pyx"]
-        self.__pkgdata = pkgdata if pkgdata else {}
-        self.__data = data if data else {
+        self.__globlist = glob if glob else ["**.pyx"]
+        self.__pkgdata = extra if extra else {}
+        self.__data = basic if basic else {
             "compiler_directives": {
                 "language_level": 3,
                 "embedsignature": True
@@ -180,7 +180,7 @@ class LibraryScanner:
 
         extensions = list()
         for module in glob_result:
-            package = re.sub("/", ".", module[len(self.__base_path)+1:-4])
+            package = re.sub("/", ".", module[len(self.__base_path) + 1:-4])
             data = self.__pkgdata[package] if package in self.__pkgdata else {}
             core = {"name": package, "sources": [module]}
             kwargs = {**self.__data, **data, **core}
@@ -197,7 +197,7 @@ class LibraryBuilder(Command):
         name = "libangelos"
         base_path = os.path.abspath(os.path.dirname(__file__))
         glob_result = list()
-        for pattern in [name+"/**.pyx", name+"/**/*.pyx"]:
+        for pattern in [name + "/**.pyx", name + "/**/*.pyx"]:
             glob_path = os.path.join(".", "lib", pattern)
             glob_result += glob(glob_path, recursive=True)
 
@@ -205,12 +205,8 @@ class LibraryBuilder(Command):
         for src_file in glob_result:
             content += "include \"{}\"\n".format(src_file[6:])
 
-        with open(os.path.join(base_path, "lib", name+".pyx"), "xb+") as output:
+        with open(os.path.join(base_path, "lib", name + ".pyx"), "xb+") as output:
             output.write(content.encode())
-
-        # TODO: Build one single file
-        #   https://stackoverflow.com/questions/30157363/collapse-multiple-submodules-to-one-cython-extension
-
 
 
 with open(path.join(base_dir, "README.md")) as desc:
@@ -219,29 +215,28 @@ with open(path.join(base_dir, "README.md")) as desc:
 with open(path.join(base_dir, "version.py")) as version:
     exec(version.read())
 
-globlist = [
-    "libangelos/**.pyx",
-    "libangelos/**/*.pyx",
-    "angelos/**.pyx",
-    "angelos/**/*.pyx"
-]
-
-pkgdata = {
-    "libangelos.library.nacl": {
-        "extra_objects": ["usr/local/lib/libsodium.a"],
-        "include_dirs": [os.path.join(base_dir, "usr", "local", "include")]  # CentOS specific only (?)
+lib_scan = {
+    "glob": [
+        "libangelos/**.pyx",
+        "libangelos/**/*.pyx",
+        "angelos/**.pyx",
+        "angelos/**/*.pyx"
+    ],
+    "extra": {
+        "libangelos.library.nacl": {
+            "extra_objects": ["usr/local/lib/libsodium.a"],
+            "include_dirs": [os.path.join(base_dir, "usr", "local", "include")]  # CentOS specific only (?)
+        }
+    },
+    "basic": {
+        "build_dir": "build",
+        "cython_c_in_temp": True,
+        "compiler_directives": {
+            "language_level": 3,
+            "embedsignature": True
+        }
     }
 }
-
-coredata = {
-    "build_dir": "build",
-    "cython_c_in_temp": True,
-    "compiler_directives": {
-        "language_level": 3,
-        "embedsignature": True
-    }
-}
-
 
 setup(
     cmdclass={"install": VendorInstall, "test": TestRunner, "library": LibraryBuilder},
@@ -295,21 +290,22 @@ setup(
     python_requires="~=3.7",
     install_requires=[
         # Build tools requirements
-        "tox", "cython", "sphinx", "sphinx_rtd_theme",
+        # "tox", "cython", "sphinx", "sphinx_rtd_theme",
         # Software import requirements
-        "plyer", "asyncssh~=2.3", "keyring", "msgpack",
+        "plyer", "asyncssh~=2.3", "msgpack",
         # Platform specific requirements
         # [Windows|Linux|Darwin]
-        "macos_keychain; platform_system == 'Darwin'",
     ],
     tests_require=[],
     packages=["libangelos", "angelos", "eidon", "angelossim"],
     package_dir={"": "lib"},
     scripts=glob("bin/*"),
-    ext_modules=cythonize(LibraryScanner("lib", globlist, pkgdata, coredata).scan())
+    ext_modules=cythonize(LibraryScanner("lib", **lib_scan).scan())
 )
 
 
+# TODO: Build one single file
+#   https://stackoverflow.com/questions/30157363/collapse-multiple-submodules-to-one-cython-extension
 """
 # TODO
 #   Compile an embedded executable
@@ -329,7 +325,3 @@ ext_modules=cythonize([Extension(
     }
 )])
 """
-
-
-
-

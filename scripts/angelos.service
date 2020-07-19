@@ -25,22 +25,22 @@ After = network.target
 
 [Service]
 Type = forking
+
+ExecStart = angelos -d start
+ExecStop = angelos -d stop
+ExecReload = angelos -d restart
+
 User = angelos
 Group = angelos
 
 WorkingDirectory = ~
-RootDirectory = opt/angelos
+RootDirectory = /opt/angelos
 RuntimeDirectory = angelos
 StateDirectory = angelos
 LogsDirectory = angelos
 ConfigurationDirectory = angelos
 
 KeyringMode = private
-
-# ExecCondition=
-ExecStart = angelos -d start
-ExecStop = angelos -d stop
-ExecReload = angelos -d restart
 
 [Install]
 WantedBy=default.target

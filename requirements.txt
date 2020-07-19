@@ -1,10 +1,11 @@
+# py2app; platform_system=='Darwin'
+# py2exe; platform_system=='Windows'
 cython
 pyinstaller
 sphinx
 sphinx_rtd_theme
-plyer
-asyncssh~=2.3
-keyring
-msgpack
-pyyaml
-# macos-keychain # No platform specific dependencies here
+
+
+# plyer
+# asyncssh~=2.3
+# msgpack

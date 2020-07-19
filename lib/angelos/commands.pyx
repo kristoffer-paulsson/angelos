@@ -26,7 +26,6 @@ from libangelos.library.nacl import SecretBox
 from libangelos.misc import Misc
 
 from angelos.cmd import Command, Option
-from libangelos.automatic import BaseAuto
 from libangelos.const import Const
 from libangelos.error import Error
 from libangelos.facade.facade import Facade
@@ -600,21 +599,9 @@ class EnvCommand(Command):
 
     async def _command(self, opts):
         self._io << ("\nEnvironment variables:\n" + "-" * 79 + "\n")
-        self._io << "\n".join(self._recurse(self.__env))
+        self._io << "\n".join(Misc.recurse_env(self.__env))
         self._io << "\n" + "-" * 79 + "\n\n"
 
-    def _recurse(self, obj, suf="", level=0):
-        items = []
-        for k, v in obj.items():
-            if isinstance(v, BaseAuto):
-                items += self._recurse(vars(v), k, level + 1)
-            else:
-                items.append(
-                    "{s:}{k:}: {v:}".format(
-                        s=(suf + "." if suf else ""), k=k, v=v
-                    )
-                )
-        return items
 
     @classmethod
     def factory(cls, **kwargs):

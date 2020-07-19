@@ -18,51 +18,14 @@ import os
 import platform
 import socket
 import sys
+from pathlib import Path
 
-from libangelos.misc import Misc
-from libangelos.utils import Util
-
-
-class BaseAuto:
-    """Baseclass."""
-    pass
+from libangelos.misc import BaseData, Misc
 
 
-class Opts(BaseAuto):
-    """Automatic values about the options."""
-    def __init__(self, parser):
-        for k, v in vars(parser.args).items():
-            self.__dict__[k] = v
+class Platform(BaseData):
+    """Platform information."""
 
-
-class Dir(BaseAuto):
-    """Automatic values about the File system."""
-
-    def __init__(self, app_name):
-        app = Util.app_dir()
-        self.stem = ""
-
-        if "/usr/local/bin" in app:
-            self.stem = os.path.dirname(os.path.dirname(os.path.dirname(app)))
-        if "/usr/bin" in app:
-            self.stem = os.path.dirname(os.path.dirname(app))
-        elif "/bin" in app:
-            self.stem = os.path.dirname(app)
-
-        # Binary install directory
-        self.executable = app
-        # Current users directory
-        self.home = Util.usr_dir()
-        # Server root directory
-        self.root = os.path.join(self.stem, "var/lib/" + app_name)
-        # Logging directory
-        self.log = os.path.join(self.stem, "var/log/" + app_name)
-        # Current working directory
-        self.current = Util.exe_dir()
-
-
-class Sys(BaseAuto):
-    """Automatic values about the platform."""
     def __init__(self):
         (
             self.system,
@@ -72,12 +35,123 @@ class Sys(BaseAuto):
             self.machine,
             self.processor,
         ) = platform.uname()
+
         self.java = platform.java_ver()[0]
         self.win = platform.win32_ver()[0]
         self.mac = platform.mac_ver()[0]
 
 
-class Net(BaseAuto):
+class Runtime(BaseData):
+    """Runtime information."""
+
+    def __init__(self):
+        self.user = os.environ["USER"]
+        self.pid = os.getpid()
+        self.ppid = os.getppid()
+        self.cpus = os.cpu_count()
+        self.platform = sys.platform
+        self.id = Misc.unique()
+
+
+class Directories(BaseData):
+    """Directories in the system"""
+    def __init__(self):
+        if self.system == "Darwin":
+            (
+                self.root_dir, self.run_dir, self.state_dir,
+                self.logs_dir, self.conf_dir
+            ) = self._macos()
+        elif self.system == "Windows":
+            (
+                self.root_dir, self.run_dir, self.state_dir,
+                self.logs_dir, self.conf_dir
+            ) = self._windows()
+        else:
+            (
+                self.root_dir, self.run_dir, self.state_dir,
+                self.logs_dir, self.conf_dir
+            ) = self._linux()
+
+
+class Desktop(Directories):
+    """Desktop computer directories for a user."""
+    def __init__(self):
+        Directories.__init__(self)
+
+    def _macos(self):
+        """Macos user directories."""
+        app = self.name.capitalize()
+        return (
+            Path("/"),
+            None,
+            Path("~/Library/Application Support/{app}".format(app=app)).home(),
+            Path("~/Library/Logs/{app}".format(app=app)).home(),
+            Path("~/Library/Caches/{app}".format(app=app)).home()
+        )
+
+    def _windows(self):
+        """Windows user directories."""
+        app = self.name.capitalize()
+        return (
+            Path("C:/"),
+            None,
+            Path("C:/Users/{user}/AppData/Local/{author}/{app}".format(user=self.user, app=app, author=app)),
+            Path("C:/Users/{user}/AppData/Local/{author}/{app}/Logs".format(user=self.user, app=app, author=app)),
+            Path("C:/Users/{user}/AppData/Local/{author}/{app}".format(user=self.user, app=app, author=app))
+        )
+
+    def _linux(self):
+        """Linux user directories."""
+        app = self.name.lower()
+        return (
+            Path("/"),
+            Path(os.environ["XDG_RUNTIME_DIR"]).home(),
+            Path(os.environ["XDG_STATE_HOME"] or "~/.local/state/{app}".format(app=app)).home(),
+            Path(os.environ["XDG_CACHE_HOME"] or "~/.cache/{app}/log".format(app=app)).home(),
+            Path(os.environ["XDG_CONFIG_HOME"] or "~/.config/{app}".format(app=app)).home()
+        )
+
+
+class Server(Directories):
+    """Server computer directories for the system."""
+    def __init__(self):
+        Directories.__init__(self)
+
+    def _macos(self):
+        """Macos server directories."""
+        app = self.name.capitalize()
+        return (
+            Path("/"),
+            None,
+            Path("/Library/Application Support/{app}".format(app=app)),
+            Path("/Library/Application Support/{app}/Logs".format(app=app)),
+            Path("/Library/Application Support/{app}".format(app=app))
+        )
+
+    def _windows(self):
+        """Windows server directories."""
+        app = self.name.capitalize()
+        return (
+            Path("C:/"),
+            None,
+            Path("C:/ProgramData/{author}/{app}".format(app=app, author=app)),
+            Path("C:/ProgramData/{author}/{app}/Logs".format(app=app, author=app)),
+            Path("C:/ProgramData/{author}/{app}".format(app=app, author=app))
+        )
+
+    def _linux(self):
+        """Linux server directories"""
+        app = self.name.lower()
+        return (
+            Path("/"),
+            Path("/run/{app}".format(app=app)),
+            Path("/var/lib/{app}".format(app=app)),
+            Path("/var/log/{app}".format(app=app)),
+            Path("/etc/{app}".format(app=app))
+        )
+
+
+class Network(BaseData):
     """Automatic values about the network."""
 
     def __init__(self):
@@ -87,28 +161,16 @@ class Net(BaseAuto):
         self.domain = socket.getfqdn()
 
 
-class Automatic(BaseAuto):
+class Automatic(BaseData):
     """Automatic values about the system."""
 
-    def __init__(self, app_name, parser=None):
+    def __init__(self, name: str):
         """Generate the values and instantiate vars."""
-        self.name = socket.gethostname()
-        self.pid = os.getpid()
-        self.ppid = os.getppid()
-        self.cpus = os.cpu_count()
-        self.platform = sys.platform
-        self.id = Misc.unique()
+        self.name = name
 
-        self.sys = Sys()
-        self.dir = Dir(app_name)
-        self.net = Net()
-
+    def override(self, parser):
+        """Override with parser values."""
         if parser:
-            self.opts = Opts(parser)
-        else:
-            self.opts = None
-
-
-"""
-('darwin', 'ios', 'android', 'win32', 'windows', 'linux', 'freebsd*')
-"""
+            for key, value in vars(parser.args).items():
+                if value or key not in self.__dict__:
+                    self.__dict__[key] = value

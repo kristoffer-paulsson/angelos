@@ -67,22 +67,19 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     sudo dnf check-update
     sudo dnf upgrade -y
-    sudo dnf install git -y
     sudo dnf groupinstall "Development Tools" -y
-    sudo dnf install python38 -y
-    sudo dnf install python38-devel -y
+    sudo dnf install nano git python38 python38-devel virtualenv -y
     sudo dnf install virtualenv -y
     sudo dnf install rpmdevtools -y
 
-    sudo adduser angelos
-    sudo passwd angelos
-    sudo groupadd angelos
-    sudo usermod -a -G angelos angelos
+    # Install packages to alternative root
+    # dnf install <package> -y --installroot=/opt/angelos --releasever=/ --nodeps
 
-    # At install time create user like this instead:
-    # sudo groupadd angelos
-    # sudo adduser angelos --system --groups angelos
-    #
+    sudo groupadd angelos
+    sudo adduser angelos --system -g angelos
+
+    sudo mkdir /opt/angelos
+    sudo chown -R angelos:angelos /opt/angelos
 
     # Requires(pre): /usr/sbin/useradd, /usr/bin/getent
     # Requires(postun): /usr/sbin/userdel
@@ -93,9 +90,6 @@ Vagrant.configure("2") do |config|
 
     # %postun
     # /usr/sbin/userdel myservice
-
-    mkdir /opt/angelos
-    sudo chown -R angelos:angelos /opt/angelos
 
     su - angelos
 
@@ -111,9 +105,18 @@ Vagrant.configure("2") do |config|
     git fetch --tags
     git checkout tags/1.0.0b1
 
-    pip install -r requirements.txt
-    python ./setup.py install
+    pip3.8 install -r requirements.txt
+    python3.8 ./setup.py install
+
+    # python3.8 ./setup.py develop
+    # python3.8 ./setup.py install --prefix /opt/angelos
+    # pip3.8 install --ignore-installed --install-option="--prefix=$PREFIX_PATH" <package_name>
+    #   Where $PREFIX_PATH is a site-packages directory
+    # PYTHONUSERBASE=/opt/angelos pip install --user --upgrade <package_name>
 
     ln -s /opt/angelos/bin/angelos /usr/local/bin/angelos
+
+
+    # pip3.8 install -r requirements.txt --user
   SHELL
 end

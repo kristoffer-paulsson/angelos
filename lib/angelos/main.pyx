@@ -13,6 +13,7 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+import logging
 import os
 import signal
 import time
@@ -26,7 +27,7 @@ class PidFile:
     """Representation of a pid-file in /tmp."""
 
     def __init__(self, filename: str):
-        self.__filename = Path("/", "tmp", filename + ".pid")
+        self.__filename = Path("/tmp/{}.pid".format(filename))
         self.__running = False
         self.__pid = 0
 
@@ -81,6 +82,7 @@ class PidFile:
 
 
 class ServerProcess(Process):
+    """Server process forking class."""
 
     def __init__(self):
         Process.__init__(self)
@@ -91,10 +93,6 @@ class ServerProcess(Process):
         pid = os.fork()
         if (pid != 0):
             return
-
-        # os.chdir("/")
-        # os.setsid()
-        # os.umask(0)
 
         self.__pid_file.put(self.pid)
         from angelos.server import Server
@@ -135,6 +133,7 @@ def cmd_runner(pid_file):
         Server().run()
         pid_file.remove()
     except Exception as e:
+        logging.critical(e, exc_info=True)
         pid_file.remove()
 
 def start() -> int:

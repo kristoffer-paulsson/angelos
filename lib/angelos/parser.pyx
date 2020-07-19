@@ -48,6 +48,13 @@ class Parser:
             help="listen to a network port. (22)",
         )
         parser.add_argument(
+            "config",
+            nargs="?",
+            default=False,
+            type=bool,
+            help="Print configuration",
+        )
+        parser.add_argument(
             "-d",
             "--daemon",
             choices=["start", "stop", "restart"],
@@ -57,35 +64,35 @@ class Parser:
         )
         parser.add_argument(
             "--root-dir",
-            dest="root_directory",
+            dest="root_dir",
             default=None,
             type=PurePath,
             help="Server root directory. (/opt/angelos)",
         )
         parser.add_argument(
             "--run-dir",
-            dest="runtime_directory",
+            dest="run_dir",
             default=None,
             type=PurePath,
             help="Runtime directory. (/run/angelos)",
         )
         parser.add_argument(
             "--state-dir",
-            dest="state_directory",
+            dest="state_dir",
             default=None,
             type=PurePath,
             help="Server state directory. (/var/lib/angelos)",
         )
         parser.add_argument(
             "--logs-dir",
-            dest="logs_directory",
+            dest="logs_dir",
             default=None,
             type=PurePath,
             help="Logs directory. (/var/log/angelos)",
         )
         parser.add_argument(
             "--conf-dir",
-            dest="config_directory",
+            dest="conf_dir",
             default=None,
             help="Configuration directory. (/etc/angelos)",
         )

@@ -168,6 +168,10 @@ class BaseDataClass(metaclass=abc.ABCMeta):
         return data_asdict(self)
 
 
+class BaseData(abc.ABC):
+    pass
+
+
 class ThresholdCounter:
     """
     ThresholdCounter is a helper class that counts ticks and alarms
@@ -382,3 +386,18 @@ class Misc:
             return None
 
         return value
+
+    @staticmethod
+    def recurse_env(obj: Any, suffix: str = "", level: int = 0) -> list:
+        """Recurse over the environment."""
+        items = []
+        for key, value in obj.items():
+            if isinstance(value, BaseData):
+                items += Misc.recurse_env(vars(value), key, level + 1)
+            else:
+                items.append(
+                    "{k:<24} {v:}".format(
+                        k=(suffix + "." if suffix else "") + key + ":", v=value
+                    )
+                )
+        return items

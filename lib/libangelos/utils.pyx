@@ -21,11 +21,13 @@ application.
 """
 import asyncio
 import importlib
+import logging
 import os
+import subprocess
 import sys
 import datetime
 from asyncio import Task
-from typing import _GenericAlias, Callable, Union
+from typing import _GenericAlias, Callable, Union, Any, List, Tuple
 
 from libangelos.error import ERROR_INFO
 
@@ -322,6 +324,44 @@ class Util:
     def verify_checksum(data: Union[bytes, bytearray], checksum: bytes) -> bool:
         """Verify the checksum out of the entered data."""
         return bytes([sum(data) & 0xFF]) == checksum
+
+    @staticmethod
+    def shell(command: str, args: list, kind: Callable = lambda x: x.decode()) -> Any:
+        """Run a shell subprocess and execute teh command.
+
+        If there is now kind given will return True on success, otherwise the
+        value processed by kind.
+        Kind should be of type:
+            lambda x: somethin(x)
+            int
+            PurePath
+        """
+        execute = command.format(*args)
+        with subprocess.Popen(
+                execute, shell=True, stdout=subprocess.PIPE if kind else None) as proc:
+            if proc.returncode:
+                raise RuntimeWarning(
+                    "With exit code ({}), failed to execute: {}".format(proc.returncode, execute))
+            elif kind:
+                return kind(proc.stdout.read())
+            else:
+                return True
+
+    @staticmethod
+    def script(run: List[Tuple[str, list]], log: bool = True) -> bool:
+        """Execute a script of shell commands."""
+        row = ("Nothing", [])
+        try:
+            for row in run:
+                Util.shell(*row, None)
+                if log:
+                    logging.info(row[0].format(*row[1]))
+        except RuntimeWarning as e:
+            if log:
+                logging.warning(e, exc_info=True)
+            return False
+        else:
+            return True
 
 
 class FactoryInterface:

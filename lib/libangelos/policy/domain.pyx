@@ -17,7 +17,7 @@
 import ipaddress
 import platform
 
-from libangelos.automatic import Net
+from libangelos.automatic import Network
 from libangelos.const import Const
 from libangelos.document.domain import Domain, Node, Location, Network, Host
 from libangelos.misc import Misc
@@ -55,7 +55,7 @@ class NodePolicy(Policy):
 
         location = None
         if server:
-            net = Net()
+            net = Network()
             location = Location(
                 nd={
                     "hostname": [net.domain],

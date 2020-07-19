@@ -18,7 +18,6 @@ import asyncio
 import collections
 import functools
 import json
-import logging
 import os
 import signal
 import socket
@@ -28,10 +27,11 @@ import asyncssh
 from angelos.parser import Parser
 from angelos.state import StateMachine
 from angelos.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
-from libangelos.automatic import Automatic
+from libangelos.automatic import Automatic, Platform, Runtime, Server as ServerDirs, Network
 from libangelos.ioc import Container, ContainerAware, Config, Handle, StaticHandle
+from libangelos.misc import Misc
 from libangelos.ssh.ssh import SessionManager
-from libangelos.utils import Event
+from libangelos.utils import Event, Util
 from libangelos.worker import Worker
 
 from angelos.starter import ConsoleStarter
@@ -40,12 +40,23 @@ from libangelos.logger import LogHandler
 from libangelos.starter import Starter
 
 
+class Auto(Automatic, Platform, Runtime, ServerDirs, Network):
+    def __init__(self, name: str, parser=None):
+        Automatic.__init__(self, name)
+        Platform.__init__(self)
+        Runtime.__init__(self)
+        ServerDirs.__init__(self)
+        Network.__init__(self)
+
+        self.override(parser)
+
+
 class AdminKeys:
     """Load and list admin keys."""
 
     def __init__(self, env: collections.ChainMap):
-        self.__path_admin = os.path.join(env["dir"].root, "admins.pub")
-        self.__path_server = os.path.join(env["dir"].root, "server")
+        self.__path_admin = os.path.join(env["state_dir"], "admins.pub")
+        self.__path_server = os.path.join(env["state_dir"], "server")
         self.__key_list = None
         self.__key_private = None
 
@@ -64,7 +75,7 @@ class AdminKeys:
         self.__key_list = asyncssh.read_public_key_list(self.__path_admin)
 
         if not os.path.isfile(self.__path_server):
-            logging.info("Private key missing, generate new.")
+            print("Private key missing, generate new.")
             self.__key_private = asyncssh.generate_private_key("ssh-rsa")
             self.__key_private.write_private_key(self.__path_server)
         else:
@@ -88,20 +99,19 @@ class Bootstrap:
 
     def __error(self, message: str):
         """Print a message to screen and in logs."""
-        logging.error(message)
         print(message)
         self.__critical = True
 
-    def criteria_root(self):
+    def criteria_state(self):
         """Check that the root folder exists."""
-        root_dir = self.__env["dir"].root
+        state_dir = self.__env["state_dir"]
 
-        if not os.path.isdir(root_dir):
-            self.__error("No root directory. ({})".format(root_dir))
+        if not os.path.isdir(state_dir):
+            self.__error("No state directory. ({})".format(state_dir))
             return
 
-        if not os.access(root_dir, os.W_OK):
-            self.__error("Root directory not writable. ({})".format(root_dir))
+        if not os.access(state_dir, os.W_OK):
+            self.__error("State directory not writable. ({})".format(state_dir))
             return
 
     def criteria_admin(self):
@@ -130,11 +140,11 @@ class Bootstrap:
         """Try to listen to designated port."""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.bind(("127.0.0.1", self.__env["opts"].port))
+            s.bind(("127.0.0.1", self.__env["port"]))
             s.listen(1)
             s.close()
         except PermissionError:
-            self.__error("Permission denied to use port {}".format(self.__env["opts"].port))
+            self.__error("Permission denied to use port {}".format(self.__env["port"]))
             return
 
     def match(self) -> bool:
@@ -146,11 +156,9 @@ class Bootstrap:
         self.criteria_port_access()
 
         if self.__critical:
-            logging.critical("One or several bootstrap criteria failed!")
-            print("Exit")
+            print("One or several bootstrap criteria failed!", "Exit")
             return False
         else:
-            logging.info("Bootstrap criteria success.")
             return True
 
 
@@ -160,9 +168,10 @@ class Configuration(Config, Container):
 
     def __load(self, filename):
         try:
-            with open(os.path.join(self.auto.dir.root, filename)) as jc:
+            with open(os.path.join(self.auto.conf_dir, filename)) as jc:
                 return json.load(jc.read())
         except FileNotFoundError:
+            print("Failure loading configuration. ({})".format(filename))
             return {}
 
     def __config(self):
@@ -174,7 +183,9 @@ class Configuration(Config, Container):
                 ENV_DEFAULT,
             ),
             "config": lambda self: collections.ChainMap(
-                CONFIG_IMMUTABLE, self.__load("config.json"), CONFIG_DEFAULT
+                CONFIG_IMMUTABLE,
+                self.__load("config.json"),
+                CONFIG_DEFAULT
             ),
             "bootstrap": lambda self: Bootstrap(self.env, self.keys),
             "keys": lambda self: AdminKeys(self.env),
@@ -188,7 +199,7 @@ class Configuration(Config, Container):
             "nodes": lambda self: Handle(asyncio.base_events.Server),
             "hosts": lambda self: Handle(asyncio.base_events.Server),
             "opts": lambda self: Parser(),
-            "auto": lambda self: Automatic("angelos", self.opts),
+            "auto": lambda self: Auto("Angelos", self.opts),
             "quit": lambda self: Event(),
         }
 
@@ -203,7 +214,6 @@ class Server(ContainerAware):
         self._applog = self.ioc.log.app
 
     def _initialize(self):
-        # self.ioc.state("running", True)
         loop = self._worker.loop
 
         loop.add_signal_handler(
@@ -229,17 +239,17 @@ class Server(ContainerAware):
         self._applog.info("Server quitting.")
 
     def _listen(self):
-        la = self.ioc.env["opts"].listen
+        la = self.ioc.env["listen"]
         if la == "localhost":
             listen = "localhost"
         elif la == "loopback":
             listen = "127.0.0.1"
         elif la == "hostname":
-            listen = self.ioc.env["net"].hostname
+            listen = self.ioc.env["hostname"]
         elif la == "domain":
-            listen = self.ioc.env["net"].domain
+            listen = self.ioc.env["domain"]
         elif la == "ip":
-            listen = self.ioc.env["net"].ip
+            listen = self.ioc.env["ip"]
         elif la == "any":
             listen = ""
         else:
@@ -258,8 +268,11 @@ class Server(ContainerAware):
 
     def run(self):
         """Run the server applications main loop."""
-        self._applog.info("-------- STARTING SERVER --------")
+        if self.ioc.env["config"]:
+            self.config()
+            return
 
+        self._applog.info("-------- STARTING SERVER --------")
         self._initialize()
         try:
             asyncio.get_event_loop().run_forever()
@@ -271,8 +284,13 @@ class Server(ContainerAware):
             )
             self._applog.exception(e)
         self._finalize()
-
         self._applog.info("-------- EXITING SERVER --------")
+
+    def config(self):
+        """Print or do other works on configuration."""
+        print(Util.headline("Environment (BEGIN)"))
+        print("\n".join(Misc.recurse_env(self.ioc.env)))
+        print(Util.headline("Environment (END)"))
 
     async def bootstrap(self):
         """Bootstraps the Angelos server by performing checks before changing state into running."""
@@ -296,7 +314,7 @@ class Server(ContainerAware):
                     if first:
                         self.ioc.admin = await ConsoleStarter().admin_server(
                             self._listen(),
-                            port=self.ioc.env["opts"].port,
+                            port=self.ioc.env["port"],
                             ioc=self.ioc,
                             loop=self._worker.loop,
                         )
@@ -325,7 +343,7 @@ class Server(ContainerAware):
                     if first:
                         self.ioc.boot = await ConsoleStarter().boot_server(
                             self._listen(),
-                            port=self.ioc.env["opts"].port,
+                            port=self.ioc.env["port"],
                             ioc=self.ioc,
                             loop=self._worker.loop,
                         )
