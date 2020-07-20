@@ -15,52 +15,18 @@
 #
 """Logger service that offers specialized logs."""
 import logging
-from logging.config import dictConfig
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from libangelos.archive7.streams import VirtualFileObject, SingleStreamManager
-from libangelos.const import Const
-from libangelos.utils import Util
-
-
-class LogHandler:
-    """Log handler loaded as a service in the container."""
-
-    def __init__(self, config):
-        """Initialize loggers."""
-        Util.is_type(config, dict)
-
-        dictConfig(config)
-
-        self.__err = logging.getLogger(Const.LOG_ERR)
-        self.__app = logging.getLogger(Const.LOG_APP)
-        self.__biz = logging.getLogger(Const.LOG_BIZ)
-
-        # self.__err = logging.getLogger("default")
-        # self.__app = logging.getLogger("default")
-        # self.__biz = logging.getLogger("default")
-
-    @property
-    def err(self):
-        """Technical error logger."""
-        return self.__err
-
-    @property
-    def app(self):
-        """Application event logger."""
-        return self.__app
-
-    @property
-    def biz(self):
-        """Biz transaction logger."""
-        return self.__biz
+from libangelos.ioc import LogAware
 
 
 class EncryptedLogFileObject(VirtualFileObject):
     """File object with support for encrypted streams."""
     def __init__(self, filename: str, secret: bytes, mode: str = "r"):
         self.__manager = SingleStreamManager(filename, secret)
-        VirtualFileObject.__init__(self.__manager.special_stream(0), filename, mode)
+        VirtualFileObject.__init__(self, self.__manager.special_stream(0), filename, mode)
 
     def _close(self):
         self._stream.close()
@@ -84,3 +50,22 @@ class EncryptedRotatingFileHandler(RotatingFileHandler):
     def _open(self):
         """Open a new fileobject with encrypted wrapper."""
         return EncryptedLogFileObject(self.baseFilename, self.__secret, self.mode)
+
+
+class Logger:
+    """Logger that is initiated together with the IoC."""
+
+    def __init__(self, secret: bytes, path: Path):
+        logging.addLevelName(LogAware.NORMAL[0], "NORMAL")
+        logging.addLevelName(LogAware.WARNING[0], "WARNING")
+        logging.addLevelName(LogAware.CRITICAL[0], "CRITICAL")
+
+        logger = logging.getLogger()
+        logger.setLevel(LogAware.NORMAL[0])
+        handler = EncryptedRotatingFileHandler(
+            filename=str(path.joinpath("nominal.log")), secret=secret)
+        handler.setFormatter(logging.Formatter(
+            fmt="%(asctime)s %(name)s:%(levelname)s %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        ))
+        logger.addHandler(handler)

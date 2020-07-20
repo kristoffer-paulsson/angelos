@@ -53,10 +53,6 @@ class Const:
     CNL_ROUTING             Mail routing pool file path
     CNL_META                Meta information storage path
 
-    LOG_ERR                 Logger for technical error messages
-    LOG_APP                 Logger for application related events
-    LOG_BIZ                 Logger for business transactions
-
     """
 
     A_TYPE_PERSON_CLIENT = ord(b"p")
@@ -88,10 +84,6 @@ class Const:
     CNL_FTP = "ftp.ar7"
     CNL_ROUTING = "routing.ar7"
     CNL_META = "meta.ar7"
-
-    LOG_ERR = "err"
-    LOG_APP = "app"
-    LOG_BIZ = "biz"
 
     OPT_LISTEN = ["localhost", "loopback", "hostname", "domain", "ip", "any"]
 

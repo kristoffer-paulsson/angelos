@@ -51,6 +51,8 @@ class StartupCommand(Command):
                     facade.data.portfolio.entity.id
                 )
 
+                self._ioc.log  # Initiate logging service in IoC.
+
             self._io << (
                 "You just de-encrypted and loaded the Facade. Next step in\n"
                 + "boot sequence is to start the services and the Admin console.\n"  # noqa E501
@@ -65,13 +67,9 @@ class StartupCommand(Command):
             self._io << "\nError: %s\n\n" % e
 
     async def _switch(self):
-        # await asyncio.sleep(2)
         self._ioc.state("serving", True)
-        # await asyncio.sleep(2)
         self._ioc.state("nodes", True)
-        # await asyncio.sleep(2)
         self._ioc.state("hosts", True)
-        # await asyncio.sleep(2)
         self._ioc.state("clients", True)
 
     @classmethod

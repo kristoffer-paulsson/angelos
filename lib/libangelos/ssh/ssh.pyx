@@ -21,19 +21,17 @@ import logging
 import asyncssh
 
 from libangelos.utils import Util
-from libangelos.ioc import ContainerAware
+from libangelos.ioc import ContainerAware, LogAware
 
 
-class SSHServer(ContainerAware, asyncssh.SSHServer):
+class SSHServer(LogAware, asyncssh.SSHServer):
     """SSH server container aware baseclass."""
 
     def __init__(self, ioc):
         """Initialize AdminServer."""
         self._conn = None
         self._client_keys = ()
-        ContainerAware.__init__(self, ioc)
-
-        self._applog = self.ioc.log.app
+        LogAware.__init__(self, ioc)
 
     def connection_made(self, conn):
         logging.info("Connection made")

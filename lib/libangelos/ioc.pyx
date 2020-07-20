@@ -18,10 +18,10 @@ The Inversion of Control (IoC) framework is used as a central part of both
 the server and client. It is used to start application services and make them
 available in the whole application.
  """
-import logging
 from typing import Any
+
+from libangelos.error import Error, ContainerServiceNotConfigured
 from libangelos.utils import Util
-from libangelos.error import Error
 
 
 class Container:
@@ -53,11 +53,7 @@ class Container:
                     Error.IOC_NOT_CONFIGURED, {"service": name}
                 )
             elif callable(self.__config[name]):
-                try:
-                    self.__instances[name] = self.__config[name](self)
-                except Exception as e:
-                    logging.exception(e)
-                    raise e
+                self.__instances[name] = self.__config[name](self)
             else:
                 raise Util.exception(
                     Error.IOC_LAMBDA_EXPECTED, {"service": name}
@@ -97,6 +93,44 @@ class ContainerAware:
 
         """
         return self.__ioc
+
+
+class LogAware(ContainerAware):
+    """Mixin for log awareness, drop-in for ContainerAware."""
+
+    NORMAL = (21,)
+    WARNING = (31,)
+    CRITICAL = (41,)
+
+    __logger = None
+
+    def __init__(self, ioc: Container):
+        ContainerAware.__init__(self, ioc)
+        try:
+            if not self.__logger:
+                self.__logger = self.ioc.log
+        except (ContainerServiceNotConfigured, AttributeError):
+            pass
+
+    def log(self, msg, *args, **kwargs):
+        """Log an event, not supposed to be used directly."""
+        if self.__logger:
+            self.__logger.log(self.NORMAL[0], msg, *args, **kwargs)
+
+    def normal(self, msg, *args, **kwargs):
+        """Log normal event."""
+        if self.__logger:
+            self.__logger.log(self.NORMAL[0], msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        """Log suspicious event."""
+        if self.__logger:
+            self.__logger.log(self.WARNING[0], msg, *args, **kwargs)
+
+    def critical(self, msg, *args, **kwargs):
+        """Log dangerous event."""
+        if self.__logger:
+            self.__logger.log(self.CRITICAL[0], msg, *args, **kwargs)
 
 
 class Config:

@@ -71,19 +71,19 @@ CONFIG_IMMUTABLE = {
             },
         },
         "loggers": {
-            Const.LOG_ERR: {  # LOG_ERR is used to log system errors
+            "err": {  # LOG_ERR is used to log system errors
                 "level": "INFO",
                 # 'propagate': None,
                 "filters": [],
                 "handlers": ["default"],
             },
-            Const.LOG_APP: {  # LOG_APP is used to log system events
+            "app": {  # LOG_APP is used to log system events
                 "level": "INFO",
                 # 'propagate': None,
                 "filters": [],
                 "handlers": ["default"],
             },
-            Const.LOG_BIZ: {  # LOG_BIZ is used to log business events
+            "biz": {  # LOG_BIZ is used to log business events
                 "level": "INFO",
                 # 'propagate': None,
                 "filters": [],

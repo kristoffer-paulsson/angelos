@@ -29,7 +29,7 @@ from angelos.parser import Parser
 from angelos.state import StateMachine
 from angelos.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
 from libangelos.automatic import Automatic, Platform, Runtime, Server as ServerDirs, Network
-from libangelos.ioc import Container, ContainerAware, Config, Handle, StaticHandle
+from libangelos.ioc import Container, ContainerAware, Config, Handle, StaticHandle, LogAware
 from libangelos.misc import Misc
 from libangelos.ssh.ssh import SessionManager
 from libangelos.utils import Event, Util
@@ -37,7 +37,7 @@ from libangelos.worker import Worker
 
 from angelos.starter import ConsoleStarter
 from libangelos.facade.facade import Facade
-from libangelos.logger import LogHandler
+from angelos.logger import Logger
 from libangelos.starter import Starter
 
 
@@ -192,7 +192,7 @@ class Configuration(Config, Container):
             "bootstrap": lambda self: Bootstrap(self.env, self.keys),
             "keys": lambda self: AdminKeys(self.env),
             "state": lambda self: StateMachine(self.config["state"]),
-            "log": lambda self: LogHandler(self.config["logger"]),
+            "log": lambda self: Logger(self.facade.secret, self.env["logs_dir"]),
             "session": lambda self: SessionManager(),
             "facade": lambda self: StaticHandle(Facade),
             "boot": lambda self: StaticHandle(asyncio.base_events.Server),
@@ -206,14 +206,13 @@ class Configuration(Config, Container):
         }
 
 
-class Server(ContainerAware):
+class Server(LogAware):
     """Main server application class."""
 
     def __init__(self):
         """Initialize app logger."""
-        ContainerAware.__init__(self, Configuration())
+        LogAware.__init__(self, Configuration())
         self._worker = Worker("server.main", self.ioc, executor=0, new=False)
-        self._applog = self.ioc.log.app
 
     def _initialize(self):
         loop = self._worker.loop
@@ -234,11 +233,10 @@ class Server(ContainerAware):
         self._worker.run_coroutine(self.nodes_server())
         self._worker.run_coroutine(self.boot_activator())
 
-        self._applog.info("Starting boot server.")
+        self.normal("Starting boot server.")
 
     def _finalize(self):
-        self._applog.info("Shutting down server.")
-        self._applog.info("Server quitting.")
+        self.normal("Exiting server.")
 
     def _listen(self):
         la = self.ioc.env["listen"]
@@ -328,14 +326,14 @@ class Server(ContainerAware):
             while not self.ioc.quit.is_set():
                 if self.ioc.state.position("boot"):
                     await self.ioc.state.off("boot")
-                    self._applog.info("Boot server turned OFF")
+                    self.normal("Boot server turned OFF")
                     server = self.ioc.boot
                     server.close()
                     await self.ioc.session.unreg_server("boot")
                     await server.wait_closed()
                 else:
                     await self.ioc.state.on("boot")
-                    self._applog.info("Boot server turned ON")
+                    self.normal("Boot server turned ON")
                     if first:
                         self.ioc.boot = await ConsoleStarter().boot_server(
                             self._listen(),
@@ -355,14 +353,14 @@ class Server(ContainerAware):
             while not self.ioc.quit.is_set():
                 if self.ioc.state.position("clients"):
                     await self.ioc.state.off("clients")
-                    self._applog.info("Clients server turned OFF")
+                    self.normal("Clients server turned OFF")
                     server = self.ioc.clients
                     server.close()
                     await self.ioc.session.unreg_server("clients")
                     await server.wait_closed()
                 else:
                     await self.ioc.state.on("clients")
-                    self._applog.info("Clients server turned ON")
+                    self.normal("Clients server turned ON")
                     self.ioc.clients = await Starter().clients_server(
                         self.ioc.facade.data.portfolio,
                         self._listen(),
@@ -379,14 +377,14 @@ class Server(ContainerAware):
             while not self.ioc.quit.is_set():
                 if self.ioc.state.position("hosts"):
                     await self.ioc.state.off("hosts")
-                    self._applog.info("Hosts server turned OFF")
+                    self.normal("Hosts server turned OFF")
                     server = self.ioc.hosts
                     server.close()
                     await self.ioc.session.unreg_server("hosts")
                     await server.wait_closed()
                 else:
                     await self.ioc.state.on("hosts")
-                    self._applog.info("Hosts server turned ON")
+                    self.normal("Hosts server turned ON")
                     self.ioc.hosts = await ConsoleStarter().hosts_server(
                         self.ioc.facade.data.portfolio,
                         self._listen(),
@@ -402,7 +400,7 @@ class Server(ContainerAware):
         try:
             while not self.ioc.quit.is_set():
                 if self.ioc.state.position("nodes"):
-                    self._applog.info("Nodes server turned OFF")
+                    self.normal("Nodes server turned OFF")
                     await self.ioc.state.off("nodes")
                     server = self.ioc.nodes
                     server.close()
@@ -410,7 +408,7 @@ class Server(ContainerAware):
                     await server.wait_closed()
                 else:
                     await self.ioc.state.on("nodes")
-                    self._applog.info("Nodes server turned ON")
+                    self.normal("Nodes server turned ON")
                     self.ioc.nodes = await Starter().nodes_server(
                         self.ioc.facade.data.portfolio,
                         self._listen(),

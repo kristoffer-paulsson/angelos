@@ -21,7 +21,7 @@ import uuid
 import asyncssh
 from angelos.cmd import Terminal
 from libangelos.const import Const
-from libangelos.ioc import ContainerAware
+from libangelos.ioc import ContainerAware, LogAware
 from libangelos.ssh.ssh import SessionHandle
 from libangelos.utils import Util
 
@@ -64,7 +64,7 @@ class AdminServerProcess(ConsoleServerProcess):
         ConsoleServerProcess.__init__(self, process_factory, sess_mgr, "admin")
 
 
-class ConsoleServer(ContainerAware, asyncssh.SSHServer):
+class ConsoleServer(LogAware, asyncssh.SSHServer):
     """SSH server container aware baseclass."""
 
     def __init__(self, ioc):
@@ -72,8 +72,6 @@ class ConsoleServer(ContainerAware, asyncssh.SSHServer):
         self._conn = None
         self._client_keys = None
         ContainerAware.__init__(self, ioc)
-
-        self._applog = self.ioc.log.app
 
     def connection_made(self, conn):
         """Handle the incoming connection."""
@@ -112,11 +110,9 @@ class BootServer(ConsoleServer):
 
         vault_file = Util.path(str(self.ioc.env["state_dir"]), Const.CNL_VAULT)
         if os.path.isfile(vault_file):
-            self._applog.info("Vault archive found. Initialize startup mode.")
+            self.normal("Vault archive found. Initialize startup mode.")
         else:
-            self._applog.info(
-                "Vault archive NOT found. Initialize setup mode."
-            )
+            self.normal("Vault archive NOT found. Initialize setup mode.")
 
     def session_requested(self):
         """Start terminal session. Denying SFTP and SCP."""

@@ -15,11 +15,11 @@
 #
 """Asynchronous multithreaded worker."""
 import asyncio
-import logging
 import threading
 import multiprocessing
 import concurrent.futures
 import functools
+import logging
 
 from libangelos.utils import Event
 from libangelos.ioc import ContainerAware

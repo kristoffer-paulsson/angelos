@@ -35,6 +35,10 @@ MANIFEST
 /docs/doctrees/**
 !/docs/doctrees/.gitkeep
 
+!/dev_env/
+/dev_env/**
+!/dev_env/.gitkeep
+
 !/docs/html/
 /docs/html/**
 !/docs/html/.gitkeep
