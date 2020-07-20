@@ -172,8 +172,9 @@ class Configuration(Config, Container):
             with open(os.path.join(self.auto.conf_dir, filename)) as jc:
                 return json.load(jc)
         except FileNotFoundError as exc:
-            print("Critical error. ({})".format(exc))
-            traceback.print_exception(type(exc), exc, exc.__traceback__)
+            Util.print_exception(exc)
+            # print("Critical error. ({})".format(exc))
+            # traceback.print_exception(type(exc), exc, exc.__traceback__)
             return {}
 
     def __config(self):

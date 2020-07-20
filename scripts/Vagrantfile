@@ -91,19 +91,19 @@ Vagrant.configure("2") do |config|
     # %postun
     # /usr/sbin/userdel myservice
 
-    su - angelos
+    # su - angelos
 
-    virtualenv /opt/angelos -p /usr/bin/python3.8
-    source /opt/angelos/bin/activate
+    # virtualenv /opt/angelos -p /usr/bin/python3.8
+    # source /opt/angelos/bin/activate
 
-    cd /opt/angelos
-    mkdir tmp
-    cd tmp
+    # cd /opt/angelos
+    # mkdir tmp
+    # cd tmp
 
     git clone https://github.com/kristoffer-paulsson/angelos.git
     cd angelos
-    git fetch --tags
-    git checkout tags/1.0.0b1
+    # git fetch --tags
+    # git checkout tags/1.0.0b1
 
     pip3.8 install -r requirements.txt
     python3.8 ./setup.py install
@@ -114,7 +114,7 @@ Vagrant.configure("2") do |config|
     #   Where $PREFIX_PATH is a site-packages directory
     # PYTHONUSERBASE=/opt/angelos pip install --user --upgrade <package_name>
 
-    ln -s /opt/angelos/bin/angelos /usr/local/bin/angelos
+    # ln -s /opt/angelos/bin/angelos /usr/local/bin/angelos
 
 
     # pip3.8 install -r requirements.txt --user

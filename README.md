@@ -81,3 +81,9 @@ Then angelos must be started with the option to listen to any
 > angelos -l any
 
 angelos --root-dir=$(pwd)/dev_env --run-dir=$(pwd)/dev_env --state-dir=$(pwd)/dev_env --logs-dir=$(pwd)/dev_env --conf-dir=$(pwd)/dev_env
+
+>cp angelos.service /etc/systemd/system/angelos.service
+>systemctl daemon-reload
+>systemctl enable angelos.service
+>systemctl restart angelos.service
+>systemctl status angelos.service

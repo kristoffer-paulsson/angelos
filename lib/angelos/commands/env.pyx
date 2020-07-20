@@ -20,7 +20,7 @@ from libangelos.misc import Misc
 class EnvCommand(Command):
     """Work with environment variables."""
 
-    abbr = """Work with environment valriables."""
+    abbr = """Work with environment variables."""
     description = (
         """Use this command to display the environment variables."""
     )  # noqa E501

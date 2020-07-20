@@ -36,12 +36,14 @@ from libangelos.error import ERROR_INFO
 class Event(asyncio.Event):
     """A threadsafe asynchronous event class."""
 
+    # TODO: Mitigate to misc.pyx
+
     def set(self):
         self._loop.call_soon_threadsafe(super().set)
 
 
 class Util:
-    """@todo."""
+    """General basic utilities."""
 
     __app_path = os.path.dirname(os.path.abspath(sys.argv[0]))
     __usr_path = os.path.expanduser("~")
@@ -374,6 +376,8 @@ class Util:
 class FactoryInterface:
     """Docstring"""
 
+    # TODO: Mitigate to misc.pyx
+
     @classmethod
     def factory(cls, **kwargs):
         """Docstring"""
@@ -382,6 +386,8 @@ class FactoryInterface:
 
 class Checksum:
     """Generate and check checksum based on introspection of data stream."""
+
+    # TODO: Mitigate to misc.pyx
 
     def __init__(self):
         self.__sum = 0
