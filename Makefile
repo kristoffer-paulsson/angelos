@@ -50,3 +50,6 @@ docs: basic
 
 test:
 	python ./tests/test_certified.py
+
+run:
+    python ./bin/angelos config --run-dir=$(pwd) --state-dir=$(pwd) --logs-dir=$(pwd) --conf-dir=$(pwd)

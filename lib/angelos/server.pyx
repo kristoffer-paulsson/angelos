@@ -21,6 +21,7 @@ import json
 import os
 import signal
 import socket
+import traceback
 from typing import Any
 
 import asyncssh
@@ -55,8 +56,8 @@ class AdminKeys:
     """Load and list admin keys."""
 
     def __init__(self, env: collections.ChainMap):
-        self.__path_admin = os.path.join(env["state_dir"], "admins.pub")
-        self.__path_server = os.path.join(env["state_dir"], "server")
+        self.__path_admin = os.path.join(str(env["state_dir"]), "admins.pub")
+        self.__path_server = os.path.join(str(env["state_dir"]), "server")
         self.__key_list = None
         self.__key_private = None
 
@@ -150,7 +151,7 @@ class Bootstrap:
     def match(self) -> bool:
         """Match all criteria for proceeding operations."""
 
-        self.criteria_root()
+        self.criteria_state()
         self.criteria_admin()
         self.criteria_load_keys()
         self.criteria_port_access()
@@ -169,9 +170,10 @@ class Configuration(Config, Container):
     def __load(self, filename):
         try:
             with open(os.path.join(self.auto.conf_dir, filename)) as jc:
-                return json.load(jc.read())
-        except FileNotFoundError:
-            print("Failure loading configuration. ({})".format(filename))
+                return json.load(jc)
+        except FileNotFoundError as exc:
+            print("Critical error. ({})".format(exc))
+            traceback.print_exception(type(exc), exc, exc.__traceback__)
             return {}
 
     def __config(self):
@@ -272,19 +274,14 @@ class Server(ContainerAware):
             self.config()
             return
 
-        self._applog.info("-------- STARTING SERVER --------")
         self._initialize()
         try:
             asyncio.get_event_loop().run_forever()
         except KeyboardInterrupt:
             pass
-        except Exception as e:
-            self._applog.critical(
-                "Server crashed due to unhandled exception: %s" % e
-            )
-            self._applog.exception(e)
+        except Exception as exc:
+            Util.print_exception(exc)
         self._finalize()
-        self._applog.info("-------- EXITING SERVER --------")
 
     def config(self):
         """Print or do other works on configuration."""
@@ -322,9 +319,8 @@ class Server(ContainerAware):
                         first = False
                     else:
                         await self.ioc.admin.start_serving()
-        except Exception as e:
-            self._applog.critical("Admin server encountered a critical error.")
-            self._applog.exception(e, exc_info=True)
+        except Exception as exc:
+            Util.exception(exc)
 
     async def boot_server(self):
         try:
@@ -351,9 +347,8 @@ class Server(ContainerAware):
                         first = False
                     else:
                         await self.ioc.boot.start_serving()
-        except Exception as e:
-            self._applog.critical("Boot server encountered a critical error.")
-            self._applog.exception(e, exc_info=True)
+        except Exception as exc:
+            Util.print_exception(exc)
 
     async def clients_server(self):
         try:
@@ -376,11 +371,8 @@ class Server(ContainerAware):
                         loop=self._worker.loop,
                     )
                     self.ioc.session.reg_server("clients", self.ioc.clients)
-        except Exception as e:
-            self._applog.critical(
-                "Clients server encountered a critical error."
-            )
-            self._applog.exception(e, exc_info=True)
+        except Exception as exc:
+            Util.print_exception(exc)
 
     async def hosts_server(self):
         try:
@@ -403,9 +395,8 @@ class Server(ContainerAware):
                         loop=self._worker.loop,
                     )
                     self.ioc.session.reg_server("hosts", self.ioc.hosts)
-        except Exception as e:
-            self._applog.critical("Hosts server encountered a critical error.")
-            self._applog.exception(e, exc_info=True)
+        except Exception as exc:
+            Util.print_exception(exc)
 
     async def nodes_server(self):
         try:
@@ -428,9 +419,8 @@ class Server(ContainerAware):
                         loop=self._worker.loop,
                     )
                     self.ioc.session.reg_server("nodes", self.ioc.nodes)
-        except Exception as e:
-            self._applog.critical("Nodes server encountered a critical error.")
-            self._applog.exception(e, exc_info=True)
+        except Exception as exc:
+            Util.print_exception(exc)
 
     async def boot_activator(self):
         await asyncio.sleep(1)

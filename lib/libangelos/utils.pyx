@@ -26,6 +26,7 @@ import os
 import subprocess
 import sys
 import datetime
+import traceback
 from asyncio import Task
 from typing import _GenericAlias, Callable, Union, Any, List, Tuple
 
@@ -260,6 +261,12 @@ class Util:
         return "{0}, Class: {1}:{2}".format(
             event_str, str(type(caught_exception)), caught_exception
         )
+
+    @staticmethod
+    def print_exception(exc: Exception):
+        """Print exception and traceback using the python print() method."""
+        print("Critical error. ({})".format(exc))
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
 
     @staticmethod
     def imp_pkg(path):

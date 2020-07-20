@@ -13,11 +13,8 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import sys
-
 from angelos.main import start
 
 
 if __name__ == '__main__':
-    result = start()
-    sys.exit(result)
+    start()

@@ -14,20 +14,25 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """SSH Bootstrap code for the Angelos server."""
-import crypt
 import logging
 import os
 import uuid
 
 import asyncssh
 from angelos.cmd import Terminal
-from libangelos.ioc import ContainerAware
-
-from angelos.commands import EnvCommand, QuitCommand, SetupCommand, StartupCommand, ProcessCommand
-from angelos.impexp import ImportCommand, ExportCommand, PortfolioCommand
 from libangelos.const import Const
-from libangelos.ssh.ssh import SSHServer, SessionHandle
+from libangelos.ioc import ContainerAware
+from libangelos.ssh.ssh import SessionHandle
 from libangelos.utils import Util
+
+from angelos.commands.env import EnvCommand
+from angelos.commands.exporter import ExportCommand
+from angelos.commands.importer import ImportCommand
+from angelos.commands.portfolio import PortfolioCommand
+from angelos.commands.process import ProcessCommand
+from angelos.commands.quit import QuitCommand
+from angelos.commands.setup import SetupCommand
+from angelos.commands.startup import StartupCommand
 
 
 class ConsoleServerProcess(asyncssh.SSHServerProcess):
@@ -96,11 +101,16 @@ class ConsoleServer(ContainerAware, asyncssh.SSHServer):
 class BootServer(ConsoleServer):
     """SSH Server for the boot sequence."""
 
+    cmds = [
+        QuitCommand,
+        EnvCommand
+    ]
+
     def __init__(self, ioc):
         """Initialize BootServer."""
         ConsoleServer.__init__(self, ioc)
 
-        vault_file = Util.path(self.ioc.env["dir"].root, Const.CNL_VAULT)
+        vault_file = Util.path(str(self.ioc.env["state_dir"]), Const.CNL_VAULT)
         if os.path.isfile(vault_file):
             self._applog.info("Vault archive found. Initialize startup mode.")
         else:
@@ -119,17 +129,17 @@ class BootServer(ConsoleServer):
 
         The terminal will be equipped for setup or startup.
         """
-        vault_file = Util.path(self.ioc.env["dir"].root, Const.CNL_VAULT)
+        vault_file = Util.path(self.ioc.env["state_dir"], Const.CNL_VAULT)
 
         if os.path.isfile(vault_file):
             return await Terminal(
-                commands=[StartupCommand, QuitCommand],
+                commands=BootServer.cmds + [StartupCommand],
                 ioc=self.ioc,
                 process=process,
             ).run()
         else:
             return await Terminal(
-                commands=[SetupCommand, QuitCommand],
+                commands=BootServer.cmds + [SetupCommand],
                 ioc=self.ioc,
                 process=process,
             ).run()

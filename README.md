@@ -79,3 +79,5 @@ On Debian you must open the ports that will be used by angelos. If you already h
 Then angelos must be started with the option to listen to any
 
 > angelos -l any
+
+angelos --root-dir=$(pwd)/dev_env --run-dir=$(pwd)/dev_env --state-dir=$(pwd)/dev_env --logs-dir=$(pwd)/dev_env --conf-dir=$(pwd)/dev_env

@@ -13,14 +13,17 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import logging
+"""Angelos service starter and maintainer."""
 import os
 import signal
 import time
+import traceback
 from multiprocessing import Process
 from pathlib import Path
 
 from angelos.parser import Parser
+
+# TODO: Make all of angelos use pathlib instead of os.path
 
 
 class PidFile:
@@ -132,8 +135,9 @@ def cmd_runner(pid_file):
         from angelos.server import Server
         Server().run()
         pid_file.remove()
-    except Exception as e:
-        logging.critical(e, exc_info=True)
+    except Exception as exc:
+        print("Critical error. ({})".format(exc))
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
         pid_file.remove()
 
 def start() -> int:

@@ -155,6 +155,7 @@ class ConsoleIO:
                 input = await self._stdin.read(1)
                 self._stdin.channel.set_line_mode(True)
             except Exception as e:
+                print("Weird", e)
                 self._stdin.channel.set_line_mode(True)
                 raise e
 
@@ -177,6 +178,7 @@ class ConsoleIO:
             self._stdin.channel.set_line_mode(True)
 
         except Exception as e:
+            print("Weird", e)
             self._stdin.channel.set_line_mode(True)
             raise e
 
@@ -719,7 +721,8 @@ class Shell(ContainerAware):
 
     async def execute(self, line):
         """Interpret one line of text in the shell."""
-        if bool(line.strip()) is False:
+        line = line.strip()
+        if bool(line) is False:
             raise Util.exception(Error.CMD_SHELL_EMPTY)
 
         cmd = re.findall(self.cmd_regex, line)
@@ -841,7 +844,7 @@ class Terminal(Shell):
                     try:
 
                         line = await self._io._stdin.readline()
-                        await self.execute(line.strip())
+                        await self.execute(line)
 
                     except CmdShellInvalidCommand as exc:
                         self._io << (
@@ -859,9 +862,6 @@ class Terminal(Shell):
                         break
                     except CmdShellException as e:
                         self._io << ("%s \n" % e)
-                    except Exception as e:
-                        logging.error(e, exc_info=True)
-                        self._io << ("%s: %s \n" % (type(e), e))
 
                     self._io << self._config["prompt"]
 
