@@ -115,6 +115,18 @@ class Bootstrap:
             self.__error("State directory not writable. ({})".format(state_dir))
             return
 
+    def criteria_conf(self):
+        """Check that the root folder exists."""
+        conf_dir = self.__env["conf_dir"]
+
+        if not os.path.isdir(conf_dir):
+            self.__error("No configuration directory. ({})".format(conf_dir))
+            return
+
+        if not os.access(conf_dir, os.W_OK):
+            self.__error("Configuration directory not writable. ({})".format(conf_dir))
+            return
+
     def criteria_admin(self):
         """Check that there are public keys for admin."""
         admin_keys_file = self.__keys.key_admin
@@ -152,6 +164,7 @@ class Bootstrap:
         """Match all criteria for proceeding operations."""
 
         self.criteria_state()
+        self.criteria_conf()
         self.criteria_admin()
         self.criteria_load_keys()
         self.criteria_port_access()
@@ -172,9 +185,8 @@ class Configuration(Config, Container):
             with open(os.path.join(self.auto.conf_dir, filename)) as jc:
                 return json.load(jc)
         except FileNotFoundError as exc:
-            Util.print_exception(exc)
-            # print("Critical error. ({})".format(exc))
-            # traceback.print_exception(type(exc), exc, exc.__traceback__)
+            print("Configuration file not found ({})".format(filename))
+            # Util.print_exception(exc)
             return {}
 
     def __config(self):

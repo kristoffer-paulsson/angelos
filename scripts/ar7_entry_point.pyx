@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# cython: language_level=3
 #
 # Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
@@ -13,8 +13,14 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-from angelos.main import start
+"""Archive7 utility entry point to be compiled into an executable.
+
+cython --embed -3 -o ./bin/test.c ./bin/test.pyx
+gcc -o ./bin/test.o -c ./bin/test.c `./usr/local/bin/python3.7-config --cflags`
+gcc -o ./bin/test ./bin/test.o `./usr/local/bin/python3.7-config --ldflags`
+"""
+from libangelos.archive7.utility import main
 
 
 if __name__ == '__main__':
-    start()
+    main()

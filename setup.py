@@ -17,6 +17,7 @@
 """Angelos build script."""
 import os
 import re
+import sys
 import tarfile
 import tempfile
 import subprocess
@@ -25,13 +26,21 @@ import urllib
 from abc import ABC, abstractmethod
 from glob import glob
 from os import path
+from pathlib import Path
+
 from setuptools import setup, Extension, Command as _Command
 from setuptools.command.install import install as setup_install
 from Cython.Build import cythonize
 from Cython.Compiler import Options
 
-base_dir = path.abspath(path.dirname(__file__))
-Options.embed = "main"
+
+major, minor, _, _, _ = sys.version_info
+PY_VER = "{0}.{1}".format(major, minor)
+
+
+base_dir = str(Path(__file__).parent)  # path.abspath(path.dirname(__file__))
+# Options.embed = "main"
+Options.docstrings = False
 
 
 class Command(_Command):
@@ -45,6 +54,58 @@ class Command(_Command):
     def finalize_options(self):
         """Finalize options"""
         pass
+
+
+class BuildSetup(Command):
+    """Preparations and adaptions of building the app."""
+
+    def run(self):
+        """Carry out preparations and adaptions."""
+        self.run_command("executable")
+
+        if sys.platform == "darwin":
+            pass
+
+        if sys.platform == "darwin":
+            self.run_command("pkg_rpm")
+
+
+class PackageRpm(Command):
+    """Build a macos dmg image."""
+
+    def run(self):
+        pass
+
+
+class Executable(Command):
+    """Compile the executable"""
+
+    def run(self):
+        name = "angelos"
+        self._dist = str(Path("./bin").absolute())
+        self._temp = tempfile.TemporaryDirectory()
+
+        temp_name = str(Path(self._temp.name, name).absolute())
+        home = str(Path("./").absolute())
+
+        cflags = subprocess.check_output(
+            "python{}-config --cflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+        ldflags = subprocess.check_output(
+            "python{}-config --ldflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+
+        subprocess.check_call(
+            "cython --embed -3 -o {}.c ./scripts/{}_entry_point.pyx".format(
+                temp_name, name), cwd=home, shell=True)
+
+        subprocess.check_call(
+            "gcc -o {0}.o -c {0}.c {1}".format(
+                temp_name, cflags), cwd=self._temp.name, shell=True)
+
+        subprocess.check_call(
+            "gcc -o ./{0} {1}.o {2}".format(
+                name, temp_name, ldflags), cwd=home, shell=True)
+
+        self._temp.cleanup()
 
 
 class TestRunner(setup_install):
@@ -190,7 +251,7 @@ class LibraryScanner:
 
 
 class LibraryBuilder(Command):
-    """Build standalone library."""
+    """Build standalone library with includes."""
 
     def run(self):
         """Build list of Extensions to be cythonized."""
@@ -229,17 +290,17 @@ lib_scan = {
         }
     },
     "basic": {
-        "build_dir": "build",
-        "cython_c_in_temp": True,
-        "compiler_directives": {
-            "language_level": 3,
-            "embedsignature": True
-        }
     }
 }
 
 setup(
-    cmdclass={"install": VendorInstall, "test": TestRunner, "library": LibraryBuilder},
+    cmdclass={
+        "make": BuildSetup,
+        "install": VendorInstall,
+        "test": TestRunner,
+        "pkg_rpm": PackageRpm,
+        "executable": Executable
+    },
     name="angelos",
     version=__version__,  # noqa F821
     license="MIT",
@@ -300,28 +361,11 @@ setup(
     packages=["libangelos", "angelos", "eidon", "angelossim"],
     package_dir={"": "lib"},
     scripts=glob("bin/*"),
-    ext_modules=cythonize(LibraryScanner("lib", **lib_scan).scan())
+    ext_modules=cythonize(
+        LibraryScanner("lib", **lib_scan).scan(),
+        build_dir="build",
+        compiler_directives={
+            "language_level": 3,
+        }
+    )
 )
-
-
-# TODO: Build one single file
-#   https://stackoverflow.com/questions/30157363/collapse-multiple-submodules-to-one-cython-extension
-"""
-# TODO
-#   Compile an embedded executable
-# https://stackoverflow.com/questions/46824143/cython-embed-flag-in-setup-py
-# https://stackoverflow.com/questions/31307169/how-to-enable-embed-with-cythonize
-ext_modules=cythonize([Extension(
-    name="angelos",
-    sources=["bin/angelos.pyx"],
-    build_dir="build",
-    cython_c_in_temp=True,
-    extra_objects=[
-        # "usr/local/lib/libpython3.7m.a"
-    ],
-    compiler_directives={
-        "language_level": 3,
-        "embedsignature": True
-    }
-)])
-"""

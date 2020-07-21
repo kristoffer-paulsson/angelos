@@ -12,6 +12,7 @@
 *.cnl
 *.ar7
 *.c
+angelos
 **/__pycache__
 /cython_debug
 /build/
