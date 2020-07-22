@@ -13,6 +13,7 @@
 *.ar7
 *.c
 angelos
+/dev/env/master.key
 **/__pycache__
 /cython_debug
 /build/

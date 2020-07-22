@@ -34,13 +34,10 @@ from Cython.Build import cythonize
 from Cython.Compiler import Options
 
 
+base_dir = str(Path(__file__).parent.absolute())
+Options.docstrings = False
 major, minor, _, _, _ = sys.version_info
 PY_VER = "{0}.{1}".format(major, minor)
-
-
-base_dir = str(Path(__file__).parent)  # path.abspath(path.dirname(__file__))
-# Options.embed = "main"
-Options.docstrings = False
 
 
 class Command(_Command):
