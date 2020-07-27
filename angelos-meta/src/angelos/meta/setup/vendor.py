@@ -1,0 +1,156 @@
+# cython: language_level=3
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+"""Vendor installer, downloads, compiles and install libraries from source."""
+import logging
+import shutil
+import subprocess
+import tarfile
+import urllib
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from abc import ABC, abstractmethod
+from setuptools import Command
+
+
+class VendorLibrary(ABC):
+    """Base class for vendors."""
+
+    @abstractmethod
+    def check(self) -> bool:
+        """Check if target is satisfied."""
+        pass
+
+    @abstractmethod
+    def download(self):
+        """Download source tarball."""
+        pass
+
+    @abstractmethod
+    def extract(self):
+        """Extract source file."""
+        pass
+
+    @abstractmethod
+    def build(self):
+        """Build sources."""
+        pass
+
+    @abstractmethod
+    def install(self):
+        """Install binaries."""
+        pass
+
+    @abstractmethod
+    def close(self):
+        """Clean up temporary files."""
+        pass
+
+
+class VendorCompile(VendorLibrary):
+    """Vendor installer for third party libraries i source code form."""
+
+    def __init__(self, base_dir: str, name: str, download: str, local: str, internal: str, target: str):
+        """
+
+        Example:
+            name = "libsodium"
+            download = "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz"
+            local = "libsodium-1.0.18.tar.gz"
+            internal = "libsodium-stable"
+            target = "./usr/local/lib/libsodium.a"
+        """
+        self._base = base_dir
+        self._name = name
+        self._download = download
+        self._local = local
+        self._internal = internal
+        self._check = target
+
+        self._tarball = Path(self._base, "tarball", self._local)
+
+        self._temp = TemporaryDirectory()
+        self._archive = str(Path(self._temp.name, self._local))
+        self._target = str(Path(self._temp.name, self._name))
+        self._work = str(Path(self._temp.name, self._name, self._internal))
+
+    def check(self) -> bool:
+        """Check if target is reached"""
+        return Path(self._base, self._check).exists()
+
+    def download(self):
+        """Download sources tarball."""
+        if not self._tarball.exists():
+            urllib.request.urlretrieve(self._download, self._archive)
+            shutil.copyfile(self._archive, str(self._tarball))
+        else:
+            shutil.copyfile(str(self._tarball), self._archive)
+
+    def extract(self):
+        """Extract source file."""
+        tar = tarfile.open(self._archive)
+        tar.extractall(self._target)
+        tar.close()
+
+    def build(self):
+        """Build sources."""
+        subprocess.check_call("./configure", cwd=self._work, shell=True)
+        # CFLAGS='-fPIC -O' CentOS specific only (?)
+        subprocess.check_call("make CFLAGS='-fPIC -O' && make check", cwd=self._work, shell=True)
+
+    def install(self):
+        """Install binaries."""
+        subprocess.check_call("make install DESTDIR=$(cd {}; pwd)".format(self._base), cwd=self._work, shell=True)
+
+    def close(self):
+        """Clean up temporary files."""
+        self._temp.cleanup()
+
+
+class Vendor(Command):
+    """Install third party vendor libraries."""
+
+    user_options = [
+        ("--base-dir=", "d", "Base directory."),
+        ("--compile=", "c", "Download, compile and install source tarball.")
+    ]
+
+    def initialize_options(self):
+        """Initialize options"""
+        self.base_dir = None
+        self.compile = None
+
+    def finalize_options(self):
+        """Finalize options"""
+        pass
+
+    def do_compile(self):
+        """Execute the compile command."""
+        if not self.compile:
+            return
+
+        for value in self.compile:
+            logging.info(self.base_dir)
+            library = VendorCompile(self.base_dir, **value)
+            if not library.check():
+                library.download()
+                library.extract()
+                library.build()
+                library.install()
+                library.close()
+
+    def run(self):
+        """Install vendors."""
+        self.do_compile()

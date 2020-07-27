@@ -1,0 +1,13 @@
+# Development environment
+pytest
+coverage
+cython
+../angelos-meta/
+
+../angelos-common/
+../angelos-bin/
+../angelos-document/
+../angelos-lib/
+../angelos-archive7/
+
+-e .

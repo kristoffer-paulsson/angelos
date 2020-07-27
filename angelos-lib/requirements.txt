@@ -1,0 +1,9 @@
+cython
+../angelos-meta/
+
+../angelos-document/
+../angelos-common/
+../angelos-bin/
+../angelos-archive7/
+
+-e .

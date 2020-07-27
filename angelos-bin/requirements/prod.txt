@@ -1,0 +1,4 @@
+# Runtime environment
+../angelos-meta/
+
+-e .

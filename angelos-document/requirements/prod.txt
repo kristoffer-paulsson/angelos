@@ -1,0 +1,6 @@
+# Runtime environment
+../angelos-meta/
+
+msgpack
+
+-e .

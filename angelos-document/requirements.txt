@@ -1,0 +1,6 @@
+cython
+../angelos-meta
+
+msgpack
+
+-e .

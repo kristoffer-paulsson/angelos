@@ -1,0 +1,9 @@
+# Development environment
+pytest
+coverage
+cython
+../angelos-meta/
+
+msgpack
+
+-e .
