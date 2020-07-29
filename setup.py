@@ -26,15 +26,21 @@ class NamespacePackageMixin:
     """Install namespace packages."""
 
     NAMESPACES = {
-        "angelos.setup": "angelos-setup/",
+        "angelos.meta": "angelos-meta/",
+        "angelos.common": "angelos-common/",
+        "angelos.bin": "angelos-bin/",
+        "angelos.document": "angelos-document/",
+        "angelos.archive7": "angelos-archive7/",
+        "angelos.lib": "angelos-lib/",
+        "angelos.server": "angelos-server/",
     }
 
     def namespace_packages(self, develop: bool = False):
-        """ Use pip to install all microlibraries.  """
+        """Use pip to install all microlibraries."""
         work_dir = os.getcwd()
-        for key, value in self.NAMESPACES.iteritems():
+        for key, value in self.NAMESPACES.items():
             try:
-                os.chdir(os.path.join(work_dir, value.root_dir))
+                os.chdir(os.path.join(work_dir, value))
                 if develop:
                     pip.main(["install", "-e", "."])
                 else:
@@ -72,19 +78,14 @@ config = {
     "version": VERSION,
     "license": "MIT",
     "description": "A safe messaging system",
-    "author": __author__,
-    "author_email": __author_email__,
-    "long_description": long_description,
+    "author": "Kristoffer Paulsson",
+    "author_email": "kristoffer.paulsson@talenten.se",
+    # "long_description": long_description,
     "long_description_content_type": "text/markdown",
-    "url": __url__,
-          # project_urls={
-          #    "Bug Tracker": "https://bugs.example.com/HelloWorld/",
-          #    "Documentation": "https://docs.example.com/HelloWorld/",
-          #    "Source Code": "https://code.example.com/HelloWorld/",
-          # }
+    "url": "https://github.com/kristoffer-paulsson/angelos",
     "cmdclass": {
-        "install": CustomInstall,
-        "develop": CustomDevelop
+        "develop": CustomDevelop,
+        "install": CustomInstall
     },
     "classifiers": [
         "Development Status :: 2 - Pre-Alpha",
@@ -119,7 +120,7 @@ config = {
         "Topic :: Utilities",
     ],
     "install_requires": [],
-    "python_requires": "'>=3.6, <4",
+    "python_requires": ">=3.6, <4",
 }
 
 

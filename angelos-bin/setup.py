@@ -16,18 +16,27 @@ from pathlib import Path
 
 from Cython.Build import cythonize
 from setuptools import setup, find_namespace_packages
-from setuptools.command.install import install as Install
+from setuptools.command.develop import develop
+from setuptools.command.install import install
 
 from angelos.meta.setup import LibraryScanner, Vendor
 
 
-class CustomInstall(Install):
+class CustomDevelop(develop):
+    """Custom steps for develop command."""
+
+    def run(self):
+        self.run_command("vendor")
+        develop.run(self)
+
+
+class CustomInstall(install):
     """Preparations and adaptions of building the app."""
 
     def run(self):
         """Carry out preparations and adaptions."""
         self.run_command("vendor")
-        Install.run(self)
+        install.run(self)
 
 
 NAME = "angelos.bin"
@@ -51,7 +60,9 @@ scan = {
 config = {
     "name": NAME,
     "version": VERSION,
+    "license": "MIT",
     "cmdclass": {
+        "develop": CustomDevelop,
         "install": CustomInstall,
         "vendor": Vendor,
     },

@@ -37,10 +37,12 @@ ar7: basic
 clean:
 	rm -fr ./dist/
 	rm -fr ./build/
-	find ./lib -name \*.so -type f -delete
-	find ./lib -name \*.dylib -type f -delete
-	find ./lib -name \*.dll -type f -delete
-	find ./lib -name \*.c -type f -delete
+	rm -fr ./angelos-*/dist/
+	rm -fr ./angelos-*/build/
+	find ./angelos-*/src -name \*.egg-info -type f -delete
+	find ./angelos-*/src -name \*.so -type f -delete
+	find ./angelos-*/src -name \*.dylib -type f -delete
+	find ./angelos-*/src -name \*.dll -type f -delete
 	rm -fr ./docs/html/
 	rm -fr ./docs/doctrees/
 

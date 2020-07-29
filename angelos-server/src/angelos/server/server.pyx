@@ -24,20 +24,20 @@ import socket
 from typing import Any
 
 import asyncssh
+from angelos.common.misc import Misc
+from angelos.common.utils import Event, Util
+
+from angelos.lib.automatic import Automatic, Platform, Runtime, Server as ServerDirs, Network
+from angelos.lib.facade.facade import Facade
+from angelos.lib.ioc import Container, Config, Handle, StaticHandle, LogAware
+from angelos.lib.ssh.ssh import SessionManager
+from angelos.lib.starter import Starter
+from angelos.lib.worker import Worker
+from angelos.server.logger import Logger
 from angelos.server.parser import Parser
+from angelos.server.starter import ConsoleStarter
 from angelos.server.state import StateMachine
 from angelos.server.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
-from angelos.lib.automatic import Automatic, Platform, Runtime, Server as ServerDirs, Network
-from angelos.lib.ioc import Container, ContainerAware, Config, Handle, StaticHandle, LogAware
-from angelos.common.misc import Misc
-from angelos.lib.ssh.ssh import SessionManager
-from angelos.lib.utils import Event, Util
-from angelos.lib.worker import Worker
-
-from angelos.server.starter import ConsoleStarter
-from angelos.lib.facade.facade import Facade
-from angelos.server.logger import Logger
-from angelos.lib.starter import Starter
 
 
 class Auto(Automatic, Platform, Runtime, ServerDirs, Network):
@@ -330,7 +330,7 @@ class Server(LogAware):
                     else:
                         await self.ioc.admin.start_serving()
         except Exception as exc:
-            Error.exception(exc)
+            Util.print_exception(exc)
 
     async def boot_server(self):
         try:

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #
 # Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
@@ -12,12 +13,80 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-from setuptools import setup, find_namespace_packages
+"""Angelos build script."""
+import inspect
+import shutil
+import subprocess
+from pathlib import Path
 
-setup(
-      name="angelos.meta",
-      version="1.0.0b1",
-      package_dir={"": "src"},
-      packages=find_namespace_packages(where="src", include=["angelos.*"]),
-      namespace_packages=["angelos"]
-)
+from setuptools import setup, Command
+
+
+class VagrantBuild(Command):
+    """Custom steps for develop command."""
+
+    user_options = [
+        ("target=", "t", "Build target."),
+    ]
+
+    def initialize_options(self):
+        """Initialize options"""
+        self.target = None
+
+    def finalize_options(self):
+        """Finalize options"""
+        pass
+
+    def run(self):
+        self.do_vagrant()
+
+    def do_vagrant(self):
+        build = Path("./build").resolve()
+        root = build.joinpath("vagrant")
+        data = root.joinpath("data")
+
+        build.mkdir(exist_ok=True)
+        root.mkdir(exist_ok=True)
+        data.mkdir(exist_ok=True)
+
+        import angelos.meta.package
+        provision = Path(inspect.getfile(angelos.meta.package)).parent
+        shutil.copyfile(str(provision.joinpath("provision.py")), str(data.joinpath("provision.py")))
+        shutil.copyfile(str(provision.joinpath("Vagrantfile")), str(root.joinpath("Vagrantfile")))
+
+        subprocess.check_call("vagrant up", shell=True, cwd=str(root))
+
+
+NAME = "angelos.meta"
+VERSION = "1.0.0b1"
+RELEASE = ""
+
+
+config = {
+    "name": NAME,
+    "version": VERSION,
+    "license": "MIT",
+    "cmdclass": {
+        "package": VagrantBuild,
+    },
+    "classifiers": [
+        "Development Status :: 3 - Alpha",
+        "Environment :: Console",
+        "Environment :: Win32 (MS Windows)",
+        "Environment :: No Input/Output (Daemon)",
+        "Framework :: AsyncIO",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
+        "Intended Audience :: Religion",
+        "Intended Audience :: System Administrators",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX",
+        "Programming Language :: Cython",
+    ],
+    "install_requires": [],
+    "python_requires": ">=3.6, <4",
+}
+
+
+setup(**config)

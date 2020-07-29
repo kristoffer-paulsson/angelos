@@ -35,6 +35,7 @@ scan = {
 config = {
     "name": NAME,
     "version": VERSION,
+    "license": "MIT",
     "classifiers": [
           "Development Status :: 4 - Beta",
           "Intended Audience :: Developers",

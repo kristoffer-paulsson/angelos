@@ -36,6 +36,7 @@ scan = {
 config = {
     "name": NAME,
     "version": VERSION,
+    "license": "MIT",
     "classifiers": [
         "Development Status :: 2 - Pre-Alpha",
         "Environment :: No Input/Output (Daemon)",
