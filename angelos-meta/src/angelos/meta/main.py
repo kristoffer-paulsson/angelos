@@ -34,13 +34,13 @@ def vagrant(cwd, angelos):
     shutil.copyfile(str(provision.joinpath("provision.py")), str(data.joinpath("provision.py")))
     shutil.copyfile(str(provision.joinpath("Vagrantfile")), str(root.joinpath("Vagrantfile")))
 
-    shutil.copytree(angelos)
-    shutil.copytree(angelos)
-    shutil.copytree(angelos)
-    shutil.copytree(angelos)
-    shutil.copytree(angelos)
-    shutil.copytree(angelos)
-    shutil.copytree(angelos)
+    # shutil.copytree(angelos)
+    # shutil.copytree(angelos)
+    # shutil.copytree(angelos)
+    # shutil.copytree(angelos)
+    # shutil.copytree(angelos)
+    # shutil.copytree(angelos)
+    # shutil.copytree(angelos)
 
     subprocess.check_call("vagrant up", shell=True, cwd=str(root))
 

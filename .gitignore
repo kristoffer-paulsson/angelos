@@ -11,3 +11,4 @@
 /dev_env/*
 *.egg-info/
 /angelos-bin/usr/
+/vagrant/

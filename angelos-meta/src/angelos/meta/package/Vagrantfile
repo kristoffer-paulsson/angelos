@@ -17,5 +17,5 @@ Vagrant.configure("2") do |config|
   config.vm.box = "centos/7"
   config.vm.box_version = "1905.1"
   config.vm.synced_folder "data", "/home/vagrant/data", nsf: true
-  config.vm.provision "shell", inline: "sudo python data/provision.py"
+  # config.vm.provision "shell", inline: "python data/provision.py"
 end

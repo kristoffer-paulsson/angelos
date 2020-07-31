@@ -68,7 +68,7 @@ class CustomInstall(install, NamespacePackageMixin):
         install.run(self)
 
 
-NAME = "angelos.lib"
+NAME = "angelos"
 VERSION = "1.0.0b1"
 RELEASE = ""
 
