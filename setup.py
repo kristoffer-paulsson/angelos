@@ -56,16 +56,16 @@ class CustomDevelop(develop, NamespacePackageMixin):
     """Custom steps for develop command."""
 
     def run(self):
-        self.namespace_packages(True)
         develop.run(self)
+        self.namespace_packages(True)
 
 
 class CustomInstall(install, NamespacePackageMixin):
     """Custom steps for install command."""
 
     def run(self):
-        self.namespace_packages()
         install.run(self)
+        self.namespace_packages()
 
 
 NAME = "angelos"
