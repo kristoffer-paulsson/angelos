@@ -1,4 +1,5 @@
 # Development environment
+wheel
 pytest
 coverage
 cython

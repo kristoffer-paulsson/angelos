@@ -18,6 +18,7 @@ from Cython.Build import cythonize
 from setuptools import setup, find_namespace_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
+from wheel.bdist_wheel import bdist_wheel
 
 from angelos.meta.setup import LibraryScanner, Vendor
 
@@ -37,6 +38,15 @@ class CustomInstall(install):
         """Carry out preparations and adaptions."""
         self.run_command("vendor")
         install.run(self)
+
+
+class CustomBDistWheel(bdist_wheel):
+    """Preparations and adaptions of building the app."""
+
+    def run(self):
+        """Carry out preparations and adaptions."""
+        self.run_command("vendor")
+        bdist_wheel.run(self)
 
 
 NAME = "angelos.bin"
@@ -64,6 +74,7 @@ config = {
     "cmdclass": {
         "develop": CustomDevelop,
         "install": CustomInstall,
+        "bdist_wheel": CustomBDistWheel,
         "vendor": Vendor,
     },
     "command_options": {

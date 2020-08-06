@@ -22,7 +22,7 @@ from subprocess import Popen, check_call, CalledProcessError, PIPE
 
 def extract_version(version):
     """Extract version from string as dictionary, (major, minor, micro)"""
-    major, minor, micro = re.search(r"(\d+).(\d+).(\d+)", version).group(1, 2, 3)
+    major, minor, micro = re.search(r"(\d+)\.(\d+)\.?(\d+)?", version).group(1, 2, 3)
     return {
         "major": int(major),
         "minor": int(minor),
