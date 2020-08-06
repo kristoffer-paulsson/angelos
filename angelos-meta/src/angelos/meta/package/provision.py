@@ -90,8 +90,54 @@ sudo chown -R angelos:angelos /etc/angelos
 """
 
 
-def install_centos_8():
-    """Install a build platform on CentOS 8."""
+CENTOS_8 = """
+# Install a build platform on CentOS 8.
+
+sudo dnf check-update
+sudo dnf upgrade -y
+sudo dnf groupinstall "Development Tools" -y
+sudo dnf install nano git python36 python36-devel virtualenv -y
+sudo dnf install virtualenv -y
+sudo dnf install rpmdevtools -y
+
+sudo groupadd angelos
+sudo adduser angelos --system -g angelos
+
+sudo mkdir /opt/angelos
+sudo mkdir /var/lib/angelos
+sudo mkdir /var/log/angelos
+sudo mkdir /etc/angelos
+
+# sudo mkdir /run/angelos
+# sudo chown -R angelos:angelos /run/angelos
+
+git clone https://github.com/kristoffer-paulsson/angelos.git
+cd angelos
+# git fetch --tags
+# git checkout tags/1.0.0b1
+
+virtualenv venv -p /usr/bin/python3.6
+source venv/bin/activate
+
+pip install -r requirements.txt
+python ./setup.py develop
+python ./setup.py install
+
+sudo chown -R vagrant:vagrant /opt/angelos
+# PYTHONUSERBASE=/opt/angelos pip install --user --upgrade --ignore-installed -r scripts/pkg_reqs.txt
+python ./setup.py install --prefix /opt/angelos
+sudo chown -R angelos:angelos /etc/angelos
+
+sudo cp scripts/env.json /etc/angelos/env.json
+sudo cp scripts/config.json /etc/angelos/config.json
+sudo touch /var/lib/admins.pub
+sudo cp scripts/angelos.service /etc/systemd/system/angelos.service
+
+sudo chown -R angelos:angelos /opt/angelos
+sudo chown -R angelos:angelos /var/lib/angelos
+sudo chown -R angelos:angelos /var/log/angelos
+sudo chown -R angelos:angelos /etc/angelos
+"""
 
 
 SYSTEM = platform.system()
@@ -110,7 +156,7 @@ if SYSTEM == "Linux":
         elif RELEASE["major"] == 7:
             failure = Popen([CENTOS_7], shell=True).wait()
         elif RELEASE["major"] == 8:
-            success = install_centos_8()
+            failure = Popen([CENTOS_8], shell=True).wait()
         else:
             SystemError("%s not yet supported" % RELEASE)
     elif DISTRO == "debian":

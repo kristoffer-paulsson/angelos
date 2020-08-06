@@ -19,7 +19,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from setuptools import setup, Command
+from setuptools import setup, Command, find_namespace_packages
 
 
 class VagrantBuild(Command):
@@ -72,19 +72,13 @@ config = {
     "classifiers": [
         "Development Status :: 3 - Alpha",
         "Environment :: Console",
-        "Environment :: Win32 (MS Windows)",
-        "Environment :: No Input/Output (Daemon)",
-        "Framework :: AsyncIO",
         "Intended Audience :: Developers",
-        "Intended Audience :: Information Technology",
-        "Intended Audience :: Religion",
-        "Intended Audience :: System Administrators",
         "License :: OSI Approved :: MIT License",
-        "Operating System :: Microsoft :: Windows",
-        "Operating System :: POSIX",
-        "Programming Language :: Cython",
     ],
     "install_requires": [],
+    "package_dir": {"": "src"},
+    "packages": find_namespace_packages(where="src", include=["angelos.*"]),
+    "namespace_packages": ["angelos"],
     "python_requires": ">=3.6, <4",
 }
 

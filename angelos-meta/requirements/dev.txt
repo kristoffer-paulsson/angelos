@@ -2,9 +2,5 @@
 pytest
 coverage
 cython
-../angelos-meta/
-
-../angelos-common/
-../angelos-bin/
 
 -e .
