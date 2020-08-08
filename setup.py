@@ -15,6 +15,7 @@
 #
 """Angelos build script."""
 import os
+from pathlib import Path
 
 import pip
 from setuptools import setup
@@ -72,7 +73,6 @@ NAME = "angelos"
 VERSION = "1.0.0b1"
 RELEASE = ""
 
-
 config = {
     "name": NAME,
     "version": VERSION,
@@ -80,7 +80,7 @@ config = {
     "description": "A safe messaging system",
     "author": "Kristoffer Paulsson",
     "author_email": "kristoffer.paulsson@talenten.se",
-    # "long_description": long_description,
+    "long_description": Path("./README.md").read_text(),
     "long_description_content_type": "text/markdown",
     "url": "https://github.com/kristoffer-paulsson/angelos",
     "cmdclass": {
@@ -122,6 +122,5 @@ config = {
     "install_requires": [],
     "python_requires": ">=3.6, <4",
 }
-
 
 setup(**config)

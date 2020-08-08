@@ -38,7 +38,7 @@ if __name__ == '__main__':
         print("Unsupported platform ({})".format(system))
 
     try:
-        from angelos.main import start
+        from angelos.server.main import start
     except ModuleNotFoundError:
         print("Could not locate Angelos installation.")
     else:

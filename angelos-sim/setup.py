@@ -83,6 +83,7 @@ coredata = {
 config = {
     "name": NAME,
     "version": VERSION,
+    "license": "MIT",
     "package_dir": {"": "src"},
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "cmdclass": {

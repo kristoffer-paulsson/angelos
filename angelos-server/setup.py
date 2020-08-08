@@ -15,8 +15,31 @@
 from pathlib import Path
 
 from Cython.Build import cythonize
+from setuptools.command.develop import develop
+from setuptools.command.install import install
+
 from angelos.meta.setup import LibraryScanner
 from setuptools import setup, find_namespace_packages
+
+from angelos.meta.setup.executable import Executable
+
+
+class CustomDevelop(develop):
+    """Custom steps for develop command."""
+
+    def run(self):
+        self.run_command("exe")
+        develop.run(self)
+
+
+class CustomInstall(install):
+    """Preparations and adaptions of building the app."""
+
+    def run(self):
+        """Carry out preparations and adaptions."""
+        self.run_command("exe")
+        install.run(self)
+
 
 NAME = "angelos.server"
 VERSION = "1.0.0b1"
@@ -36,6 +59,17 @@ scan = {
 config = {
     "name": NAME,
     "version": VERSION,
+    "license": "MIT",
+    "cmdclass": {
+        "develop": CustomDevelop,
+        "install": CustomInstall,
+        "exe": Executable
+    },
+    "command_options": {
+        "exe": {
+            "name": ("", "angelos")
+        }
+    },
     "classifiers": [
         "Development Status :: 4 - Beta",
         "Environment :: No Input/Output (Daemon)",

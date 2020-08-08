@@ -18,9 +18,20 @@ import inspect
 import shutil
 import subprocess
 from pathlib import Path
+from argparse import ArgumentParser
 
 
-def vagrant(cwd, angelos):
+def parser():
+    parser = ArgumentParser("Package command parser.")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--vagrant", dest="vagrant",
+        choices=["centos7", "centos8", "debian10"]
+    )
+    return parser.parse_args()
+
+
+def vagrant(distro: str):
     cwd = Path(os.getcwd())
     root = cwd.joinpath("vagrant")
     data = root.joinpath("data")
@@ -32,21 +43,22 @@ def vagrant(cwd, angelos):
     import angelos.meta.package
     provision = Path(inspect.getfile(angelos.meta.package)).parent
     shutil.copyfile(str(provision.joinpath("provision.py")), str(data.joinpath("provision.py")))
-    shutil.copyfile(str(provision.joinpath("Vagrantfile")), str(root.joinpath("Vagrantfile")))
+    shutil.copyfile(str(provision.joinpath(distro)), str(root.joinpath("Vagrantfile")))
 
-    # shutil.copytree(angelos)
-    # shutil.copytree(angelos)
-    # shutil.copytree(angelos)
-    # shutil.copytree(angelos)
-    # shutil.copytree(angelos)
-    # shutil.copytree(angelos)
-    # shutil.copytree(angelos)
+    # shutil.copytree(angelos_path)
+    # shutil.copytree(angelos_path)
+    # shutil.copytree(angelos_path)
+    # shutil.copytree(angelos_path)
+    # shutil.copytree(angelos_path)
+    # shutil.copytree(angelos_path)
+    # shutil.copytree(angelos_path)
 
     subprocess.check_call("vagrant up", shell=True, cwd=str(root))
 
 
 def start():
-    cwd = Path(os.getcwd())
-    import angelos.meta.package
-    angelos = Path(inspect.getfile(angelos.meta.package)).parents[5]
-    vagrant(cwd, angelos)
+    args = parser()
+    if args.vagrant:
+        # import angelos.meta.package
+        # angelos = Path(inspect.getfile(angelos.meta.package)).parents[5]
+        vagrant(args.vagrant)

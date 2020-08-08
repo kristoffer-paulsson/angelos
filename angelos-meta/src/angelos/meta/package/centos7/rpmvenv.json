@@ -1,0 +1,83 @@
+{
+  "extensions": {
+    "enabled": [
+      "blocks",
+      "file_permissions",
+      "extra_files",
+      "python_venv"
+    ]
+  },
+  "core": {
+    "name": "angelos",
+    "version": "1.0.0b1",
+    "release": "1",
+    "summary": "Ἄγγελος is a safe messenger system.",
+    "group": "Application/System",
+    "license": "MIT",
+    "url": "https://github.com/kristoffer-paulsson/angelos",
+    "source": "../../../../../",
+    "requires": ["python36"],
+    "conflicts": [],
+    "obsoletes": [],
+    "provides": []
+  },
+  "blocks": {
+    "post": ["post_inst.sh"],
+    "postun": ["post_uninst.sh"],
+    "pre": ["pre_inst.sh"],
+    "preun": ["pre_uninst.sh"],
+    "prep": [],
+    "build": [],
+    "install": [],
+    "clean": [],
+    "desc": [],
+    "files": [],
+    "changelog": []
+  },
+  "file_permissions": {
+    "user": "angelos",
+    "group": "angelos",
+    "create_user": true,
+    "create_group": true
+  },
+  "file_extras": {
+    "files": [
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos7/angelos.service",
+        "dest": "/etc/systemd/system/angelos.service"
+      },
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos7/env.json",
+        "dest": "/etc/angelos/env.json"
+      },
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos7/config.json",
+        "dest": "/etc/angelos/env.json"
+      },
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos7/admins.pub",
+        "dest": "/var/lib/admins.pub"
+      },
+      {
+        "src": "angelos-server/bin/angelos",
+        "dest": "/usr/local/bin/angelos"
+      }
+    ]
+  },
+  "python_venv": {
+    "cmd": "virtualenv",
+    "flags": [
+      "--always-copy"
+    ],
+    "name": "angelos",
+    "path": "/opt/angelos",
+    "python": "python3.6",
+    "require_setup_py": false,
+    "requirements": [
+      "requirements.txt"
+    ],
+    "strip_binaries": false,
+    "use_pip_install": true,
+    "remove_pycache": true
+  }
+}
