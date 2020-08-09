@@ -26,11 +26,11 @@ if __name__ == '__main__':
 
     if system == "Linux":
 
-        site = pathlib.Path("/opt/angelos/lib/python{}/site-packages".format(PY_VER))
+        site = pathlib.Path("/opt/angelos/angelos/lib/python{}/site-packages".format(PY_VER))
         if site.exists():
             sys.path.insert(0, str(site))
 
-        site64 = pathlib.Path("/opt/angelos/lib64/python{}/site-packages".format(PY_VER))
+        site64 = pathlib.Path("/opt/angelos/angelos/lib64/python{}/site-packages".format(PY_VER))
         if site64.exists():
             sys.path.insert(0, str(site64))
 

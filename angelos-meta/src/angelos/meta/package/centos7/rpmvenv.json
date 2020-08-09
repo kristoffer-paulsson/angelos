@@ -80,7 +80,7 @@
         "dest": "/var/lib/admins.pub"
       },
       {
-        "src": "angelos-server/bin/angelos",
+        "src": "angelos-server/angelos",
         "dest": "/usr/local/bin/angelos"
       }
     ]
@@ -93,9 +93,9 @@
     "name": "angelos",
     "path": "/opt/angelos",
     "python": "python3.6",
-    "require_setup_py": false,
+    "require_setup_py": true,
     "requirements": [
-      "requirements.txt"
+      "angelos-meta/src/angelos/meta/package/centos7/requirements.txt"
     ],
     "strip_binaries": false,
     "use_pip_install": false,
