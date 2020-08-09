@@ -31,7 +31,7 @@ Vagrant.configure("2") do |config|
     cd angelos
 
     pip3.6 install -r requirements.txt --user
-    cp meta-angelos/src/angelos/meta/package/centos/rpmvenv.json config.json
+    cp meta-angelos/src/angelos/meta/package/centos7/rpmvenv.json config.json
     rpmvenv config.json
 
   SHELL
