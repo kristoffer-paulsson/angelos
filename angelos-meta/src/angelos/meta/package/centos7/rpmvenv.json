@@ -73,7 +73,7 @@
       },
       {
         "src": "angelos-meta/src/angelos/meta/package/centos7/config.json",
-        "dest": "/etc/angelos/env.json"
+        "dest": "/etc/angelos/config.json"
       },
       {
         "src": "angelos-meta/src/angelos/meta/package/centos7/admins.pub",
@@ -98,7 +98,7 @@
       "requirements.txt"
     ],
     "strip_binaries": false,
-    "use_pip_install": true,
+    "use_pip_install": false,
     "remove_pycache": true
   }
 }
