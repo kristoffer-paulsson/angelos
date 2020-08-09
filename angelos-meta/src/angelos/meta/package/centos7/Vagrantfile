@@ -17,5 +17,22 @@ Vagrant.configure("2") do |config|
   config.vm.box = "centos/7"
   config.vm.box_version = "1905.1"
   config.vm.synced_folder "data", "/home/vagrant/data", nsf: true
-  # config.vm.provision "shell", inline: "python data/provision.py"
+  config.vm.provision "shell", inline: <<-SHELL
+
+    sudo yum check-update
+    sudo yum upgrade -y
+    sudo yum groupinstall "Development Tools" -y
+    sudo yum install nano git python36 python36-devel rpmdevtools -y
+
+    pip3.6 install rpmvenv --user
+    pip3.6 install virtualenv --user
+
+    git clone https://github.com/kristoffer-paulsson/angelos.git
+    cd angelos
+
+    pip3.6 install -r requirements.txt --user
+    cp meta-angelos/src/angelos/meta/package/centos/rpmvenv.json config.json
+    rpmvenv config.json
+
+  SHELL
 end

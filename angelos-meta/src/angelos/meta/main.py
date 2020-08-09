@@ -42,8 +42,10 @@ def vagrant(distro: str):
 
     import angelos.meta.package
     provision = Path(inspect.getfile(angelos.meta.package)).parent
-    shutil.copyfile(str(provision.joinpath("provision.py")), str(data.joinpath("provision.py")))
-    shutil.copyfile(str(provision.joinpath(distro)), str(root.joinpath("Vagrantfile")))
+    # shutil.copyfile(str(provision.joinpath("provision.py")), str(data.joinpath("provision.py")))
+    # print(provision.joinpath(distro))
+    # exit()
+    shutil.copyfile(str(provision.joinpath(distro, "Vagrantfile")), str(root.joinpath("Vagrantfile")))
 
     # shutil.copytree(angelos_path)
     # shutil.copytree(angelos_path)
