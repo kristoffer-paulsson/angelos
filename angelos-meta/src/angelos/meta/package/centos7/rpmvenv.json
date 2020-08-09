@@ -3,7 +3,7 @@
     "enabled": [
       "blocks",
       "file_permissions",
-      "extra_files",
+      "file_extras",
       "python_venv"
     ]
   },
@@ -16,23 +16,44 @@
     "license": "MIT",
     "url": "https://github.com/kristoffer-paulsson/angelos",
     "source": "",
-    "requires": ["python36"],
-    "conflicts": [],
-    "obsoletes": [],
-    "provides": []
+    "requires": [
+      "python36"
+    ],
+    "conflicts": [
+    ],
+    "obsoletes": [
+    ],
+    "provides": [
+    ]
   },
   "blocks": {
-    "post": ["angelos-meta/src/angelos/meta/package/centos7/post_inst.sh"],
-    "postun": ["angelos-meta/src/angelos/meta/package/centos7/post_uninst.sh"],
-    "pre": ["angelos-meta/src/angelos/meta/package/centos7/pre_inst.sh"],
-    "preun": ["angelos-meta/src/angelos/meta/package/centos7/pre_uninst.sh"],
-    "prep": [],
-    "build": [],
-    "install": [],
-    "clean": [],
-    "desc": [],
-    "files": [],
-    "changelog": []
+    "post": [
+      "angelos-meta/src/angelos/meta/package/centos7/post_inst.sh"
+    ],
+    "postun": [
+      "angelos-meta/src/angelos/meta/package/centos7/post_uninst.sh"
+    ],
+    "pre": [
+      "angelos-meta/src/angelos/meta/package/centos7/pre_inst.sh"
+    ],
+    "preun": [
+      "angelos-meta/src/angelos/meta/package/centos7/pre_uninst.sh"
+    ],
+    "prep": [
+    ],
+    "build": [
+    ],
+    "install": [
+    ],
+    "clean": [
+    ],
+    "desc": [
+      "Ἄγγελος is a safe messenger system."
+    ],
+    "files": [
+    ],
+    "changelog": [
+    ]
   },
   "file_permissions": {
     "user": "angelos",
