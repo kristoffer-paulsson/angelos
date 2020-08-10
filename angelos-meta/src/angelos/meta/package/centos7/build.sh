@@ -14,11 +14,6 @@
 #     Kristoffer Paulsson - initial implementation
 #
 
-sudo rm -fR /opt/angelos/*
-sudo rmdir /opt/angelos
-sudo rm -fR /var/lib/angelos/*
-sudo rmdir /var/lib/angelos
-sudo rm -fR /var/log/angelos/*
-sudo rmdir /var/log/angelos
-sudo rm -fR /etc/angelos/*
-sudo rmdir /etc/angelos
+cd angelos-server/
+python3.6 ./setup.py exe
+cd ../

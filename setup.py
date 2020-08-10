@@ -15,6 +15,7 @@
 #
 """Angelos build script."""
 import os
+import sys
 from pathlib import Path
 
 import pip
@@ -42,10 +43,11 @@ class NamespacePackageMixin:
         for key, value in self.NAMESPACES.items():
             try:
                 os.chdir(os.path.join(work_dir, value))
+                addition = ["--user"] if "--user" in sys.argv else []
                 if develop:
-                    pip.main(["install", "-e", "."])
+                    pip.main(["install", "-e", "."] + addition)
                 else:
-                    pip.main(["install", "."])
+                    pip.main(["install", "."] + addition)
             except Exception as exc:
                 print("Oops, something went wrong installing", key)
                 print(exc)

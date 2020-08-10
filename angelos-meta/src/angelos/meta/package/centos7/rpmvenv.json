@@ -31,15 +31,31 @@
       "angelos-meta/src/angelos/meta/package/centos7/post_inst.sh"
     ],
     "postun": [
-      "angelos-meta/src/angelos/meta/package/centos7/post_uninst.sh"
+      "sudo rm -fR /opt/angelos/*",
+      "sudo rmdir /opt/angelos",
+      "sudo rm -fR /var/lib/angelos/*",
+      "sudo rmdir /var/lib/angelos",
+      "sudo rm -fR /var/log/angelos/*",
+      "sudo rmdir /var/log/angelos",
+      "sudo rm -fR /etc/angelos/*",
+      "sudo rmdir /etc/angelos"
     ],
     "pre": [
-      "angelos-meta/src/angelos/meta/package/centos7/pre_inst.sh"
+      "sudo mkdir /opt/angelos",
+      "sudo chown -R angelos:angelos /opt/angelos",
+      "sudo mkdir /var/lib/angelos",
+      "sudo chown -R angelos:angelos /var/lib/angelos",
+      "sudo mkdir /var/log/angelos",
+      "sudo chown -R angelos:angelos /var/log/angelos",
+      "sudo mkdir /etc/angelos",
+      "sudo chown -R angelos:angelos /etc/angelos"
     ],
     "preun": [
       "angelos-meta/src/angelos/meta/package/centos7/pre_uninst.sh"
     ],
     "prep": [
+      "cd $RPM_SOURCE_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION-$RPM_PACKAGE_RELEASE.$RPM_ARCH/angelos-server/",
+      "python3.6 ./setup.py exe"
     ],
     "build": [
     ],
@@ -77,7 +93,7 @@
       },
       {
         "src": "angelos-meta/src/angelos/meta/package/centos7/admins.pub",
-        "dest": "/var/lib/admins.pub"
+        "dest": "/var/lib/angelos/admins.pub"
       },
       {
         "src": "angelos-server/angelos",
