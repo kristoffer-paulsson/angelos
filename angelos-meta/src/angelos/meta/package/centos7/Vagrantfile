@@ -33,8 +33,10 @@ Vagrant.configure("2") do |config|
     # Build angelos entry point.
 
     pip3.6 install -r requirements.txt --user
+    pip3.6 install setuptools --upgrade --user
+    pip3.6 install wheel --upgrade --user
     pip3.6 install -e . --user
-    pip3.6 install -e ./angelos-server --user
+
     cp angelos-meta/src/angelos/meta/package/centos7/rpmvenv.json config.json
     rpmvenv config.json
 

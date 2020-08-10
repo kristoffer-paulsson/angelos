@@ -54,8 +54,6 @@
       "angelos-meta/src/angelos/meta/package/centos7/pre_uninst.sh"
     ],
     "prep": [
-      "cd $RPM_SOURCE_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION-$RPM_PACKAGE_RELEASE.$RPM_ARCH/angelos-server/",
-      "python3.6 ./setup.py exe"
     ],
     "build": [
     ],
