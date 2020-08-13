@@ -132,7 +132,7 @@ def cmd_runner(pid_file):
         return
     try:
         pid_file.put(os.getpid())
-        from angelos.server import Server
+        from angelos.server.server import Server
         Server().run()
         pid_file.remove()
     except Exception as exc:
