@@ -47,7 +47,7 @@ config = {
           "Topic :: System :: Archiving",
           "Topic :: Utilities"
     ],
-    # "install_requires": ["angelos.common", "angelos.bin"],
+    "install_requires": ["contextvars;python_version<'3.7'"],
     "package_dir": {"": "src"},
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "namespace_packages": ["angelos"],
