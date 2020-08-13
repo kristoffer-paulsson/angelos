@@ -24,9 +24,8 @@ import os
 import re
 import socket
 import uuid
-from abc import ABC, abstractmethod, ABCMeta
+from abc import ABC, abstractmethod
 from concurrent.futures.thread import ThreadPoolExecutor
-from dataclasses import dataclass, asdict as data_asdict
 from threading import Thread
 from typing import Callable, Awaitable, Any, Union, List
 from urllib.parse import urlparse
@@ -214,14 +213,6 @@ class SharedResourceMixin:
         """
         await asyncio.sleep(0)
         return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
-
-
-@dataclass
-class BaseDataClass(metaclass=ABCMeta):
-    """A base dataclass with some basic functions"""
-
-    def _asdict(self) -> dict:
-        return data_asdict(self)
 
 
 class BaseData(ABC):

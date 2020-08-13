@@ -21,6 +21,16 @@ import asyncssh
 
 from angelos.meta.testing import run_async
 
+# FIXME:
+#    Implement this one somewhere.
+"""
+import importlib
+modules = LibraryScanner(str(Path("./src")), **scan).list()
+for module in modules:
+    print(module)
+    importlib.import_module(module)
+"""
+
 
 class BaseTestNetwork(TestCase):
     """Base test for facade based unit testing."""

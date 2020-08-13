@@ -28,7 +28,7 @@ import subprocess
 import sys
 import traceback
 from asyncio import Task
-from typing import _GenericAlias, Callable, Union, Any, List, Tuple
+from typing import Callable, Union, Any, List, Tuple
 
 
 class Event(asyncio.Event):
@@ -112,7 +112,7 @@ class Util:
         Instance    The instanced variable
         type        The class type of expected type, or tuple of them
         """
-        if isinstance(types, _GenericAlias):
+        if isinstance(types, "_GenericAlias"):
             return isinstance(instance, types.__args__)
         else:
             return isinstance(instance, types)

@@ -66,7 +66,9 @@ import datetime
 import logging
 import uuid
 from abc import ABC, abstractmethod
-from contextlib import ContextDecorator, AbstractContextManager, AbstractAsyncContextManager
+from contextlib import ContextDecorator, AbstractContextManager
+# Removed becuase of backward comaptability with 3.6
+# AbstractAsyncContextManager
 from contextvars import ContextVar
 
 from angelos.lib.error import AngelosException
@@ -269,7 +271,9 @@ def policy(section, sn, level=None):  # TODO: Write unittest
     return decorator
 
 
-class evaluate(ContextDecorator, AbstractContextManager, AbstractAsyncContextManager):
+# Should be if not for 3.6 backward compatibility.
+# AbstractAsyncContextManager
+class evaluate(ContextDecorator, AbstractContextManager):
     """Evaluate decorator and context manager.
 
     Wrap methods or enclose pieces of code that you want to evaluate

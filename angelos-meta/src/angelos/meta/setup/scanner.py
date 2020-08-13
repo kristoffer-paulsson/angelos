@@ -46,3 +46,17 @@ class LibraryScanner:
             extensions.append(Extension(**kwargs))
 
         return extensions
+
+    def list(self) -> list:
+        """Build list of modules found."""
+        glob_result = list()
+        for pattern in self.__globlist:
+            glob_path = str(pathlib.Path(self.__base_path, pattern))
+            glob_result += glob.glob(glob_path, recursive=True)
+
+        modules = list()
+        for module in glob_result:
+            package = re.sub("/", ".", module[len(self.__base_path) + 1:-4])
+            modules.append(package)
+
+        return modules

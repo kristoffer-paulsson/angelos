@@ -1,9 +1,10 @@
 # py2app; platform_system=='Darwin'
 # py2exe; platform_system=='Windows'
 cython
-pyinstaller
-sphinx
-sphinx_rtd_theme
+wheel
+# pyinstaller
+# sphinx
+# sphinx_rtd_theme
 
 
 # plyer

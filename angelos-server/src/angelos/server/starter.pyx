@@ -24,7 +24,7 @@ from angelos.lib.ioc import Container
 from angelos.lib.policy.portfolio import PrivatePortfolio
 from angelos.lib.ssh.ssh import SSHClient, SSHServer
 
-from angelos.lib.console import BootServer, AdminServer
+from angelos.server.console import BootServer, AdminServer
 from angelos.lib.starter import Starter
 
 

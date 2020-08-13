@@ -14,13 +14,9 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Commonly used types and functions go here."""
-import datetime
 from abc import ABCMeta
 from collections import namedtuple
-from dataclasses import dataclass
-from typing import Union, List
-
-from angelos.common.misc import BaseDataClass
+from typing import Union
 
 
 class PortfolioABC(metaclass=ABCMeta):
@@ -30,64 +26,11 @@ class PortfolioABC(metaclass=ABCMeta):
 class PrivatePortfolioABC(metaclass=ABCMeta):
     pass
 
-"""
-@dataclass
-class PersonData(BaseDataClass):
-
-    given_name: str
-    family_name: str
-    names: List[str]
-    sex: str
-    born: datetime.date
-
-    def _asdict(self) -> dict:
-        return {
-            "given_name": self.given_name,
-            "family_name": self.family_name,
-            "names": self.names,
-            "sex": self.sex,
-            "born": self.born,
-        }
-"""
 
 PersonData = namedtuple("PersonData", "given_name,family_name,names,sex,born")
 
 
-"""
-@dataclass
-class MinistryData(BaseDataClass):
-
-    ministry: str
-    vision: str
-    founded: datetime.date
-
-    def _asdict(self) -> dict:
-        return {
-            "ministry": self.ministry,
-            "vision": self.vision,
-            "founded": self.founded,
-        }
-"""
-
 MinistryData = namedtuple("MinistryData", "ministry,vision,founded")
-
-"""
-@dataclass
-class ChurchData(BaseDataClass):
-
-    city: str
-    region: str
-    country: str
-    founded: datetime.date
-
-    def _asdict(self) -> dict:
-        return {
-            "city": self.city,
-            "region": self.region,
-            "country": self.country,
-            "founded": self.founded,
-        }
-"""
 
 
 ChurchData = namedtuple("ChurchData", "city,region,country,founded")
