@@ -82,7 +82,8 @@ config = {
     "description": "A safe messaging system",
     "author": "Kristoffer Paulsson",
     "author_email": "kristoffer.paulsson@talenten.se",
-    "long_description": Path("./README.md").read_text(),
+    "long_description": "Ἄγγελος is a safe messenger system. \"Angelos means 'Carrier of a divine message.\"",
+    # Path("./README.md").read_text(),
     "long_description_content_type": "text/markdown",
     "url": "https://github.com/kristoffer-paulsson/angelos",
     "cmdclass": {

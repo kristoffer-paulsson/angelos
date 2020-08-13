@@ -28,7 +28,11 @@
   },
   "blocks": {
     "post": [
-      "angelos-meta/src/angelos/meta/package/centos7/post_inst.sh"
+      "sudo chown -R angelos:angelos /opt/angelos",
+      "sudo chown -R angelos:angelos /var/lib/angelos",
+      "sudo chown -R angelos:angelos /var/log/angelos",
+      "sudo chown -R angelos:angelos /etc/angelos",
+      "ln -s /opt/angelos/angelos/bin/angelos /usr/local/bin/angelos"
     ],
     "postun": [
       "sudo rm -fR /opt/angelos/*",
@@ -42,16 +46,12 @@
     ],
     "pre": [
       "sudo mkdir /opt/angelos",
-      "sudo chown -R angelos:angelos /opt/angelos",
       "sudo mkdir /var/lib/angelos",
-      "sudo chown -R angelos:angelos /var/lib/angelos",
       "sudo mkdir /var/log/angelos",
-      "sudo chown -R angelos:angelos /var/log/angelos",
-      "sudo mkdir /etc/angelos",
-      "sudo chown -R angelos:angelos /etc/angelos"
+      "sudo mkdir /etc/angelos"
     ],
     "preun": [
-      "angelos-meta/src/angelos/meta/package/centos7/pre_uninst.sh"
+      "rm /usr/local/bin/angelos"
     ],
     "prep": [
     ],
@@ -95,7 +95,7 @@
       },
       {
         "src": "angelos-server/angelos",
-        "dest": "/usr/local/bin/angelos"
+        "dest": "/opt/angelos/angelos/bin/angelos"
       }
     ]
   },
