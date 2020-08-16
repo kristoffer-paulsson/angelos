@@ -21,6 +21,7 @@ import json
 import os
 import signal
 import socket
+import errno
 from typing import Any
 
 import asyncssh
@@ -157,7 +158,12 @@ class Bootstrap:
             s.close()
         except PermissionError:
             self.__error("Permission denied to use port {}".format(self.__env["port"]))
-            return
+        except socket.error as e:
+            if e.errno == errno.EADDRINUSE:
+                self.__error("Address with port {} already in use".format(self.__env["port"]))
+        else:
+            s.close()
+
 
     def match(self) -> bool:
         """Match all criteria for proceeding operations."""

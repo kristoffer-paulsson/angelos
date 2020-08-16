@@ -12,20 +12,16 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-[Unit]
-Description = Run the Angelos server
-After = network.target
 
-[Service]
-Type = forking
-AmbientCapabilities = CAP_NET_BIND_SERVICE
+Vagrant.configure("2") do |config|
+  config.vm.box = "centos/7"
+  config.vm.box_version = "1905.1"
+  config.vm.synced_folder "data", "/home/vagrant/data", nsf: true
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
 
-ExecStart = /usr/local/bin/angelos -d start
-ExecStop = /usr/local/bin/angelos -d stop
-ExecReload = /usr/local/bin/angelos -d restart
+    sudo yum check-update
+    sudo yum upgrade -y
+    sudo yum install data/angelos-1.0.0b1-1.x86_64.rpm -y
 
-User = angelos
-Group = angelos
-
-[Install]
-WantedBy=default.target
+  SHELL
+end
