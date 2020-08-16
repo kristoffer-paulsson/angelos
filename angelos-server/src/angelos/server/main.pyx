@@ -98,7 +98,7 @@ class ServerProcess(Process):
             return
 
         self.__pid_file.put(self.pid)
-        from angelos.server import Server
+        from angelos.server.server import Server
         Server().run()
         self.__pid_file.remove()
 

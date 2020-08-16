@@ -20,18 +20,18 @@ After = network.target
 Type = forking
 AmbientCapabilities = CAP_NET_BIND_SERVICE
 
-ExecStart = angelos -d start
-ExecStop = angelos -d stop
-ExecReload = angelos -d restart
+ExecStart = /usr/local/bin/angelos -d start
+ExecStop = /usr/local/bin/angelos -d stop
+ExecReload = /usr/local/bin/angelos -d restart
 
 User = angelos
 Group = angelos
 
-# RootDirectory = /opt/angelos
+# RootDirectory = /opt/angelos/angelos
 RuntimeDirectory = angelos
-StateDirectory = angelos
-LogsDirectory = angelos
-ConfigurationDirectory = angelos
+StateDirectory = /var/lib/angelos  # angelos
+LogsDirectory = /var/log/angelos  # angelos
+ConfigurationDirectory = /etc/angelos  # angelos
 
 KeyringMode = private
 
