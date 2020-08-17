@@ -229,8 +229,14 @@ class Server(LogAware):
 
     def __init__(self):
         """Initialize app logger."""
+        self.__return_code = 0
         LogAware.__init__(self, Configuration())
         self._worker = Worker("server.main", self.ioc, executor=0, new=False)
+
+    @property
+    def return_code(self) -> int:
+        """Server return code."""
+        return self.__return_code
 
     def _initialize(self):
         loop = self._worker.loop
@@ -296,6 +302,7 @@ class Server(LogAware):
         except KeyboardInterrupt:
             pass
         except Exception as exc:
+            self.__return_code = 3
             Util.print_exception(exc)
         self._finalize()
 
@@ -308,6 +315,7 @@ class Server(LogAware):
     async def bootstrap(self):
         """Bootstraps the Angelos server by performing checks before changing state into running."""
         if not self.ioc.bootstrap.match():
+            self.__return_code = 2
             raise KeyboardInterrupt()
         else:
             self.ioc.state("running", True)

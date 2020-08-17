@@ -15,6 +15,7 @@
 #
 """Angelos server entry point to be compiled into an executable."""
 
+
 if __name__ == '__main__':
     import sys
     import pathlib
@@ -36,10 +37,12 @@ if __name__ == '__main__':
 
     else:
         print("Unsupported platform ({})".format(system))
+        exit(1)
 
     try:
         from angelos.server.main import start
     except ModuleNotFoundError:
         print("Could not locate Angelos installation.")
+        exit(1)
     else:
-        start()
+        exit(start())
