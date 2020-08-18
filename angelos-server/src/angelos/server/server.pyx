@@ -157,10 +157,10 @@ class Bootstrap:
             s.listen(1)
             s.close()
         except PermissionError:
-            self.__error("Permission denied to use port {}".format(self.__env["port"]))
+            self.__error("Permission denied to use port {}.".format(self.__env["port"]))
         except socket.error as e:
             if e.errno == errno.EADDRINUSE:
-                self.__error("Address with port {} already in use".format(self.__env["port"]))
+                self.__error("Address with port {} already in use.".format(self.__env["port"]))
         else:
             s.close()
 
@@ -198,8 +198,9 @@ class Configuration(Config, Container):
         return {
             "env": lambda self: collections.ChainMap(
                 ENV_IMMUTABLE,
-                vars(self.auto),
+                {key:value for key, value in vars(self.opts).items() if value},
                 self.__load("env.json"),
+                vars(self.auto),
                 ENV_DEFAULT,
             ),
             "config": lambda self: collections.ChainMap(
@@ -219,7 +220,7 @@ class Configuration(Config, Container):
             "nodes": lambda self: Handle(asyncio.base_events.Server),
             "hosts": lambda self: Handle(asyncio.base_events.Server),
             "opts": lambda self: Parser(),
-            "auto": lambda self: Auto("Angelos", self.opts),
+            "auto": lambda self: Auto("Angelos"),
             "quit": lambda self: Event(),
         }
 

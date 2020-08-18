@@ -25,7 +25,15 @@ particular are used to configure services available from the IoC container.
 from angelos.lib.const import Const
 
 """Environment default values."""
-ENV_DEFAULT = {}
+ENV_DEFAULT = {
+    "listen": "localhost",
+    "port": 22,
+    "root_dir": None,
+    "run_dir": None,
+    "state_dir": None,
+    "logs_dir": None,
+    "conf_dir": None
+}
 
 """Environment immutable values."""
 ENV_IMMUTABLE = {"name": "angelos"}

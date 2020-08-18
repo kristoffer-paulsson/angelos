@@ -36,14 +36,14 @@ class Parser:
             "--listen",
             choices=Const.OPT_LISTEN,
             dest="listen",
-            default="localhost",
+            default=None,
             help="listen to a network interface. (localhost)",
         )
         parser.add_argument(
             "-p",
             "--port",
             dest="port",
-            default=22,
+            default=None,
             type=int,
             help="listen to a network port. (22)",
         )
