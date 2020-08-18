@@ -32,7 +32,12 @@ ENV_DEFAULT = {
     "run_dir": None,
     "state_dir": None,
     "logs_dir": None,
-    "conf_dir": None
+    "conf_dir": None,
+    "config": None,
+    "daemon": None,
+    "hostname": None,
+    "domain": None,
+    "ip": None
 }
 
 """Environment immutable values."""
