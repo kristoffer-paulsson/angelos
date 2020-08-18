@@ -33,7 +33,7 @@ ENV_DEFAULT = {
     "state_dir": None,
     "logs_dir": None,
     "conf_dir": None,
-    "config": None,
+    "config": False,
     "daemon": None,
     "hostname": None,
     "domain": None,
