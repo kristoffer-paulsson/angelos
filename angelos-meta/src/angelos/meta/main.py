@@ -26,7 +26,7 @@ def parser():
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--vagrant", dest="vagrant",
-        choices=["centos7"]
+        choices=["centos7", "centos8"]
     )
     return parser.parse_args()
 
@@ -34,6 +34,7 @@ def parser():
 def vagrant(distro: str):
     cwd = Path(os.getcwd())
     root = cwd.joinpath("vagrant")
+    inst = cwd.joinpath("vagrant2")
     data = root.joinpath("data")
 
     cwd.mkdir(exist_ok=True)
@@ -42,25 +43,12 @@ def vagrant(distro: str):
 
     import angelos.meta.package
     provision = Path(inspect.getfile(angelos.meta.package)).parent
-    # shutil.copyfile(str(provision.joinpath("provision.py")), str(data.joinpath("provision.py")))
-    # print(provision.joinpath(distro))
-    # exit()
     shutil.copyfile(str(provision.joinpath(distro, "Vagrantfile")), str(root.joinpath("Vagrantfile")))
-
-    # shutil.copytree(angelos_path)
-    # shutil.copytree(angelos_path)
-    # shutil.copytree(angelos_path)
-    # shutil.copytree(angelos_path)
-    # shutil.copytree(angelos_path)
-    # shutil.copytree(angelos_path)
-    # shutil.copytree(angelos_path)
-
+    shutil.copyfile(str(provision.joinpath(distro, "Vagrantfile_install")), str(inst.joinpath("Vagrantfile")))
     subprocess.check_call("vagrant up", shell=True, cwd=str(root))
 
 
 def start():
     args = parser()
     if args.vagrant:
-        # import angelos.meta.package
-        # angelos = Path(inspect.getfile(angelos.meta.package)).parents[5]
         vagrant(args.vagrant)

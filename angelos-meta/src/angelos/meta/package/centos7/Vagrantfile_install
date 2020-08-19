@@ -1,0 +1,33 @@
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "centos/7"
+  config.vm.box_version = "1905.1"
+  config.vm.synced_folder "data", "/home/vagrant/data", nsf: true
+
+  config.vm.network "forwarded_port", guest: 3, host: 2003
+  config.vm.network "forwarded_port", guest: 4, host: 2004
+  config.vm.network "forwarded_port", guest: 5, host: 2005
+
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+
+    sudo yum check-update
+    sudo yum upgrade -y
+    sudo yum install nano -y
+    ssh-keygen -f ~/.ssh/id_rsa -P ""
+
+  SHELL
+end

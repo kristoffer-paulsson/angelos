@@ -1,0 +1,118 @@
+{
+  "extensions": {
+    "enabled": [
+      "blocks",
+      "file_permissions",
+      "file_extras",
+      "python_venv"
+    ]
+  },
+  "core": {
+    "name": "angelos",
+    "version": "1.0.0b1",
+    "release": "1",
+    "summary": "Ἄγγελος is a safe messenger system.",
+    "group": "Application/System",
+    "license": "MIT",
+    "url": "https://github.com/kristoffer-paulsson/angelos",
+    "source": "",
+    "requires": [
+      "python38"
+    ],
+    "conflicts": [
+    ],
+    "obsoletes": [
+    ],
+    "provides": [
+    ]
+  },
+  "blocks": {
+    "post": [
+      "sudo chown -R angelos:angelos /opt/angelos",
+      "sudo chown -R angelos:angelos /var/lib/angelos",
+      "sudo chown -R angelos:angelos /var/log/angelos",
+      "sudo chown -R angelos:angelos /etc/angelos",
+      "ln -s /opt/angelos/angelos/bin/angelos /usr/local/bin/angelos"
+    ],
+    "postun": [
+      "sudo rm -fR /opt/angelos/*",
+      "sudo rmdir /opt/angelos",
+      "sudo rm -fR /var/lib/angelos/*",
+      "sudo rmdir /var/lib/angelos",
+      "sudo rm -fR /var/log/angelos/*",
+      "sudo rmdir /var/log/angelos",
+      "sudo rm -fR /etc/angelos/*",
+      "sudo rmdir /etc/angelos"
+    ],
+    "pre": [
+      "sudo mkdir /opt/angelos",
+      "sudo mkdir /var/lib/angelos",
+      "sudo mkdir /var/log/angelos",
+      "sudo mkdir /etc/angelos"
+    ],
+    "preun": [
+      "rm /usr/local/bin/angelos"
+    ],
+    "prep": [
+    ],
+    "build": [
+    ],
+    "install": [
+    ],
+    "clean": [
+    ],
+    "desc": [
+      "Ἄγγελος is a safe messenger system."
+    ],
+    "files": [
+    ],
+    "changelog": [
+    ]
+  },
+  "file_permissions": {
+    "user": "angelos",
+    "group": "angelos",
+    "create_user": true,
+    "create_group": true
+  },
+  "file_extras": {
+    "files": [
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos8/angelos.service",
+        "dest": "/etc/systemd/system/angelos.service"
+      },
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos8/env.json",
+        "dest": "/etc/angelos/env.json"
+      },
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos8/config.json",
+        "dest": "/etc/angelos/config.json"
+      },
+      {
+        "src": "angelos-meta/src/angelos/meta/package/centos8/admins.pub",
+        "dest": "/var/lib/angelos/admins.pub"
+      },
+      {
+        "src": "angelos-server/angelos",
+        "dest": "/opt/angelos/angelos/bin/angelos"
+      }
+    ]
+  },
+  "python_venv": {
+    "cmd": "virtualenv",
+    "flags": [
+      "--always-copy"
+    ],
+    "name": "angelos",
+    "path": "/opt/angelos",
+    "python": "python3.8",
+    "require_setup_py": true,
+    "requirements": [
+      "angelos-meta/src/angelos/meta/package/centos8/requirements.txt"
+    ],
+    "strip_binaries": false,
+    "use_pip_install": false,
+    "remove_pycache": true
+  }
+}
