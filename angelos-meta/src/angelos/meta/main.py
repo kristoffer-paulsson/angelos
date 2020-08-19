@@ -39,6 +39,7 @@ def vagrant(distro: str):
 
     cwd.mkdir(exist_ok=True)
     root.mkdir(exist_ok=True)
+    inst.mkdir(exist_ok=True)
     data.mkdir(exist_ok=True)
 
     import angelos.meta.package

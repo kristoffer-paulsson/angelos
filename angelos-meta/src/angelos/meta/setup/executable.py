@@ -47,8 +47,13 @@ class Executable(Command):
 
         cflags = subprocess.check_output(
             "python{}-config --cflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
-        ldflags = subprocess.check_output(
-            "python{}-config --ldflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+        if major == 3 and minor >= 8:
+            # https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
+            ldflags = subprocess.check_output(
+                "python{}-config --ldflags --embed".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+        else:
+            ldflags = subprocess.check_output(
+                "python{}-config --ldflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
 
         subprocess.check_call(
             "cython --embed -3 -o {}.c ./scripts/{}_entry_point.pyx".format(

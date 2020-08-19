@@ -24,6 +24,7 @@ Vagrant.configure("2") do |config|
     sudo yum groupinstall "Development Tools" -y
     sudo yum install nano git python36 python36-devel rpmdevtools -y
 
+    pip3.6 install pip --upgrade --user
     pip3.6 install rpmvenv --user
     pip3.6 install virtualenv --user
 
