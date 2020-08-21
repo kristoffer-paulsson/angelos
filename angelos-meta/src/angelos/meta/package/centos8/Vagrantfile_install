@@ -14,9 +14,8 @@
 #
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "centos/8"
-  config.vm.box_version = "1905.1"
-  config.vm.synced_folder "data", "/home/vagrant/data", nsf: true
+  config.vm.box = "generic/centos8"
+  config.vm.synced_folder "data", "/home/vagrant/data", type: "virtualbox"
 
   config.vm.network "forwarded_port", guest: 3, host: 2003
   config.vm.network "forwarded_port", guest: 4, host: 2004
@@ -24,9 +23,9 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision "shell", privileged: false, inline: <<-SHELL
 
-    sudo yum check-update
-    sudo yum upgrade -y
-    sudo yum install nano -y
+    sudo dnf check-update
+    sudo dnf upgrade -y
+    sudo dnf install nano -y
     ssh-keygen -f ~/.ssh/id_rsa -P ""
 
   SHELL

@@ -34,13 +34,15 @@ def parser():
 def vagrant(distro: str):
     cwd = Path(os.getcwd())
     root = cwd.joinpath("vagrant")
-    inst = cwd.joinpath("vagrant2")
     data = root.joinpath("data")
+    inst = cwd.joinpath("vagrant2")
+    data2 = inst.joinpath("data")
 
     cwd.mkdir(exist_ok=True)
     root.mkdir(exist_ok=True)
-    inst.mkdir(exist_ok=True)
     data.mkdir(exist_ok=True)
+    inst.mkdir(exist_ok=True)
+    data2.mkdir(exist_ok=True)
 
     import angelos.meta.package
     provision = Path(inspect.getfile(angelos.meta.package)).parent
