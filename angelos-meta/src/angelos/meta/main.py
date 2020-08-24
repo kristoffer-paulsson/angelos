@@ -26,7 +26,7 @@ def parser():
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--vagrant", dest="vagrant",
-        choices=["centos7", "centos8"]
+        choices=["centos7", "centos8", "debian10"]
     )
     return parser.parse_args()
 

@@ -1,0 +1,6 @@
+#DEBHELPER#
+
+chown -R angelos:angelos /opt/angelos
+chown -R angelos:angelos /var/lib/angelos
+chown -R angelos:angelos /var/log/angelos
+chown -R angelos:angelos /etc/angelos

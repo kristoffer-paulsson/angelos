@@ -1,0 +1,10 @@
+#DEBHELPER#
+
+# rm -fR /opt/angelos/*
+# rmdir /opt/angelos
+# rm -fR /var/lib/angelos/*
+# rmdir /var/lib/angelos
+# rm -fR /var/log/angelos/*
+# rmdir /var/log/angelos
+# rm -fR /etc/angelos/*
+# rmdir /etc/angelos

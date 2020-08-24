@@ -1,0 +1,11 @@
+#DEBHELPER#
+
+sudo groupadd angelos
+sudo adduser angelos --system -g angelos
+
+# mkdir /opt/angelos
+# mkdir /var/lib/angelos
+# mkdir /var/log/angelos
+# mkdir /etc/angelos
+
+# cp angelos-meta/src/angelos/meta/package/debian10/angelos.service /etc/systemd/system/angelos.service
