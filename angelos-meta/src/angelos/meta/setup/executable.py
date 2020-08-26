@@ -39,10 +39,10 @@ class Executable(Command):
         major, minor, _, _, _ = sys.version_info
         PY_VER = "{0}.{1}".format(major, minor)
 
-        self._dist = str(Path("./bin").absolute())
-        self._temp = tempfile.TemporaryDirectory()
+        dist = str(Path("./bin").absolute())
+        temp = tempfile.TemporaryDirectory()
 
-        temp_name = str(Path(self._temp.name, self.name).absolute())
+        temp_name = str(Path(temp.name, self.name).absolute())
         home = str(Path("./").absolute())
 
         cflags = subprocess.check_output(
@@ -61,10 +61,10 @@ class Executable(Command):
 
         subprocess.check_call(
             "gcc -o {0}.o -c {0}.c {1}".format(
-                temp_name, cflags), cwd=self._temp.name, shell=True)
+                temp_name, cflags), cwd=temp.name, shell=True)
 
         subprocess.check_call(
             "gcc -o ./{0} {1}.o {2}".format(
                 self.name, temp_name, ldflags), cwd=home, shell=True)
 
-        self._temp.cleanup()
+        temp.cleanup()
