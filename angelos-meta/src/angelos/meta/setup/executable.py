@@ -59,8 +59,9 @@ class Executable(Command):
             "cython --embed -3 -o {}.c ./scripts/{}_entry_point.pyx".format(
                 temp_name, self.name), cwd=home, shell=True)
 
+        # CFLAGS='-fPIC' Debian 10 specific only (?)
         subprocess.check_call(
-            "gcc -o {0}.o -c {0}.c {1}".format(
+            "gcc -o {0}.o -c {0}.c {1} -fPIC".format(
                 temp_name, cflags), cwd=temp.name, shell=True)
 
         subprocess.check_call(
