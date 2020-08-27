@@ -24,7 +24,7 @@ class Executable(Command):
     """Compile the executable"""
 
     user_options = [
-        ("--name=", "n", "Entry name."),
+        ("name=", "n", "Entry name."),
     ]
 
     def initialize_options(self):
@@ -47,6 +47,10 @@ class Executable(Command):
 
         cflags = subprocess.check_output(
             "python{}-config --cflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+
+        # Debian 10 specific
+        cflags = cflags.replace("-specs=/usr/share/dpkg/no-pie-compile.specs", "")
+
         if major == 3 and minor >= 8:
             # https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
             ldflags = subprocess.check_output(
@@ -59,9 +63,8 @@ class Executable(Command):
             "cython --embed -3 -o {}.c ./scripts/{}_entry_point.pyx".format(
                 temp_name, self.name), cwd=home, shell=True)
 
-        # CFLAGS='-fPIC' Debian 10 specific only (?)
         subprocess.check_call(
-            "gcc -o {0}.o -c {0}.c {1} -fPIC".format(
+            "gcc -o {0}.o -c {0}.c {1}".format(
                 temp_name, cflags), cwd=temp.name, shell=True)
 
         subprocess.check_call(
