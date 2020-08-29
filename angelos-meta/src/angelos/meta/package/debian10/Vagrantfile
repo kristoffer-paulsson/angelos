@@ -37,7 +37,6 @@ Vagrant.configure("2") do |config|
     pip3 install wheel --upgrade --user
     pip3 install -e . --user
 
-    # (deactivate; dpkg-buildpackage -us -uc -b)
     dpkg-buildpackage -us -uc -b
 
     # Copy deb to data folder.
