@@ -44,6 +44,7 @@ class NamespacePackageMixin:
             try:
                 os.chdir(os.path.join(work_dir, value))
                 addition = ["--user"] if "--user" in sys.argv else []
+                # addition = sys.argv[2:]
                 if develop:
                     pip.main(["install", "-e", "."] + addition)
                 else:
