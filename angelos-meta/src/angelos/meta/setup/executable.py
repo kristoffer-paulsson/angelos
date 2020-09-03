@@ -65,10 +65,10 @@ class Executable(Command):
 
         subprocess.check_call(
             "gcc -o {0}.o -c {0}.c {1}".format(
-                temp_name, cflags), cwd=temp.name, shell=True)
+                temp_name, cflags), cwd=temp_name, shell=True)
 
         subprocess.check_call(
-            "gcc -o ./{0} {1}.o {2}".format(
+            "gcc -o ./bin/{0} {1}.o {2}".format(
                 self.name, temp_name, ldflags), cwd=home, shell=True)
 
         temp.cleanup()

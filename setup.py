@@ -17,6 +17,7 @@
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pip
 from setuptools import setup
@@ -40,11 +41,12 @@ class NamespacePackageMixin:
     def namespace_packages(self, develop: bool = False):
         """Use pip to install all microlibraries."""
         work_dir = os.getcwd()
+        prefix = Path(self.path).absolute() if hasattr(self, "path") else None
         for key, value in self.NAMESPACES.items():
             try:
                 os.chdir(os.path.join(work_dir, value))
                 addition = ["--user"] if "--user" in sys.argv else []
-                # addition = sys.argv[2:]
+                addition = ["--ignore-installed", "--prefix", prefix] if prefix else []
                 if develop:
                     pip.main(["install", "-e", "."] + addition)
                 else:
@@ -72,6 +74,56 @@ class CustomInstall(install, NamespacePackageMixin):
         self.namespace_packages()
 
 
+class AngelosEnvBuilder(EnvBuilder):
+    def setup_scripts(self, context: SimpleNamespace) -> None:
+        """Don't install activation scripts."""
+        pass
+
+
+class CustomEnvironment(install, NamespacePackageMixin):
+    """Custom steps for setting up virtual environment command."""
+
+    user_options = [
+        ("path=", "p", "Virtual environment directory."),
+    ] + install.user_options
+
+    def initialize_options(self):
+        """Initialize options"""
+        install.initialize_options(self)
+        self.path = None
+
+    def finalize_options(self):
+        """Finalize options"""
+        install.finalize_options(self)
+
+    def run(self):
+        major, minor, _, _, _ = sys.version_info
+        PY_VER = "{0}.{1}".format(major, minor)
+
+        path = str(Path(self.path).absolute())
+        env = AngelosEnvBuilder()
+        env.create(path)
+
+        install.run(self)
+        self.namespace_packages()
+
+        work_dir = os.getcwd()
+        try:
+            server = self.NAMESPACES["angelos.server"]
+            os.chdir(os.path.join(work_dir, server))
+            addition = ["--user"] if "--user" in sys.argv else []
+            addition = ["--ignore-installed", "--prefix", prefix] if prefix else []
+            if develop:
+                pip.main(["install", "-e", "."] + addition)
+            else:
+                pip.main(["install", "."] + addition)
+        except Exception as exc:
+            print("Oops, something went wrong.", key)
+            print(exc)
+        finally:
+            os.chdir(work_dir)
+
+
 NAME = "angelos"
 VERSION = "1.0.0b1"
 RELEASE = ""
@@ -83,13 +135,14 @@ config = {
     "description": "A safe messaging system",
     "author": "Kristoffer Paulsson",
     "author_email": "kristoffer.paulsson@talenten.se",
-    "long_description": "Ἄγγελος is a safe messenger system. \"Angelos means 'Carrier of a divine message.\"",
+    "long_description": "Ἄγγελος is a safe messenger system. Angelos means \"Carrier of a divine message.\"",
     # Path("./README.md").read_text(),
     "long_description_content_type": "text/markdown",
     "url": "https://github.com/kristoffer-paulsson/angelos",
     "cmdclass": {
         "develop": CustomDevelop,
-        "install": CustomInstall
+        "install": CustomInstall,
+        "venv": CustomEnvironment
     },
     "classifiers": [
         "Development Status :: 2 - Pre-Alpha",

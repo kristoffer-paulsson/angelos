@@ -15,7 +15,6 @@
 from pathlib import Path
 
 from Cython.Build import cythonize
-from angelos.meta.setup.venv import Environment
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 
@@ -64,8 +63,7 @@ config = {
     "cmdclass": {
         "develop": CustomDevelop,
         "install": CustomInstall,
-        "exe": Executable,
-        "venv": Environment
+        "exe": Executable
     },
     "command_options": {
         "exe": {
