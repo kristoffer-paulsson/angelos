@@ -6,8 +6,8 @@
 /angelos-*/build/
 /angelos-*/dist/
 /angelos-*/.tox/
-/angelos-*/tarball/*
-!/angelos-*/tarball/.gitkeep
+/angelos-bin/tarball/*
+!/angelos-bin/tarball/.gitkeep
 /dev_env/*
 *.egg-info/
 /angelos-bin/usr/

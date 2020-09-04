@@ -98,7 +98,7 @@ config = {
           "Programming Language :: Cython",
           "Topic :: Security :: Cryptography",
     ],
-    "data_files": [("", [str(p) for p in Path("./tarball").glob("*.tar.gz")])],
+    # "data_files": [("", [str(p) for p in Path("tarball").glob("*.tar.gz")])],
     "package_dir": {"": "src"},
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "namespace_packages": ["angelos"],

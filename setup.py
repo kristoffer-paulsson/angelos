@@ -15,9 +15,11 @@
 #
 """Angelos build script."""
 import os
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from venv import EnvBuilder
 
 import pip
 from setuptools import setup
@@ -99,29 +101,33 @@ class CustomEnvironment(install, NamespacePackageMixin):
     def run(self):
         major, minor, _, _, _ = sys.version_info
         PY_VER = "{0}.{1}".format(major, minor)
-
         path = str(Path(self.path).absolute())
+
+        # Compile entry point
+        subprocess.check_call(
+            "python setup.py exe --name={0}".format("angelos"),
+            cwd=str(Path(os.curdir, self.NAMESPACES["angelos.server"])),
+            shell=True
+        )
+
+        # Generate virtual environment
         env = AngelosEnvBuilder()
         env.create(path)
 
+        # Install and compile angelos server to environment
         install.run(self)
         self.namespace_packages()
 
-        work_dir = os.getcwd()
-        try:
-            server = self.NAMESPACES["angelos.server"]
-            os.chdir(os.path.join(work_dir, server))
-            addition = ["--user"] if "--user" in sys.argv else []
-            addition = ["--ignore-installed", "--prefix", prefix] if prefix else []
-            if develop:
-                pip.main(["install", "-e", "."] + addition)
-            else:
-                pip.main(["install", "."] + addition)
-        except Exception as exc:
-            print("Oops, something went wrong.", key)
-            print(exc)
-        finally:
-            os.chdir(work_dir)
+        # Copy entry point to virtual environment
+        subprocess.check_call(
+            "cp {0} {1}".format(
+                str(Path(os.curdir, self.NAMESPACES["angelos.server"], "bin/angelos")),
+                str(Path(path, "bin/angelos"))
+            ), shell=True
+        )
+
+        # Strip symbols from binaries in the environment
+        subprocess.check_call("strip -x -S $(find {0} -type f)".format(path), shell=True)
 
 
 NAME = "angelos"
