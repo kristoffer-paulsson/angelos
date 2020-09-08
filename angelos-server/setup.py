@@ -18,7 +18,7 @@ from Cython.Build import cythonize
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 
-from angelos.meta.setup import LibraryScanner
+from angelos.meta.setup import LibraryScanner, Vendor, VendorCompilePython
 from setuptools import setup, find_namespace_packages
 
 from angelos.meta.setup.executable import Executable
@@ -63,11 +63,25 @@ config = {
     "cmdclass": {
         "develop": CustomDevelop,
         "install": CustomInstall,
-        "exe": Executable
+        "exe": Executable,
+        "vendor": Vendor,
     },
     "command_options": {
         "exe": {
             "name": ("", "angelos")
+        },
+        "vendor": {
+            "base_dir": ("", str(Path(__file__).parent.absolute())),
+            "compile": ("", [
+                {
+                    "class": VendorCompilePython,
+                    "name": "python",
+                    "download": "https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tgz",
+                    "local": "Python-3.8.5.tgz",
+                    "internal": "Python-3.8.5",
+                    "check": "/nowhere",
+                }
+            ]),
         }
     },
     "classifiers": [

@@ -1,6 +1,7 @@
 *.c
 *.so
 *.tar.gz
+tarball/
 /dist/
 /build/
 /angelos-*/build/

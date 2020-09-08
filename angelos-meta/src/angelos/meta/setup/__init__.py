@@ -14,9 +14,11 @@
 #
 
 from .scanner import LibraryScanner
-from .vendor import Vendor
+from .vendor import Vendor, VendorCompileNacl, VendorCompilePython
 
 __all__ = [
     "LibraryScanner",
-    "Vendor"
+    "Vendor",
+    "VendorCompileNacl",
+    "VendorCompilePython",
 ]

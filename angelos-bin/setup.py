@@ -20,7 +20,7 @@ from setuptools.command.develop import develop
 from setuptools.command.install import install
 from wheel.bdist_wheel import bdist_wheel
 
-from angelos.meta.setup import LibraryScanner, Vendor
+from angelos.meta.setup import LibraryScanner, Vendor, VendorCompileNacl
 
 
 class CustomDevelop(develop):
@@ -82,11 +82,12 @@ config = {
             "base_dir": ("", str(Path(__file__).parent.absolute())),
             "compile": ("", [
                 {
+                    "class": VendorCompileNacl,
                     "name": "libsodium",
                     "download": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz",
                     "local": "libsodium-1.0.18.tar.gz",
                     "internal": "libsodium-stable",
-                    "target": "usr/local/lib/libsodium.a",
+                    "check": "usr/local/lib/libsodium.a",
                 }
             ]),
         }
