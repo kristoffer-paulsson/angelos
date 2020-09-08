@@ -25,11 +25,13 @@ class Executable(Command):
 
     user_options = [
         ("name=", "n", "Entry name."),
+        ("prefix=", "p", "Possible prefix where to link against.")
     ]
 
     def initialize_options(self):
         """Initialize options"""
         self.name = None
+        self.prefix = None
 
     def finalize_options(self):
         """Finalize options"""
@@ -39,25 +41,29 @@ class Executable(Command):
         major, minor, _, _, _ = sys.version_info
         PY_VER = "{0}.{1}".format(major, minor)
 
-        dist = str(Path("./bin").absolute())
+        config = str(
+            Path(self.prefix, "bin", "python{}-config".format(PY_VER)).resolve()
+        ) if self.prefix else "python{}-config".format(PY_VER)
+        dist = str(Path(self.prefix, "bin").resolve()) if self.prefix else str(Path("./bin").absolute())
+
         temp = tempfile.TemporaryDirectory()
 
         temp_name = str(Path(temp.name, self.name).absolute())
         home = str(Path("./").absolute())
 
         cflags = subprocess.check_output(
-            "python{}-config --cflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+            "{} --cflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
 
         # Debian 10 specific
         cflags = cflags.replace("-specs=/usr/share/dpkg/no-pie-compile.specs", "")
 
+        # https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
         if major == 3 and minor >= 8:
-            # https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
             ldflags = subprocess.check_output(
-                "python{}-config --ldflags --embed".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+                "{} --ldflags --embed".format(config), stderr=subprocess.STDOUT, shell=True).decode()
         else:
             ldflags = subprocess.check_output(
-                "python{}-config --ldflags".format(PY_VER), stderr=subprocess.STDOUT, shell=True).decode()
+                "{} --ldflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
 
         subprocess.check_call(
             "cython --embed -3 -o {}.c ./scripts/{}_entry_point.pyx".format(
