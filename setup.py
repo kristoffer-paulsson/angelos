@@ -22,7 +22,7 @@ from types import SimpleNamespace
 from venv import EnvBuilder
 
 import pip
-from setuptools import setup
+from setuptools import setup, Command
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 
@@ -82,52 +82,91 @@ class AngelosEnvBuilder(EnvBuilder):
         pass
 
 
-class CustomEnvironment(install, NamespacePackageMixin):
+class CustomEnvironment(Command, NamespacePackageMixin):
     """Custom steps for setting up virtual environment command."""
 
     user_options = [
         ("path=", "p", "Virtual environment directory."),
-    ] + install.user_options
+    ]
 
     def initialize_options(self):
         """Initialize options"""
-        install.initialize_options(self)
         self.path = None
 
     def finalize_options(self):
         """Finalize options"""
-        install.finalize_options(self)
+        pass
 
     def run(self):
-        major, minor, _, _, _ = sys.version_info
-        PY_VER = "{0}.{1}".format(major, minor)
-        path = str(Path(self.path).absolute())
+        path_install = str(Path(self.path).resolve())
+        path_current = str(Path(os.curdir).resolve())
+        path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
+        path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
 
-        # Compile entry point
+        env = {k: os.environ[k] for k in os.environ.keys() if k not in (
+            "PYCHARM_MATPLOTLIB_INTERACTIVE", "IPYTHONENABLE", "PYDEVD_LOAD_VALUES_ASYNC",
+            "__PYVENV_LAUNCHER__", "PYTHONUNBUFFERED", "PYTHONIOENCODING",
+            "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
+            "PYTHONPATH"
+        )}
+
+        # Compile and install python
         subprocess.check_call(
-            "python setup.py exe --name={0}".format("angelos"),
-            cwd=str(Path(os.curdir, self.NAMESPACES["angelos.server"])),
+            "python setup.py vendor --prefix={}".format(path_install),
+            cwd=path_server,
             shell=True
         )
 
-        # Generate virtual environment
-        env = AngelosEnvBuilder()
-        env.create(path)
+        # Compile and install build requirements
+        for pypi in ["pip", "setuptools", "wheel", "cython"]:
+            subprocess.run(
+                "{1}/bin/python3 -m pip install {0} --upgrade".format(pypi, path_install),
+                cwd=path_current,
+                shell=True,
+                env=env
+            )
 
-        # Install and compile angelos server to environment
-        install.run(self)
-        self.namespace_packages()
-
-        # Copy entry point to virtual environment
-        subprocess.check_call(
-            "cp {0} {1}".format(
-                str(Path(os.curdir, self.NAMESPACES["angelos.server"], "bin/angelos")),
-                str(Path(path, "bin/angelos"))
-            ), shell=True
+        # Compile and install angelos meta subpackage
+        subprocess.run(
+            "{0}/bin/python3 -m pip install . --ignore-installed --prefix={0}".format(path_install),
+            cwd=path_meta,
+            shell=True,
+            env=env
         )
 
+        # Compile and install angelos entry point
+        subprocess.run(
+            "{1}/bin/python3 setup.py exe --name={0} --prefix={1}".format("angelos", path_install),
+            cwd=path_server,
+            shell=True,
+            env=env
+        )
+
+        # Compile and install angelos binaries
+        subprocess.run(
+            "{0}/bin/python3 setup.py install --prefix={0}".format(path_install),
+            cwd=path_current,
+            shell=True,
+            env=env
+        )
+
+        # Strip all angelos binaries
+        subprocess.run(
+            "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
+                path_install), cwd=path_current, shell=True, env=env)
+        subprocess.run(
+            "strip -x -S $(find {}/bin -type f)".format(
+                path_install), cwd=path_current, shell=True, env=env)
+
+        # Generate virtual environment
+        # env = AngelosEnvBuilder()
+        # env.create(path)
+
+        # Install and compile angelos server to environment
+        # install.run(self)
+        # self.namespace_packages()
+
         # Strip symbols from binaries in the environment
-        subprocess.check_call("strip -x -S $(find {0} -type f)".format(path), shell=True)
 
 
 NAME = "angelos"
