@@ -87,86 +87,129 @@ class CustomEnvironment(Command, NamespacePackageMixin):
 
     user_options = [
         ("path=", "p", "Virtual environment directory."),
+        ("step=", "s", "Start from step X."),
     ]
 
     def initialize_options(self):
         """Initialize options"""
         self.path = None
+        self.step = 0
 
     def finalize_options(self):
         """Finalize options"""
         pass
 
-    def run(self):
-        path_install = str(Path(self.path).resolve())
-        path_current = str(Path(os.curdir).resolve())
-        path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
-        path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
+    def prepare(self):
+        """Make preparations."""
+        self.path_install = str(Path(self.path).resolve())
+        self.path_current = str(Path(os.curdir).resolve())
+        self.path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
+        self.path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
 
-        env = {k: os.environ[k] for k in os.environ.keys() if k not in (
+        self.env = {k: os.environ[k] for k in os.environ.keys() if k not in (
             "PYCHARM_MATPLOTLIB_INTERACTIVE", "IPYTHONENABLE", "PYDEVD_LOAD_VALUES_ASYNC",
             "__PYVENV_LAUNCHER__", "PYTHONUNBUFFERED", "PYTHONIOENCODING",
             "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
             "PYTHONPATH"
         )}
 
-        # Compile and install python
-        subprocess.check_call(
-            "python setup.py vendor --prefix={}".format(path_install),
-            cwd=path_server,
-            shell=True
-        )
-
-        # Compile and install build requirements
-        for pypi in ["pip", "setuptools", "wheel", "cython"]:
-            subprocess.run(
-                "{1}/bin/python3 -m pip install {0} --upgrade".format(pypi, path_install),
-                cwd=path_current,
-                shell=True,
-                env=env
+    def create(self):
+        """Create a python environment."""
+        # 1. Compile and install python
+        if self.step < 2:
+            subprocess.check_call(
+                "python setup.py vendor --prefix={}".format(self.path_install),
+                cwd=self.path_server,
+                shell=True
             )
 
-        # Compile and install angelos meta subpackage
-        subprocess.run(
-            "{0}/bin/python3 -m pip install . --ignore-installed --prefix={0}".format(path_install),
-            cwd=path_meta,
-            shell=True,
-            env=env
-        )
+        # 2. Compile and install build requirements
+        if self.step < 3:
+            for pypi in ["pip", "setuptools", "wheel", "cython"]:
+                subprocess.run(
+                    "{1}/bin/python3 -m pip install {0} --upgrade".format(pypi, self.path_install),
+                    cwd=self.path_current,
+                    shell=True,
+                    env=self.env
+                )
 
-        # Compile and install angelos entry point
-        subprocess.run(
-            "{1}/bin/python3 setup.py exe --name={0} --prefix={1}".format("angelos", path_install),
-            cwd=path_server,
-            shell=True,
-            env=env
-        )
+        # 3. Install angelos meta subpackage
+        if self.step < 4:
+            subprocess.run(
+                "{0}/bin/python3 -m pip install . --ignore-installed --prefix={0}".format(self.path_install),
+                cwd=self.path_meta,
+                shell=True,
+                env=self.env
+            )
 
-        # Compile and install angelos binaries
-        subprocess.run(
-            "{0}/bin/python3 setup.py install --prefix={0}".format(path_install),
-            cwd=path_current,
-            shell=True,
-            env=env
-        )
+    def install(self):
+        """Install angelos to environment."""
+        # 4. Compile and install angelos entry point
+        if self.step < 5:
+            subprocess.run(
+                "{1}/bin/python3 setup.py exe --name={0} --prefix={1}".format("angelos", self.path_install),
+                cwd=self.path_server,
+                shell=True,
+                env=self.env
+            )
 
-        # Strip all angelos binaries
-        subprocess.run(
-            "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
-                path_install), cwd=path_current, shell=True, env=env)
-        subprocess.run(
-            "strip -x -S $(find {}/bin -type f)".format(
-                path_install), cwd=path_current, shell=True, env=env)
+        # 5. Compile and install angelos binaries
+        if self.step < 6:
+            subprocess.run(
+                "{0}/bin/python3 setup.py install --prefix={0}".format(self.path_install),
+                cwd=self.path_current,
+                shell=True,
+                env=self.env
+            )
 
-        # Generate virtual environment
-        # env = AngelosEnvBuilder()
-        # env.create(path)
+    def strip(self):
+        """Strip all libraries and binaries from debug symbols."""
+        # 6.
+        if self.step < 7:
+            subprocess.run(
+                "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
+                    self.path_install), cwd=self.path_current, shell=True, env=self.env)
+            subprocess.run(
+                "strip -x -S $(find {}/bin -type f)".format(
+                    self.path_install), cwd=self.path_current, shell=True, env=self.env)
 
-        # Install and compile angelos server to environment
-        # install.run(self)
-        # self.namespace_packages()
+    def cleanup(self):
+        """Clean up unnecessary artefacts."""
+        # 7. Uninstall unnecessary requirements
+        if self.step < 8:
+            for pypi in ["cython", "wheel", "setuptools", "pip"]:
+                subprocess.run(
+                    "{1}/bin/python3 -m pip uninstall {0} --yes".format(pypi, self.path_install),
+                    cwd=self.path_current,
+                    shell=True,
+                    env=self.env
+                )
 
-        # Strip symbols from binaries in the environment
+        # 8. Remove unnecessary folders
+        if self.step < 9:
+            subprocess.run(
+                "rm -fR {}/share".format(self.path_install),
+                cwd=self.path_current, shell=True, env=self.env)
+            subprocess.run(
+                "rm -fR {}/include".format(self.path_install),
+                cwd=self.path_current, shell=True, env=self.env)
+
+        # 9. Remove unused binaries and links
+        if self.step < 10:
+            subprocess.run(
+                "find . ! -name 'angelos' -type f -exec rm -f {} +",
+                cwd=str(Path(self.path_install, "bin").resolve()), shell=True, env=self.env)
+            subprocess.run(
+                "find . ! -name 'angelos' -type l -exec rm -f {} +",
+                cwd=str(Path(self.path_install, "bin").resolve()), shell=True, env=self.env)
+
+    def run(self):
+        """Create a frozen standalone angelos server environment."""
+        self.prepare()
+        self.create()
+        self.install()
+        self.strip()
+        self.cleanup()
 
 
 NAME = "angelos"
