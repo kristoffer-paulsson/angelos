@@ -152,6 +152,18 @@ class CustomEnvironment(Command, NamespacePackageMixin):
                 shell=True,
                 env=self.env
             )
+            subprocess.run(
+                "{1}/bin/python3 setup.py script --name={0} --prefix={1}".format("install", self.path_install),
+                cwd=self.path_server,
+                shell=True,
+                env=self.env
+            )
+            subprocess.run(
+                "{1}/bin/python3 setup.py script --name={0} --prefix={1}".format("uninstall", self.path_install),
+                cwd=self.path_server,
+                shell=True,
+                env=self.env
+            )
 
         # 5. Compile and install angelos binaries
         if self.step < 6:
@@ -197,7 +209,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
         # 9. Remove unused binaries and links
         if self.step < 10:
             subprocess.run(
-                "find . ! -name 'angelos' -type f -exec rm -f {} +",
+                "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
                 cwd=str(Path(self.path_install, "bin").resolve()), shell=True, env=self.env)
             subprocess.run(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",

@@ -22,6 +22,7 @@ from angelos.meta.setup import LibraryScanner, Vendor, VendorCompilePython
 from setuptools import setup, find_namespace_packages
 
 from angelos.meta.setup.executable import Executable
+from angelos.meta.setup.script import Script
 
 
 class CustomDevelop(develop):
@@ -64,7 +65,8 @@ config = {
         "develop": CustomDevelop,
         "install": CustomInstall,
         "exe": Executable,
-        "vendor": Vendor,
+        "script": Script,
+        "vendor": Vendor
     },
     "command_options": {
         "exe": {

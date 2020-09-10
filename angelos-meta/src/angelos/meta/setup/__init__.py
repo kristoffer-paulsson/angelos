@@ -20,5 +20,5 @@ __all__ = [
     "LibraryScanner",
     "Vendor",
     "VendorCompileNacl",
-    "VendorCompilePython",
+    "VendorCompilePython"
 ]
