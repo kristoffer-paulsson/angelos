@@ -15,6 +15,7 @@
 #
 """Angelos build script."""
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -105,38 +106,59 @@ class CustomEnvironment(Command, NamespacePackageMixin):
     user_options = [
         ("path=", "p", "Virtual environment directory."),
         ("step=", "s", "Start from step X."),
-        ("skip=", "k", "Skip over parts (prepare,create,install,strip,cleanup)."),
 
     ]
 
     def initialize_options(self):
         """Initialize options"""
         self.path = None
-        self.step = 0
-        self.skip = ""
+        self.step = None
 
     def finalize_options(self):
         """Finalize options"""
-        pass
+        try:
+            if not Path(self.path).exists():
+                raise TypeError()
+        except TypeError:
+            print("Path is invalid")
+            exit(1)
+
+        if isinstance(self.step, str):
+            matches = []
+            for match in re.findall(r"""(\d+-\d+|\d+)""", self.step):
+                if "-" in match:
+                    se = match.split("-")
+                    matches += list(range(int(se[0]), int(se[1])+1))
+                else:
+                    matches += [int(match)]
+            if matches:
+                self.step = matches
+            else:
+                print("Invalid steps given.")
+                exit(1)
+
+        if not self.step:
+            self.step = list(range(1, 10+1))
 
     def prepare(self):
         """Make preparations."""
-        self.path_install = str(Path(self.path).resolve())
-        self.path_current = str(Path(os.curdir).resolve())
-        self.path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
-        self.path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
+        if 1 in self.step:
+            self.path_install = str(Path(self.path).resolve())
+            self.path_current = str(Path(os.curdir).resolve())
+            self.path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
+            self.path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
 
-        self.env = {k: os.environ[k] for k in os.environ.keys() if k not in (
-            "PYCHARM_MATPLOTLIB_INTERACTIVE", "IPYTHONENABLE", "PYDEVD_LOAD_VALUES_ASYNC",
-            "__PYVENV_LAUNCHER__", "PYTHONUNBUFFERED", "PYTHONIOENCODING",
-            "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
-            "PYTHONPATH"
-        )}
+            self.env = {k: os.environ[k] for k in os.environ.keys() if k not in (
+                "PYCHARM_MATPLOTLIB_INTERACTIVE", "IPYTHONENABLE", "PYDEVD_LOAD_VALUES_ASYNC",
+                "__PYVENV_LAUNCHER__", "PYTHONUNBUFFERED", "PYTHONIOENCODING",
+                "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
+                "PYTHONPATH"
+            )}
 
     def create(self):
         """Create a python environment."""
         # 1. Compile and install python
-        if self.step < 2:
+        if 2 in self.step:
             subprocess.check_call(
                 "python setup.py vendor --prefix={}".format(self.path_install),
                 cwd=self.path_server,
@@ -144,7 +166,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
             )
 
         # 2. Compile and install build requirements
-        if self.step < 3:
+        if 3 in self.step:
             for pypi in ["pip", "setuptools", "wheel", "cython"]:
                 subprocess.run(
                     "{1}/bin/python3 -m pip install {0} --upgrade".format(pypi, self.path_install),
@@ -154,7 +176,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
                 )
 
         # 3. Install angelos meta subpackage
-        if self.step < 4:
+        if 4 in self.step:
             subprocess.run(
                 "{0}/bin/python3 -m pip install . --ignore-installed --prefix={0}".format(self.path_install),
                 cwd=self.path_meta,
@@ -165,7 +187,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
     def install(self):
         """Install angelos to environment."""
         # 4. Compile and install angelos entry point
-        if self.step < 5:
+        if 5 in self.step:
             subprocess.run(
                 "{1}/bin/python3 setup.py exe --name={0} --prefix={1}".format("angelos", self.path_install),
                 cwd=self.path_server,
@@ -186,7 +208,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
             )
 
         # 5. Compile and install angelos binaries
-        if self.step < 6:
+        if 6 in self.step:
             subprocess.run(
                 "{0}/bin/python3 setup.py install --prefix={0}".format(self.path_install),
                 cwd=self.path_current,
@@ -197,7 +219,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
     def strip(self):
         """Strip all libraries and binaries from debug symbols."""
         # 6.
-        if self.step < 7:
+        if 7 in self.step:
             subprocess.run(
                 "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
                     self.path_install), cwd=self.path_current, shell=True, env=self.env)
@@ -208,7 +230,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
     def cleanup(self):
         """Clean up unnecessary artefacts."""
         # 7. Uninstall unnecessary requirements
-        if self.step < 8:
+        if 8 in self.step:
             for pypi in ["cython", "wheel", "setuptools", "pip"]:
                 subprocess.run(
                     "{1}/bin/python3 -m pip uninstall {0} --yes".format(pypi, self.path_install),
@@ -218,7 +240,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
                 )
 
         # 8. Remove unnecessary folders
-        if self.step < 9:
+        if 9 in self.step:
             subprocess.run(
                 "rm -fR {}/share".format(self.path_install),
                 cwd=self.path_current, shell=True, env=self.env)
@@ -227,7 +249,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
                 cwd=self.path_current, shell=True, env=self.env)
 
         # 9. Remove unused binaries and links
-        if self.step < 10:
+        if 10 in self.step:
             subprocess.run(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
                 cwd=str(Path(self.path_install, "bin").resolve()), shell=True, env=self.env)
@@ -237,20 +259,11 @@ class CustomEnvironment(Command, NamespacePackageMixin):
 
     def run(self):
         """Create a frozen standalone angelos server environment."""
-        if "prepare" not in self.skip:
-            self.prepare()
-
-        if "create" not in self.skip:
-            self.create()
-
-        if "install" not in self.skip:
-            self.install()
-
-        if "strip" not in self.skip:
-            self.strip()
-
-        if "cleanup" not in self.skip:
-            self.cleanup()
+        self.prepare()
+        self.create()
+        self.install()
+        self.strip()
+        self.cleanup()
 
 
 NAME = "angelos"
