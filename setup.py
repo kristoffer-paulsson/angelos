@@ -85,9 +85,28 @@ class AngelosEnvBuilder(EnvBuilder):
 class CustomEnvironment(Command, NamespacePackageMixin):
     """Custom steps for setting up virtual environment command."""
 
+    """Binary libraries for CPython:
+    libc6               libc
+    libbz2              libbz2          libbz2-dev      
+    libdb5.3            libdb
+    libffi6             libffi          libffi-dev      /usr/lib/x86_64-linux-gnu/libffi.a
+    liblzma5            liblzma         liblzma-dev     /usr/lib/x86_64-linux-gnu/liblzma.a
+    libmpdec2
+    libncursesw6        libncursesw
+    libssl1.1           libssl3
+    libreadline7        libreadline
+    libsqlite3-0        libsqlite3
+    libtinfo6           libtinfo
+    libuuid1            libuuid
+    
+    Search regex:
+    /usr/lib(?:64)?/lib(\w*).(?:so|dll|dylib)
+    """
     user_options = [
         ("path=", "p", "Virtual environment directory."),
         ("step=", "s", "Start from step X."),
+        ("skip=", "k", "Skip over parts (prepare,create,install,strip,cleanup)."),
+
     ]
 
     def initialize_options(self):
@@ -217,11 +236,20 @@ class CustomEnvironment(Command, NamespacePackageMixin):
 
     def run(self):
         """Create a frozen standalone angelos server environment."""
-        self.prepare()
-        self.create()
-        self.install()
-        self.strip()
-        self.cleanup()
+        if "prepare" not in self.skip:
+            self.prepare()
+
+        if "create" not in self.skip:
+            self.create()
+
+        if "install" not in self.skip:
+            self.install()
+
+        if "strip" not in self.skip:
+            self.strip()
+
+        if "cleanup" not in self.skip:
+            self.cleanup()
 
 
 NAME = "angelos"
