@@ -113,6 +113,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
         """Initialize options"""
         self.path = None
         self.step = 0
+        self.skip = ""
 
     def finalize_options(self):
         """Finalize options"""
