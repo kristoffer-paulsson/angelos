@@ -44,12 +44,13 @@ class NamespacePackageMixin:
     def namespace_packages(self, develop: bool = False):
         """Use pip to install all microlibraries."""
         work_dir = os.getcwd()
-        prefix = Path(self.path).absolute() if hasattr(self, "path") else None
+        prefix = Path(self.prefix).absolute() if hasattr(self, "prefix") else None
         for key, value in self.NAMESPACES.items():
             try:
                 os.chdir(os.path.join(work_dir, value))
                 addition = ["--user"] if "--user" in sys.argv else []
                 addition = ["--ignore-installed", "--prefix", prefix] if prefix else []
+                print("prefix", prefix)
                 if develop:
                     pip.main(["install", "-e", "."] + addition)
                 else:
@@ -86,23 +87,6 @@ class AngelosEnvBuilder(EnvBuilder):
 class CustomEnvironment(Command, NamespacePackageMixin):
     """Custom steps for setting up virtual environment command."""
 
-    """Binary libraries for CPython:
-    libc6               libc
-    libbz2              libbz2          libbz2-dev      
-    libdb5.3            libdb
-    libffi6             libffi          libffi-dev      /usr/lib/x86_64-linux-gnu/libffi.a
-    liblzma5            liblzma         liblzma-dev     /usr/lib/x86_64-linux-gnu/liblzma.a
-    libmpdec2
-    libncursesw6        libncursesw
-    libssl1.1           libssl3
-    libreadline7        libreadline
-    libsqlite3-0        libsqlite3
-    libtinfo6           libtinfo
-    libuuid1            libuuid
-    
-    Search regex:
-    /usr/lib(?:64)?/lib(\w*).(?:so|dll|dylib)
-    """
     user_options = [
         ("path=", "p", "Virtual environment directory."),
         ("step=", "s", "Start from step X."),
@@ -134,7 +118,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
             if matches:
                 self.step = matches
             else:
-                print("Invalid steps given.")
+                print("Invalid steps")
                 exit(1)
 
         if not self.step:
@@ -188,6 +172,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
         """Install angelos to environment."""
         # 4. Compile and install angelos entry point
         if 5 in self.step:
+            print("PREFIX", self.path_install)
             subprocess.run(
                 "{1}/bin/python3 setup.py exe --name={0} --prefix={1}".format("angelos", self.path_install),
                 cwd=self.path_server,
@@ -209,6 +194,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
 
         # 5. Compile and install angelos binaries
         if 6 in self.step:
+            print("PREFIX", self.path_install)
             subprocess.run(
                 "{0}/bin/python3 setup.py install --prefix={0}".format(self.path_install),
                 cwd=self.path_current,

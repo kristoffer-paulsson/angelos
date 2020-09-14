@@ -74,7 +74,8 @@ class Executable(Command):
                 temp_name, cflags), cwd=temp.name, shell=True)
 
         subprocess.check_call(
-            "gcc -o {0}/{1} {2}.o {3}".format(
+            "gcc -rdynamic -o {0}/{1} {2}.o {3}".format(
                 dist, self.name, temp_name, ldflags), cwd=home, shell=True)
+        # -rdynamic --> --export-dynamic
 
         temp.cleanup()

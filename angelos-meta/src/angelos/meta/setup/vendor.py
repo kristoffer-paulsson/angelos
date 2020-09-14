@@ -150,7 +150,7 @@ class VendorCompilePython(VendorCompile):
         self._env = {k: os.environ[k] for k in os.environ.keys() if k not in self.EXCLUDE}
 
         subprocess.run(
-            "./configure --enable-optimization --prefix={}".format(self._prefix),
+            "./configure --enable-optimization --with-lto --prefix={}".format(self._prefix),
             cwd=self._work, shell=True, env=self._env
         )
 
