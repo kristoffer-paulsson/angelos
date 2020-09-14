@@ -44,13 +44,12 @@ class NamespacePackageMixin:
     def namespace_packages(self, develop: bool = False):
         """Use pip to install all microlibraries."""
         work_dir = os.getcwd()
-        prefix = Path(self.prefix).absolute() if hasattr(self, "prefix") else None
+        prefix = Path(self.prefix).absolute() if self.prefix else None
         for key, value in self.NAMESPACES.items():
             try:
                 os.chdir(os.path.join(work_dir, value))
                 addition = ["--user"] if "--user" in sys.argv else []
                 addition = ["--ignore-installed", "--prefix", prefix] if prefix else []
-                print("prefix", prefix)
                 if develop:
                     pip.main(["install", "-e", "."] + addition)
                 else:
@@ -170,7 +169,6 @@ class CustomEnvironment(Command, NamespacePackageMixin):
         """Install angelos to environment."""
         # 4. Compile and install angelos entry point
         if 5 in self.step:
-            print("PREFIX", self.path_install)
             subprocess.run(
                 "{1}/bin/python3 setup.py exe --name={0} --prefix={1}".format("angelos", self.path_install),
                 cwd=self.path_server,

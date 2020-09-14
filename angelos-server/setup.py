@@ -29,7 +29,6 @@ class CustomDevelop(develop):
     """Custom steps for develop command."""
 
     def run(self):
-        self.run_command("exe")
         develop.run(self)
 
 
@@ -38,7 +37,6 @@ class CustomInstall(install):
 
     def run(self):
         """Carry out preparations and adaptions."""
-        self.run_command("exe")
         install.run(self)
 
 
