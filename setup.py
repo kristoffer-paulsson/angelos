@@ -86,20 +86,20 @@ class CustomEnvironment(Command, NamespacePackageMixin):
     """Custom steps for setting up virtual environment command."""
 
     user_options = [
-        ("path=", "p", "Virtual environment directory."),
+        ("prefix=", "p", "Virtual environment directory."),
         ("step=", "s", "Start from step X."),
 
     ]
 
     def initialize_options(self):
         """Initialize options"""
-        self.path = None
+        self.prefix = None
         self.step = None
 
     def finalize_options(self):
         """Finalize options"""
         try:
-            if not Path(self.path).exists():
+            if not Path(self.prefix).exists():
                 raise TypeError()
         except TypeError:
             print("Path is invalid")
@@ -125,7 +125,7 @@ class CustomEnvironment(Command, NamespacePackageMixin):
     def prepare(self):
         """Make preparations."""
         if 1 in self.step:
-            self.path_install = str(Path(self.path).resolve())
+            self.path_install = str(Path(self.prefix).resolve())
             self.path_current = str(Path(os.curdir).resolve())
             self.path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
             self.path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
@@ -192,7 +192,6 @@ class CustomEnvironment(Command, NamespacePackageMixin):
 
         # 5. Compile and install angelos binaries
         if 6 in self.step:
-            print("PREFIX", self.path_install)
             subprocess.run(
                 "{0}/bin/python3 setup.py install --prefix={0}".format(self.path_install),
                 cwd=self.path_current,
