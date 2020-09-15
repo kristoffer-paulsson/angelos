@@ -90,7 +90,7 @@ fi
 if id $USERNAME >/dev/null 2>&1; then
   printf "User $USERNAME already exists.\n"
 else
-  adduser $USERNAME --system -g $GROUPNAME
+  useradd $USERNAME --system -g $GROUPNAME
 fi
 
 # Create directories for angelos
