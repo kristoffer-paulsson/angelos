@@ -33,15 +33,17 @@ FILE_ENV=$DIR_ETC/env.json
 FILE_CONF=$DIR_ETC/config.json
 FILE_SERVICE=/etc/systemd/system/$NAME_SERVICE
 
-DATA_ENV_JSON=<<EOF
+DATA_ENV_JSON=$(cat <<EOF
 {}
 EOF
+)
 
-DATA_CONFIG_JSON=<<EOF
+DATA_CONFIG_JSON=$(cat <<EOF
 {}
 EOF
+)
 
-DATA_SYSTEMD_SERVICE=<<EOF
+DATA_SYSTEMD_SERVICE=$(cat <<EOF
 [Unit]
 Description = Run the Angelos server
 After = network.target
@@ -68,10 +70,11 @@ KeyringMode = private
 [Install]
 WantedBy=default.target
 EOF
+)
 
 # Check sudo access
 if [ $(id -u) -ne 0 ]
-  then echo "Please run using sudo"
+  then echo "Run as sudo"
   exit
 fi
 
@@ -79,29 +82,56 @@ fi
 grep $GROUPNAME /etc/group 2>&1>/dev/null
 if [ $? != 0 ]
 then
-  printf "Group $GROUPNAME already exists.\n"
-else
   groupadd $GROUPNAME
+else
+  printf "Group $GROUPNAME already exists.\n"
+fi
+
+if id $USERNAME >/dev/null 2>&1; then
+  printf "User $USERNAME already exists.\n"
+else
   adduser $USERNAME --system -g $GROUPNAME
 fi
 
 # Create directories for angelos
-mkdir $DIR_VAR
-mkdir $DIR_LOG
-mkdir $DIR_ETC
+mkdir $DIR_VAR -p
+mkdir $DIR_LOG -p
+mkdir $DIR_ETC -p
 
 # Create admin public keys file
-echo "" > $FILE_ADMINS
+if [ -s "$FILE_ADMINS" ]
+then
+   echo "$FILE_ADMINS already exists, left untouched."
+else
+  echo "" > $FILE_ADMINS
+fi
 
 # Create configuration
-echo "$DATA_ENV_JSON" > $FILE_ENV
-echo "$DATA_CONFIG_JSON" > $FILE_CONF
+if [ -s "$FILE_ENV" ]
+then
+   echo "$FILE_ENV already exists, left untouched."
+else
+  echo $DATA_ENV_JSON > $FILE_ENV
+fi
+
+if [ -s "$FILE_CONF" ]
+then
+   echo "$FILE_CONF already exists, left untouched."
+else
+  echo $DATA_CONFIG_JSON > $FILE_CONF
+fi
 
 # Setup systemd service
-echo "$DATA_SYSTEMD_SERVICE" > $FILE_SERVICE
-chmod 644 $FILE_SERVICE
-systemctl daemon-reload
-systemctl enable $NAME_SERVICE
+if [ -s "$FILE_SERVICE" ]
+then
+   echo "$FILE_SERVICE already exists, left untouched."
+else
+  echo "$DATA_SYSTEMD_SERVICE" > $FILE_SERVICE
+  chmod 644 $FILE_SERVICE
+  systemctl daemon-reload
+  systemctl enable
+  echo "Run '>sudo systemctl start $NAME_SERVICE' in order to start angelos."
+fi
 
 # Set angelos:angelos ownership
 chown -R $USERNAME:$GROUPNAME $DIR_ANGELOS
@@ -110,4 +140,4 @@ chown -R $USERNAME:$GROUPNAME $DIR_LOG
 chown -R $USERNAME:$GROUPNAME $DIR_ETC
 
 # Make angelos binary accessible
-ln -s $FILE_EXE $LINK_EXE
+ln -sf $FILE_EXE $LINK_EXE

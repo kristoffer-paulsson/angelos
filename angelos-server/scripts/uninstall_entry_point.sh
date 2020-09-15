@@ -35,7 +35,7 @@ FILE_SERVICE=/etc/systemd/system/$NAME_SERVICE
 
 # Check sudo access
 if [ $(id -u) -ne 0 ]
-  then echo "Please run using sudo"
+  then echo "Run as sudo"
   exit
 fi
 
