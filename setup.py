@@ -175,18 +175,6 @@ class CustomEnvironment(Command, NamespacePackageMixin):
                 shell=True,
                 env=self.env
             )
-            subprocess.run(
-                "{1}/bin/python3 setup.py script --name={0} --prefix={1}".format("install", self.path_install),
-                cwd=self.path_server,
-                shell=True,
-                env=self.env
-            )
-            subprocess.run(
-                "{1}/bin/python3 setup.py script --name={0} --prefix={1}".format("uninstall", self.path_install),
-                cwd=self.path_server,
-                shell=True,
-                env=self.env
-            )
 
         # 5. Compile and install angelos binaries
         if 6 in self.step:
