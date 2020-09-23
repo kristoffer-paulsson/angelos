@@ -155,7 +155,7 @@ class VendorCompilePython(VendorCompile):
         )
 
         subprocess.run("make", cwd=self._work, shell=True, env=self._env)
-        subprocess.run("make test", cwd=self._work, shell=True, env=self._env)
+        # subprocess.run("make test", cwd=self._work, shell=True, env=self._env)
 
     def install(self):
         """Install binaries."""
