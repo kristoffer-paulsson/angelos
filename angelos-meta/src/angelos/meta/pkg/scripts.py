@@ -17,7 +17,6 @@ from .data import GROUPNAME, USERNAME, NAME_NIX, DIR_VAR, DIR_LOG, DIR_ETC, FILE
     FILE_CONF, FILE_SERVICE, NAME_SERVICE, DIR_ANGELOS, FILE_EXE, LINK_EXE
 
 
-
 SCRIPTLET_PRE_INSTALL = """
 grep {0} /etc/group 2>&1>/dev/null
 if [ $? != 0 ]
@@ -32,7 +31,7 @@ if id {1} >/dev/null 2>&1; then
 else
   useradd {1} --system -g {0}
 fi
-""".format(GROUPNAME, USERNAME)
+"""
 
 SCRIPTLET_POST_INSTALL = """
 DATA_ENV_JSON=$(cat <<EOF
@@ -63,9 +62,9 @@ Group = {groupname}
 
 # RootDirectory = {dirangelos}
 RuntimeDirectory = {namenix}
-StateDirectory = {dirvar}
-LogsDirectory = {dirlog}
-ConfigurationDirectory = {diretc}
+StateDirectory = {service_dirvar}
+LogsDirectory = {service_dirlog}
+ConfigurationDirectory = {service_diretc}
 
 KeyringMode = private
 
@@ -93,6 +92,8 @@ then
    echo "{fileenv} already exists, left untouched."
 else
   echo $DATA_ENV_JSON > {fileenv}
+  chown {username}:{groupname} {fileenv}
+  chmod 400 {fileenv}
 fi
 
 if [ -s "{fileconf}" ]
@@ -100,6 +101,8 @@ then
    echo "{fileconf} already exists, left untouched."
 else
   echo $DATA_CONFIG_JSON > {fileconf}
+  chown {username}:{groupname} {fileconf}
+  chmod 400 {fileconf}
 fi
 
 # Setup systemd service
@@ -117,16 +120,15 @@ fi
 # Set angelos:angelos ownership
 chown -R {username}:{groupname} {dirangelos}
 chown -R {username}:{groupname} {dirvar}
+chmod 700 {dirvar}
 chown -R {username}:{groupname} {dirlog}
+chmod 700 {dirlog}
 chown -R {username}:{groupname} {diretc}
+chmod 440 {diretc}
 
 # Make angelos binary accessible
 ln -sf {fileexe} {linkexe}
-""".format(
-    namenix=NAME_NIX, dirvar=DIR_VAR, dirlog=DIR_LOG, diretc=DIR_ETC, fileadmins=FILE_ADMINS,
-    fileenv=FILE_ENV, fileconf=FILE_CONF, fileservice=FILE_SERVICE, nameservice=NAME_SERVICE,
-    username=USERNAME, groupname=GROUPNAME, dirangelos=DIR_ANGELOS, fileexe=FILE_EXE, linkexe=LINK_EXE
-)
+"""
 
 SCRIPTLET_PRE_UNINSTALL = """
 # Remove systemd entry
@@ -137,7 +139,7 @@ systemctl daemon-reload
 
 # Remove angelos link
 rm {2}
-""".format(NAME_SERVICE, FILE_SERVICE, LINK_EXE)
+"""
 
 SCRIPTLET_POST_UNINSTALL = """
 # Remove all angelos files
@@ -147,4 +149,23 @@ rm -fR {1}/*
 # Remove all angelos directories
 rmdir {0}
 rmdir {1}
-""".format(DIR_ETC, DIR_ANGELOS)
+"""
+
+
+def render_scriptlets(service_full_path: bool=True) -> tuple:
+    """Render the scriptlets and return a tuple of
+    (SCRIPTLET_PRE_INSTALL, SCRIPTLET_POST_INSTALL, SCRIPTLET_PRE_UNINSTALL, SCRIPTLET_POST_UNINSTALL)
+    """
+    return (
+        SCRIPTLET_PRE_INSTALL.format(GROUPNAME, USERNAME),
+        SCRIPTLET_POST_INSTALL.format(
+            namenix=NAME_NIX, dirvar=DIR_VAR, dirlog=DIR_LOG, diretc=DIR_ETC, fileadmins=FILE_ADMINS,
+            fileenv=FILE_ENV, fileconf=FILE_CONF, fileservice=FILE_SERVICE, nameservice=NAME_SERVICE,
+            username=USERNAME, groupname=GROUPNAME, dirangelos=DIR_ANGELOS, fileexe=FILE_EXE, linkexe=LINK_EXE,
+            service_dirvar=DIR_VAR if service_full_path else NAME_NIX,
+            service_dirlog=DIR_LOG if service_full_path else NAME_NIX,
+            service_diretc=DIR_ETC if service_full_path else NAME_NIX
+        ),
+        SCRIPTLET_PRE_UNINSTALL.format(NAME_SERVICE, FILE_SERVICE, LINK_EXE),
+        SCRIPTLET_POST_UNINSTALL.format(DIR_ETC, DIR_ANGELOS)
+    )

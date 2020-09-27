@@ -16,7 +16,7 @@
 import os
 
 from .data import NAME_NIX, VERSION, LICENSE, URL, PERMS_DIR, PERMS_EXEC, PERMS_FILE, EXEC_PREFIX, DIR_ANGELOS
-from .scripts import SCRIPTLET_PRE_INSTALL, SCRIPTLET_POST_INSTALL, SCRIPTLET_PRE_UNINSTALL, SCRIPTLET_POST_UNINSTALL
+from .scripts import render_scriptlets
 
 RPM_SPEC = """
 Name: {namenix}
@@ -86,10 +86,11 @@ def walk_files(path: str) -> str:
     return output
 
 
-def render_rpm_spec(release: int) -> str:
+def render_rpm_spec(release: int, full_path: bool=True) -> str:
     """Render the RPM spec file."""
+    preinst, postinst, preuninst, postuninst = render_scriptlets(full_path)
     return RPM_SPEC.format(
-        preinst=SCRIPTLET_PRE_INSTALL, postinst=SCRIPTLET_POST_INSTALL, preuninst=SCRIPTLET_PRE_UNINSTALL,
-        postuninst=SCRIPTLET_POST_UNINSTALL, namenix=NAME_NIX, url=URL, version=VERSION, release=release,
+        preinst=preinst, postinst=postinst, preuninst=preuninst,
+        postuninst=postuninst, namenix=NAME_NIX, url=URL, version=VERSION, release=release,
         license=LICENSE, files=walk_files(DIR_ANGELOS)
     )

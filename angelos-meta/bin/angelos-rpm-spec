@@ -26,7 +26,17 @@ parser.add_argument(
     help="Release number.",
     required=True
 )
+parser.add_argument(
+    "-f",
+    "--full-path",
+    dest="full_path",
+    type=lambda x: x.lower() in ["true", "1", "yes"],
+    default=True,
+    help="Full paths in service script.",
+    required=False
+)
 
 
-if __name__ == '__main__':
-    print(render_rpm_spec(parser.parse_args().release))
+if __name__ == "__main__":
+    args = parser.parse_args()
+    print(render_rpm_spec(args.release, args.full_path))
