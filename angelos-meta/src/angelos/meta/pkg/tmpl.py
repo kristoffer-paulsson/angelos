@@ -29,6 +29,7 @@ BuildArch: x86_64
 BuildRequires: bzip2-devel, expat-devel, gdbm-devel, ncurses-devel, openssl-devel, readline-devel, sqlite-devel,
 BuildRequires: tk-devel, xz-devel, zlib-devel, libffi-devel
 Requires: bzip2-libs, expat, gdbm-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, tk, xz-libs, zlib, libffi
+AutoReqProv: no
 
 # RPM error problem
 # https://fedoraproject.org/wiki/Changes/Make_ambiguous_python_shebangs_error
