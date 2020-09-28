@@ -81,15 +81,14 @@ rm {linkexe}
 %changelog
 
 %files
-%defattr({permsfile}, {username}, {groupname}, {permsdir})
 %attr(700, -, -) {dirvar}
 %attr(700, -, -) {dirlog}
 %{{_unitdir}}/{nameservice}
 %config {fileenv}
 %config {fileconf}
 %attr(600, -, -) {fileadmins}
-%dir {dirangelos}
-%attr({permsexec}, -, -) {fileexe}
+%defattr({permsfile}, {username}, {groupname}, {permsdir})
+{files}
 """
 
 
@@ -97,11 +96,13 @@ def walk_files(path: str) -> str:
     """Walk all files and directories at install path."""
     output = ""
     for root, dirs, files in os.walk(path):
-        output += "%attr({perms}, angelos, angelos) {path}\n".format(
+        output += "{path}\n".format(
             perms=PERMS_DIR, path=root)
         for file in files:
-            output += "%attr({perms}, angelos, angelos) {path}\n".format(
-                perms=(PERMS_EXEC if root.startswith(EXEC_PREFIX) else PERMS_FILE),
+            output += "%attr({perms}, {username}, {groupname}) {path}\n".format(
+                perms=PERMS_EXEC, path=os.path.join(root, file),
+                username=USERNAME, groupname=GROUPNAME
+            ) if root.startswith(EXEC_PREFIX) else "{path}\n".format(
                 path=os.path.join(root, file)
             )
     return output
@@ -114,7 +115,8 @@ def render_rpm_spec(release: int, full_path: bool=True) -> str:
         fileenv=FILE_ENV, fileconf=FILE_CONF, fileexe=FILE_EXE, linkexe=LINK_EXE,
         fileadmins=FILE_ADMINS, permsexec=PERMS_EXEC, permsfile=PERMS_FILE, permsdir=PERMS_DIR,
         username=USERNAME, groupname=GROUPNAME, nameservice=NAME_SERVICE,
-        namenix=NAME_NIX, url=URL, version=VERSION, release=release, license=LICENSE
+        namenix=NAME_NIX, url=URL, version=VERSION, release=release, license=LICENSE,
+        files=walk_files(DIR_ANGELOS)
     )
 
 
