@@ -15,7 +15,8 @@
 """Install file templates."""
 import os
 
-from .data import NAME_NIX, VERSION, LICENSE, URL, PERMS_DIR, PERMS_EXEC, PERMS_FILE, EXEC_PREFIX, DIR_ANGELOS
+from .data import NAME_NIX, VERSION, LICENSE, URL, PERMS_DIR, PERMS_EXEC, PERMS_FILE, EXEC_PREFIX, DIR_ANGELOS, \
+    FILE_ENV, FILE_CONF, FILE_EXE, USERNAME, GROUPNAME, NAME_SERVICE, DIR_VAR, DIR_LOG, DIR_ETC, FILE_ADMINS, LINK_EXE
 from .scripts import render_scriptlets
 
 RPM_SPEC = """
@@ -25,15 +26,16 @@ Release: {release}
 Summary: A safe messaging system.
 License: {license}
 URL: {url}
+Source1: angelos.service
+Source2: env.json
+Source3: config.json
+Source4: admins.pub
 BuildArch: x86_64
 BuildRequires: bzip2-devel, expat-devel, gdbm-devel, ncurses-devel, openssl-devel, readline-devel, sqlite-devel,
 BuildRequires: tk-devel, xz-devel, zlib-devel, libffi-devel
+BuildRequires: systemd-rpm-macros /usr/bin/pathfix.py
 Requires: bzip2-libs, expat, gdbm-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, tk, xz-libs, zlib, libffi
 AutoReqProv: no
-
-# RPM error problem
-# https://fedoraproject.org/wiki/Changes/Make_ambiguous_python_shebangs_error
-BuildRequires: /usr/bin/pathfix.py
 
 %description
  Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."
@@ -45,31 +47,49 @@ BuildRequires: /usr/bin/pathfix.py
 %check
 
 %install
-
 mkdir %{{buildroot}}/opt -p
 sudo mv /opt/angelos/ %{{buildroot}}/opt
 
-# Shebang RPM error crash fix
+install --directory %{{buildroot}}{diretc}
+install --directory %{{buildroot}}{dirvar}
+install --directory %{{buildroot}}{dirlog}
+
+install -D -m 0644 %{{SOURCE1}} %{{buildroot}}%{{_unitdir}}/{nameservice}
+install -D -m 0644 %{{SOURCE2}} %{{buildroot}}{fileenv}
+install -D -m 0644 %{{SOURCE3}} %{{buildroot}}{fileconf}
+install -D -m 0644 %{{SOURCE4}} %{{buildroot}}{fileadmins}
+
 pathfix.py -pni "%{{__python3}} %{{py3_shbang_opts}}" %{{buildroot}}/*
 
 %clean
 
 %pre
-{preinst}
+grep -q {groupname} /etc/group >/dev/null 2>&1 || groupadd {groupname}
+id {username} >/dev/null 2>&1 || useradd {username} --system -g {groupname}
 
 %post
-{postinst}
+%systemd_post {nameservice}
+ln -sf {fileexe} {linkexe}
 
 %preun
-{preuninst}
+%systemd_preun {nameservice}
+rm {linkexe}
 
 %postun
-{postuninst}
+%systemd_postun {nameservice}
 
 %changelog
 
 %files
-{files}
+%defattr({permsfile}, {username}, {groupname}, {permsdir})
+%attr(700, -, -) {dirvar}
+%attr(700, -, -) {dirlog}
+%{{_unitdir}}/{nameservice}
+%config {fileenv}
+%config {fileconf}
+%attr(600, -, -) {fileadmins}
+%dir {dirangelos}
+%attr({permsexec}, -, -) {fileexe}
 """
 
 
@@ -88,10 +108,75 @@ def walk_files(path: str) -> str:
 
 
 def render_rpm_spec(release: int, full_path: bool=True) -> str:
-    """Render the RPM spec file."""
-    preinst, postinst, preuninst, postuninst = render_scriptlets(full_path)
+    """Render the RPM spec file. (angelos.spec)"""
     return RPM_SPEC.format(
-        preinst=preinst, postinst=postinst, preuninst=preuninst,
-        postuninst=postuninst, namenix=NAME_NIX, url=URL, version=VERSION, release=release,
-        license=LICENSE, files=walk_files(DIR_ANGELOS)
+        dirangelos=DIR_ANGELOS, dirvar=DIR_VAR, diretc=DIR_ETC, dirlog=DIR_LOG,
+        fileenv=FILE_ENV, fileconf=FILE_CONF, fileexe=FILE_EXE, linkexe=LINK_EXE,
+        fileadmins=FILE_ADMINS, permsexec=PERMS_EXEC, permsfile=PERMS_FILE, permsdir=PERMS_DIR,
+        username=USERNAME, groupname=GROUPNAME, nameservice=NAME_SERVICE,
+        namenix=NAME_NIX, url=URL, version=VERSION, release=release, license=LICENSE
+    )
+
+
+SYSTEMD_UNIT = """
+[Unit]
+Description = Run the Angelos server
+After = network.target
+
+[Service]
+Type = forking
+AmbientCapabilities = CAP_NET_BIND_SERVICE
+
+ExecStart = {namenix} -d start
+ExecStop = {namenix} -d stop
+ExecReload = {namenix} -d restart
+
+User = {username}
+Group = {groupname}
+
+StateDirectory = {service_dirvar}
+LogsDirectory = {service_dirlog}
+ConfigurationDirectory = {service_diretc}
+
+KeyringMode = private
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def render_systemd_unit(service_full_path: bool=True) -> str:
+    """Render systemd unit file. (angelos.service)"""
+    return SYSTEMD_UNIT.format(
+        namenix=NAME_NIX, username=USERNAME, groupname=GROUPNAME,
+        service_dirvar=DIR_VAR if service_full_path else NAME_NIX,
+        service_dirlog=DIR_LOG if service_full_path else NAME_NIX,
+        service_diretc=DIR_ETC if service_full_path else NAME_NIX
+    )
+
+
+ENV_JSON = """{{}}"""
+
+
+def render_env_json() -> str:
+    """Render env configuration file. (env.json)"""
+    return ENV_JSON.format(
+    )
+
+
+CONFIG_JSON = """{{}}"""
+
+
+def render_config_json() -> str:
+    """Render config configuration file. (config.json)"""
+    return CONFIG_JSON.format(
+    )
+
+
+ADMINS_PUB = """"""
+
+
+def render_admins_pub() -> str:
+    """Render admins public key file. (admins.pub)"""
+    return ADMINS_PUB.format(
     )

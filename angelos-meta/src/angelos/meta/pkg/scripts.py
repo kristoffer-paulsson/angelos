@@ -34,15 +34,6 @@ fi
 """
 
 SCRIPTLET_POST_INSTALL = """
-DATA_ENV_JSON=$(cat <<EOF
-{{}}
-EOF
-)
-
-DATA_CONFIG_JSON=$(cat <<EOF
-{{}}
-EOF
-)
 
 DATA_SYSTEMD_SERVICE=$(cat <<EOF
 [Unit]
@@ -76,7 +67,7 @@ EOF
 # Create directories for angelos
 mkdir {dirvar} -p
 mkdir {dirlog} -p
-mkdir {diretc} -p
+# mkdir {diretc} -p
 
 # Create admin public keys file
 if [ -s "{fileadmins}" ]
@@ -87,23 +78,23 @@ else
 fi
 
 # Create configuration
-if [ -s "{fileenv}" ]
-then
-   echo "{fileenv} already exists, left untouched."
-else
-  echo $DATA_ENV_JSON > {fileenv}
-  chown {username}:{groupname} {fileenv}
-  chmod 400 {fileenv}
-fi
+# if [ -s "{fileenv}" ]
+# then
+#    echo "{fileenv} already exists, left untouched."
+# else
+#   echo $DATA_ENV_JSON > {fileenv}
+#   chown {username}:{groupname} {fileenv}
+#   chmod 400 {fileenv}
+# fi
 
-if [ -s "{fileconf}" ]
-then
-   echo "{fileconf} already exists, left untouched."
-else
-  echo $DATA_CONFIG_JSON > {fileconf}
-  chown {username}:{groupname} {fileconf}
-  chmod 400 {fileconf}
-fi
+# if [ -s "{fileconf}" ]
+# then
+#    echo "{fileconf} already exists, left untouched."
+# else
+#   echo $DATA_CONFIG_JSON > {fileconf}
+#   chown {username}:{groupname} {fileconf}
+#   chmod 400 {fileconf}
+# fi
 
 # Setup systemd service
 if [ -s "{fileservice}" ]
@@ -123,8 +114,8 @@ chown -R {username}:{groupname} {dirvar}
 chmod 700 {dirvar}
 chown -R {username}:{groupname} {dirlog}
 chmod 700 {dirlog}
-chown -R {username}:{groupname} {diretc}
-chmod 440 {diretc}
+# chown -R {username}:{groupname} {diretc}
+# chmod 440 {diretc}
 
 # Make angelos binary accessible
 ln -sf {fileexe} {linkexe}
