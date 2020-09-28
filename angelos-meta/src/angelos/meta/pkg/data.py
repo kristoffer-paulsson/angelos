@@ -54,3 +54,18 @@ EXEC_PREFIX = "{}/bin".format(DIR_ANGELOS)
 PERMS_EXEC = 500
 PERMS_FILE = 400
 PERMS_DIR = 444
+
+FILTER = [
+    "/test/",
+    "/tests/",
+    "/unittest/",
+    "/test_",
+    "/distutils/",
+    "/angelos/meta/",
+    "/tkinter/",
+    "/turtledemo/",
+    "/idlelib/",
+    "/ensurepip/",
+    "/lib2to3/",
+    "/venv/"
+]
