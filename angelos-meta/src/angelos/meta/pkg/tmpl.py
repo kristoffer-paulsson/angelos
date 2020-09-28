@@ -117,13 +117,13 @@ def filter_files(path: str, subs: list = None):
     for root, dirs, files in os.walk(path):
         # Deal with directory
         # root
-        if re.search(pattern, root):
+        if re.search(pattern, root) and os.path.exists(root):
             shutil.rmtree(root)
             print("Deleted directory:", root)
         for file in files:
             # Deal with file
             filepath = os.path.join(root, file)
-            if re.search(pattern, filepath):
+            if re.search(pattern, filepath) and os.path.exists(filepath):
                 os.remove(filepath)
                 print("Deleted file:", filepath)
 
