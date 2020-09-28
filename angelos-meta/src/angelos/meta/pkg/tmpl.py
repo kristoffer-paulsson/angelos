@@ -113,17 +113,19 @@ def walk_files(path: str) -> str:
 
 def filter_files(path: str, subs: list = None):
     """Filter all files and directories."""
-    substr = re.compile("|".join(subs if subs else FILTER))
+    pattern = "|".join(subs if subs else FILTER)
     for root, dirs, files in os.walk(path):
         # Deal with directory
         # root
-        if subs.search(root):
+        if re.search(pattern, root):
             shutil.rmtree(root)
+            print("Deleted directory:", root)
         for file in files:
             # Deal with file
             filepath = os.path.join(root, file)
-            if subs.search(filepath):
+            if re.search(pattern, filepath):
                 os.remove(filepath)
+                print("Deleted file:", filepath)
 
 
 def render_rpm_spec(release: int, full_path: bool=True) -> str:
