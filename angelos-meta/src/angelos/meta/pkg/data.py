@@ -51,6 +51,7 @@ FILE_CONF = "{}/config.json".format(DIR_ETC)
 FILE_SERVICE = "/etc/systemd/system/{}".format(NAME_SERVICE)
 
 EXEC_PREFIX = "{}/bin".format(DIR_ANGELOS)
+EXEC_SUFFIX = ".so"
 PERMS_EXEC = 500
 PERMS_FILE = 400
 PERMS_DIR = 444

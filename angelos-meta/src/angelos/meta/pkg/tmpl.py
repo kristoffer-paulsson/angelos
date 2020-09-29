@@ -19,7 +19,7 @@ import shutil
 
 from .data import NAME_NIX, VERSION, LICENSE, URL, PERMS_DIR, PERMS_EXEC, PERMS_FILE, EXEC_PREFIX, DIR_ANGELOS, \
     FILE_ENV, FILE_CONF, FILE_EXE, USERNAME, GROUPNAME, NAME_SERVICE, DIR_VAR, DIR_LOG, DIR_ETC, FILE_ADMINS, LINK_EXE, \
-    FILTER
+    FILTER, EXEC_SUFFIX
 from .scripts import render_scriptlets
 
 RPM_SPEC = """
@@ -102,11 +102,12 @@ def walk_files(path: str) -> str:
         output += "{path}\n".format(
             perms=PERMS_DIR, path=root)
         for file in files:
+            filepath = os.path.join(root, file)
             output += "%attr({perms}, {username}, {groupname}) {path}\n".format(
-                perms=PERMS_EXEC, path=os.path.join(root, file),
+                perms=PERMS_EXEC, path=filepath,
                 username=USERNAME, groupname=GROUPNAME
-            ) if root.startswith(EXEC_PREFIX) else "{path}\n".format(
-                path=os.path.join(root, file)
+            ) if root.startswith(EXEC_PREFIX) or file.endswith(EXEC_SUFFIX) else "{path}\n".format(
+                path=filepath
             )
     return output
 
@@ -158,6 +159,7 @@ AmbientCapabilities = CAP_NET_BIND_SERVICE
 ExecStart = {namenix} -d start
 ExecStop = {namenix} -d stop
 ExecReload = {namenix} -d restart
+PIDFile = /tmp/angelos.pid
 
 User = {username}
 Group = {groupname}
