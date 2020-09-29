@@ -89,7 +89,7 @@ rm {linkexe}
 %{{_unitdir}}/{nameservice}
 %config {fileenv}
 %config {fileconf}
-%attr(600, -, -) {fileadmins}
+%attr(600, {username}, {groupname}) {fileadmins}
 %defattr({permsfile}, {username}, {groupname}, {permsdir})
 {files}
 """
