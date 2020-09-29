@@ -57,6 +57,7 @@ PERMS_FILE = 400
 PERMS_DIR = 544
 
 FILTER = [
+    ".dist-info",
     "/test/",
     "/tests/",
     "/unittest/",
@@ -68,5 +69,10 @@ FILTER = [
     "/idlelib/",
     "/ensurepip/",
     "/lib2to3/",
-    "/venv/"
+    "/venv/",
+    "/sqlite3/",
+    "/wsgiref/",
+    "/xmlrpc/",
+    "/dbm/",
+    "/pydoc_data/",
 ]
