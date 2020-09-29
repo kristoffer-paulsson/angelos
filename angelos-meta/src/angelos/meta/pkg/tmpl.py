@@ -32,7 +32,6 @@ URL: {url}
 Source1: angelos.service
 Source2: env.json
 Source3: config.json
-Source4: admins.pub
 BuildArch: x86_64
 BuildRequires: bzip2-devel, expat-devel, gdbm-devel, ncurses-devel, openssl-devel, readline-devel, sqlite-devel,
 BuildRequires: tk-devel, xz-devel, zlib-devel, libffi-devel
@@ -60,7 +59,6 @@ install --directory %{{buildroot}}{dirlog}
 install -D -m 0644 %{{SOURCE1}} %{{buildroot}}%{{_unitdir}}/{nameservice}
 install -D -m 0644 %{{SOURCE2}} %{{buildroot}}{fileenv}
 install -D -m 0644 %{{SOURCE3}} %{{buildroot}}{fileconf}
-install -D -m 0644 %{{SOURCE4}} %{{buildroot}}{fileadmins}
 
 pathfix.py -pni "%{{__python3}} %{{py3_shbang_opts}}" %{{buildroot}}/*
 
@@ -72,6 +70,9 @@ id {username} >/dev/null 2>&1 || useradd {username} --system -g {groupname}
 
 %post
 %systemd_post {nameservice}
+touch {fileadmins}
+chown 600 {fileadmins}
+chmod {username}:{groupname} {fileadmins}
 ln -sf {fileexe} {linkexe}
 
 %preun
@@ -89,7 +90,6 @@ rm {linkexe}
 %{{_unitdir}}/{nameservice}
 %config {fileenv}
 %config {fileconf}
-%attr(600, {username}, {groupname}) {fileadmins}
 %defattr({permsfile}, {username}, {groupname}, {permsdir})
 {files}
 """

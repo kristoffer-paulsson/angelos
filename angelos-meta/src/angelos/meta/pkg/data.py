@@ -54,7 +54,7 @@ EXEC_PREFIX = "{}/bin".format(DIR_ANGELOS)
 EXEC_SUFFIX = ".so"
 PERMS_EXEC = 500
 PERMS_FILE = 400
-PERMS_DIR = 444
+PERMS_DIR = 544
 
 FILTER = [
     "/test/",
