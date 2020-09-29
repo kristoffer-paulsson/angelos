@@ -122,7 +122,7 @@ def filter_files(path: str, subs: list = None):
                 try:
                     os.remove(filepath)
                     print("Deleted file:", filepath)
-                except as e:
+                except Exception as e:
                     print(filepath, e)
         # Deal with directory
         if re.search(pattern, root) and os.path.exists(root):
@@ -130,7 +130,7 @@ def filter_files(path: str, subs: list = None):
                 shutil.rmtree(root)
                 print("Deleted directory:", root)
 
-            except as e:
+            except Exception as e:
                 print(root, e)
 
 
