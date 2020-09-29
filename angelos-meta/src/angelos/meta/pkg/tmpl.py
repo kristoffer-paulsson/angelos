@@ -119,12 +119,19 @@ def filter_files(path: str, subs: list = None):
             # Deal with file
             filepath = os.path.join(root, file)
             if re.search(pattern, filepath) and os.path.exists(filepath):
-                # os.remove(filepath)
-                print("Deleted file:", filepath)
+                try:
+                    os.remove(filepath)
+                    print("Deleted file:", filepath)
+                except as e:
+                    print(filepath, e)
         # Deal with directory
         if re.search(pattern, root) and os.path.exists(root):
-            # shutil.rmtree(root)
-            print("Deleted directory:", root)
+            try:
+                shutil.rmtree(root)
+                print("Deleted directory:", root)
+
+            except as e:
+                print(root, e)
 
 
 def render_rpm_spec(release: int, full_path: bool=True) -> str:
