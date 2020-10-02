@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+
+HELP=$(cat << EOF
+Use "virtenv" to handle a Python 3.x virtual environment for Angelos.
+
+  > virtenv ( setup | start | stop )
+
+  SETUP: Creates a new virtual environment and upgrades pip, setuptools
+  and wheel to latest version, then install requirements and setup
+  Angelos in development mode.
+  START: Starts an already existent virtual environment.
+  STOP: Stops an already running virtual environment.
+
+EOF
+)
+
+[ -z ${VIRTUAL_ENV} ] && IN_VENV=1 || IN_VENV=0
+
+case $1 in
+  setup)
+    [ $IN_VENV ] && echo "Already inside a virtual environment!" && exit 1
+    python3 -m virtualenv venv -p /usr/bin/python3
+    source venv/bin/activate
+    pip install pip --upgrade
+    pip install setuptools --upgrade
+    pip install wheel --upgrade
+    pip install -r requirements.txt
+    pip install -e .
+    ;;
+  start)
+    [ $IN_VENV ] && echo "Already inside a virtual environment!" && exit 1
+    source venv/bin/activate
+    ;;
+  stop)
+    ! [ $IN_VENV ] && echo "No active virtual environment!." && exit 1
+    deactivate
+    ;;
+  *)
+    echo "$HELP"
+    exit 1
+    ;;
+esac

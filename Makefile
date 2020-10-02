@@ -16,23 +16,15 @@
 PYI = --log=DEBUG --onefile
 AR7_IMPORT = uuid pathlib
 
-.PHONY: docs
+.PHONY: install check clean
 default:
+	echo ""
 
-init:
-	pip install -r requirements.txt
-	python setup.py develop
+install:
+	python setup.py venv --prefix=$(DESTDIR)
 
-basic:
-	python setup.py develop
-
-angelos: basic
-	python ./setup/angelos_spec.py
-	pyinstaller angelos.spec ./bin/angelos $(PYI)
-
-ar7: basic
-	python ./setup/ar7_spec.py
-	pyinstaller ./ar7.spec  $(PYI)
+check:
+	echo ""
 
 clean:
 	rm -fr ./dist/
@@ -46,12 +38,3 @@ clean:
 	rm -fr ./docs/html/
 	rm -fr ./docs/doctrees/
 
-docs: basic
-	sphinx-apidoc -o docs lib/angelos
-	sphinx-build -M html docs docs
-
-test:
-	python ./tests/test_certified.py
-
-run:
-    python ./bin/angelos config --run-dir=$(pwd) --state-dir=$(pwd) --logs-dir=$(pwd) --conf-dir=$(pwd)
