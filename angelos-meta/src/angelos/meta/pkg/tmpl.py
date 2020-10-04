@@ -13,14 +13,14 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Install file templates."""
+import datetime
 import os
 import re
 import shutil
 
 from .data import NAME_NIX, VERSION, LICENSE, URL, PERMS_DIR, PERMS_EXEC, PERMS_FILE, EXEC_PREFIX, DIR_ANGELOS, \
     FILE_ENV, FILE_CONF, FILE_EXE, USERNAME, GROUPNAME, NAME_SERVICE, DIR_VAR, DIR_LOG, DIR_ETC, FILE_ADMINS, LINK_EXE, \
-    FILTER, EXEC_SUFFIX
-from .scripts import render_scriptlets
+    FILTER, EXEC_SUFFIX, AUTHOR, AUTHOR_EMAIL
 
 RPM_SPEC = """
 Name: {namenix}
@@ -185,13 +185,133 @@ def render_systemd_unit(service_full_path: bool=True) -> str:
     )
 
 
+def render_deb_name(release: int) -> str:
+    """Render the debian package name."""
+    return "{namenix}_{version}-{release}_amd64".format(
+        name=NAME_NIX, version=VERSION, release=release)
+
+
+DEB_CONTROL = """
+Package: {namenix}
+Version: {version}
+Homepage: {url}
+Depends: zlib1g libncurses5 libgdbm libnss3 libssl libreadline libffi bzip2 libsqlite3
+Architecture: amd64
+Maintainer: {author} <{authoremail}>
+Description:  Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."
+"""
+
+
+def render_deb_control() -> str:
+    """Render the control file. (debian/control)"""
+    return DEB_CONTROL.format(
+        namenix=NAME_NIX, version=VERSION, url=URL, author=AUTHOR, authoremail=AUTHOR_EMAIL
+    )
+
+
+DEB_COPYRIGHT = """
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: {namenix}
+Upstream-Contact: {author} <{authoremail}>
+Source: {url}
+
+Files: *
+Copyright: 2018-2020, {author} <{authoremail}>
+License: MIT
+"""
+
+
+def render_deb_copyright() -> str:
+    """Render the copyright file. (debian/copyright)"""
+    return DEB_COPYRIGHT.format(
+        namenix=NAME_NIX, author=AUTHOR, authoremail=AUTHOR_EMAIL, url=URL,
+    )
+
+
+DEB_CHANGELOG = """
+{namenix} ({version}) testing; urgency=medium
+
+ * Initial release.
+ 
+-- {author} <{authoremail}>  {timestamp}
+"""
+
+
+def render_deb_changelog() -> str:
+    """Render the changelog file. (debian/changelog)"""
+    return DEB_CHANGELOG.format(
+        namenix=NAME_NIX, version=VERSION, author=AUTHOR, authoremail=AUTHOR_EMAIL,
+        timestamp=datetime.datetime.strftime(
+            datetime.datetime.now(
+                datetime.datetime.now(
+                    datetime.timezone.utc).astimezone().tzinfo), "%a, %d %b %Y %X %z"),
+    )
+
+
+DEB_RULES = """
+#!/usr/bin/make -f
+#DH_VERBOSE = 1
+#export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+#export DEB_CFLAGS_MAINT_APPEND = -Wall -pedantic
+#export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
+%:
+    dh $@
+"""
+
+
+def render_deb_rules() -> str:
+    """Render the compat file. (debian/rules)"""
+    return DEB_RULES.format()
+
+
+DEB_COMPAT = """
+10
+"""
+
+
+def render_deb_compat() -> str:
+    """Render the compat file. (debian/compat)"""
+    return DEB_COMPAT.format()
+
+
+DEB_CONFFILES = """
+"""
+
+
+def render_deb_conffiles() -> str:
+    """Render the conffiles file. (debian/conffiles)"""
+    return DEB_CONFFILES.format()
+
+
+DEB_DIRS = """
+etc/angelos
+var/lib/angelos
+var/log/angelos
+"""
+
+
+def render_deb_dirs() -> str:
+    """Render the dirs file. (debian/dirs)"""
+    return DEB_DIRS.format()
+
+
+DEB_LINKS = """
+{fileexe} {linkexe}
+"""
+
+
+def render_deb_links() -> str:
+    """Render the dirs file. (debian/angelos.links)"""
+    return DEB_LINKS.format(fileexe=FILE_EXE, linkexe=LINK_EXE)
+
+
 ENV_JSON = """{{}}"""
 
 
 def render_env_json() -> str:
     """Render env configuration file. (env.json)"""
-    return ENV_JSON.format(
-    )
+    return ENV_JSON.format()
 
 
 CONFIG_JSON = """{{}}"""
@@ -199,8 +319,7 @@ CONFIG_JSON = """{{}}"""
 
 def render_config_json() -> str:
     """Render config configuration file. (config.json)"""
-    return CONFIG_JSON.format(
-    )
+    return CONFIG_JSON.format()
 
 
 ADMINS_PUB = """"""
@@ -208,5 +327,4 @@ ADMINS_PUB = """"""
 
 def render_admins_pub() -> str:
     """Render admins public key file. (admins.pub)"""
-    return ADMINS_PUB.format(
-    )
+    return ADMINS_PUB.format()

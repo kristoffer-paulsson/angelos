@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+from argparse import ArgumentParser
+from angelos.meta.pkg.tmpl import render_deb_control, render_deb_name
+
+parser = ArgumentParser()
+parser.add_argument(
+    "-r",
+    "--render",
+    dest="render",
+    type=str,
+    default=None,
+    help="Render file.",
+    required=True
+)
+parser.add_argument(
+    "-l",
+    "--release",
+    dest="release",
+    type=int,
+    default=None,
+    help="Release number.",
+    required=False
+)
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    if args.render == "control":
+        print(render_deb_control(False))
+    elif args.render == "name":
+        print(render_deb_name(args.release))
