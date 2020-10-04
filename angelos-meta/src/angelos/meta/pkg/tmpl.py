@@ -188,7 +188,7 @@ def render_systemd_unit(service_full_path: bool=True) -> str:
 def render_deb_name(release: int) -> str:
     """Render the debian package name."""
     return "{namenix}_{version}-{release}_amd64".format(
-        name=NAME_NIX, version=VERSION, release=release)
+        namenix=NAME_NIX, version=VERSION, release=release)
 
 
 DEB_CONTROL = """

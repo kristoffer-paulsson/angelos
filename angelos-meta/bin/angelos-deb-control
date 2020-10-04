@@ -39,6 +39,6 @@ parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
     if args.render == "control":
-        print(render_deb_control(False))
+        print(render_deb_control())
     elif args.render == "name":
         print(render_deb_name(args.release))
