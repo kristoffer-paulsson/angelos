@@ -14,12 +14,26 @@
 #     Kristoffer Paulsson - initial implementation
 #
 
-# Creates user and group for Angelos install.
+#Variables for the Angelos installation scripts.
 [ $(id -u) -ne 0 ] && echo "Run as sudo" && exit 1
-[ -z ${USERNAME} ] && echo "USERNAME is not set!" && exit 1
-[ -z ${GROUP} ] && echo "GROUP is not set!" && exit 1
+[ -z "${DESTDIR}" ] && echo "DESTDIR is not set!" && exit 1
 
-##########  CREATE_USER  ##########
-grep -q "$GROUP" /etc/group >/dev/null 2>&1 || groupadd "$GROUP"
-id "$USERNAME" >/dev/null 2>&1 || useradd "$USERNAME" --system -g "$GROUP"
-##########  CREATE_USER_END  ##########
+##########  VARIABLES  ##########
+PACKAGE=angelos
+
+USERNAME=$PACKAGE
+GROUP=$PACKAGE
+
+ROOT_DIR=$DESTDIR/opt/$PACKAGE
+VAR_DIR=$DESTDIR/var/lib/$PACKAGE
+LOG_DIR=$DESTDIR/var/log/$PACKAGE
+CONF_DIR=$DESTDIR/etc/$PACKAGE
+##########  VARIABLES_END  ##########
+
+export PACKAGE
+export USERNAME
+export GROUP
+export ROOT_DIR
+export VAR_DIR
+export LOG_DIR
+export CONF_DIR

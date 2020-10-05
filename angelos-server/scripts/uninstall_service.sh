@@ -14,12 +14,16 @@
 #     Kristoffer Paulsson - initial implementation
 #
 
-# Creates user and group for Angelos install.
+# Disable and uninstall service for Angelos.
 [ $(id -u) -ne 0 ] && echo "Run as sudo" && exit 1
-[ -z ${USERNAME} ] && echo "USERNAME is not set!" && exit 1
-[ -z ${GROUP} ] && echo "GROUP is not set!" && exit 1
+[ -z "${PACKAGE}" ] && echo "PACKAGE is not set!" && exit 1
+[ -z "${DESTDIR}" ] && echo "DESTDIR is not set!" && exit 1
 
-##########  CREATE_USER  ##########
-grep -q "$GROUP" /etc/group >/dev/null 2>&1 || groupadd "$GROUP"
-id "$USERNAME" >/dev/null 2>&1 || useradd "$USERNAME" --system -g "$GROUP"
-##########  CREATE_USER_END  ##########
+##########  UNINSTALL_SERVICE  ##########
+SERVICE_DIR=$DESTDIR/usr/lib/systemd/system
+
+systemctl stop "$PACKAGE.service"
+systemctl disable "$PACKAGE.service"
+systemctl daemon-reload
+rm "$SERVICE_DIR/$PACKAGE.service"
+##########  UNINSTALL_SERVICE_END  ##########

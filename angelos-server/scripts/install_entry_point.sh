@@ -126,7 +126,7 @@ if [ -s "$FILE_SERVICE" ]
 then
    echo "$FILE_SERVICE already exists, left untouched."
 else
-  echo "$DATA_SYSTEMD_SERVICE" > $FILE_SERVICE
+  echo "" > /usr/lib/systemd/system/angelos.service
   chmod 644 $FILE_SERVICE
   systemctl daemon-reload
   systemctl enable

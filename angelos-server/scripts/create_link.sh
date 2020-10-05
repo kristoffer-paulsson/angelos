@@ -14,12 +14,11 @@
 #     Kristoffer Paulsson - initial implementation
 #
 
-# Creates user and group for Angelos install.
+# Creates symlink to Angelos binary.
 [ $(id -u) -ne 0 ] && echo "Run as sudo" && exit 1
-[ -z ${USERNAME} ] && echo "USERNAME is not set!" && exit 1
-[ -z ${GROUP} ] && echo "GROUP is not set!" && exit 1
+[ -z "${DESTDIR}" ] && echo "DESTDIR is not set!" && exit 1
+[ -z "${ROOT_DIR}" ] && echo "ROOT_DIR is not set!" && exit 1
 
-##########  CREATE_USER  ##########
-grep -q "$GROUP" /etc/group >/dev/null 2>&1 || groupadd "$GROUP"
-id "$USERNAME" >/dev/null 2>&1 || useradd "$USERNAME" --system -g "$GROUP"
-##########  CREATE_USER_END  ##########
+##########  CREATE_LINK  ##########
+ln -sf "$ROOT_DIR/bin/$PACKAGE" "$DESTDIR/usr/local/bin/$PACKAGE"
+##########  CREATE_LINK_END  ##########

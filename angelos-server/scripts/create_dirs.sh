@@ -15,9 +15,13 @@
 #
 
 # Creates directories for Angelos install.
-[ -z ${DESTDIR} ] && echo "DESTDIR is not set!" && exit 1
-[ -z ${PACKAGE} ] && echo "PACKAGE is not set!" && exit 1
+[ $(id -u) -ne 0 ] && echo "Run as sudo" && exit 1
+[ -z "${CONF_DIR}" ] && echo "CONF_DIR is not set!" && exit 1
+[ -z "${VAR_DIR}" ] && echo "VAR_DIR is not set!" && exit 1
+[ -z "${LOG_DIR}" ] && echo "LOG_DIR is not set!" && exit 1
 
-mkdir -p $(DESTDIR)/etc/$(PACKAGE)
-mkdir -p $(DESTDIR)/var/lib/$(PACKAGE)
-mkdir -p $(DESTDIR)/var/log/$(PACKAGE)
+##########  CREATE_DIRS  ##########
+install -d -m 0755 "$CONF_DIR"
+install -d -g $GROUP -o $USERNAME -m 0700 "$VAR_DIR"
+install -d -g $GROUP -o $USERNAME -m 0700 "$LOG_DIR"
+##########  CREATE_DIRS_END  ##########
