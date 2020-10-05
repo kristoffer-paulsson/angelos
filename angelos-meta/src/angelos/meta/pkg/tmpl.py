@@ -195,7 +195,7 @@ DEB_CONTROL = """
 Package: {namenix}
 Version: {version}
 Homepage: {url}
-Depends: zlib1g, libncurses5, libgdbm6, libnss3, libssl1.1, readline, libffi, bzip2, libsqlite3-0
+Depends: zlib1g, libncurses5, libgdbm6, libnss3, libssl1.1, libreadline7, libffi, bzip2, libsqlite3-0
 Architecture: amd64
 Maintainer: {author} <{authoremail}>
 Description:  Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."
