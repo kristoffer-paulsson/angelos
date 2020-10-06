@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+from argparse import ArgumentParser
+
+from angelos.meta.pkg.data import DEBIAN, CENTOS
+from angelos.meta.pkg.util import ScriptIndexer, ScriptScissor
+
+parser = ArgumentParser()
+parser.add_argument(
+    "-r",
+    "--render",
+    dest="render",
+    type=str,
+    default=None,
+    choices=["pre-inst", "post-inst", "pre-rem", "post-rem"],
+    help="Render install script.",
+    required=True
+)
+parser.add_argument(
+    "-s",
+    "--system",
+    dest="system",
+    type=str,
+    default=None,
+    choices=["debian", "centos"],
+    help="Render for operating system.",
+    required=True
+)
+
+beginning = """
+DESTDIR=""
+"""
+
+
+if __name__ == "__main__":
+
+    indexer = ScriptIndexer()
+    indexer.walk("angelos-server/scripts/bash")
+    scissor = ScriptScissor(indexer.index)
+
+    args = parser.parse_args()
+    if args.system == "debian":
+        meta = DEBIAN
+    elif args.system == "centos":
+        meta = CENTOS
+
+    if args.render == "pre-inst":
+        print(beginning + scissor.stitch(meta["pre_inst"]))
+    elif args.render == "post-inst":
+        print(beginning + scissor.stitch(meta["post_inst"]))
+    elif args.render == "pre-rem":
+        print(beginning + scissor.stitch(meta["pre_rem"]))
+    elif args.render == "post-rem":
+        print(beginning + scissor.stitch(meta["post_rem"]))

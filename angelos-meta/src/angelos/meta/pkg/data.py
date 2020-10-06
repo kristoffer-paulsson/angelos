@@ -76,3 +76,88 @@ FILTER = [
     "/dbm/",
     "/pydoc_data/",
 ]
+
+DEBIAN = {
+    "build_deps": [
+        "zlib1g-dev",
+        "libncurses5-dev",
+        "libgdbm-dev",
+        "libnss3-dev",
+        "libssl-dev",
+        "libreadline-dev",
+        "libffi-dev",
+        "libbz2-dev",
+        "libsqlite3-dev"
+    ],
+    "run_deps": [
+        "zlib1g",
+        "libncurses5",
+        "libgdbm6",
+        "libnss3",
+        "libssl1.1",
+        "libreadline7",
+        "libffi6",
+        "bzip2",
+        "libsqlite3-0"
+    ],
+    "pre_inst": [
+        "VARIABLES",
+        "CREATE_USER"
+    ],
+    "post_inst": [
+        "VARIABLES",
+        "CREATE_LINK"
+    ],
+    "pre_rem": [
+        "VARIABLES",
+        "REMOVE_LINK"
+    ],
+    "post_rem": [
+        "VARIABLES"
+    ]
+}
+
+CENTOS = {
+    "build_deps": [
+        "bzip2-devel",
+        "expat-devel",
+        "gdbm-devel",
+        "ncurses-devel",
+        "openssl-devel",
+        "readline-devel",
+        "sqlite-devel",
+        "tk-devel",
+        "xz-devel",
+        "zlib-devel",
+        "libffi-devel"
+    ],
+    "run_deps": [
+        "bzip2-libs",
+        "expat",
+        "gdbm-libs",
+        "ncurses-libs",
+        "openssl-libs",
+        "readline",
+        "sqlite-libs",
+        "tk",
+        "xz-libs",
+        "zlib",
+        "libffi"
+    ],
+    "pre_inst": [
+        "VARIABLES",
+        "CREATE_USER"
+    ],
+    "post_inst": [
+        "VARIABLES",
+        "INSTALL_ADMINS",
+        "CREATE_LINK"
+    ],
+    "pre_rem": [
+        "VARIABLES",
+        "REMOVE_LINK"
+    ],
+    "post_rem": [
+        "VARIABLES"
+    ]
+}

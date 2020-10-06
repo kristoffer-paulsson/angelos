@@ -38,3 +38,7 @@ EOF
 install -D -m 0644 -g "$GROUP" -o "$USERNAME" <"$CONFIG" "$CONF_DIR/config.json"
 ##########  INSTALL_CONFIG_END  ##########
 
+##########  INSTALL_ADMINS  ##########
+install -D -m 0600 -g "$GROUP" -o "$USERNAME" <"" "$VAR_DIR/admins.pub"
+##########  INSTALL_ADMINS_END  ##########
+
