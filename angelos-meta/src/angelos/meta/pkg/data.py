@@ -106,7 +106,11 @@ DEBIAN = {
     ],
     "post_inst": [
         "VARIABLES",
-        "CREATE_LINK"
+        "CREATE_LINK",
+        "PERMISSIONS_ROOT",
+        "PERMISSIONS_VAR",
+        "PERMISSIONS_LOG",
+        "PERMISSIONS_CONF"
     ],
     "pre_rem": [
         "VARIABLES",
