@@ -24,7 +24,7 @@ RELEASE = ""
 
 scan = {
     "glob": [
-        "angelos/common/*.pyx"
+        str(Path("angelos/common/*.pyx"))
     ],
     "extra": {
     },

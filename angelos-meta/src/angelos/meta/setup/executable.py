@@ -66,8 +66,8 @@ class Executable(Command):
                 "{} --ldflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
 
         subprocess.check_call(
-            "cython --embed -3 -o {}.c ./scripts/{}_entry_point.pyx".format(
-                temp_name, self.name), cwd=home, shell=True)
+            "cython --embed -3 -o {0}.c {1:s}".format(
+                temp_name, Path("./scripts", temp_name + "_entry_point.pyx"), self.name), cwd=home, shell=True)
 
         subprocess.check_call(
             "gcc -o {0}.o -c {0}.c {1}".format(

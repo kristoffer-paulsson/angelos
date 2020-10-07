@@ -46,8 +46,8 @@ RELEASE = ""
 
 scan = {
     "glob": [
-        "angelos/server/*.pyx",
-        "angelos/server/**/*.pyx",
+        str(Path("angelos/server/*.pyx")),
+        str(Path("angelos/server/**/*.pyx")),
     ],
     "extra": {
     },
@@ -79,7 +79,7 @@ config = {
                     "download": "https://www.python.org/ftp/python/3.8.5/Python-3.8.5.tgz",
                     "local": "Python-3.8.5.tgz",
                     "internal": "Python-3.8.5",
-                    "check": "/nowhere",
+                    "check": str(Path("/nowhere")),
                 }
             ]),
         }

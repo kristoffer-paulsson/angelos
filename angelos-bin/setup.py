@@ -55,11 +55,11 @@ RELEASE = ""
 
 scan = {
     "glob": [
-        "angelos/bin/*.pyx"
+        str(Path("angelos/bin/*.pyx"))
     ],
     "extra": {
         "angelos.bin.nacl": {
-            "extra_objects": ["usr/local/lib/libsodium.a"],
+            "extra_objects": [str(Path("usr/local/lib/libsodium.a"))],
             "include_dirs": [str(Path("./usr/local/include").absolute())]  # CentOS specific only (?)
         }
     },
@@ -87,7 +87,7 @@ config = {
                     "download": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz",
                     "local": "libsodium-1.0.18.tar.gz",
                     "internal": "libsodium-stable",
-                    "check": "usr/local/lib/libsodium.a",
+                    "check": str(Path("usr/local/lib/libsodium.a")),
                 }
             ]),
         }

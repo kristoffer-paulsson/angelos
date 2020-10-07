@@ -1,4 +1,0 @@
-angelos-meta/src/angelos/meta/package/debian10/admins.pub var/lib/angelos
-angelos-meta/src/angelos/meta/package/debian10/env.json etc/angelos
-angelos-meta/src/angelos/meta/package/debian10/config.json etc/angelos
-angelos-server/angelos opt/angelos/angelos/bin

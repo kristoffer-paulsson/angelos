@@ -14,6 +14,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 from argparse import ArgumentParser
+from pathlib import Path
 
 from angelos.meta.pkg.data import DEBIAN, CENTOS
 from angelos.meta.pkg.util import ScriptIndexer, ScriptScissor
@@ -64,7 +65,7 @@ DESTDIR=""
 if __name__ == "__main__":
 
     indexer = ScriptIndexer()
-    indexer.walk("angelos-server/scripts/bash")
+    indexer.walk(str(Path("angelos-server/scripts/bash")))
     scissor = ScriptScissor(indexer.index)
 
     args = parser.parse_args()

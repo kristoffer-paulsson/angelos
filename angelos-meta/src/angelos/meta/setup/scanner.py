@@ -14,6 +14,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Library scanner to scan for all *.pyx files in a hierarchy."""
+import os
 import re
 import glob
 import pathlib
@@ -25,7 +26,7 @@ class LibraryScanner:
     """Scan directories for Cython *.pyx files and configure extensions to build."""
 
     def __init__(self, base_path: str, glob: list = None, extra: dict = None, basic: dict = None):
-        self.__base_path = base_path
+        self.__base_path = str(pathlib.Path(base_path))
         self.__globlist = glob if glob else ["**.pyx"]
         self.__pkgdata = extra if extra else dict()
         self.__data = basic if basic else dict()
@@ -39,7 +40,7 @@ class LibraryScanner:
 
         extensions = list()
         for module in glob_result:
-            package = re.sub("/", ".", module[len(self.__base_path) + 1:-4])
+            package = re.sub(os.sep, ".", module[len(self.__base_path) + 1:-4])
             data = self.__pkgdata[package] if package in self.__pkgdata else {}
             core = {"name": package, "sources": [module]}
             kwargs = {**self.__data, **data, **core}
@@ -56,7 +57,7 @@ class LibraryScanner:
 
         modules = list()
         for module in glob_result:
-            package = re.sub("/", ".", module[len(self.__base_path) + 1:-4])
+            package = re.sub(os.sep, ".", module[len(self.__base_path) + 1:-4])
             modules.append(package)
 
         return modules

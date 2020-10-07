@@ -40,4 +40,5 @@ class Script(Command):
         home = str(Path("./").absolute())
 
         subprocess.check_call(
-            "cp {0}/scripts/{1}_entry_point.sh {2}/{1}".format(home, self.name, dist), cwd=home, shell=True)
+            "cp {0:s} {2}/{1}".format(
+                Path(home, "scripts", self.name + "_entry_point.sh"), self.name, dist), cwd=home, shell=True)

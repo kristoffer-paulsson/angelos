@@ -21,7 +21,7 @@ import uuid
 from tempfile import TemporaryDirectory
 
 from angelos.common.misc import BaseDataClass
-from angelos.lib.automatic import Automatic
+from angelos.lib.automatic import Automatic, Path
 from angelos.lib.const import Const
 from angelos.lib.facade.facade import Facade, TypeFacadeMixin, ClientFacadeMixin, ServerFacadeMixin
 from angelos.lib.ioc import Handle, ContainerAware, Config, Container
@@ -100,7 +100,7 @@ class Configuration(Config, Container):
 
     def __load(self, filename):
         try:
-            with open(os.path.join(self.auto.dir.root, filename)) as jc:
+            with open(str(Path(self.auto.dir.root, filename))) as jc:
                 return json.load(jc.read())
         except FileNotFoundError:
             return {}

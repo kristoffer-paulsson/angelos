@@ -17,6 +17,7 @@ import datetime
 import os
 import re
 import shutil
+from pathlib import Path
 
 from .data import NAME_NIX, VERSION, LICENSE, URL, PERMS_DIR, PERMS_EXEC, PERMS_FILE, EXEC_PREFIX, DIR_ANGELOS, \
     FILE_ENV, FILE_CONF, FILE_EXE, USERNAME, GROUPNAME, NAME_SERVICE, DIR_VAR, DIR_LOG, DIR_ETC, FILE_ADMINS, LINK_EXE, \
@@ -97,6 +98,7 @@ rm {linkexe}
 
 def walk_files(path: str) -> str:
     """Walk all files and directories at install path."""
+    path = str(Path(path))
     output = ""
     for root, dirs, files in os.walk(path):
         output += "{path}\n".format(
