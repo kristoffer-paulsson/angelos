@@ -1,7 +1,8 @@
 # py2app; platform_system=='Darwin'
 # py2exe; platform_system=='Windows'
-cython
+setuptools
 wheel
+cython
 # pyinstaller
 # sphinx
 # sphinx_rtd_theme
