@@ -14,10 +14,8 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Library scanner to scan for all *.pyx files in a hierarchy."""
-import os
-import re
 import glob
-import pathlib
+from pathlib import Path
 
 from setuptools import Extension
 
@@ -26,7 +24,7 @@ class LibraryScanner:
     """Scan directories for Cython *.pyx files and configure extensions to build."""
 
     def __init__(self, base_path: str, glob: list = None, extra: dict = None, basic: dict = None):
-        self.__base_path = str(pathlib.Path(base_path))
+        self.__base_path = str(Path(base_path))
         self.__globlist = glob if glob else ["**.pyx"]
         self.__pkgdata = extra if extra else dict()
         self.__data = basic if basic else dict()
@@ -35,12 +33,12 @@ class LibraryScanner:
         """Build list of Extensions to be cythonized."""
         glob_result = list()
         for pattern in self.__globlist:
-            glob_path = str(pathlib.Path(self.__base_path, pattern))
+            glob_path = str(Path(self.__base_path, pattern))
             glob_result += glob.glob(glob_path, recursive=True)
 
         extensions = list()
         for module in glob_result:
-            package = re.sub(os.sep, ".", module[len(self.__base_path) + 1:-4])
+            package = ".".join(Path(module[len(self.__base_path) + 1:-4]).parts)
             data = self.__pkgdata[package] if package in self.__pkgdata else {}
             core = {"name": package, "sources": [module]}
             kwargs = {**self.__data, **data, **core}
@@ -52,12 +50,12 @@ class LibraryScanner:
         """Build list of modules found."""
         glob_result = list()
         for pattern in self.__globlist:
-            glob_path = str(pathlib.Path(self.__base_path, pattern))
+            glob_path = str(Path(self.__base_path, pattern))
             glob_result += glob.glob(glob_path, recursive=True)
 
         modules = list()
         for module in glob_result:
-            package = re.sub(os.sep, ".", module[len(self.__base_path) + 1:-4])
+            package = ".".join(Path(module[len(self.__base_path) + 1:-4]).parts)
             modules.append(package)
 
         return modules
