@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import tarfile
 import urllib
+import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from abc import ABC, abstractmethod
@@ -44,6 +45,18 @@ class VendorLibrary(ABC):
     def extract(self):
         """Extract source file."""
         pass
+
+    def uncompress(self, archive, target):
+        """Uncompress Zip or Tar files."""
+        if zipfile.is_zipfile(archive):
+            zar = zipfile.ZipFile(archive)
+            zar.extractall(self)
+        elif tarfile.is_tarfile(archive):
+            tar = tarfile.open(archive)
+            tar.extractall(target)
+            tar.close()
+        else:
+            raise OSError("Unkown zip/archive format")
 
     @abstractmethod
     def build(self):
@@ -105,9 +118,7 @@ class VendorCompile(VendorLibrary):
 
     def extract(self):
         """Extract source file."""
-        tar = tarfile.open(self._archive)
-        tar.extractall(self._target)
-        tar.close()
+        self.uncompress(self._archive, self._target)
 
     def close(self):
         """Clean up temporary files."""
@@ -152,9 +163,7 @@ class VendorDownload(VendorLibrary):
 
     def extract(self):
         """Extract source file."""
-        tar = tarfile.open(self._tarball)
-        tar.extractall(self._target)
-        tar.close()
+        self.uncompress(self._archive, self._target)
 
     def build(self):
         pass
