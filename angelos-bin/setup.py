@@ -12,9 +12,11 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+import sys
 from pathlib import Path
 
 from Cython.Build import cythonize
+from angelos.meta.setup.vendor import VendorDownload
 from setuptools import setup, find_namespace_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
@@ -59,6 +61,9 @@ scan = {
     ],
     "extra": {
         "angelos.bin.nacl": {
+            "extra_objects": [str(Path("tarball/libsodium/x64/Release/v142/static/libsodium.lib"))],
+            "include_dirs": [str(Path("tarball/libsodium/include").absolute())]
+        } if sys.platform == "win32" else {
             "extra_objects": [str(Path("usr/local/lib/libsodium.a"))],
             "include_dirs": [str(Path("./usr/local/include").absolute())]  # CentOS specific only (?)
         }
@@ -82,6 +87,13 @@ config = {
             "base_dir": ("", str(Path(__file__).parent.absolute())),
             "compile": ("", [
                 {
+                    "class": VendorDownload,
+                    "name": "libsodium",
+                    "download": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable-msvc.zip",
+                    "local": "libsodium-1.0.18-msvc.zip",
+                    "internal": "libsodium",
+                    "check": str(Path("tarball/libsodium/x64/Release/v142/static/libsodium.lib")),
+                } if sys.platform == "win32" else {
                     "class": VendorCompileNacl,
                     "name": "libsodium",
                     "download": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz",

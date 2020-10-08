@@ -62,7 +62,6 @@ class VendorLibrary(ABC):
 
 
 class VendorCompile(VendorLibrary):
-    """Vendor installer for third party libraries i source code form."""
 
     def __init__(
             self, base_dir: str, name: str, download: str,
@@ -113,6 +112,58 @@ class VendorCompile(VendorLibrary):
     def close(self):
         """Clean up temporary files."""
         self._temp.cleanup()
+
+
+class VendorDownload(VendorLibrary):
+    """Vendor installer for third party libraries i source code form."""
+
+    def __init__(
+            self, base_dir: str, name: str, download: str,
+            local: str, internal: str, check: str, prefix: str = None
+    ):
+        """
+
+        Example:
+            name = "libsodium"
+            download = "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz"
+            local = "libsodium-1.0.18.tar.gz"
+            internal = "libsodium-stable"
+            target = "./usr/local/lib/libsodium.a"
+        """
+        self._base = base_dir
+        self._prefix = str(Path(prefix).resolve()) if isinstance(prefix, str) else ""
+        self._name = name
+        self._download = download
+        self._local = local
+        self._internal = internal
+        self._check = check
+
+        self._tarball = Path(self._base, "tarball", self._local)
+        self._target = str(Path(self._base, "tarball", self._name))
+
+    def check(self) -> bool:
+        """Check if target is reached"""
+        return Path(self._base, self._check).exists()
+
+    def download(self):
+        """Download sources tarball."""
+        if not self._tarball.exists():
+            urllib.request.urlretrieve(self._download, self._tarball)
+
+    def extract(self):
+        """Extract source file."""
+        tar = tarfile.open(self._tarball)
+        tar.extractall(self._target)
+        tar.close()
+
+    def build(self):
+        pass
+
+    def install(self):
+        pass
+
+    def close(self):
+        pass
 
 
 class VendorCompileNacl(VendorCompile):
