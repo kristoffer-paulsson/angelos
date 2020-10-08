@@ -61,11 +61,13 @@ scan = {
     ],
     "extra": {
         "angelos.bin.nacl": {
-            "extra_objects": [str(Path("tarball/libsodium/x64/Release/v142/static/libsodium.lib"))],
-            "include_dirs": [str(Path("tarball/libsodium/include").absolute())]
+            "libraries": [str(Path("libsodium"))],
+            "library_dirs": [str(Path("tarball/libsodium/libsodium/x64/Release/v142/static"))],
+            "include_dirs": [str(Path("tarball/libsodium/libsodium/include").absolute())],
+            "language": "c++"
         } if sys.platform == "win32" else {
             "extra_objects": [str(Path("usr/local/lib/libsodium.a"))],
-            "include_dirs": [str(Path("./usr/local/include").absolute())]  # CentOS specific only (?)
+            "include_dirs": [str(Path("usr/local/include").absolute())]  # CentOS specific only (?)
         }
     },
     "basic": {
@@ -92,7 +94,7 @@ config = {
                     "download": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable-msvc.zip",
                     "local": "libsodium-1.0.18-msvc.zip",
                     "internal": "libsodium",
-                    "check": str(Path("tarball/libsodium/x64/Release/v142/static/libsodium.lib")),
+                    "check": str(Path("tarball/libsodium/libsodium/x64/Release/v142/static/libsodium.lib")),
                 } if sys.platform == "win32" else {
                     "class": VendorCompileNacl,
                     "name": "libsodium",
@@ -116,7 +118,7 @@ config = {
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "namespace_packages": ["angelos"],
     "ext_modules": cythonize(
-        LibraryScanner(str(Path("./src")), **scan).scan(),
+        LibraryScanner(str(Path("src")), **scan).scan(),
         build_dir="build",
         compiler_directives={
             "language_level": 3,

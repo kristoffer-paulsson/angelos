@@ -50,7 +50,7 @@ class VendorLibrary(ABC):
         """Uncompress Zip or Tar files."""
         if zipfile.is_zipfile(archive):
             zar = zipfile.ZipFile(archive)
-            zar.extractall(self)
+            zar.extractall(target)
         elif tarfile.is_tarfile(archive):
             tar = tarfile.open(archive)
             tar.extractall(target)
@@ -163,7 +163,7 @@ class VendorDownload(VendorLibrary):
 
     def extract(self):
         """Extract source file."""
-        self.uncompress(self._archive, self._target)
+        self.uncompress(str(self._tarball), self._target)
 
     def build(self):
         pass
