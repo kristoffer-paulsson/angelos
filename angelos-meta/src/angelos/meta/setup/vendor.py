@@ -180,7 +180,7 @@ class VendorCompileNacl(VendorCompile):
 
     def build(self):
         """Build sources."""
-        subprocess.check_call("configure", cwd=self._work, shell=True)
+        subprocess.check_call("./configure", cwd=self._work, shell=True)
         # CFLAGS='-fPIC -O' CentOS specific only (?)
         if platform.system() == "Linux":
             subprocess.check_call("make CFLAGS='-fPIC -O' && make check", cwd=self._work, shell=True)
@@ -210,7 +210,7 @@ class VendorCompilePython(VendorCompile):
         self._env = {k: os.environ[k] for k in os.environ.keys() if k not in self.EXCLUDE}
 
         subprocess.run(
-            "configure --enable-optimization --with-lto --prefix={}".format(self._prefix),
+            "./configure --enable-optimization --with-lto --prefix={}".format(self._prefix),
             cwd=self._work, shell=True, env=self._env
         )
 
