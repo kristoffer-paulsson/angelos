@@ -160,8 +160,8 @@ class CustomEnvironment(Command, SubPackages):
         # 3. Install angelos meta subpackage
         if 4 in self.step:
             subprocess.run(
-                "{0} -m pip install . --ignore-installed --prefix={0}".format(
-                    self.path_python),
+                "{0} -m pip install . --ignore-installed --prefix={1}".format(
+                    self.path_python, self.path_install),
                 cwd=self.path_meta,
                 shell=True,
                 env=self.env
