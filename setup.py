@@ -22,15 +22,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from venv import EnvBuilder
 
-import pip
 from setuptools import setup, Command
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 
 
-class NamespacePackageMixin:
-    """Install namespace packages."""
-
+class SubPackages:
     NAMESPACES = {
         "angelos.meta": "angelos-meta" + os.sep,
         "angelos.common": "angelos-common" + os.sep,
@@ -41,130 +38,48 @@ class NamespacePackageMixin:
         "angelos.server": "angelos-server" + os.sep,
     }
 
-    def namespace_packages(self, develop: bool = False):
-        """Use pip to install all microlibraries."""
-        work_dir = os.getcwd()
-        prefix = Path(self.prefix).absolute() if self.prefix else None
-        for key, value in self.NAMESPACES.items():
-            try:
-                os.chdir(os.path.join(work_dir, value))
-                addition = ["--user"] if "--user" in sys.argv else []
-                addition = ["--ignore-installed", "--prefix", prefix] if prefix else []
-                if develop:
-                    pip.main(["install", "-e", "."] + addition)
-                else:
-                    pip.main(["install", "."] + addition)
-            except Exception as exc:
-                print("Oops, something went wrong installing", key)
-                print(exc)
-            finally:
-                os.chdir(work_dir)
 
-
-class GeneralCommand(Command):
-    NAMESPACES = {
-        "angelos.meta": "angelos-meta" + os.sep,
-        "angelos.common": "angelos-common" + os.sep,
-        "angelos.bin": "angelos-bin" + os.sep,
-        "angelos.document": "angelos-document" + os.sep,
-        "angelos.archive7": "angelos-archive7" + os.sep,
-        "angelos.lib": "angelos-lib" + os.sep,
-        "angelos.server": "angelos-server" + os.sep,
-    }
-
-    command = ["python"]
-    filter = 0
-
-    user_options = list()
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def __init__(self, dist, **kw):
-        """
-        Construct the command for dist, updating
-        vars(self) with any keyword parameters.
-        """
-        Command.__init__(self, dist, **kw)
-
-    def run(self):
-        work_dir = os.getcwd()
-        self.argv = sys.argv[self.filter:]
-        for package, directory in self.NAMESPACES.items():
-            try:
-                path = Path(work_dir, directory)
-                command = " ".join(self.command + self.argv + self.options())
-                print("Execute:", command)
-                subprocess.run(
-                    command,
-                    cwd=path.resolve(),
-                    shell=True
-                )
-            except Exception as exc:
-                print("Oops, something went wrong installing", package)
-                print(exc)
-
-    def options(self) -> list:
-        return []
-
-
-class CustomDevelop(GeneralCommand):
+class CustomDevelop(SubPackages, develop):
     """Custom steps for develop command."""
 
-    command = ["pip", "install", "-e", "."]
-    filter = 2
-
-    """
     def run(self):
         work_dir = os.getcwd()
-        prefix = Path(self.prefix).resolve() if getattr(self, "prefix", None) else None
+        prefix = str(Path(self.prefix).resolve()) if self.prefix else None
         for package, directory in self.NAMESPACES.items():
             try:
                 path = Path(work_dir, directory)
                 addition = ["--user"] if "--user" in sys.argv else []
-                addition += ["--ignore-installed", "--prefix", "{:s}".format(prefix)] if prefix else []
+                addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
                 subprocess.run(
                     " ".join(["pip", "install", "-e", "."] + addition),
-                    cwd=path.resolve(),
+                    cwd=str(path.resolve()),
                     shell=True
                 )
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
-    """
 
 
-class CustomInstall(GeneralCommand):
+class CustomInstall(SubPackages, install):
     """Custom steps for install command."""
 
-    command = ["pip", "install", "."]
-    filter = 2
-
-    def options(self) -> list:
-        opts = ["--ignore-installed"] if any(arg.startswith("--prefix") for arg in self.argv) else []
-        return opts
-
-    """
     def run(self):
         work_dir = os.getcwd()
-        prefix = Path(self.prefix).absolute() if getattr(self, "prefix", None) else None
+        prefix = str(Path(self.prefix).absolute()) if self.prefix else None
         for package, directory in self.NAMESPACES.items():
             try:
+                print(work_dir, directory)
                 path = Path(work_dir, directory)
                 addition = ["--user"] if "--user" in sys.argv else []
-                addition += ["--ignore-installed", "--prefix", "{:s}".format(prefix)] if prefix else []
+                addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
                 subprocess.run(
                     " ".join(["pip", "install", "."] + addition),
-                    cwd=path.resolve(),
+                    cwd=str(path.resolve()),
                     shell=True
                 )
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
-    """
 
 
 class AngelosEnvBuilder(EnvBuilder):
@@ -173,7 +88,7 @@ class AngelosEnvBuilder(EnvBuilder):
         pass
 
 
-class CustomEnvironment(Command, NamespacePackageMixin):
+class CustomEnvironment(Command, SubPackages):
     """Custom steps for setting up virtual environment command."""
 
     user_options = [
@@ -347,7 +262,6 @@ config = {
     "cmdclass": {
         "develop": CustomDevelop,
         "install": CustomInstall,
-        "bdist_wheel": GeneralCommand,
         "venv": CustomEnvironment
     },
     "classifiers": [

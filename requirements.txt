@@ -1,13 +1,4 @@
-# py2app; platform_system=='Darwin'
-# py2exe; platform_system=='Windows'
+pip
 setuptools
 wheel
 cython
-# pyinstaller
-# sphinx
-# sphinx_rtd_theme
-
-
-# plyer
-# asyncssh~=2.3
-# msgpack
