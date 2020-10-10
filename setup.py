@@ -19,8 +19,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
-from venv import EnvBuilder
 
 from setuptools import setup, Command
 from setuptools.command.develop import develop
@@ -39,7 +37,7 @@ class SubPackages:
     }
 
 
-class CustomDevelop(SubPackages, develop):
+class CustomDevelop(develop, SubPackages):
     """Custom steps for develop command."""
 
     def run(self):
@@ -60,7 +58,7 @@ class CustomDevelop(SubPackages, develop):
                 print(exc)
 
 
-class CustomInstall(SubPackages, install):
+class CustomInstall(install, SubPackages):
     """Custom steps for install command."""
 
     def run(self):
@@ -80,12 +78,6 @@ class CustomInstall(SubPackages, install):
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
-
-
-class AngelosEnvBuilder(EnvBuilder):
-    def setup_scripts(self, context: SimpleNamespace) -> None:
-        """Don't install activation scripts."""
-        pass
 
 
 class CustomEnvironment(Command, SubPackages):
@@ -298,7 +290,6 @@ config = {
     ],
     "install_requires": [],
     "python_requires": ">=3.6, <4",
-    "package_dir": "dev_env"
 }
 
 setup(**config)
