@@ -140,7 +140,7 @@ class CustomEnvironment(Command, SubPackages):
         # 1. Compile and install python
         if 2 in self.step:
             subprocess.check_call(
-                "python setup.py vendor --prefix={:s}".format(Path(self.path_install)),
+                "python setup.py vendor --prefix={:s}".format(self.path_install),
                 cwd=self.path_server,
                 shell=True
             )
@@ -149,7 +149,7 @@ class CustomEnvironment(Command, SubPackages):
         if 3 in self.step:
             for pypi in ["pip", "setuptools", "wheel", "cython"]:
                 subprocess.run(
-                    "{1:s} -m pip install {0} --upgrade".format(pypi, Path(self.path_install, "bin/python3")),
+                    "{1:s} -m pip install {0} --upgrade".format(pypi, str(Path(self.path_install, "bin/python3"))),
                     cwd=self.path_current,
                     shell=True,
                     env=self.env
@@ -158,7 +158,8 @@ class CustomEnvironment(Command, SubPackages):
         # 3. Install angelos meta subpackage
         if 4 in self.step:
             subprocess.run(
-                "{0:s} -m pip install . --ignore-installed --prefix={0:s}".format(Path(self.path_install, "bin/python3")),
+                "{0:s} -m pip install . --ignore-installed --prefix={0:s}".format(
+                    str(Path(self.path_install, "bin/python3"))),
                 cwd=self.path_meta,
                 shell=True,
                 env=self.env
@@ -170,7 +171,7 @@ class CustomEnvironment(Command, SubPackages):
         if 5 in self.step:
             subprocess.run(
                 "{1:s} setup.py exe --name={0} --prefix={2:s}".format(
-                    "angelos", Path(self.path_install, "bin/python3"), Path(self.path_install)),
+                    "angelos", str(Path(self.path_install, "bin/python3")), self.path_install),
                 cwd=self.path_server,
                 shell=True,
                 env=self.env
@@ -180,7 +181,7 @@ class CustomEnvironment(Command, SubPackages):
         if 6 in self.step:
             subprocess.run(
                 "{0:s} setup.py install --prefix={1:s}".format(
-                    Path(self.path_install, "bin/python3"), Path(self.path_install)),
+                    str(Path(self.path_install, "bin/python3")), self.path_install),
                 cwd=self.path_current,
                 shell=True,
                 env=self.env
@@ -192,10 +193,10 @@ class CustomEnvironment(Command, SubPackages):
         if 7 in self.step:
             subprocess.run(
                 "strip -x -S $(find {:s} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
-                    Path(self.path_install)), cwd=self.path_current, shell=True, env=self.env)
+                    self.path_install), cwd=self.path_current, shell=True, env=self.env)
             subprocess.run(
                 "strip -x -S $(find {:s} -type f)".format(
-                    Path(self.path_install, "bin")), cwd=self.path_current, shell=True, env=self.env)
+                    str(Path(self.path_install, "bin"))), cwd=self.path_current, shell=True, env=self.env)
 
     def cleanup(self):
         """Clean up unnecessary artefacts."""
@@ -203,7 +204,7 @@ class CustomEnvironment(Command, SubPackages):
         if 8 in self.step:
             for pypi in ["cython", "wheel", "setuptools", "pip"]:
                 subprocess.run(
-                    "{1:s} -m pip uninstall {0} --yes".format(pypi, Path(self.path_install, "bin/python3")),
+                    "{1:s} -m pip uninstall {0} --yes".format(pypi, str(Path(self.path_install, "bin/python3"))),
                     cwd=self.path_current,
                     shell=True,
                     env=self.env
@@ -212,20 +213,20 @@ class CustomEnvironment(Command, SubPackages):
         # 8. Remove unnecessary folders
         if 9 in self.step:
             subprocess.run(
-                "rm -fR {:s}".format(Path(self.path_install, "share")),
+                "rm -fR {:s}".format(str(Path(self.path_install, "share"))),
                 cwd=self.path_current, shell=True, env=self.env)
             subprocess.run(
-                "rm -fR {:s}".format(Path(self.path_install, "include")),
+                "rm -fR {:s}".format(str(Path(self.path_install, "include"))),
                 cwd=self.path_current, shell=True, env=self.env)
 
         # 9. Remove unused binaries and links
         if 10 in self.step:
             subprocess.run(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
-                cwd=str(Path(self.path_install, "bin").resolve()), shell=True, env=self.env)
+                cwd=Path(self.path_install, "bin").resolve(), shell=True, env=self.env)
             subprocess.run(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",
-                cwd=str(Path(self.path_install, "bin").resolve()), shell=True, env=self.env)
+                cwd=Path(self.path_install, "bin").resolve(), shell=True, env=self.env)
 
     def run(self):
         """Create a frozen standalone angelos server environment."""
