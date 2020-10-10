@@ -57,6 +57,8 @@ PERMS_FILE = 400
 PERMS_DIR = 544
 
 FILTER = [
+    "/python3.6/",
+    "/python3.7/",
     ".dist-info",
     "/test/",
     "/tests/",

@@ -52,7 +52,7 @@ class Executable(Command):
         home = str(Path("./").absolute())
 
         cflags = subprocess.check_output(
-            "{} --cflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
+            "{0} --cflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
 
         # Debian 10 specific
         cflags = cflags.replace("-specs=/usr/share/dpkg/no-pie-compile.specs", "")
@@ -60,22 +60,22 @@ class Executable(Command):
         # https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
         if major == 3 and minor >= 8:
             ldflags = subprocess.check_output(
-                "{} --ldflags --embed".format(config), stderr=subprocess.STDOUT, shell=True).decode()
+                "{0} --ldflags --embed".format(config), stderr=subprocess.STDOUT, shell=True).decode()
         else:
             ldflags = subprocess.check_output(
-                "{} --ldflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
+                "{0} --ldflags".format(config), stderr=subprocess.STDOUT, shell=True).decode()
 
         subprocess.check_call(
-            "cython --embed -3 -o {0}.c {1:s}".format(
-                temp_name, Path("./scripts", temp_name + "_entry_point.pyx"), self.name), cwd=home, shell=True)
+            "cython --embed -3 -o {0}.c {1}".format(
+                temp_name, Path("./scripts/", self.name+"_entry_point.pyx")), cwd=home, shell=True)
 
         subprocess.check_call(
             "gcc -o {0}.o -c {0}.c {1}".format(
                 temp_name, cflags), cwd=temp.name, shell=True)
 
         subprocess.check_call(
-            "gcc -rdynamic -o {0}/{1} {2}.o {3}".format(
-                dist, self.name, temp_name, ldflags), cwd=home, shell=True)
+            "gcc -rdynamic -o {0} {1}.o {2}".format(
+                Path(dist, self.name), temp_name, ldflags), cwd=home, shell=True)
         # -rdynamic --> --export-dynamic
 
         temp.cleanup()
