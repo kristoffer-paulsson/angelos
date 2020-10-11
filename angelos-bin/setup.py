@@ -12,6 +12,7 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+import os
 import sys
 from pathlib import Path
 
@@ -61,10 +62,14 @@ scan = {
     ],
     "extra": {
         "angelos.bin.nacl": {
-            "libraries": [str(Path("libsodium"))],
-            "library_dirs": [str(Path("tarball/libsodium/libsodium/x64/Release/v142/static"))],
             "include_dirs": [str(Path("tarball/libsodium/libsodium/include").absolute())],
-            "language": "c++"
+            "extra_compile_args": ["-static"],
+            "extra_objects": [
+                str(Path("tarball/libsodium/libsodium/x64/Release/v142/static/libsodium.lib").absolute())
+            ],
+            "export_symbols": [
+                "crypto_box_beforenm", "crypto_sign_bytes", "crypto_secretbox_open", "crypto_scalarmult_base"
+            ],
         } if sys.platform == "win32" else {
             "extra_objects": [str(Path("usr/local/lib/libsodium.a"))],
             "include_dirs": [str(Path("usr/local/include").absolute())]  # CentOS specific only (?)
@@ -94,7 +99,7 @@ config = {
                     "download": "https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable-msvc.zip",
                     "local": "libsodium-1.0.18-msvc.zip",
                     "internal": "libsodium",
-                    "check": str(Path("tarball/libsodium/libsodium/x64/Release/v142/static/libsodium.lib")),
+                    "check": str(Path("tarball/libsodium/libsodium/x64/Release/v142/static/libsodium.lib").absolute()),
                 } if sys.platform == "win32" else {
                     "class": VendorCompileNacl,
                     "name": "libsodium",
@@ -124,6 +129,7 @@ config = {
             "language_level": 3,
         }
     ),
+    # "data_files": [('', [str(Path("tarball/libsodium/libsodium/x64/Release/v142/dynamic/libsodium.dll"))])]
 }
 
 setup(**config)
