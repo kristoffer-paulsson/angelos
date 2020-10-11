@@ -4,6 +4,7 @@ cython
 contextvars;python_version<"3.7"
 
 ../angelos-common/
+../angelos-psi/
 ../angelos-bin/
 
 

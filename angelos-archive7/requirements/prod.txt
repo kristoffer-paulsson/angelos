@@ -2,6 +2,7 @@
 ../angelos-meta/
 
 ../angelos-common/
+../angelos-psi/
 ../angelos-bin/
 
 -e .

@@ -27,13 +27,14 @@ from setuptools.command.install import install
 
 class SubPackages:
     NAMESPACES = {
-        "angelos.meta": "angelos-meta" + os.sep,
-        "angelos.common": "angelos-common" + os.sep,
-        "angelos.bin": "angelos-bin" + os.sep,
-        "angelos.document": "angelos-document" + os.sep,
-        "angelos.archive7": "angelos-archive7" + os.sep,
-        "angelos.lib": "angelos-lib" + os.sep,
-        "angelos.server": "angelos-server" + os.sep,
+        "angelos.meta": "angelos-meta",
+        "angelos.psi": "angelos-psi",
+        "angelos.common": "angelos-common",
+        "angelos.bin": "angelos-bin",
+        "angelos.document": "angelos-document",
+        "angelos.archive7": "angelos-archive7",
+        "angelos.lib": "angelos-lib",
+        "angelos.server": "angelos-server",
     }
 
 
@@ -45,17 +46,20 @@ class CustomDevelop(develop, SubPackages):
         prefix = str(Path(self.prefix).resolve()) if self.prefix else None
         for package, directory in self.NAMESPACES.items():
             try:
-                path = Path(work_dir, directory)
+                path = str(Path(work_dir, directory).resolve())
+                os.chdir(path)
                 addition = ["--user"] if "--user" in sys.argv else []
                 addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
                 subprocess.run(
-                    " ".join(["pip", "install", "-e", "."] + addition),
-                    cwd=str(path.resolve()),
-                    shell=True
+                     " ".join(["pip", "install", "-e", "."] + addition),
+                     cwd=path,
+                     shell=True
                 )
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
+            finally:
+                os.chdir(work_dir)
 
 
 class CustomInstall(install, SubPackages):
@@ -63,21 +67,23 @@ class CustomInstall(install, SubPackages):
 
     def run(self):
         work_dir = os.getcwd()
-        prefix = str(Path(self.prefix).absolute()) if self.prefix else None
+        prefix = str(Path(self.prefix).resolve()) if self.prefix else None
         for package, directory in self.NAMESPACES.items():
             try:
-                print(work_dir, directory)
-                path = Path(work_dir, directory)
+                path = str(Path(work_dir, directory).resolve())
+                os.chdir(path)
                 addition = ["--user"] if "--user" in sys.argv else []
                 addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
                 subprocess.run(
-                    " ".join(["pip", "install", "."] + addition),
-                    cwd=str(path.resolve()),
-                    shell=True
+                     " ".join(["pip", "install", "."] + addition),
+                     cwd=path,
+                     shell=True
                 )
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
+            finally:
+                os.chdir(work_dir)
 
 
 class CustomEnvironment(Command, SubPackages):

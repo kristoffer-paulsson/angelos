@@ -54,6 +54,7 @@ config = {
             "language_level": 3,
         }
     ),
+    "python_requires": ">=3.6, <4",
 }
 
 setup(**config)

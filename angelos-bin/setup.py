@@ -129,7 +129,7 @@ config = {
             "language_level": 3,
         }
     ),
-    # "data_files": [('', [str(Path("tarball/libsodium/libsodium/x64/Release/v142/dynamic/libsodium.dll"))])]
+    "python_requires": ">=3.6, <4",
 }
 
 setup(**config)

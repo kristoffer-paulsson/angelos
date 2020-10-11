@@ -14,7 +14,6 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Data streams."""
-import fcntl
 import hashlib
 import os
 import struct
@@ -26,6 +25,7 @@ from typing import Union
 from angelos.archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, \
     BlockError, StreamError, BaseFileObject, StreamManagerError
 from angelos.archive7.tree import SimpleBTree
+from angelos.psi.filelock import FileLock
 from angelos.bin.nacl import SecretBox
 
 BLANK_DATA = b"\x00" * DATA_SIZE
@@ -673,7 +673,7 @@ class StreamManager(ABC):
         if os.path.isfile(filename):
             # Open and use file
             self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
-            fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            FileLock.acquire(self.__file)
             self.__file.seek(0, os.SEEK_END)
             length = self.__file.tell()
             if length % BLOCK_SIZE:
@@ -700,7 +700,7 @@ class StreamManager(ABC):
         else:
             # Setup file before using
             self.__file = open(self.__filename, "wb+", BLOCK_SIZE)
-            fcntl.lockf(self.__file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            FileLock.acquire(self.__file)
 
             for i in range(max(self.SPECIAL_BLOCK_COUNT, 1)):
                 self.__blocks[i] = self.new_block()
@@ -738,7 +738,7 @@ class StreamManager(ABC):
 
             self.__file.flush()
             os.fsync(self.__file.fileno())
-            fcntl.lockf(self.__file, fcntl.LOCK_UN)
+            FileLock.release(self.__file)
             self.__file.close()
             self.__closed = True
 
