@@ -59,12 +59,12 @@ class BaseKeyLoader(ABC):
         if key is None:
             key = cls.new()
 
-        cls._set_key("Λόγῳ", "angelos-conceal", base64.b64encode(key).decode())
+        cls._set_key("Λόγῳ", "angelos-conceal", base64.b64encode(key))
         box = SecretBox(key)
 
         cls._set_key(
             "Λόγῳ", "angelos-masterkey", base64.b64encode(
-                box.encrypt(master)).decode())
+                box.encrypt(master)))
 
     @classmethod
     def redo(cls):
@@ -128,7 +128,7 @@ elif sys.platform.startswith("win32"):
                 raise RuntimeWarning(
                     "Get key '{}' failed: {}".format(name, ""))
             else:
-                return data["CredentialBlob"].decode('utf-16')
+                return data["CredentialBlob"].decode('utf-16').encode()
 
         @classmethod
         def _set_key(cls, realm: str, name: str, key: bytes):
@@ -156,12 +156,12 @@ else:
 
         @classmethod
         def _get_key(cls, realm: str, name: str):
-            raise NotImplementedError()
+            raise NotImplementedError("Not implemented for platform: {}".format(sys.platform))
 
         @classmethod
         def _set_key(cls, realm: str, name: str, key: bytes):
-            raise NotImplementedError()
+            raise NotImplementedError("Not implemented for platform: {}".format(sys.platform))
 
         @classmethod
         def _del_key(cls, realm: str, name: str):
-            raise NotImplementedError()
+            raise NotImplementedError("Not implemented for platform: {}".format(sys.platform))

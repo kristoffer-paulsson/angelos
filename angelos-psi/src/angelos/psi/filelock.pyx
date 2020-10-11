@@ -79,8 +79,8 @@ else:
 
         @classmethod
         def acquire(cls, fd):
-            raise NotImplementedError()
+            raise NotImplementedError("Not implemented for platform: {}".format(os.name))
 
         @classmethod
         def release(cls, fd):
-            raise NotImplementedError()
+            raise NotImplementedError("Not implemented for platform: {}".format(os.name))
