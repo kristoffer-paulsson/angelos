@@ -20,12 +20,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from setuptools import setup, Command
+from setuptools import setup, Command, Extension
 from setuptools.command.develop import develop
 from setuptools.command.install import install
+from Cython.Build import cythonize
 
 
 class SubPackages:
+    """Subpackages to execute commands on."""
+
     NAMESPACES = {
         "angelos.meta": "angelos-meta",
         "angelos.psi": "angelos-psi",
@@ -37,53 +40,46 @@ class SubPackages:
         "angelos.server": "angelos-server",
     }
 
-
-class CustomDevelop(develop, SubPackages):
-    """Custom steps for develop command."""
-
-    def run(self):
+    def subpackage(self, command: list):
+        """Deal with all subpackages."""
         work_dir = os.getcwd()
-        prefix = str(Path(self.prefix).resolve()) if self.prefix else None
+        prefix = str(Path(getattr(self, "prefix")).resolve()) if getattr(self, "prefix", None) else None
         for package, directory in self.NAMESPACES.items():
             try:
                 path = str(Path(work_dir, directory).resolve())
                 os.chdir(path)
                 addition = ["--user"] if "--user" in sys.argv else []
                 addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
-                subprocess.run(
-                     " ".join(["pip", "install", "-e", "."] + addition),
-                     cwd=path,
-                     shell=True
-                )
+                with subprocess.Popen(
+                        " ".join(command + addition),
+                        stdout=sys.stdout,
+                        stderr=sys.stderr,
+                        shell=True
+                ):
+                    pass
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
             finally:
                 os.chdir(work_dir)
+
+
+class CustomDevelop(develop, SubPackages):
+    """Custom steps for develop command."""
+
+    def run(self):
+        """Run develop on namespace and subpackages."""
+        develop.run(self)
+        self.subpackage(["pip", "install", "-e", "."])
 
 
 class CustomInstall(install, SubPackages):
     """Custom steps for install command."""
 
     def run(self):
-        work_dir = os.getcwd()
-        prefix = str(Path(self.prefix).resolve()) if self.prefix else None
-        for package, directory in self.NAMESPACES.items():
-            try:
-                path = str(Path(work_dir, directory).resolve())
-                os.chdir(path)
-                addition = ["--user"] if "--user" in sys.argv else []
-                addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
-                subprocess.run(
-                     " ".join(["pip", "install", "."] + addition),
-                     cwd=path,
-                     shell=True
-                )
-            except Exception as exc:
-                print("Oops, something went wrong installing", package)
-                print(exc)
-            finally:
-                os.chdir(work_dir)
+        """Run install on namespace and subpackages."""
+        install.run(self)
+        self.subpackage(["pip", "install", "."])
 
 
 class CustomEnvironment(Command, SubPackages):
@@ -249,6 +245,7 @@ NAME = "angelos"
 VERSION = "1.0.0b1"
 RELEASE = ""
 
+
 config = {
     "name": NAME,
     "version": VERSION,
@@ -297,7 +294,16 @@ config = {
         "Topic :: System :: Archiving",
         "Topic :: Utilities",
     ],
-    "install_requires": [],
+    "package_dir": {"": "src"},
+    "packages": ["angelos"],
+    "install_requires": ["cython"],
+    "ext_modules": cythonize(
+        Extension("angelos.data", ["src/angelos/data.pyx"]),
+        build_dir="build",
+        compiler_directives={
+            "language_level": 3,
+        }
+    ),
     "python_requires": ">=3.6, <4",
 }
 

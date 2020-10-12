@@ -31,7 +31,7 @@ clean:
 	rm -fr ./build/
 	rm -fr ./angelos-*/dist/
 	rm -fr ./angelos-*/build/
-	find ./angelos-*/src -name \*.egg-info -type f -delete
+	find ./angelos-*/src -name \*.egg-info -type d -delete
 	find ./angelos-*/src -name \*.so -type f -delete
 	find ./angelos-*/src -name \*.dylib -type f -delete
 	find ./angelos-*/src -name \*.pyd -type f -delete
