@@ -128,7 +128,7 @@ class CustomEnvironment(Command, SubPackages):
         cur_dir = os.getcwd()
         try:
             os.chdir(work_dir)
-            subprocess.call(cmd, cwd=work_dir, shell=True, env=env)
+            subprocess.call(cmd, cwd=str(work_dir), shell=True, env=env)
         except Exception as exc:
             print(exc)
         finally:
@@ -138,12 +138,12 @@ class CustomEnvironment(Command, SubPackages):
         """Make preparations."""
         if 1 in self.step:
             print("##########  1_PREPARATIONS  ##########")
-            self.path_install = str(Path(self.prefix).resolve())
-            self.path_current = str(Path(os.curdir).resolve())
-            self.path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
-            self.path_server = str(Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve())
-            self.path_bin = str(Path(self.path_install, "bin"))
-            self.path_python = str(Path(self.path_bin, "python3"))
+            self.path_install = Path(self.prefix).resolve()
+            self.path_current = Path(os.curdir).resolve()
+            self.path_meta = Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve()
+            self.path_server = Path(os.curdir, self.NAMESPACES["angelos.server"]).resolve()
+            self.path_bin = Path(self.path_install, "bin")
+            self.path_python = Path(self.path_bin, "python3")
 
             self.env = {k: os.environ[k] for k in os.environ.keys() if k not in (
                 "PYCHARM_MATPLOTLIB_INTERACTIVE", "IPYTHONENABLE", "PYDEVD_LOAD_VALUES_ASYNC",
@@ -152,12 +152,12 @@ class CustomEnvironment(Command, SubPackages):
                 "PYTHONPATH"
             )}
 
-            print("path_install:", self.path_install)
-            print("path_current:", self.path_current)
-            print("path_meta:", self.path_meta)
-            print("path_server:", self.path_server)
-            print("path_bin:", self.path_bin)
-            print("path_python:", self.path_python)
+            print("path_install:", str(self.path_install))
+            print("path_current:", str(self.path_current))
+            print("path_meta:", str(self.path_meta))
+            print("path_server:", str(self.path_server))
+            print("path_bin:", str(self.path_bin))
+            print("path_python:", str(self.path_python))
 
             print("##########  1_PREPARATIONS_END  ##########")
 
@@ -167,7 +167,7 @@ class CustomEnvironment(Command, SubPackages):
         if 2 in self.step:
             print("##########  2_PYTHON_BUILD  ##########")
             self.process(
-                "python setup.py vendor --prefix={0}".format(self.path_install), self.path_server)
+                "python setup.py vendor --prefix={0}".format(str(self.path_install)), self.path_server)
             print("##########  2_PYTHON_BUILD_END  ##########")
 
         # 2. Compile and install build requirements
@@ -175,14 +175,16 @@ class CustomEnvironment(Command, SubPackages):
             print("##########  3_REQUIREMENTS_INSTALL  ##########")
             for pypi in ["pip", "setuptools", "wheel", "cython"]:
                 self.process(
-                    "{1} -m pip install {0} --upgrade".format(pypi, self.path_python), self.path_current, self.env)
+                    "{1} -m pip install {0} --upgrade".format(
+                        pypi, str(self.path_python)), self.path_current, self.env)
             print("##########  3_REQUIREMENTS_INSTALL_END  ##########")
 
         # 3. Install angelos meta subpackage
         if 4 in self.step:
             print("##########  4_ANGELOS_META  ##########")
             self.process(
-                "{0} -m pip install . --ignore-installed --prefix={1}".format(self.path_python, self.path_install),
+                "{0} -m pip install . --ignore-installed --prefix={1}".format(
+                    str(self.path_python), str(self.path_install)),
                 self.path_meta, self.env)
             print("##########  4_ANGELOS_META_END  ##########")
 
@@ -192,7 +194,8 @@ class CustomEnvironment(Command, SubPackages):
         if 5 in self.step:
             print("##########  5_EXECUTABLE_BUILD  ##########")
             self.process(
-                "{1} setup.py exe --name={0} --prefix={2}".format("angelos", self.path_python, self.path_install),
+                "{1} setup.py exe --name={0} --prefix={2}".format(
+                    "angelos", str(self.path_python), str(self.path_install)),
                 self.path_server, self.env)
             print("##########  5_EXECUTABLE_BUILD_END  ##########")
 
@@ -200,7 +203,7 @@ class CustomEnvironment(Command, SubPackages):
         if 6 in self.step:
             print("##########  6_ANGELOS_BUILD  ##########")
             self.process(
-                "{0} setup.py install --prefix={1}".format(self.path_python, self.path_install),
+                "{0} setup.py install --prefix={1}".format(str(self.path_python), str(self.path_install)),
                 self.path_current, self.env)
             print("##########  6_ANGELOS_BUILD_END  ##########")
 
@@ -211,10 +214,10 @@ class CustomEnvironment(Command, SubPackages):
             print("##########  7_STRIP_BINARIES  ##########")
             self.process(
                 "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
-                    self.path_install),
+                    str(self.path_install)),
                 self.path_current, self.env)
             self.process(
-                "strip -x -S $(find {} -type f)".format(self.path_bin),
+                "strip -x -S $(find {} -type f)".format(str(self.path_bin)),
                 self.path_current, self.env)
             print("##########  7_STRIP_BINARIES_END  ##########")
 
@@ -225,7 +228,7 @@ class CustomEnvironment(Command, SubPackages):
             print("##########  8_REQUIREMENTS_UNINSTALL  ##########")
             for pypi in ["cython", "wheel", "setuptools", "pip"]:
                 self.process(
-                    "{1} -m pip uninstall {0} --yes".format(pypi, self.path_python),
+                    "{1} -m pip uninstall {0} --yes".format(pypi, str(self.path_python)),
                     self.path_current, self.env)
             print("##########  8_REQUIREMENTS_UNINSTALL_END  ##########")
 
@@ -233,10 +236,10 @@ class CustomEnvironment(Command, SubPackages):
         if 9 in self.step:
             print("##########  9_REMOVE_FOLDERS  ##########")
             self.process(
-                "rm -fR {}".format(Path(self.path_install, "share")),
+                "rm -fR {}".format(str(Path(self.path_install, "share"))),
                 self.path_current, self.env)
             self.process(
-                "rm -fR {}".format(Path(self.path_install, "include")),
+                "rm -fR {}".format(str(Path(self.path_install, "include"))),
                 self.path_current, self.env)
             print("##########  9_REMOVE_FOLDERS_END  ##########")
 
@@ -245,10 +248,10 @@ class CustomEnvironment(Command, SubPackages):
             print("##########  10_REMOVE_BINARIES  ##########")
             self.process(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
-                str(Path(self.path_bin).resolve()), self.env)
+                self.path_bin.resolve(), self.env)
             self.process(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",
-                str(Path(self.path_bin).resolve()), self.env)
+                self.path_bin.resolve(), self.env)
             print("##########  10_REMOVE_BINARIES_END  ##########")
 
     def run(self):
