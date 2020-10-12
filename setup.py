@@ -139,6 +139,14 @@ class CustomEnvironment(Command, SubPackages):
                 "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
                 "PYTHONPATH"
             )}
+
+            print("path_install:", self.path_install)
+            print("path_current:", self.path_current)
+            print("path_meta:", self.path_meta)
+            print("path_server:", self.path_server)
+            print("path_bin:", self.path_bin)
+            print("path_python:", self.path_python)
+
             print("##########  1_PREPARATIONS_END  ##########")
 
     def create(self):
@@ -153,7 +161,7 @@ class CustomEnvironment(Command, SubPackages):
                 stdout=sys.stdout,
                 stderr=sys.stderr
             )
-            print("##########  2_PYTHON_BUIL_END  ##########")
+            print("##########  2_PYTHON_BUILD_END  ##########")
 
         # 2. Compile and install build requirements
         if 3 in self.step:
@@ -279,7 +287,7 @@ class CustomEnvironment(Command, SubPackages):
             print("##########  10_REMOVE_BINARIES  ##########")
             subprocess.Popen(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
-                cwd=Path(self.path_bin).resolve(),
+                cwd=str(Path(self.path_bin).resolve()),
                 shell=True,
                 env=self.env,
                 stdout=sys.stdout,
@@ -287,7 +295,7 @@ class CustomEnvironment(Command, SubPackages):
             )
             subprocess.Popen(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",
-                cwd=Path(self.path_bin).resolve(),
+                cwd=str(Path(self.path_bin).resolve()),
                 shell=True,
                 env=self.env,
                 stdout=sys.stdout,
