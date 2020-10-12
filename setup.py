@@ -125,6 +125,7 @@ class CustomEnvironment(Command, SubPackages):
     def prepare(self):
         """Make preparations."""
         if 1 in self.step:
+            print("##########  1_PREPARATIONS  ##########")
             self.path_install = str(Path(self.prefix).resolve())
             self.path_current = str(Path(os.curdir).resolve())
             self.path_meta = str(Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve())
@@ -138,107 +139,171 @@ class CustomEnvironment(Command, SubPackages):
                 "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
                 "PYTHONPATH"
             )}
+            print("##########  1_PREPARATIONS_END  ##########")
 
     def create(self):
         """Create a python environment."""
         # 1. Compile and install python
         if 2 in self.step:
+            print("##########  2_PYTHON_BUILD  ##########")
             subprocess.check_call(
                 "python setup.py vendor --prefix={0}".format(self.path_install),
                 cwd=self.path_server,
-                shell=True
+                shell=True,
+                stdout=sys.stdout,
+                stderr=sys.stderr
             )
+            print("##########  2_PYTHON_BUIL_END  ##########")
 
         # 2. Compile and install build requirements
         if 3 in self.step:
+            print("##########  3_REQUIREMENTS_INSTALL  ##########")
             for pypi in ["pip", "setuptools", "wheel", "cython"]:
                 subprocess.run(
                     "{1} -m pip install {0} --upgrade".format(pypi, self.path_python),
                     cwd=self.path_current,
                     shell=True,
-                    env=self.env
+                    env=self.env,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr
                 )
+            print("##########  3_REQUIREMENTS_INSTALL_END  ##########")
 
         # 3. Install angelos meta subpackage
         if 4 in self.step:
+            print("##########  4_ANGELOS_META  ##########")
             subprocess.run(
                 "{0} -m pip install . --ignore-installed --prefix={1}".format(
                     self.path_python, self.path_install),
                 cwd=self.path_meta,
                 shell=True,
-                env=self.env
+                env=self.env,
+                stdout = sys.stdout,
+                stderr = sys.stderr
             )
+            print("##########  4_ANGELOS_META_END  ##########")
 
     def install(self):
         """Install angelos to environment."""
         # 4. Compile and install angelos entry point
         if 5 in self.step:
+            print("##########  5_EXECUTABLE_BUILD  ##########")
             subprocess.run(
                 "{1} setup.py exe --name={0} --prefix={2}".format(
                     "angelos", self.path_python, self.path_install),
                 cwd=self.path_server,
                 shell=True,
-                env=self.env
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
             )
+            print("##########  5_EXECUTABLE_BUILD_END  ##########")
 
         # 5. Compile and install angelos binaries
         if 6 in self.step:
+            print("##########  6_ANGELOS_BUILD  ##########")
             subprocess.run(
                 "{0} setup.py install --prefix={1}".format(
                     self.path_python, self.path_install),
                 cwd=self.path_current,
                 shell=True,
-                env=self.env
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
             )
+            print("##########  6_ANGELOS_BUILD_END  ##########")
 
     def strip(self):
         """Strip all libraries and binaries from debug symbols."""
         # 6.
         if 7 in self.step:
+            print("##########  7_STRIP_BINARIES  ##########")
             subprocess.run(
                 "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
-                    self.path_install), cwd=self.path_current, shell=True, env=self.env)
+                    self.path_install),
+                cwd=self.path_current,
+                shell=True,
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
             subprocess.run(
                 "strip -x -S $(find {} -type f)".format(
-                    self.path_bin), cwd=self.path_current, shell=True, env=self.env)
+                    self.path_bin),
+                cwd=self.path_current,
+                shell=True, env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
+            print("##########  7_STRIP_BINARIES_END  ##########")
 
     def cleanup(self):
         """Clean up unnecessary artefacts."""
         # 7. Uninstall unnecessary requirements
         if 8 in self.step:
+            print("##########  8_REQUIREMENTS_UNINSTALL  ##########")
             for pypi in ["cython", "wheel", "setuptools", "pip"]:
                 subprocess.run(
                     "{1} -m pip uninstall {0} --yes".format(pypi, self.path_python),
                     cwd=self.path_current,
                     shell=True,
-                    env=self.env
+                    env=self.env,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr
                 )
+            print("##########  8_REQUIREMENTS_UNINSTALL_END  ##########")
 
         # 8. Remove unnecessary folders
         if 9 in self.step:
+            print("##########  9_REMOVE_FOLDERS  ##########")
             subprocess.run(
                 "rm -fR {}".format(Path(self.path_install, "share")),
-                cwd=self.path_current, shell=True, env=self.env)
+                cwd=self.path_current,
+                shell=True,
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
             subprocess.run(
                 "rm -fR {}".format(Path(self.path_install, "include")),
-                cwd=self.path_current, shell=True, env=self.env)
+                cwd=self.path_current,
+                shell=True,
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
+            print("##########  9_REMOVE_FOLDERS_END  ##########")
 
         # 9. Remove unused binaries and links
         if 10 in self.step:
+            print("##########  10_REMOVE_BINARIES  ##########")
             subprocess.run(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
-                cwd=Path(self.path_bin).resolve(), shell=True, env=self.env)
+                cwd=Path(self.path_bin).resolve(),
+                shell=True,
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
             subprocess.run(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",
-                cwd=Path(self.path_bin).resolve(), shell=True, env=self.env)
+                cwd=Path(self.path_bin).resolve(),
+                shell=True,
+                env=self.env,
+                stdout=sys.stdout,
+                stderr=sys.stderr
+            )
+            print("##########  10_REMOVE_BINARIES_END  ##########")
 
     def run(self):
         """Create a frozen standalone angelos server environment."""
+        print("##########  VIRTUAL_ENVIRONMENT  ##########")
         self.prepare()
         self.create()
         self.install()
         self.strip()
         self.cleanup()
+        print("##########  VIRTUAL_ENVIRONMENT_END  ##########")
 
 
 NAME = "angelos"
