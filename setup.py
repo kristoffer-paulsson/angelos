@@ -194,7 +194,7 @@ class CustomEnvironment(Command, SubPackages):
         if 5 in self.step:
             print("##########  5_EXECUTABLE_BUILD  ##########")
             self.process(
-                "{1} setup.py exe --name={0} --prefix={2}".format(
+                "{1}.8 setup.py exe --name={0} --prefix={2}".format(
                     "angelos", str(self.path_python), str(self.path_install)),
                 self.path_server, self.env)
             print("##########  5_EXECUTABLE_BUILD_END  ##########")
@@ -203,7 +203,7 @@ class CustomEnvironment(Command, SubPackages):
         if 6 in self.step:
             print("##########  6_ANGELOS_BUILD  ##########")
             self.process(
-                "{0} setup.py install --prefix={1}".format(str(self.path_python), str(self.path_install)),
+                "{0}.8 setup.py install --prefix={1}".format(str(self.path_python), str(self.path_install)),
                 self.path_current, self.env)
             print("##########  6_ANGELOS_BUILD_END  ##########")
 
