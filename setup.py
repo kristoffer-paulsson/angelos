@@ -51,13 +51,11 @@ class SubPackages:
                 os.chdir(path)
                 addition = ["--user"] if "--user" in sys.argv else []
                 addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
-                with subprocess.Popen(
-                        " ".join(command + addition),
-                        stdout=sys.stdout,
-                        stderr=sys.stderr,
-                        shell=True
-                ):
-                    pass
+                exe = [sys.executable, "-m"] if bool(sys.executable) else []
+                cmd = " ".join(exe + command + addition)
+                sys.stdout.write("Subpackage: {}\n".format(path))
+                sys.stdout.write("Subprocess: {}\n".format(cmd))
+                subprocess.call(cmd, shell=True)
             except Exception as exc:
                 print("Oops, something went wrong installing", package)
                 print(exc)
@@ -128,6 +126,7 @@ class CustomEnvironment(Command, SubPackages):
         cur_dir = os.getcwd()
         try:
             os.chdir(work_dir)
+            sys.stdout.write("Supprocess:{}\n".format(cmd))
             subprocess.call(cmd, cwd=str(work_dir), shell=True, env=env)
         except Exception as exc:
             print(exc)
@@ -137,7 +136,7 @@ class CustomEnvironment(Command, SubPackages):
     def prepare(self):
         """Make preparations."""
         if 1 in self.step:
-            print("##########  1_PREPARATIONS  ##########")
+            sys.stdout.write("##########  1_PREPARATIONS  ##########\n")
             self.path_install = Path(self.prefix).resolve()
             self.path_current = Path(os.curdir).resolve()
             self.path_meta = Path(os.curdir, self.NAMESPACES["angelos.meta"]).resolve()
@@ -152,66 +151,66 @@ class CustomEnvironment(Command, SubPackages):
                 "PYTHONPATH"
             )}
 
-            print("path_install:", str(self.path_install))
-            print("path_current:", str(self.path_current))
-            print("path_meta:", str(self.path_meta))
-            print("path_server:", str(self.path_server))
-            print("path_bin:", str(self.path_bin))
-            print("path_python:", str(self.path_python))
+            sys.stdout.write("path_install:{}\n".format(str(self.path_install)))
+            sys.stdout.write("path_current:{}\n".format(str(self.path_current)))
+            sys.stdout.write("path_meta:{}\n".format(str(self.path_meta)))
+            sys.stdout.write("path_server:{}\n".format(str(self.path_server)))
+            sys.stdout.write("path_bin:{}\n".format(str(self.path_bin)))
+            sys.stdout.write("path_python:{}\n".format(str(self.path_python)))
 
-            print("##########  1_PREPARATIONS_END  ##########")
+            sys.stdout.write("##########  1_PREPARATIONS_END  ##########\n")
 
     def create(self):
         """Create a python environment."""
         # 1. Compile and install python
         if 2 in self.step:
-            print("##########  2_PYTHON_BUILD  ##########")
+            sys.stdout.write("##########  2_PYTHON_BUILD  ##########\n")
             self.process(
                 "python setup.py vendor --prefix={0}".format(str(self.path_install)), self.path_server)
-            print("##########  2_PYTHON_BUILD_END  ##########")
+            sys.stdout.write("##########  2_PYTHON_BUILD_END  ##########\n")
 
         # 2. Compile and install build requirements
         if 3 in self.step:
-            print("##########  3_REQUIREMENTS_INSTALL  ##########")
+            sys.stdout.write("##########  3_REQUIREMENTS_INSTALL  ##########\n")
             for pypi in ["pip", "setuptools", "wheel", "cython"]:
                 self.process(
                     "{1} -m pip install {0} --upgrade".format(
                         pypi, str(self.path_python)), self.path_current, self.env)
-            print("##########  3_REQUIREMENTS_INSTALL_END  ##########")
+            sys.stdout.write("##########  3_REQUIREMENTS_INSTALL_END  ##########\n")
 
         # 3. Install angelos meta subpackage
         if 4 in self.step:
-            print("##########  4_ANGELOS_META  ##########")
+            sys.stdout.write("##########  4_ANGELOS_META  ##########\n")
             self.process(
                 "{0} -m pip install . --ignore-installed --prefix={1}".format(
                     str(self.path_python), str(self.path_install)),
                 self.path_meta, self.env)
-            print("##########  4_ANGELOS_META_END  ##########")
+            sys.stdout.write("##########  4_ANGELOS_META_END  ##########\n")
 
     def install(self):
         """Install angelos to environment."""
         # 4. Compile and install angelos entry point
         if 5 in self.step:
-            print("##########  5_EXECUTABLE_BUILD  ##########")
+            sys.stdout.write("##########  5_EXECUTABLE_BUILD  ##########\n")
             self.process(
-                "{1}.8 setup.py exe --name={0} --prefix={2}".format(
+                "{1} setup.py exe --name={0} --prefix={2}".format(
                     "angelos", str(self.path_python), str(self.path_install)),
                 self.path_server, self.env)
-            print("##########  5_EXECUTABLE_BUILD_END  ##########")
+            sys.stdout.write("##########  5_EXECUTABLE_BUILD_END  ##########\n")
 
         # 5. Compile and install angelos binaries
         if 6 in self.step:
-            print("##########  6_ANGELOS_BUILD  ##########")
+            sys.stdout.write("##########  6_ANGELOS_BUILD  ##########\n")
             self.process(
-                "{0}.8 setup.py install --prefix={1}".format(str(self.path_python), str(self.path_install)),
+                "{0} setup.py install --prefix={1}".format(str(self.path_python), str(self.path_install)),
                 self.path_current, self.env)
-            print("##########  6_ANGELOS_BUILD_END  ##########")
+            sys.stdout.write("##########  6_ANGELOS_BUILD_END  ##########\n")
 
     def strip(self):
         """Strip all libraries and binaries from debug symbols."""
         # 6.
         if 7 in self.step:
-            print("##########  7_STRIP_BINARIES  ##########")
+            sys.stdout.write("##########  7_STRIP_BINARIES  ##########\n")
             self.process(
                 "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
                     str(self.path_install)),
@@ -219,50 +218,50 @@ class CustomEnvironment(Command, SubPackages):
             self.process(
                 "strip -x -S $(find {} -type f)".format(str(self.path_bin)),
                 self.path_current, self.env)
-            print("##########  7_STRIP_BINARIES_END  ##########")
+            sys.stdout.write("##########  7_STRIP_BINARIES_END  ##########\n")
 
     def cleanup(self):
         """Clean up unnecessary artefacts."""
         # 7. Uninstall unnecessary requirements
         if 8 in self.step:
-            print("##########  8_REQUIREMENTS_UNINSTALL  ##########")
+            sys.stdout.write("##########  8_REQUIREMENTS_UNINSTALL  ##########\n")
             for pypi in ["cython", "wheel", "setuptools", "pip"]:
                 self.process(
                     "{1} -m pip uninstall {0} --yes".format(pypi, str(self.path_python)),
                     self.path_current, self.env)
-            print("##########  8_REQUIREMENTS_UNINSTALL_END  ##########")
+            sys.stdout.write("##########  8_REQUIREMENTS_UNINSTALL_END  ##########\n")
 
         # 8. Remove unnecessary folders
         if 9 in self.step:
-            print("##########  9_REMOVE_FOLDERS  ##########")
+            sys.stdout.write("##########  9_REMOVE_FOLDERS  ##########\n")
             self.process(
                 "rm -fR {}".format(str(Path(self.path_install, "share"))),
                 self.path_current, self.env)
             self.process(
                 "rm -fR {}".format(str(Path(self.path_install, "include"))),
                 self.path_current, self.env)
-            print("##########  9_REMOVE_FOLDERS_END  ##########")
+            sys.stdout.write("##########  9_REMOVE_FOLDERS_END  ##########\n")
 
         # 9. Remove unused binaries and links
         if 10 in self.step:
-            print("##########  10_REMOVE_BINARIES  ##########")
+            sys.stdout.write("##########  10_REMOVE_BINARIES  ##########\n")
             self.process(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
                 self.path_bin.resolve(), self.env)
             self.process(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",
                 self.path_bin.resolve(), self.env)
-            print("##########  10_REMOVE_BINARIES_END  ##########")
+            sys.stdout.write("##########  10_REMOVE_BINARIES_END  ##########\n")
 
     def run(self):
         """Create a frozen standalone angelos server environment."""
-        print("##########  VIRTUAL_ENVIRONMENT  ##########")
+        sys.stdout.write("##########  VIRTUAL_ENVIRONMENT  ##########\n")
         self.prepare()
         self.create()
         self.install()
         self.strip()
         self.cleanup()
-        print("##########  VIRTUAL_ENVIRONMENT_END  ##########")
+        sys.stdout.write("##########  VIRTUAL_ENVIRONMENT_END  ##########\n")
 
 
 NAME = "angelos"
