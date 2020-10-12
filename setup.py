@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+from os import PathLike
 from pathlib import Path
 
 from setuptools import setup, Command, Extension
@@ -122,6 +123,17 @@ class CustomEnvironment(Command, SubPackages):
         if not self.step:
             self.step = list(range(1, 10+1))
 
+    def process(self, cmd: str, work_dir: PathLike, env: dict = None):
+        """Run subprocess and print output."""
+        cur_dir = os.getcwd()
+        try:
+            os.chdir(work_dir)
+            subprocess.call(cmd, cwd=work_dir, shell=True, env=env)
+        except Exception as exc:
+            print(exc)
+        finally:
+            os.chdir(cur_dir)
+
     def prepare(self):
         """Make preparations."""
         if 1 in self.step:
@@ -154,44 +166,24 @@ class CustomEnvironment(Command, SubPackages):
         # 1. Compile and install python
         if 2 in self.step:
             print("##########  2_PYTHON_BUILD  ##########")
-            with subprocess.Popen(
-                "python setup.py vendor --prefix={0}".format(self.path_install),
-                cwd=self.path_server,
-                shell=True,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+            self.process(
+                "python setup.py vendor --prefix={0}".format(self.path_install), self.path_server)
             print("##########  2_PYTHON_BUILD_END  ##########")
 
         # 2. Compile and install build requirements
         if 3 in self.step:
             print("##########  3_REQUIREMENTS_INSTALL  ##########")
             for pypi in ["pip", "setuptools", "wheel", "cython"]:
-                with subprocess.Popen(
-                    "{1} -m pip install {0} --upgrade".format(pypi, self.path_python),
-                    cwd=self.path_current,
-                    shell=True,
-                    env=self.env,
-                    stdout=sys.stdout,
-                    stderr=sys.stderr
-                ):
-                    pass
+                self.process(
+                    "{1} -m pip install {0} --upgrade".format(pypi, self.path_python), self.path_current, self.env)
             print("##########  3_REQUIREMENTS_INSTALL_END  ##########")
 
         # 3. Install angelos meta subpackage
         if 4 in self.step:
             print("##########  4_ANGELOS_META  ##########")
-            with subprocess.Popen(
-                "{0} -m pip install . --ignore-installed --prefix={1}".format(
-                    self.path_python, self.path_install),
-                cwd=self.path_meta,
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+            self.process(
+                "{0} -m pip install . --ignore-installed --prefix={1}".format(self.path_python, self.path_install),
+                self.path_meta, self.env)
             print("##########  4_ANGELOS_META_END  ##########")
 
     def install(self):
@@ -199,31 +191,17 @@ class CustomEnvironment(Command, SubPackages):
         # 4. Compile and install angelos entry point
         if 5 in self.step:
             print("##########  5_EXECUTABLE_BUILD  ##########")
-            with subprocess.Popen(
-                "{1} setup.py exe --name={0} --prefix={2}".format(
-                    "angelos", self.path_python, self.path_install),
-                cwd=self.path_server,
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+            self.process(
+                "{1} setup.py exe --name={0} --prefix={2}".format("angelos", self.path_python, self.path_install),
+                self.path_server, self.env)
             print("##########  5_EXECUTABLE_BUILD_END  ##########")
 
         # 5. Compile and install angelos binaries
         if 6 in self.step:
             print("##########  6_ANGELOS_BUILD  ##########")
-            with subprocess.Popen(
-                "{0} setup.py install --prefix={1}".format(
-                    self.path_python, self.path_install),
-                cwd=self.path_current,
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+            self.process(
+                "{0} setup.py install --prefix={1}".format(self.path_python, self.path_install),
+                self.path_current, self.env)
             print("##########  6_ANGELOS_BUILD_END  ##########")
 
     def strip(self):
@@ -231,25 +209,13 @@ class CustomEnvironment(Command, SubPackages):
         # 6.
         if 7 in self.step:
             print("##########  7_STRIP_BINARIES  ##########")
-            with subprocess.Popen(
+            self.process(
                 "strip -x -S $(find {} -type f -name \*.so -o -name \*.dll -o -name \*.a -o -name \*.dylib)".format(
                     self.path_install),
-                cwd=self.path_current,
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
-            with subprocess.Popen(
-                "strip -x -S $(find {} -type f)".format(
-                    self.path_bin),
-                cwd=self.path_current,
-                shell=True, env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+                self.path_current, self.env)
+            self.process(
+                "strip -x -S $(find {} -type f)".format(self.path_bin),
+                self.path_current, self.env)
             print("##########  7_STRIP_BINARIES_END  ##########")
 
     def cleanup(self):
@@ -258,61 +224,31 @@ class CustomEnvironment(Command, SubPackages):
         if 8 in self.step:
             print("##########  8_REQUIREMENTS_UNINSTALL  ##########")
             for pypi in ["cython", "wheel", "setuptools", "pip"]:
-                with subprocess.Popen(
+                self.process(
                     "{1} -m pip uninstall {0} --yes".format(pypi, self.path_python),
-                    cwd=self.path_current,
-                    shell=True,
-                    env=self.env,
-                    stdout=sys.stdout,
-                    stderr=sys.stderr
-                ):
-                    pass
+                    self.path_current, self.env)
             print("##########  8_REQUIREMENTS_UNINSTALL_END  ##########")
 
         # 8. Remove unnecessary folders
         if 9 in self.step:
             print("##########  9_REMOVE_FOLDERS  ##########")
-            with subprocess.Popen(
+            self.process(
                 "rm -fR {}".format(Path(self.path_install, "share")),
-                cwd=self.path_current,
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
-            with subprocess.Popen(
+                self.path_current, self.env)
+            self.process(
                 "rm -fR {}".format(Path(self.path_install, "include")),
-                cwd=self.path_current,
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+                self.path_current, self.env)
             print("##########  9_REMOVE_FOLDERS_END  ##########")
 
         # 9. Remove unused binaries and links
         if 10 in self.step:
             print("##########  10_REMOVE_BINARIES  ##########")
-            with subprocess.Popen(
+            self.process(
                 "find . ! -name 'angelos' -and ! -name 'install' -and ! -name 'uninstall' -type f -exec rm -f {} +",
-                cwd=str(Path(self.path_bin).resolve()),
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
-            with subprocess.Popen(
+                str(Path(self.path_bin).resolve()), self.env)
+            self.process(
                 "find . ! -name 'angelos' -type l -exec rm -f {} +",
-                cwd=str(Path(self.path_bin).resolve()),
-                shell=True,
-                env=self.env,
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            ):
-                pass
+                str(Path(self.path_bin).resolve()), self.env)
             print("##########  10_REMOVE_BINARIES_END  ##########")
 
     def run(self):
