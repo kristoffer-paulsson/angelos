@@ -252,7 +252,7 @@ class BlockProcessor(ABC):
         iterator = StreamIterator(self._fd, self._generator)
         for data in iterator:
             block = BlockTuple(*struct.unpack(FORMAT_BLOCK, self._decryptor.decrypt(data)))
-            self.process(
+            self.subprocess(
                 iterator.position,
                 block,
                 tuple(f.analyze(block, iterator.position) for f in self._filter)
