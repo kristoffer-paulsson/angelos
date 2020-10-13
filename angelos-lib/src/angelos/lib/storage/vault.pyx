@@ -18,6 +18,7 @@ import datetime
 import io
 import logging
 import uuid
+from pathlib import PurePosixPath
 from typing import List, Dict, Any, Optional, Callable
 
 from angelos.archive7.archive import TYPE_LINK, Archive7
@@ -78,11 +79,11 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         ("/settings/networks.csv", b"")
     )
 
-    NODES = "/settings/nodes"
-    INBOX = "/messages/inbox/"
+    NODES = PurePosixPath("/settings/nodes")
+    INBOX = PurePosixPath("/messages/inbox/")
 
     @classmethod
-    async def setup(cls, home_dir: str, secret: bytes, portfolio: PrivatePortfolio, vtype=None, vrole=None) -> object:
+    async def setup(cls, home_dir: PurePosixPath, secret: bytes, portfolio: PrivatePortfolio, vtype=None, vrole=None) -> object:
         """Create and setup the whole Vault according to policy's.
 
         Args:
@@ -106,7 +107,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             vrole=vrole
         )
 
-    async def save(self, filename, document, document_file_id_match=True):
+    async def save(self, filename: PurePosixPath, document, document_file_id_match=True):
         """Save a document at a certain location.
 
         Args:
@@ -133,7 +134,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             modified=updated
         )
 
-    async def delete(self, filename: str):
+    async def delete(self, filename: PurePosixPath):
         """Remove a document at a certain location.
 
         Args:
@@ -144,7 +145,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """
         return await self.archive.remove(filename)
 
-    async def link(self, path: str, link_to: str) -> None:
+    async def link(self, path: PurePosixPath, link_to: PurePosixPath) -> None:
         """Create a link to file or directory.
 
         Args:
@@ -156,7 +157,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         """
         await self.archive.link(path, link_to)
 
-    async def update(self, filename, document):
+    async def update(self, filename: PurePosixPath, document):
         """Update a document on file.
 
         Args:
@@ -174,7 +175,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             modified=updated,
         )
 
-    async def issuer(self, issuer, path="/", limit=1):
+    async def issuer(self, issuer, path: PurePosixPath = PurePosixPath("/"), limit=1):
         """Search a folder for documents by issuer."""
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
@@ -250,7 +251,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             logging.exception(e)
 
     async def search_docs(
-            self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
+            self, issuer: uuid.UUID = None, path: PurePosixPath = PurePosixPath("/"), limit: int = 1
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
 
@@ -277,7 +278,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         Returns:
 
         """
-        filename = "/settings/" + name
+        filename = PurePosixPath("/settings/", name)
         data = text.getvalue().encode()
         is_file = await self.archive.isfile(filename)
         if is_file:
@@ -294,7 +295,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         Returns:
 
         """
-        filename = "/settings/" + name
+        filename = PurePosixPath("/settings/", name)
         is_file = await self.archive.isfile(filename)
         if is_file:
             data = await self.archive.load(filename)

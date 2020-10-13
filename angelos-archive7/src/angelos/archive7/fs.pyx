@@ -379,14 +379,14 @@ class HierarchyTraverser(Iterable):
 
     def _iterate_dir(self, record: EntryRecord):
         self.__segments.append(record.name.decode())
-        yield record, "/" + os.path.join(*self.__segments)[5:]
+        yield record, os.sep + os.path.join(*self.__segments)[5:]
         for item in self.__listings.tree.traverse(record.id):
             entry = self._get_entry(uuid.UUID(bytes=item))
             if entry.type == TYPE_ERR:
                 entry.parent = record.id
-                yield entry, "/" + os.path.join(*self.__segments, "<error>")[5:]
+                yield entry, os.sep + os.path.join(*self.__segments, "<error>")[5:]
             elif entry.type != TYPE_DIR:
-                yield entry, "/" + os.path.join(*self.__segments, entry.name.decode())[5:]
+                yield entry, os.sep + os.path.join(*self.__segments, entry.name.decode())[5:]
             else:
                 for entry2, path in self._iterate_dir(entry):
                     yield entry2, path
@@ -395,7 +395,7 @@ class HierarchyTraverser(Iterable):
     def __iter__(self):
         entry = self._get_entry(self.__identity)
         if entry.type != TYPE_DIR:
-            yield entry, "/" + os.path.join(*self.__segments, entry.name.decode())[5:]
+            yield entry, os.sep + os.path.join(*self.__segments, entry.name.decode())[5:]
         else:
             for entry2, path in self._iterate_dir(entry):
                 yield entry2, path

@@ -28,6 +28,7 @@ import subprocess
 import sys
 import traceback
 from asyncio import Task
+from os import PathLike
 from typing import Callable, Union, Any, List, Tuple
 
 
@@ -357,6 +358,11 @@ class Util:
             return False
         else:
             return True
+
+    @staticmethod
+    def pathify(self, path: PathLike, escape: bool = False) -> str:
+        """Translates a PathLike object into string and escapes in Windows environments."""
+        return str(path) if not (os.name == "nt" and escape) else "\"{}\"".format(str(path))
 
 
 class FactoryInterface:

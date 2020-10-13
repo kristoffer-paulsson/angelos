@@ -15,6 +15,8 @@
 #
 """A task for synchronizing and indexing contacts in relation to portfolios."""
 import asyncio
+import uuid
+from pathlib import PurePosixPath
 
 from angelos.lib.task.task import TaskFacadeExtension
 
@@ -54,7 +56,7 @@ class ContactPortfolioSyncTask(TaskFacadeExtension):
         # await contacts.remove(self.facade.data.portfolio.entity.id)
         self._progress(1.0)
         
-    async def __link(self, path, eid):
-        filename = path + str(eid)
-        target = self.facade.storage.vault.PATH_PORTFOLIOS[0] + str(eid) + "/" + str(eid) + ".ent"
+    async def __link(self, path: PurePosixPath, eid: uuid.UUID):
+        filename = PurePosixPath(path, str(eid))
+        target = PurePosixPath(self.facade.storage.vault.PATH_PORTFOLIOS[0], str(eid), str(eid) + ".ent")
         await self.facade.storage.vault.link(filename, target)

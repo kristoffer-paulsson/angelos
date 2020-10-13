@@ -18,6 +18,7 @@ import collections
 import pprint
 import uuid
 from collections.abc import Iterable
+from pathlib import PurePosixPath
 from typing import Set, Tuple
 
 import msgpack
@@ -743,7 +744,7 @@ class PortfolioPolicy:
         raise NotImplementedError()
 
     @staticmethod
-    def doc2fileident(document: DocumentT) -> str:
+    def doc2fileident(document: DocumentT) -> PurePosixPath:
         """Translate document into file identifier."""
         if document.type in (
             DocType.COM_ENVELOPE,
@@ -753,11 +754,11 @@ class PortfolioPolicy:
             DocType.COM_SHARE,
             DocType.COM_REPORT,
         ):
-            return ""
+            return PurePosixPath("")
         else:
-            return "{0}{1}".format(
+            return PurePosixPath("{0}{1}".format(
                 document.id, DOCUMENT_PATTERN[document.type]
-            )
+            ))
 
     @staticmethod
     def path2fileident(filename: str) -> str:

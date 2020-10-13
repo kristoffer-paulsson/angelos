@@ -17,6 +17,7 @@
 import atexit
 import os
 import uuid
+from pathlib import PurePosixPath, Path
 
 from angelos.archive7.archive import Archive7
 from angelos.archive7.fs import Delete
@@ -33,7 +34,7 @@ class StorageFacadeExtension(FacadeExtension):
     INIT_HIERARCHY = ("/",)
     INIT_FILES = ()
 
-    def __init__(self, facade: BaseFacade, home_dir: str, secret: bytes, delete=Delete.HARD):
+    def __init__(self, facade: BaseFacade, home_dir: Path, secret: bytes, delete=Delete.HARD):
         """Initialize the Storage extension."""
         FacadeExtension.__init__(self, facade)
         self.__archive = Archive7.open(self.filename(home_dir), secret, delete)
@@ -65,7 +66,7 @@ class StorageFacadeExtension(FacadeExtension):
     async def setup(
         cls,
         facade: BaseFacade,
-        home_dir: str,
+        home_dir: Path,
         secret: bytes,
         owner: uuid.UUID,
         node: uuid.UUID,
@@ -92,7 +93,7 @@ class StorageFacadeExtension(FacadeExtension):
         return cls(facade, home_dir, secret)
 
     @classmethod
-    def filename(cls, dir_name):
+    def filename(cls, dir_name: Path) -> Path:
         """
 
         Args:
@@ -101,14 +102,14 @@ class StorageFacadeExtension(FacadeExtension):
         Returns:
 
         """
-        return os.path.join(dir_name, cls.CONCEAL[0])
+        return Path(dir_name, cls.CONCEAL[0])
 
     @classmethod
     async def _hierarchy(cls, archive):
         for i in cls.INIT_HIERARCHY:
-            await archive.mkdir(i)
+            await archive.mkdir(PurePosixPath(i))
 
     @classmethod
     async def _files(cls, archive):
         for i in cls.INIT_FILES:
-            await archive.mkfile(i[0], i[1])
+            await archive.mkfile(PurePosixPath(i[0]), i[1])

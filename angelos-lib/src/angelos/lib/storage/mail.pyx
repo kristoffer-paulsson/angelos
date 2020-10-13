@@ -15,6 +15,7 @@
 #
 """Vault."""
 import uuid
+from pathlib import PurePosixPath
 from typing import List
 
 from angelos.lib.const import Const
@@ -39,7 +40,7 @@ class MailStorage(StorageFacadeExtension):
 
     INIT_HIERARCHY = ("/",)
 
-    async def save(self, filename, document, document_file_id_match=True):
+    async def save(self, filename: PurePosixPath, document, document_file_id_match=True):
         """Save a document at a certain location.
 
         Args:
@@ -65,11 +66,11 @@ class MailStorage(StorageFacadeExtension):
             created=created,
             modified=updated,
         )
-    async def delete(self, filename):
+    async def delete(self, filename: PurePosixPath):
         """Remove a document at a certain location."""
         return await self.archive.remove(filename)
 
-    async def update(self, filename, document):
+    async def update(self, filename: PurePosixPath, document):
         """Update a document on file."""
         created, updated, owner = Glue.doc_save(document)
 
@@ -79,7 +80,7 @@ class MailStorage(StorageFacadeExtension):
             modified=updated,
         )
 
-    async def issuer(self, issuer, path="/", limit=1):
+    async def issuer(self, issuer, path: PurePosixPath = PurePosixPath("/"), limit=1):
         """Search a folder for documents by issuer."""
         raise DeprecationWarning('Use "search" instead of "issuer".')
 
@@ -93,7 +94,7 @@ class MailStorage(StorageFacadeExtension):
         return datalist
 
     async def search(
-        self, issuer: uuid.UUID = None, path: str = "/", limit: int = 1
+        self, issuer: uuid.UUID = None, path: PurePosixPath = PurePosixPath("/"), limit: int = 1
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
 

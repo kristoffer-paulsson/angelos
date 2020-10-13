@@ -18,6 +18,7 @@ import asyncio
 import copy
 import logging
 import uuid
+from pathlib import PurePosixPath
 from typing import Tuple, List, Set, Any
 
 from angelos.document.types import StatementT, DocumentT
@@ -36,24 +37,24 @@ from angelos.lib.helper import Glue
 class PortfolioMixin:
     """Mixin that lets a storage deal with a portfolio repository."""
 
-    PATH_PORTFOLIOS = ("/portfolios/",)
+    PATH_PORTFOLIOS = (PurePosixPath("/portfolios/"),)
 
-    def portfolio_path(self, eid: uuid.UUID) -> str:
+    def portfolio_path(self, eid: uuid.UUID) -> PurePosixPath:
         """Generate portfolio path for a particular entity id."""
-        return  "{0}{1}".format(self.PATH_PORTFOLIOS[0], eid)
+        return  PurePosixPath("{0}{1}".format(self.PATH_PORTFOLIOS[0], eid))
 
-    async def portfolio_files(self, path: str, owner: uuid.UUID = None):
+    async def portfolio_files(self, path: PurePosixPath, owner: uuid.UUID = None):
         """Glob a list of all files in a portfolio."""
-        return await self.archive.glob(name="{dir}/*".format(dir=path), owner=owner)
+        return await self.archive.glob(name=PurePosixPath("{dir}/*".format(dir=path)), owner=owner)
 
-    async def portfolio_exists_not(self, path: str, eid: uuid.UUID):
+    async def portfolio_exists_not(self, path: PurePosixPath, eid: uuid.UUID):
         """Check that portfolio exists."""
         is_dir = await self.archive.isdir(path)
         if not is_dir:
             raise Error.exception(Error.PORTFOLIO_EXISTS_NOT, {
                 "portfolio": eid})
 
-    async def write_file(self, filename: str, doc: DocumentT):
+    async def write_file(self, filename: PurePosixPath, doc: DocumentT):
         """Write a document to the current archive."""
         is_file = await self.archive.isfile(filename)
         if is_file:
@@ -395,10 +396,10 @@ class PortfolioMixin:
                     raise Error.exception(Error.PORTFOLIO_NOT_STATEMENT, {
                         "document": doc.id, "issuer": doc.issuer})
                 if policy.issued_document(doc):
-                    filename = DOCUMENT_PATH[doc.type].format(
+                    filename = PurePosixPath(DOCUMENT_PATH[doc.type].format(
                         dir="{0}{1}".format(self.PATH_PORTFOLIOS[0], doc.owner),
                         file=doc.id,
-                    )
+                    ))
                     ops.append(await self.write_file(filename, doc))
                 else:
                     rejected.add(doc)
@@ -450,7 +451,7 @@ class PortfolioMixin:
         issuer, owner = portfolio.to_sets()
         for doc in issuer | owner:
             files.append(
-                (DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id), doc)
+                (PurePosixPath(DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)), doc)
             )
 
         ops = list()
@@ -614,7 +615,7 @@ class PortfolioMixin:
         save = issuer | owner
 
         for doc in save:
-            filename = DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id)
+            filename = PurePosixPath(DOCUMENT_PATH[doc.type].format(dir=dirname, file=doc.id))
             ops.append(await self.write_file(filename, doc))
 
         return await self.gather(*ops)

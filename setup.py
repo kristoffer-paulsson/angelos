@@ -46,13 +46,17 @@ class SubPackages:
         sys.stdout.write(" ".join([str(string) for string in largs]) + "\n")
         sys.stdout.flush()
 
+    def pathify(self, path: PathLike) -> str:
+        """Translates a PathLike object into string and escapes in Windows environments."""
+        return str(path) if not os.name == "nt" else "\"{}\"".format(str(path))
+
     def subprocess(self, cmd: str, work_dir: PathLike, env: dict = None):
         """Run subprocess and print output."""
         cur_dir = os.getcwd()
         try:
             os.chdir(work_dir)
             self.print("Subrocess", cmd)
-            with subprocess.Popen(cmd, cwd=str(work_dir), shell=True, env=env, stdout=sys.stdout, stderr=sys.stderr):
+            with subprocess.Popen(cmd, cwd=work_dir, shell=True, env=env, stdout=sys.stdout, stderr=sys.stderr):
                 pass
         except Exception as exc:
             print(exc)
@@ -62,12 +66,12 @@ class SubPackages:
     def subpackage(self, command: list):
         """Deal with all subpackages."""
         work_dir = os.getcwd()
-        prefix = str(Path(getattr(self, "prefix")).resolve()) if getattr(self, "prefix", None) else None
+        prefix = self.pathify(Path(getattr(self, "prefix")).resolve()) if getattr(self, "prefix", None) else None
         for package, directory in self.NAMESPACES.items():
             path = str(Path(work_dir, directory).resolve())
             addition = ["--user"] if "--user" in sys.argv else []
             addition += ["--ignore-installed", "--prefix", prefix] if prefix else []
-            exe = [sys.executable, "-m"] if bool(sys.executable) else []
+            exe = [self.pathify(Path(sys.executable)), "-m"] if bool(sys.executable) else []
             cmd = " ".join(exe + command + addition)
             self.print("Subpackage:", path)
             self.subprocess(cmd, path)
