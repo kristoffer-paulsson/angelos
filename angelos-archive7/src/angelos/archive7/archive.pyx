@@ -252,7 +252,7 @@ class Archive7(SharedResourceMixin):
 
         files = set()
         async for entry, path in self.search(sq):
-            files.add(PurePosixPath(path))
+            files.add(path)
 
         return files
 

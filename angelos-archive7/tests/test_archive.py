@@ -45,7 +45,8 @@ class TestArchive7(TestCase):
         cls.files = dict()
         cls.links = dict()
         for _ in range(cls.FILE_COUNT):
-            cls.files[PurePosixPath(random.choice(LIPSUM_PATH), Generate.filename())] = Generate.lipsum()
+            filename = PurePosixPath(random.choice(LIPSUM_PATH), Generate.filename())
+            cls.files[filename] = Generate.lipsum()
         cls.archive.close()
 
     @classmethod
