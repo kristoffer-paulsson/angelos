@@ -218,9 +218,6 @@ class Archive7(SharedResourceMixin):
 
         return self.__manager.search_entry(identity)
 
-    # async def glob(self, *args, **kwargs):
-    #    return await self._run(functools.partial(self.__glob, *args, **kwargs))
-
     async def glob(
             self,
             name="*",
@@ -255,7 +252,7 @@ class Archive7(SharedResourceMixin):
 
         files = set()
         async for entry, path in self.search(sq):
-            files.add(path)
+            files.add(PurePosixPath(path))
 
         return files
 
@@ -364,12 +361,11 @@ class Archive7(SharedResourceMixin):
             name        The full path and name of new directory
             returns     the entry ID
         """
-        dirname, name = os.path.split(dirname)
-        parent = self.__manager.resolve_path(dirname)
+        parent = self.__manager.resolve_path(dirname.parent)
         if not parent:
-            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": dirname})
+            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": dirname.parent})
         return self.__manager.create_entry(
-            TYPE_DIR, name, parent, user=user, group=group, perms=perms
+            TYPE_DIR, dirname.parts[-1], parent, user=user, group=group, perms=perms
         )
 
     async def mkfile(self, *args, **kwargs):
@@ -389,15 +385,14 @@ class Archive7(SharedResourceMixin):
             perms: int = None
     ) -> uuid.UUID:
         """Create a new file."""
-        dirname, name = os.path.split(filename)
-        parent = self.__manager.resolve_path(dirname)
+        parent = self.__manager.resolve_path(filename.parent)
 
         if not parent:
             raise OSError("Parent directory not found")
 
         identity = self.__manager.create_entry(
             type_=TYPE_FILE,
-            name=name,
+            name=filename.parts[-1],
             stream=uuid.UUID(int=0),
             parent=parent,
             identity=id,
@@ -430,16 +425,15 @@ class Archive7(SharedResourceMixin):
             perms: int = None
     ) -> uuid.UUID:
         """Create a new link to file or directory."""
-        dirname, name = os.path.split(filename)
-        parent = self.__manager.resolve_path(dirname)
+        parent = self.__manager.resolve_path(filename.parent)
         if not parent:
-            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": dirname})
+            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename.parent})
         owner = self.__manager.resolve_path(target)
         if not owner:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"target": target})
         return self.__manager.create_entry(
             type_=TYPE_LINK,
-            name=name,
+            name=filename.parts[-1],
             parent=parent,
             owner=owner,
             created=created,

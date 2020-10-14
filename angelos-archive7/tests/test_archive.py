@@ -15,6 +15,8 @@
 import copy
 import os
 import random
+from collections import Counter
+from pathlib import PurePosixPath
 from tempfile import TemporaryDirectory
 from unittest.case import TestCase
 
@@ -43,7 +45,7 @@ class TestArchive7(TestCase):
         cls.files = dict()
         cls.links = dict()
         for _ in range(cls.FILE_COUNT):
-            cls.files[os.path.join(random.choice(LIPSUM_PATH), Generate.filename())] = Generate.lipsum()
+            cls.files[PurePosixPath(random.choice(LIPSUM_PATH), Generate.filename())] = Generate.lipsum()
         cls.archive.close()
 
     @classmethod
@@ -93,7 +95,7 @@ class TestArchive7(TestCase):
     async def test_01_mkdir(self):
         try:
             for path in LIPSUM_PATH:
-                await self.archive.mkdir(path)
+                await self.archive.mkdir(PurePosixPath(path))
         except Exception as e:
             self.fail(e)
 
@@ -113,7 +115,7 @@ class TestArchive7(TestCase):
             for filename in keys[:self.FILE_COUNT // 4]:
                 name = Generate.filename()
                 await self.archive.rename(filename, name)
-                self.files[os.path.join(os.path.dirname(filename), name)] = self.files[filename]
+                self.files[PurePosixPath(filename.parent, name)] = self.files[filename]
                 del self.files[filename]
         except Exception as e:
             self.fail(e)
@@ -125,10 +127,10 @@ class TestArchive7(TestCase):
             random.shuffle(keys)
             for filename in keys[:self.FILE_COUNT // 4]:
                 dirs = copy.deepcopy(LIPSUM_PATH)
-                dirs.remove(os.path.dirname(filename))
-                dirname = random.choice(dirs)
+                dirs.remove(str(filename.parent))
+                dirname = PurePosixPath(random.choice(dirs))
                 await self.archive.move(filename, dirname)
-                self.files[os.path.join(dirname, os.path.basename(filename))] = self.files[filename]
+                self.files[PurePosixPath(dirname, filename.parts[-1])] = self.files[filename]
                 del self.files[filename]
         except Exception as e:
             self.fail(e)
@@ -176,7 +178,7 @@ class TestArchive7(TestCase):
     async def test_09_isdir(self):
         try:
             for path in LIPSUM_PATH:
-                result = await self.archive.isdir(path)
+                result = await self.archive.isdir(PurePosixPath(path))
                 self.assertTrue(result)
 
             for filename in self.files.keys():
@@ -189,7 +191,7 @@ class TestArchive7(TestCase):
     async def test_10_isfile(self):
         try:
             for path in LIPSUM_PATH:
-                result = await self.archive.isfile(path)
+                result = await self.archive.isfile(PurePosixPath(path))
                 self.assertFalse(result)
 
             for filename in self.files.keys():
@@ -215,7 +217,7 @@ class TestArchive7(TestCase):
             keys = list(self.files.keys())
             random.shuffle(keys)
             for filename in keys[:self.FILE_COUNT // 4]:
-                linkname = os.path.join(random.choice(LIPSUM_PATH), Generate.filename())
+                linkname = PurePosixPath(random.choice(LIPSUM_PATH), Generate.filename())
                 await self.archive.link(linkname, filename)
                 self.links[linkname] = self.files[filename]
         except Exception as e:
@@ -240,18 +242,7 @@ class TestArchive7(TestCase):
             globed = await self.archive.glob()
             files = list(self.files.keys())
             links = list(self.links.keys())
-            total = set(LIPSUM_PATH + ["/"] + files + links)
-            # print(
-            #    len(LIPSUM_PATH),
-            #    len(globed),
-            #    len(files),
-            #    len(links),
-            #    len(files + links),
-            #    len(LIPSUM_PATH + ["/"] + files + links)
-            # )
-
-            # print(globed - total)
-            # print(total - globed)
-            self.assertEqual(globed, total)
+            total = set([PurePosixPath(path) for path in LIPSUM_PATH] + [PurePosixPath("/")] + files + links)
+            self.assertEqual(Counter(globed), Counter(total))
         except Exception as e:
             self.fail(e)

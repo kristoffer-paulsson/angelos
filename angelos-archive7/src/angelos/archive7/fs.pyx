@@ -22,7 +22,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from pathlib import PurePath
+from pathlib import PurePath, PurePosixPath
 from typing import Union, Iterator
 
 from angelos.archive7.base import DATA_SIZE
@@ -476,7 +476,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         link = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
         return EntryRecord.meta_unpack(self.__entries.tree.get(key=link.owner))
 
-    def resolve_path(self, filename: PurePath, follow_link: bool = False) -> uuid.UUID:
+    def resolve_path(self, filename: PurePosixPath, follow_link: bool = False) -> uuid.UUID:
         """Resolve a path by walking it.
 
         Args:
