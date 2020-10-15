@@ -14,6 +14,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Module docstring."""
+from pathlib import Path
 
 from angelos.lib.api.contact import ContactAPI
 from angelos.lib.api.crud import CrudAPI
@@ -113,7 +114,7 @@ class PersonClientFacade(BaseFacade, ClientFacadeMixin, PersonFacadeMixin):
 
     INFO = (Const.A_TYPE_PERSON_CLIENT,)
 
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade and its mixins."""
         BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
@@ -125,7 +126,7 @@ class PersonServerFacade(BaseFacade, ServerFacadeMixin, PersonFacadeMixin):
 
     INFO = (Const.A_TYPE_PERSON_SERVER,)
 
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade and its mixins."""
         BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
@@ -137,7 +138,7 @@ class MinistryClientFacade(BaseFacade, ClientFacadeMixin, MinistryFacadeMixin):
 
     INFO = (Const.A_TYPE_MINISTRY_CLIENT,)
 
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade and its mixins."""
         BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
@@ -149,7 +150,7 @@ class MinistryServerFacade(BaseFacade, ServerFacadeMixin, MinistryFacadeMixin):
 
     INFO = (Const.A_TYPE_MINISTRY_SERVER,)
 
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade and its mixins."""
         BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
@@ -161,7 +162,7 @@ class ChurchClientFacade(BaseFacade, ClientFacadeMixin, ChurchFacadeMixin):
 
     INFO = (Const.A_TYPE_CHURCH_CLIENT,)
 
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade and its mixins."""
         BaseFacade.__init__(self, home_dir, secret)
         ClientFacadeMixin.__init__(self)
@@ -173,7 +174,7 @@ class ChurchServerFacade(BaseFacade, ServerFacadeMixin, ChurchFacadeMixin):
 
     INFO = (Const.A_TYPE_CHURCH_SERVER,)
 
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade and its mixins."""
         BaseFacade.__init__(self, home_dir, secret)
         ServerFacadeMixin.__init__(self)
@@ -200,7 +201,7 @@ class Facade:
     }, )
 
     @staticmethod
-    async def setup(home_dir: str, secret: bytes, role: int, server: bool, portfolio: PrivatePortfolio) -> BaseFacade:
+    async def setup(home_dir: Path, secret: bytes, role: int, server: bool, portfolio: PrivatePortfolio) -> BaseFacade:
         """Set up facade from scratch."""
         vault_role = Facade._check_role(role)
         vault_type = Facade._check_type(portfolio, server)
@@ -214,7 +215,7 @@ class Facade:
         return facade
 
     @staticmethod
-    async def open(home_dir: str, secret: bytes) -> BaseFacade:
+    async def open(home_dir: Path, secret: bytes) -> BaseFacade:
         """Open a facade from disk."""
         vault = VaultStorage(None, home_dir, secret)
         facade_class = Facade.MAP[0][vault.archive.stats().type]

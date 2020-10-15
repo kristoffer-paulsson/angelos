@@ -18,28 +18,29 @@ import tracemalloc
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from libangelos.api.contact import ContactAPI
-from libangelos.policy.types import PersonData, MinistryData, ChurchData
+from angelos.lib.api.contact import ContactAPI
+from angelos.lib.api.crud import CrudAPI
+from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
 
-from libangelos.api.mailbox import MailboxAPI
-from libangelos.api.replication import ReplicationAPI
-from libangelos.api.settings import SettingsAPI
-from libangelos.storage.ftp import FtpStorage
-from libangelos.storage.home import HomeStorage
-from libangelos.storage.mail import MailStorage
-from libangelos.storage.pool import PoolStorage
-from libangelos.storage.routing import RoutingStorage
-from libangelos.storage.vault import VaultStorage
-from libangelos.const import Const
-from libangelos.data.client import ClientData
-from libangelos.data.portfolio import PortfolioData
-from libangelos.data.prefs import PreferencesData
-from libangelos.data.server import ServerData
-from libangelos.facade.facade import Facade, ServerFacadeMixin, ClientFacadeMixin
-from libangelos.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation
-from libangelos.task.contact_sync import ContactPortfolioSyncTask
-
-from tests.support.generate import Generate, run_async
+from angelos.lib.api.mailbox import MailboxAPI
+from angelos.lib.api.replication import ReplicationAPI
+from angelos.lib.api.settings import SettingsAPI
+from angelos.lib.storage.ftp import FtpStorage
+from angelos.lib.storage.home import HomeStorage
+from angelos.lib.storage.mail import MailStorage
+from angelos.lib.storage.pool import PoolStorage
+from angelos.lib.storage.routing import RoutingStorage
+from angelos.lib.storage.vault import VaultStorage
+from angelos.lib.const import Const
+from angelos.lib.data.client import ClientData
+from angelos.lib.data.portfolio import PortfolioData
+from angelos.lib.data.prefs import PreferencesData
+from angelos.lib.data.server import ServerData
+from angelos.lib.facade.facade import Facade, ServerFacadeMixin, ClientFacadeMixin
+from angelos.lib.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation
+from angelos.lib.task.contact_sync import ContactPortfolioSyncTask
+from angelos.meta.fake import Generate
+from angelos.meta.testing import run_async
 
 
 class TestFacade(TestCase):
@@ -92,6 +93,7 @@ class TestFacade(TestCase):
             self.assertIsInstance(facade.storage.mail, MailStorage)
             self.assertIsInstance(facade.storage.ftp, FtpStorage)
             self.assertIsInstance(facade.data.server, ServerData)
+            self.assertIsInstance(facade.api.crud, CrudAPI)
 
         if isinstance(facade, ClientFacadeMixin):
             self.assertIsInstance(facade.storage.home, HomeStorage)

@@ -22,7 +22,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from pathlib import PurePath, PurePosixPath
+from pathlib import PurePath, PurePosixPath, Path
 from typing import Union, Iterator
 
 from angelos.archive7.base import DATA_SIZE
@@ -435,7 +435,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
     STREAM_PATHS = 3
     STREAM_LISTINGS = 4
 
-    def __init__(self, filename: str, secret: bytes):
+    def __init__(self, filename: Path, secret: bytes):
         self.__descriptors = dict()
         self.__entries = None
         self.__paths = None

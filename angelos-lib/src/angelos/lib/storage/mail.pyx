@@ -38,7 +38,7 @@ class MailStorage(StorageFacadeExtension):
     CONCEAL = (Const.CNL_MAIL,)
     USEFLAG = (Const.A_USE_MAIL,)
 
-    INIT_HIERARCHY = ("/",)
+    INIT_HIERARCHY = ()
 
     async def save(self, filename: PurePosixPath, document, document_file_id_match=True):
         """Save a document at a certain location.

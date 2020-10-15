@@ -20,6 +20,7 @@ import struct
 import uuid
 from abc import abstractmethod, ABC
 from os import SEEK_CUR, SEEK_SET, SEEK_END
+from pathlib import Path
 from typing import Union
 
 from angelos.archive7.base import BLOCK_SIZE, DATA_SIZE, FORMAT_BLOCK, SIZE_BLOCK, FORMAT_STREAM, SIZE_STREAM, \
@@ -657,7 +658,7 @@ class StreamManager(ABC):
 
     BLOCK_META = 0
 
-    def __init__(self, filename: str, secret: bytes):
+    def __init__(self, filename: Path, secret: bytes):
         self.__created = False
         self.__filename = filename
         self.__closed = False
@@ -670,7 +671,7 @@ class StreamManager(ABC):
         self.__internal = [None for _ in range(self.SPECIAL_STREAM_COUNT)]
         self._streams = dict()
 
-        if os.path.isfile(filename):
+        if self.__filename.is_file():
             # Open and use file
             self.__file = open(self.__filename, "rb+", BLOCK_SIZE)
             FileLock.acquire(self.__file)
@@ -950,7 +951,7 @@ class DynamicMultiStreamManager(FixedMultiStreamManager):
 
     STREAM_INDEX = 1
 
-    def __init__(self, filename: str, secret: bytes):
+    def __init__(self, filename: Path, secret: bytes):
         StreamManager.__init__(self, filename, secret)
         self.__registry = StreamRegistry(self)
 

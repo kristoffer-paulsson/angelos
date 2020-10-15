@@ -45,7 +45,7 @@ class PortfolioMixin:
 
     async def portfolio_files(self, path: PurePosixPath, owner: uuid.UUID = None):
         """Glob a list of all files in a portfolio."""
-        return await self.archive.glob(name=PurePosixPath("{dir}/*".format(dir=path)), owner=owner)
+        return await self.archive.glob(name="{dir}/*".format(dir=str(path)), owner=owner)
 
     async def portfolio_exists_not(self, path: PurePosixPath, eid: uuid.UUID):
         """Check that portfolio exists."""
@@ -496,7 +496,7 @@ class PortfolioMixin:
         for field in config:
             pattern = PORTFOLIO_PATTERN[field]
             for filename in result:
-                if pattern == filename[-4:]:
+                if pattern == str(PurePosixPath(filename.parent, filename.stem)):
                     files.add(filename)
 
         ops = list()
@@ -556,7 +556,7 @@ class PortfolioMixin:
         for field in config:
             pattern = PORTFOLIO_PATTERN[field]
             for filename in result:
-                if pattern == filename[-4:]:
+                if pattern == str(PurePosixPath(filename.parent, filename.stem)):
                     files.add(filename)
 
         available = set()

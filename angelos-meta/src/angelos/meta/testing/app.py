@@ -20,7 +20,7 @@ import os
 import uuid
 from tempfile import TemporaryDirectory
 
-from angelos.common.misc import BaseDataClass
+from angelos.common.misc import BaseData
 from angelos.lib.automatic import Automatic, Path
 from angelos.lib.const import Const
 from angelos.lib.facade.facade import Facade, TypeFacadeMixin, ClientFacadeMixin, ServerFacadeMixin
@@ -143,11 +143,11 @@ class StubApplication(BaseApplicationStub):
         self.ioc.facade = facade
 
     @staticmethod
-    async def _open(home_dir: str, secret: bytes) -> TypeFacadeMixin:
+    async def _open(home_dir: Path, secret: bytes) -> TypeFacadeMixin:
         return await Facade.open(home_dir, secret)
 
     @staticmethod
-    async def _create(home_dir: str, secret: bytes, data: BaseDataClass, server: bool) -> TypeFacadeMixin:
+    async def _create(home_dir: Path, secret: bytes, data: BaseData, server: bool) -> TypeFacadeMixin:
         """Implement facade generation logic here."""
         if isinstance(data, PersonData):
             portfolio = SetupPersonOperation.create(data, server=True)
@@ -167,12 +167,12 @@ class StubApplication(BaseApplicationStub):
         )
 
     @staticmethod
-    async def open(home_dir: str, secret: bytes) -> ClientFacadeMixin:
+    async def open(home_dir: Path, secret: bytes) -> ClientFacadeMixin:
         """Facade open abstract method."""
         raise NotImplementedError()
 
     @staticmethod
-    async def create(home_dir: str, secret: bytes, data: BaseDataClass) -> ServerFacadeMixin:
+    async def create(home_dir: Path, secret: bytes, data: BaseData) -> ServerFacadeMixin:
         """Facade create abstract method."""
         raise NotImplementedError()
 
@@ -185,12 +185,12 @@ class StubServer(StubApplication):
     """Stub server for simulations and testing."""
 
     @staticmethod
-    async def open(home_dir: str, secret: bytes) -> ServerFacadeMixin:
+    async def open(home_dir: Path, secret: bytes) -> ServerFacadeMixin:
         """Open stub server."""
         return StubServer(await StubApplication._open(home_dir, secret))
 
     @staticmethod
-    async def create(home_dir: str, secret: bytes, data: BaseDataClass) -> ServerFacadeMixin:
+    async def create(home_dir: Path, secret: bytes, data: BaseData) -> ServerFacadeMixin:
         """Create stub server."""
         return StubServer(await StubApplication._create(home_dir, secret, data, True))
 
@@ -209,12 +209,12 @@ class StubClient(StubApplication):
     """Stub client for simulations and testing."""
 
     @staticmethod
-    async def open(home_dir: str, secret: bytes) -> ClientFacadeMixin:
+    async def open(home_dir: Path, secret: bytes) -> ClientFacadeMixin:
         """Open stub client."""
         return StubClient(await StubApplication._open(home_dir, secret))
 
     @staticmethod
-    async def create(home_dir: str, secret: bytes, data: BaseDataClass) -> ClientFacadeMixin:
+    async def create(home_dir: Path, secret: bytes, data: BaseData) -> ClientFacadeMixin:
         """Create stub client."""
         return StubClient(await StubApplication._create(home_dir, secret, data, False))
 
@@ -233,7 +233,7 @@ class ApplicationContext:
     #dir = None
     #secret = None
 
-    def __init__(self, tmp_dir, secret, app):
+    def __init__(self, tmp_dir: TemporaryDirectory, secret: bytes, app):
         self.dir = tmp_dir
         self.secret = secret
         self.app = app
@@ -243,7 +243,7 @@ class ApplicationContext:
         """Set up stub application environment."""
         secret = Generate.new_secret()
         tmp_dir = TemporaryDirectory()
-        app = await app_cls.create(tmp_dir.name, secret, data)
+        app = await app_cls.create(Path(tmp_dir.name), secret, data)
         return cls(tmp_dir, secret, app)
 
     def __del__(self):
@@ -262,7 +262,7 @@ class StubMaker:
     )
 
     @classmethod
-    async def __setup(cls, operation, generator, home, secret, server):
+    async def __setup(cls, operation, generator, home: Path, secret: bytes, server: bool):
         return await Facade.setup(
             home,
             secret,
@@ -274,7 +274,7 @@ class StubMaker:
         )
 
     @classmethod
-    async def create_person_facace(cls, homedir: str, secret: bytes, server: bool = False) -> Facade:
+    async def create_person_facade(cls, homedir: Path, secret: bytes, server: bool = False) -> Facade:
         """Generate random person facade.
 
         Args:
@@ -293,7 +293,7 @@ class StubMaker:
             SetupPersonOperation, Generate.person_data, homedir, secret, server)
 
     @classmethod
-    async def create_ministry_facade(cls, homedir: str, secret: bytes, server: bool = False) -> Facade:
+    async def create_ministry_facade(cls, homedir: Path, secret: bytes, server: bool = False) -> Facade:
         """Generate random ministry facade.
 
         Args:
@@ -312,7 +312,7 @@ class StubMaker:
             SetupMinistryOperation, Generate.ministry_data, homedir, secret, server)
 
     @classmethod
-    async def create_church_facade(cls, homedir: str, secret: bytes, server: bool = True) -> bytes:
+    async def create_church_facade(cls, homedir: Path, secret: bytes, server: bool = True) -> bytes:
         """Generate random church facade.
 
         Args:

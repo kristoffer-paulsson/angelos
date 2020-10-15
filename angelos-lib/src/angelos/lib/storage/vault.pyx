@@ -18,7 +18,7 @@ import datetime
 import io
 import logging
 import uuid
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 from typing import List, Dict, Any, Optional, Callable
 
 from angelos.archive7.archive import TYPE_LINK, Archive7
@@ -83,7 +83,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     INBOX = PurePosixPath("/messages/inbox/")
 
     @classmethod
-    async def setup(cls, home_dir: PurePosixPath, secret: bytes, portfolio: PrivatePortfolio, vtype=None, vrole=None) -> object:
+    async def setup(cls, home_dir: Path, secret: bytes, portfolio: PrivatePortfolio, vtype=None, vrole=None) -> object:
         """Create and setup the whole Vault according to policy's.
 
         Args:
@@ -223,32 +223,29 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             Returns a dictionary with a custom resultset indexed by file ID.
 
         """
-        try:
-            sq = Archive7.Query(pattern=pattern)
-            sq.type((TYPE_FILE, TYPE_LINK) if link else TYPE_FILE).deleted(deleted)
-            if modified:
-                sq.modified(modified)
-            if created:
-                sq.created(created)
-            if owner:
-                sq.owner(owner)
+        sq = Archive7.Query(pattern=pattern)
+        sq.type((TYPE_FILE, TYPE_LINK) if link else TYPE_FILE).deleted(deleted)
+        if modified:
+            sq.modified(modified)
+        if created:
+            sq.created(created)
+        if owner:
+            sq.owner(owner)
 
-            result = dict()
-            count = 0
-            async for entry, path in self.archive.search(sq):
-                if link and entry.type == TYPE_LINK:
-                    followed = self.archive._Archive7__manager._FileSystemStreamManager__follow_link(entry.id)
-                    result[link.id] = fields(path, followed)
-                else:
-                    result[entry.id] = fields(path, entry)
+        result = dict()
+        count = 0
+        async for entry, path in self.archive.search(sq):
+            if link and entry.type == TYPE_LINK:
+                followed = self.archive._Archive7__manager._FileSystemStreamManager__follow_link(entry.id)
+                result[link.id] = fields(path, followed)
+            else:
+                result[entry.id] = fields(path, entry)
 
-                count += 1
-                if count == limit:
-                    break
+            count += 1
+            if count == limit:
+                break
 
-            return result
-        except Exception as e:
-            logging.exception(e)
+        return result
 
     async def search_docs(
             self, issuer: uuid.UUID = None, path: PurePosixPath = PurePosixPath("/"), limit: int = 1

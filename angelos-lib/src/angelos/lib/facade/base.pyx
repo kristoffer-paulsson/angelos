@@ -17,6 +17,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 from typing import Awaitable
 
 from angelos.lib.error import ContainerServiceNotConfigured
@@ -139,7 +140,7 @@ class BaseFacade:
         Description of attribute `__storage`.
 
     """
-    def __init__(self, home_dir: str, secret: bytes):
+    def __init__(self, home_dir: Path, secret: bytes):
         """Initialize the facade."""
 
         self.__home_dir = home_dir
@@ -255,7 +256,7 @@ class BaseFacade:
             raise RuntimeError("Post init already done")
 
     @property
-    def path(self) -> str:
+    def path(self) -> Path:
         """Property exposing the Facade home directory..
 
         Returns

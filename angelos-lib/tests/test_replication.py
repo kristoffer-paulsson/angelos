@@ -13,8 +13,12 @@
 #     Kristoffer Paulsson - initial implementation
 #
 import logging
+import sys
+import tracemalloc
 from tempfile import TemporaryDirectory
+from unittest import TestCase
 
+import asyncssh
 from angelos.lib.policy.portfolio import PGroup
 from angelos.lib.policy.verify import StatementPolicy
 from angelos.lib.task.task import TaskWaitress
@@ -143,13 +147,20 @@ class TestCrossAuthentication(BaseTestNetwork):
         print(await self.client.app.ioc.facade.api.settings.networks())
 
 
-class TestFullReplication(BaseTestNetwork):
+class TestFullReplication(TestCase):
     pref_loglevel = logging.DEBUG
     pref_connectable = True
 
     server = None
     client1 = None
     client2 = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Setup test class with a facade and ten contacts."""
+        tracemalloc.start()
+        logging.basicConfig(stream=sys.stderr, level=cls.pref_loglevel)
+        asyncssh.logging.set_log_level(cls.pref_loglevel)
 
     @run_async
     async def setUp(self) -> None:

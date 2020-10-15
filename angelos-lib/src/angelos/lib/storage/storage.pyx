@@ -31,7 +31,7 @@ class StorageFacadeExtension(FacadeExtension):
     CONCEAL = ("",)
     USEFLAG = (0,)
 
-    INIT_HIERARCHY = ("/",)
+    INIT_HIERARCHY = ()
     INIT_FILES = ()
 
     def __init__(self, facade: BaseFacade, home_dir: Path, secret: bytes, delete=Delete.HARD):

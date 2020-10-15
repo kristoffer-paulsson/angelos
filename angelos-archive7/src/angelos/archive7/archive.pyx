@@ -162,7 +162,7 @@ class Archive7(SharedResourceMixin):
         return archive
 
     @staticmethod
-    def open(filename: Path, secret: bytes, delete=3):
+    def open(filename: Path, secret: bytes, delete: int = 3):
         """Open an archive with a symmetric encryption key.
 
         Args:
@@ -220,18 +220,17 @@ class Archive7(SharedResourceMixin):
 
     async def glob(
             self,
-            name="*",
-            id=None,
-            parent=None,
-            owner=None,
-            created=None,
-            modified=None,
-            deleted=False,
-            user=None,
-            group=None
+            name: str = "*",
+            id: uuid.UUID = None,
+            parent: uuid.UUID = None,
+            owner: uuid.UUID = None,
+            created: datetime.datetime = None,
+            modified: datetime.datetime = None,
+            deleted: bool = False,
+            user: str = None,
+            group: str = None
     ):
         """Glob the file system in the archive."""
-
         sq = Archive7.Query(pattern=name)
         if id:
             sq.id(id)
@@ -490,7 +489,7 @@ class Archive7(SharedResourceMixin):
             entry, path = await self._wild(functools.partial(self.__search, traverser=traverser))
             if not entry:
                 break
-            if evaluator(entry, path):
+            if evaluator(entry, str(path)):
                 yield entry, path
 
     def __search(self, traverser: HierarchyTraverser) -> tuple:
@@ -508,7 +507,7 @@ class Archive7(SharedResourceMixin):
         GT = ">"  # b'g'
         LT = "<"  # b'l'
 
-        def __init__(self, pattern="*"):
+        def __init__(self, pattern: str ="*"):
             """Init a query."""
             self.__type = (TYPE_FILE, TYPE_DIR, TYPE_LINK)
             self.__path_regex = None
