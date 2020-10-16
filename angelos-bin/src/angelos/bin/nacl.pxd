@@ -46,3 +46,18 @@ cdef extern from "sodium.h":
     int crypto_box_afternm(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *k)
     size_t crypto_box_boxzerobytes()
     int crypto_box_open_afternm(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k)
+
+    # Client/server key-exchange
+    size_t crypto_kx_publickeybytes()
+    size_t crypto_kx_secretkeybytes()
+    size_t crypto_kx_sessionkeybytes()
+
+    int crypto_kx_keypair(unsigned char *pk, unsigned char *sk)
+    int crypto_kx_client_session_keys(unsigned char *rx, unsigned char *tx, const unsigned char *client_pk, const unsigned char *client_sk, const unsigned char *server_pk)
+    int crypto_kx_server_session_keys(unsigned char *rx, unsigned char *tx, const unsigned char *server_pk, const unsigned char *server_sk, const unsigned char *client_pk)
+
+    size_t crypto_aead_xchacha20poly1305_ietf_npubbytes(void)
+    size_t crypto_aead_xchacha20poly1305_ietf_keybytes(void)
+    size_t crypto_aead_xchacha20poly1305_ietf_abytes(void)
+    int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k)
+    int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k)

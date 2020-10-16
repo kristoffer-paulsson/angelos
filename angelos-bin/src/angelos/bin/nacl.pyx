@@ -22,7 +22,11 @@ from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_secretbox_boxzerobytes, crypto_sign_bytes, crypto_sign_secretkeybytes, \
     crypto_sign_publickeybytes, crypto_sign_seed_keypair, crypto_sign, crypto_sign_open, \
     randombytes, crypto_box_noncebytes, crypto_box_publickeybytes, crypto_box_secretkeybytes, \
-    crypto_box_keypair, crypto_scalarmult_base, crypto_box_beforenmbytes
+    crypto_box_keypair, crypto_scalarmult_base, crypto_box_beforenmbytes, crypto_kx_publickeybytes, \
+    crypto_kx_secretkeybytes, crypto_kx_sessionkeybytes, crypto_kx_client_session_keys, \
+    crypto_kx_server_session_keys, crypto_aead_xchacha20poly1305_ietf_npubbytes, \
+    crypto_aead_xchacha20poly1305_ietf_keybytes, crypto_aead_xchacha20poly1305_ietf_abytes, \
+    crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt
 
 
 SIZE_BOX_NONCE = crypto_box_noncebytes()
@@ -43,6 +47,13 @@ SIZE_BOX_BEFORENM = crypto_box_beforenmbytes()
 SIZE_BOX_ZERO = crypto_box_zerobytes()
 SIZE_BOX_BOXZERO = crypto_box_boxzerobytes()
 
+SIZE_KX_PUBLICKEY = crypto_kx_publickeybytes()
+SIZE_KX_SECRETKEY = crypto_kx_secretkeybytes()
+SIZE_KX_SESSIONKEY = crypto_kx_sessionkeybytes()
+
+SIZE_AEAD_NPUB = crypto_aead_xchacha20poly1305_ietf_npubbytes()
+SIZE_AEAD_KEY = crypto_aead_xchacha20poly1305_ietf_keybytes()
+SIZE_AEAD_A = crypto_aead_xchacha20poly1305_ietf_abytes()
 
 class BaseKey:
     """Base class for encryption and signing keys."""
@@ -82,6 +93,10 @@ class BaseKey:
     @staticmethod
     def rand_nonce() -> bytes:
         return BaseKey.randombytes(SIZE_SECRETBOX_NONCE)
+
+    @staticmethod
+    def rand_aead_nonce() -> bytes:
+        return BaseKey.randombytes(SIZE_AEAD_NPUB)
 
     def _salsa_key(self) -> bytes:
         return BaseKey.randombytes(SIZE_SECRETBOX_KEY)
@@ -255,3 +270,86 @@ class CryptoBox:
             raise RuntimeError("Unable to decrypt message")
 
         return message[SIZE_BOX_ZERO:]
+
+
+class NetworkBox:
+    def __init__(self, us: SecretKey, them: PublicKey):
+        self._them = them
+        if len(self._them.pk) != SIZE_KX_PUBLICKEY:
+            raise ValueError("Invalid public key bytes")
+
+        self._us = us
+        if len(self._us.sk) != SIZE_KX_SECRETKEY or len(self._us.pk) != SIZE_KX_PUBLICKEY:
+            raise RuntimeError("Passed in invalid secret key")
+
+        self._tx = bytes(SIZE_KX_SESSIONKEY)
+        self._rx = bytes(SIZE_KX_SESSIONKEY)
+
+    def encrypt(self, message: bytes, data: bytes) -> bytes:
+        cdef unsigned long long crypto_len
+
+        data_len = len(data)
+        if len(data_len) > 255:
+            raise ValueError("Data can not be longer than 255 bytes.")
+
+        msg_len = len(message)
+        crypto = bytes(msg_len + SIZE_AEAD_A)
+        nonce = BaseKey.rand_aead_nonce()
+        fail = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            crypto, crypto_len,
+            message, msg_len,
+            data, data_len, NULL, nonce, self._tx
+        )
+        if fail:
+            raise RuntimeError("Unable to encrypt messsage")
+        return str(chr(data_len)).encode() + data + nonce + crypto
+
+    def decrypt(self, crypto: bytes) -> (bytes, bytes):
+        cdef unsigned long long msg_len
+
+        data_len = ord(crypto[0])
+        data = crypto[1:data_len]
+        nonce = crypto[1+data_len:1+data_len+SIZE_AEAD_NPUB]
+        message = bytes(len(crypto) - 1+data_len+SIZE_AEAD_NPUB - SIZE_AEAD_A)
+
+        fail = crypto_aead_xchacha20poly1305_ietf_decrypt(
+            message, msg_len,
+            NULL,
+            crypto[1+data_len+SIZE_AEAD_NPUB:], len(crypto[1+data_len+SIZE_AEAD_NPUB:]),
+            data, data_len, nonce, self._rx
+        )
+
+        if fail:
+            raise RuntimeError("Unable to decrypt message")
+
+        return message, data
+
+    def decrypt(self, ctxt, aadLen):
+        '''
+        Decrypt the given message, if no nonce or aad are given they will be
+        extracted from the message
+        '''
+        aad = ctxt[:aadLen]
+        nonce = ctxt[aadLen:aadLen+libnacl.crypto_aead_aes256gcm_NPUBBYTES]
+        ctxt = ctxt[aadLen+libnacl.crypto_aead_aes256gcm_NPUBBYTES:]
+        if len(nonce) != libnacl.crypto_aead_aes256gcm_NPUBBYTES:
+            raise ValueError('Invalid nonce')
+        if self.usingAES:
+            return libnacl.crypto_aead_aes256gcm_decrypt(ctxt, aad, nonce, self.sk)
+        return libnacl.crypto_aead_chacha20poly1305_ietf_decrypt(ctxt, aad, nonce, self.sk)
+
+
+class ServerBox(NetworkBox):
+    def __init__(self, server: SecretKey, client: PublicKey):
+        NetworkBox.__init__(self, server, client)
+        fail = crypto_kx_server_session_keys(self._rx, self._tx, self._us.sk, self._us.pk, self._them.pk)
+        if fail:
+            raise RuntimeError("Suspicious client public key")
+
+
+class ClientBox:
+    def __init__(self, client: SecretKey, server: PublicKey):
+        NetworkBox.__init__(self, client, server)
+        fail = crypto_kx_client_session_keys(self._rx, self._tx, self._us.sk, self._us.pk, self._them.pk)
+        if fail:
+            raise RuntimeError("Suspicious server public key")
