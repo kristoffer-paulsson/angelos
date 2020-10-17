@@ -49,27 +49,18 @@ class TestEvent(TestCase):
 
     @run_async
     async def test_sender(self):
-        try:
-            await self.notifier.notify_all(10, {"hello": "world"})
-            self.assertIs(self.observer.event.sender, self.notifier)
-        except Exception as e:
-            self.fail()
+        await self.notifier.notify_all(10, {"hello": "world"})
+        self.assertIs(self.observer.event.sender, self.notifier)
 
     @run_async
     async def test_action(self):
-        try:
-            await self.notifier.notify_all(10, {"hello": "world"})
-            self.assertIs(self.observer.event.action, 10)
-        except Exception as e:
-            self.fail()
+        await self.notifier.notify_all(10, {"hello": "world"})
+        self.assertIs(self.observer.event.action, 10)
 
     @run_async
     async def test_data(self):
-        try:
-            await self.notifier.notify_all(10, {"hello": "world"})
-            self.assertIs(self.observer.event.data["hello"], "world")
-        except Exception as e:
-            self.fail()
+        await self.notifier.notify_all(10, {"hello": "world"})
+        self.assertIs(self.observer.event.data["hello"], "world")
 
 
 class TestNotifierMixin(TestCase):
@@ -86,26 +77,17 @@ class TestNotifierMixin(TestCase):
         del self.notifier
 
     def test_subscribe(self):
-        try:
-            self.notifier.subscribe(self.observer)
-        except Exception as e:
-            self.fail()
+        self.notifier.subscribe(self.observer)
 
     def test_unsubscribe(self):
-        try:
-            self.notifier.subscribe(self.observer)
-            self.notifier.unsubscribe(self.observer)
-        except Exception as e:
-            self.fail()
+        self.notifier.subscribe(self.observer)
+        self.notifier.unsubscribe(self.observer)
 
     @run_async
     async def test_notify_all(self):
-        try:
-            self.notifier.subscribe(self.observer)
-            await self.notifier.notify_all(10, {"hello": "world"})
-            self.assertIs(self.observer.event.data["hello"], "world")
-        except Exception as e:
-            self.fail()
+        self.notifier.subscribe(self.observer)
+        await self.notifier.notify_all(10, {"hello": "world"})
+        self.assertIs(self.observer.event.data["hello"], "world")
 
 
 class TestObserverMixin(TestCase):
@@ -123,22 +105,13 @@ class TestObserverMixin(TestCase):
         del self.notifier
 
     def test_add_subscription(self):
-        try:
-            self.observer.add_subscription(self.notifier)
-        except Exception as e:
-            self.fail()
+        self.observer.add_subscription(self.notifier)
 
     def test_end_subscription(self):
-        try:
-            self.observer.add_subscription(self.notifier)
-            self.observer.end_subscription(self.notifier)
-        except Exception as e:
-            self.fail()
+        self.observer.add_subscription(self.notifier)
+        self.observer.end_subscription(self.notifier)
 
     @run_async
     async def test_notify(self):
-        try:
-            await self.observer.notify(Event(self.notifier, 10, {"hello": "world"}))
-            self.assertIsInstance(self.observer.event, Event)
-        except Exception as e:
-            self.fail()
+        await self.observer.notify(Event(self.notifier, 10, {"hello": "world"}))
+        self.assertIsInstance(self.observer.event, Event)

@@ -1,0 +1,33 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
+"""Dealing with subpackages."""
+
+from argparse import ArgumentParser
+
+from angelos.meta.nspkg import NamespacePackage
+
+parser = ArgumentParser(description="Deal with namespace packages.")
+subparser = parser.add_subparsers(dest="command")
+create_parser = subparser.add_parser("create", description="Create a new namespace package.")
+create_parser.add_argument("pkg", nargs=1)
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    print(args)
+    nspkg = NamespacePackage(args.pkg[0], "angelos")
+    if args.command == "create":
+        nspkg.create()

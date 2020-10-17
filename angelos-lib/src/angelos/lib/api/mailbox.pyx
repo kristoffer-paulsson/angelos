@@ -528,7 +528,7 @@ class MailboxAPI(ApiFacadeExtension):
                 )
             )
 
-        result = await asyncio.gather(*save_list, return_exceptions=True)
+        result = await asyncio.gather(*save_list)
         return True, reject, result
 
     async def load_envelope(self, envelope_id: uuid.UUID) -> Envelope:

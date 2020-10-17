@@ -35,11 +35,8 @@ class TestEnvelope(TestCase):
         del self.instance
 
     def test__check_expiry_period(self):
-        try:
-            stub = Envelope()
-            stub._check_expiry_period()
-        except Exception as e:
-            self.fail(e)
+        stub = Envelope()
+        stub._check_expiry_period()
 
         with self.assertRaises(DocumentError) as context:
             stub = Envelope()
@@ -47,7 +44,4 @@ class TestEnvelope(TestCase):
             stub._check_expiry_period()
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

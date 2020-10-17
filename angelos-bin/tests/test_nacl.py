@@ -23,243 +23,174 @@ MESSAGE = "I love you in Jesus name!".encode()
 
 class TestBaseKey(TestCase):
     def test_sk(self):
-        try:
-            key = BaseKey()
-            self.assertIs(key.sk, None)
-        except Exception as e:
-            self.fail(e)
+        key = BaseKey()
+        self.assertIs(key.sk, None)
 
     def test_pk(self):
-        try:
-            key = BaseKey()
-            self.assertIs(key.pk, None)
-        except Exception as e:
-            self.fail(e)
+        key = BaseKey()
+        self.assertIs(key.pk, None)
 
     def test_vk(self):
-        try:
-            key = BaseKey()
-            self.assertIs(key.vk, None)
-        except Exception as e:
-            self.fail(e)
+        key = BaseKey()
+        self.assertIs(key.vk, None)
 
     def test_seed(self):
-        try:
-            key = BaseKey()
-            self.assertIs(key.seed, None)
-        except Exception as e:
-            self.fail(e)
+        key = BaseKey()
+        self.assertIs(key.seed, None)
 
     def test_randombytes(self):
-        try:
-            rand = BaseKey.randombytes(32)
-            self.assertIsInstance(rand, bytes)
-            self.assertIs(len(rand), 32)
-        except Exception as e:
-            self.fail(e)
+        rand = BaseKey.randombytes(32)
+        self.assertIsInstance(rand, bytes)
+        self.assertIs(len(rand), 32)
 
     def test_rand_nonce(self):
-        try:
-            nonce = BaseKey.rand_nonce()
-            self.assertIsInstance(nonce, bytes)
-            self.assertIs(len(nonce), SIZE_SECRETBOX_NONCE)
-        except Exception as e:
-            self.fail(e)
+        nonce = BaseKey.rand_nonce()
+        self.assertIsInstance(nonce, bytes)
+        self.assertIs(len(nonce), SIZE_SECRETBOX_NONCE)
 
     def test__salsa_key(self):
-        try:
-            key = BaseKey()
-            salsa = key._salsa_key()
-            self.assertIsInstance(salsa, bytes)
-            self.assertIs(len(salsa), SIZE_SECRETBOX_KEY)
-        except Exception as e:
-            self.fail(e)
+        key = BaseKey()
+        salsa = key._salsa_key()
+        self.assertIsInstance(salsa, bytes)
+        self.assertIs(len(salsa), SIZE_SECRETBOX_KEY)
 
 
 class TestSecretBox(TestCase):
     def test_encrypt(self):
-        try:
-            box = SecretBox()
-            encrypted = box.encrypt(MESSAGE)
-            self.assertNotEqual(MESSAGE, encrypted)
-            self.assertIs(
-                len(encrypted),
-                len(MESSAGE) + SIZE_SECRETBOX_ZERO + SIZE_SECRETBOX_NONCE - SIZE_SECRETBOX_BOXZERO
-            )
-        except Exception as e:
-            self.fail(e)
+        box = SecretBox()
+        encrypted = box.encrypt(MESSAGE)
+        self.assertNotEqual(MESSAGE, encrypted)
+        self.assertIs(
+            len(encrypted),
+            len(MESSAGE) + SIZE_SECRETBOX_ZERO + SIZE_SECRETBOX_NONCE - SIZE_SECRETBOX_BOXZERO
+        )
 
     def test_decrypt(self):
-        try:
-            box = SecretBox()
-            encrypted = box.encrypt(MESSAGE)
-            self.assertNotEqual(MESSAGE, encrypted)
-            decrypted = box.decrypt(encrypted)
-            self.assertEqual(MESSAGE, decrypted)
-        except Exception as e:
-            self.fail(e)
+        box = SecretBox()
+        encrypted = box.encrypt(MESSAGE)
+        self.assertNotEqual(MESSAGE, encrypted)
+        decrypted = box.decrypt(encrypted)
+        self.assertEqual(MESSAGE, decrypted)
 
 
 class TestSigner(TestCase):
     def test_sign(self):
-        try:
-            signer = Signer()
-            signed = signer.sign(MESSAGE)
-            self.assertIn(MESSAGE, signed)
-            self.assertIs(len(signed), len(MESSAGE) + SIZE_SIGN)
-            self.assertEqual(Verifier(signer.vk).verify(signed), MESSAGE)
-        except Exception as e:
-            self.fail(e)
+        signer = Signer()
+        signed = signer.sign(MESSAGE)
+        self.assertIn(MESSAGE, signed)
+        self.assertIs(len(signed), len(MESSAGE) + SIZE_SIGN)
+        self.assertEqual(Verifier(signer.vk).verify(signed), MESSAGE)
 
     def test_signature(self):
-        try:
-            signer = Signer()
-            signature = signer.signature(MESSAGE)
-            self.assertNotIn(MESSAGE, signature)
-            self.assertIs(len(signature), SIZE_SIGN)
-            self.assertEqual(Verifier(signer.vk).verify(signature + MESSAGE), MESSAGE)
-        except Exception as e:
-            self.fail(e)
+        signer = Signer()
+        signature = signer.signature(MESSAGE)
+        self.assertNotIn(MESSAGE, signature)
+        self.assertIs(len(signature), SIZE_SIGN)
+        self.assertEqual(Verifier(signer.vk).verify(signature + MESSAGE), MESSAGE)
 
 
 class TestVerifier(TestCase):
     def test_verify(self):
-        try:
-            signer = Signer()
-            verifier = Verifier(signer.vk)
-            self.assertEqual(verifier.verify(signer.sign(MESSAGE)), MESSAGE)
-            self.assertEqual(verifier.verify(signer.signature(MESSAGE) + MESSAGE), MESSAGE)
-            with self.assertRaises(ValueError):
-                verifier.verify(MESSAGE)
-        except Exception as e:
-            self.fail(e)
+        signer = Signer()
+        verifier = Verifier(signer.vk)
+        self.assertEqual(verifier.verify(signer.sign(MESSAGE)), MESSAGE)
+        self.assertEqual(verifier.verify(signer.signature(MESSAGE) + MESSAGE), MESSAGE)
+        with self.assertRaises(ValueError):
+            verifier.verify(MESSAGE)
 
 
 class TestPublicKey(TestCase):
     def test_pk(self):
-        try:
-            key = PublicKey(BaseKey.randombytes(SIZE_BOX_PUBLICKEY))
-            self.assertIsInstance(key.pk, bytes)
-            self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
-            with self.assertRaises(ValueError):
-                PublicKey(BaseKey.randombytes(SIZE_BOX_PUBLICKEY - 1))
-        except Exception as e:
-            self.fail(e)
+        key = PublicKey(BaseKey.randombytes(SIZE_BOX_PUBLICKEY))
+        self.assertIsInstance(key.pk, bytes)
+        self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
+        with self.assertRaises(ValueError):
+            PublicKey(BaseKey.randombytes(SIZE_BOX_PUBLICKEY - 1))
 
 
 class TestSecretKey(TestCase):
     def test_sk(self):
-        try:
-            key = SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY))
-            self.assertIsInstance(key.sk, bytes)
-            self.assertIs(len(key.sk), SIZE_BOX_SECRETKEY)
+        key = SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY))
+        self.assertIsInstance(key.sk, bytes)
+        self.assertIs(len(key.sk), SIZE_BOX_SECRETKEY)
 
-            key = SecretKey()
-            self.assertIsInstance(key.sk, bytes)
-            self.assertIs(len(key.sk), SIZE_BOX_SECRETKEY)
+        key = SecretKey()
+        self.assertIsInstance(key.sk, bytes)
+        self.assertIs(len(key.sk), SIZE_BOX_SECRETKEY)
 
-            with self.assertRaises(ValueError):
-                SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY - 1))
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(ValueError):
+            SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY - 1))
 
     def test_pk(self):
-        try:
-            key = SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY))
-            self.assertIsInstance(key.pk, bytes)
-            self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
+        key = SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY))
+        self.assertIsInstance(key.pk, bytes)
+        self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
 
-            key = SecretKey()
-            self.assertIsInstance(key.pk, bytes)
-            self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
+        key = SecretKey()
+        self.assertIsInstance(key.pk, bytes)
+        self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
 
-            with self.assertRaises(ValueError):
-                SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY - 1))
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(ValueError):
+            SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY - 1))
 
 
 class TestDualSecret(TestCase):
     def test_sign(self):
-        try:
-            dual = DualSecret()
-            signed = dual.sign(MESSAGE)
-            self.assertIn(MESSAGE, signed)
-            self.assertIs(len(signed), len(MESSAGE) + SIZE_SIGN)
-            self.assertEqual(Verifier(dual.vk).verify(signed), MESSAGE)
-        except Exception as e:
-            self.fail(e)
+        dual = DualSecret()
+        signed = dual.sign(MESSAGE)
+        self.assertIn(MESSAGE, signed)
+        self.assertIs(len(signed), len(MESSAGE) + SIZE_SIGN)
+        self.assertEqual(Verifier(dual.vk).verify(signed), MESSAGE)
 
     def test_signature(self):
-        try:
-            dual = DualSecret()
-            signature = dual.signature(MESSAGE)
-            self.assertNotIn(MESSAGE, signature)
-            self.assertIs(len(signature), SIZE_SIGN)
-            self.assertEqual(Verifier(dual.vk).verify(signature + MESSAGE), MESSAGE)
-        except Exception as e:
-            self.fail(e)
+        dual = DualSecret()
+        signature = dual.signature(MESSAGE)
+        self.assertNotIn(MESSAGE, signature)
+        self.assertIs(len(signature), SIZE_SIGN)
+        self.assertEqual(Verifier(dual.vk).verify(signature + MESSAGE), MESSAGE)
 
     def test_sk(self):
-        try:
-            dual = DualSecret()
-            self.assertIsInstance(dual.sk, bytes)
-            self.assertIs(len(dual.sk), SIZE_BOX_SECRETKEY)
-        except Exception as e:
-            self.fail(e)
+        dual = DualSecret()
+        self.assertIsInstance(dual.sk, bytes)
+        self.assertIs(len(dual.sk), SIZE_BOX_SECRETKEY)
 
     def test_pk(self):
-        try:
-            dual = DualSecret()
-            self.assertIsInstance(dual.pk, bytes)
-            self.assertIs(len(dual.pk), SIZE_BOX_PUBLICKEY)
-        except Exception as e:
-            self.fail(e)
+        dual = DualSecret()
+        self.assertIsInstance(dual.pk, bytes)
+        self.assertIs(len(dual.pk), SIZE_BOX_PUBLICKEY)
 
     def test_vk(self):
-        try:
-            dual = DualSecret()
-            self.assertIsInstance(dual.vk, bytes)
-            self.assertIs(len(dual.vk), SIZE_SIGN_PUBLICKEY)
-        except Exception as e:
-            self.fail(e)
+        dual = DualSecret()
+        self.assertIsInstance(dual.vk, bytes)
+        self.assertIs(len(dual.vk), SIZE_SIGN_PUBLICKEY)
 
     def test_seed(self):
-        try:
-            dual = DualSecret()
-            self.assertIsInstance(dual.seed, bytes)
-            self.assertIs(len(dual.seed), SIZE_SIGN_SEED)
-        except Exception as e:
-            self.fail(e)
+        dual = DualSecret()
+        self.assertIsInstance(dual.seed, bytes)
+        self.assertIs(len(dual.seed), SIZE_SIGN_SEED)
 
 
 class TestCryptoBox(TestCase):
     def test_encrypt(self):
-        try:
-            bengt = SecretKey()
-            evert = SecretKey()
-            bengt_box = CryptoBox(bengt, PublicKey(evert.pk))
+        bengt = SecretKey()
+        evert = SecretKey()
+        bengt_box = CryptoBox(bengt, PublicKey(evert.pk))
 
-            encrypted = bengt_box.encrypt(MESSAGE)
-            self.assertNotEqual(MESSAGE, encrypted)
-            self.assertIs(
-                len(encrypted),
-                len(MESSAGE) + SIZE_SECRETBOX_ZERO + SIZE_SECRETBOX_NONCE - SIZE_SECRETBOX_BOXZERO
-            )
-        except Exception as e:
-            self.fail(e)
+        encrypted = bengt_box.encrypt(MESSAGE)
+        self.assertNotEqual(MESSAGE, encrypted)
+        self.assertIs(
+            len(encrypted),
+            len(MESSAGE) + SIZE_SECRETBOX_ZERO + SIZE_SECRETBOX_NONCE - SIZE_SECRETBOX_BOXZERO
+        )
 
     def test_decrypt(self):
-        try:
-            bengt = SecretKey()
-            evert = SecretKey()
-            bengt_box = CryptoBox(bengt, PublicKey(evert.pk))
-            evert_box = CryptoBox(evert, PublicKey(bengt.pk))
+        bengt = SecretKey()
+        evert = SecretKey()
+        bengt_box = CryptoBox(bengt, PublicKey(evert.pk))
+        evert_box = CryptoBox(evert, PublicKey(bengt.pk))
 
-            encrypted = bengt_box.encrypt(MESSAGE)
+        encrypted = bengt_box.encrypt(MESSAGE)
 
-            self.assertNotEqual(MESSAGE, encrypted)
-            decrypted = evert_box.decrypt(encrypted)
-            self.assertEqual(MESSAGE, decrypted)
-        except Exception as e:
-            self.fail(e)
+        self.assertNotEqual(MESSAGE, encrypted)
+        decrypted = evert_box.decrypt(encrypted)
+        self.assertEqual(MESSAGE, decrypted)

@@ -41,10 +41,7 @@ class TestProfile(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestPersonProfile(TestCase):
@@ -55,10 +52,7 @@ class TestPersonProfile(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestMinistryProfile(TestCase):
@@ -69,10 +63,7 @@ class TestMinistryProfile(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestChurchProfile(TestCase):
@@ -83,7 +74,4 @@ class TestChurchProfile(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

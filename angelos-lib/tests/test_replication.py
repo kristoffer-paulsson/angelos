@@ -178,48 +178,45 @@ class TestFullReplication(TestCase):
     @run_async
     async def test_mail_replication_client1_server_client2(self):
         """A complete test of two clients mailing to each other via a server."""
-        try:
-            # Make all players trust each other
-            await Operations.cross_authenticate(self.server.app.ioc.facade, self.client1.app.ioc.facade, True)
-            await Operations.cross_authenticate(self.server.app.ioc.facade, self.client2.app.ioc.facade, True)
-            await Operations.trust_mutual(self.client1.app.ioc.facade, self.client2.app.ioc.facade)
+        # Make all players trust each other
+        await Operations.cross_authenticate(self.server.app.ioc.facade, self.client1.app.ioc.facade, True)
+        await Operations.cross_authenticate(self.server.app.ioc.facade, self.client2.app.ioc.facade, True)
+        await Operations.trust_mutual(self.client1.app.ioc.facade, self.client2.app.ioc.facade)
 
-            mail = await Operations.send_mail(self.client1.app.ioc.facade, self.client2.app.ioc.facade.data.portfolio)
-            await self.server.app.listen()
+        mail = await Operations.send_mail(self.client1.app.ioc.facade, self.client2.app.ioc.facade.data.portfolio)
+        await self.server.app.listen()
 
-            self.assertIs(
-                len(await self.client1.app.ioc.facade.api.mailbox.load_outbox()), 1,
-                "Client 1 should have one (1) letter in the outbox before connecting."
-            )
+        self.assertIs(
+            len(await self.client1.app.ioc.facade.api.mailbox.load_outbox()), 1,
+            "Client 1 should have one (1) letter in the outbox before connecting."
+        )
 
-            client = await self.client1.app.connect()
-            await client.mail()
+        client = await self.client1.app.connect()
+        await client.mail()
 
-            self.assertIs(
-                len(await self.server.app.ioc.facade.storage.mail.search()), 1,
-                "Server should have one (1) letter in its routing mail box after Client 1 connected."
-            )
-            self.assertIs(
-                len(await self.client1.app.ioc.facade.api.mailbox.load_outbox()), 0,
-                "Client 1 should have zero (0) letters in its outbox after connecting to server."
-            )
+        self.assertIs(
+            len(await self.server.app.ioc.facade.storage.mail.search()), 1,
+            "Server should have one (1) letter in its routing mail box after Client 1 connected."
+        )
+        self.assertIs(
+            len(await self.client1.app.ioc.facade.api.mailbox.load_outbox()), 0,
+            "Client 1 should have zero (0) letters in its outbox after connecting to server."
+        )
 
-            client = await self.client2.app.connect()
-            await client.mail()
+        client = await self.client2.app.connect()
+        await client.mail()
 
-            inbox = await self.client2.app.ioc.facade.api.mailbox.load_inbox()
-            self.assertIs(
-                len(inbox), 1,
-                "Client 2 should have one (1) letter in its inbox after connecting to the server."
-            )
-            self.assertIs(
-                len(await self.server.app.ioc.facade.storage.mail.search()), 0,
-                "Server should have zero (0) letters in its routing mail box after Client 2 connected."
-            )
-            mail2 = await self.client2.app.ioc.facade.api.mailbox.open_envelope(inbox.pop())
-            self.assertEqual(mail.body, mail2.body, "Checking that the sent mail equals the received mail.")
+        inbox = await self.client2.app.ioc.facade.api.mailbox.load_inbox()
+        self.assertIs(
+            len(inbox), 1,
+            "Client 2 should have one (1) letter in its inbox after connecting to the server."
+        )
+        self.assertIs(
+            len(await self.server.app.ioc.facade.storage.mail.search()), 0,
+            "Server should have zero (0) letters in its routing mail box after Client 2 connected."
+        )
+        mail2 = await self.client2.app.ioc.facade.api.mailbox.open_envelope(inbox.pop())
+        self.assertEqual(mail.body, mail2.body, "Checking that the sent mail equals the received mail.")
 
-        except Exception as e:
-            self.fail(e)
 
 

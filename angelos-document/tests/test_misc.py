@@ -35,17 +35,11 @@ class TestStoredLetter(TestCase):
         del self.instance
 
     def test_check_document_id(self):
-        try:
-            self.instance._check_document_id()
-        except Exception as e:
-            self.fail(e)
+        self.instance._check_document_id()
 
         self.instance.message.id = uuid.uuid4()
         with self.assertRaises(DocumentError) as context:
             self.instance._check_document_id()
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

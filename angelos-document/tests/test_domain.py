@@ -44,10 +44,7 @@ class TestDomain(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestNode(TestCase):
@@ -67,27 +64,21 @@ class TestNode(TestCase):
         with self.assertRaises(DocumentError) as context:
             self.instance._check_location()
 
-        try:
-            self.instance = self._prepare_node(Location(nd={"hostname": ["example.com"]}))
-            self.instance._check_location()
+        self.instance = self._prepare_node(Location(nd={"hostname": ["example.com"]}))
+        self.instance._check_location()
 
-            self.instance = self._prepare_node(Location(nd={"ip":  [IPv4Address("127.0.0.1")]}))
-            self.instance._check_location()
+        self.instance = self._prepare_node(Location(nd={"ip":  [IPv4Address("127.0.0.1")]}))
+        self.instance._check_location()
 
-            self.instance = self._prepare_node(Location(nd={
-                "ip": [IPv4Address("127.0.0.1")],
-                "hostname": ["example.com"]
-            }))
-            self.instance._check_location()
-        except Exception as e:
-            self.fail(e)
+        self.instance = self._prepare_node(Location(nd={
+            "ip": [IPv4Address("127.0.0.1")],
+            "hostname": ["example.com"]
+        }))
+        self.instance._check_location()
 
     def test_apply_rules(self):
-        try:
-            self.instance = self._prepare_node(Location(nd={"hostname": ["example.com"]}))
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.instance = self._prepare_node(Location(nd={"hostname": ["example.com"]}))
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestNetwork(TestCase):
@@ -107,31 +98,25 @@ class TestNetwork(TestCase):
         with self.assertRaises(DocumentError) as context:
             self.instance._check_host()
 
-        try:
-            self.instance = self._prepare_network(Host(nd={
-                "node": uuid.uuid4(),
-                "hostname": ["example.com"]}))
-            self.instance._check_host()
+        self.instance = self._prepare_network(Host(nd={
+            "node": uuid.uuid4(),
+            "hostname": ["example.com"]}))
+        self.instance._check_host()
 
-            self.instance = self._prepare_network(Host(nd={
-                "node": uuid.uuid4(),
-                "ip":  [IPv4Address("127.0.0.1")]}))
-            self.instance._check_host()
+        self.instance = self._prepare_network(Host(nd={
+            "node": uuid.uuid4(),
+            "ip":  [IPv4Address("127.0.0.1")]}))
+        self.instance._check_host()
 
-            self.instance = self._prepare_network(Host(nd={
-                "node": uuid.uuid4(),
-                "ip": [IPv4Address("127.0.0.1")],
-                "hostname": ["example.com"]
-            }))
-            self.instance._check_host()
-        except Exception as e:
-            self.fail(e)
+        self.instance = self._prepare_network(Host(nd={
+            "node": uuid.uuid4(),
+            "ip": [IPv4Address("127.0.0.1")],
+            "hostname": ["example.com"]
+        }))
+        self.instance._check_host()
 
     def test_apply_rules(self):
-        try:
-            self.instance = self._prepare_network(Host(nd={
-                "node": uuid.uuid4(),
-                "hostname": ["example.com"]}))
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.instance = self._prepare_network(Host(nd={
+            "node": uuid.uuid4(),
+            "hostname": ["example.com"]}))
+        self.assertTrue(self.instance.apply_rules())

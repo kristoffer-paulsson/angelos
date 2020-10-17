@@ -14,7 +14,7 @@
 #
 from unittest import TestCase
 
-from libangelos.validation import BasePolicyApplier, PolicyMixin, \
+from angelos.lib.validation import BasePolicyApplier, PolicyMixin, \
     PolicyValidator, PolicyPerformer, PolicyException, policy, evaluate, PolicyBreachException
 
 
@@ -96,104 +96,78 @@ class StubPerformer(PolicyPerformer, FooPolicyStub, BarPolicyStub, BazPolicyStub
 
 class TestBasePolicyApplier(TestCase):
     def test__applier(self):
-        try:
-            with self.assertRaises(TypeError):
-                BasePolicyApplier()
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(TypeError):
+            BasePolicyApplier()
 
     def test__setup(self):
-        try:
-            with self.assertRaises(TypeError):
-                BasePolicyApplier()
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(TypeError):
+            BasePolicyApplier()
 
     def test__clean(self):
-        try:
-            with self.assertRaises(TypeError):
-                BasePolicyApplier()
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(TypeError):
+            BasePolicyApplier()
 
 
 class TestPolicyMixin(TestCase):
     def test_apply(self):
-        try:
-            with self.assertRaises(TypeError):
-                PolicyMixin()
-        except Exception as e:
-            self.fail(e)
-
+        with self.assertRaises(TypeError):
+            PolicyMixin()
 
 class TestPolicyValidator(TestCase):
     def test_validate(self):
+        with self.assertRaises(TypeError):
+            PolicyValidator()
+
+        subject = SubjectStub()
+        validator = StubValidator()
+
         try:
-            with self.assertRaises(TypeError):
-                PolicyValidator()
+            validator.validate(subject)
+        except PolicyException:
+            self.fail("No policy exception expected.")
 
-            subject = SubjectStub()
-            validator = StubValidator()
-
-            try:
-                validator.validate(subject)
-            except PolicyException:
-                self.fail("No policy exception expected.")
-
-            with self.assertRaises(PolicyException):
-                subject.foo = False
-                validator.validate(subject)
-
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(PolicyException):
+            subject.foo = False
+            validator.validate(subject)
 
 
 class TestPolicyPerformer(TestCase):
     def test_perform(self):
+        with self.assertRaises(TypeError):
+            PolicyPerformer()
+
+        subject = SubjectStub()
+        performer = StubPerformer()
+
         try:
-            with self.assertRaises(TypeError):
-                PolicyPerformer()
+            performer.perform(subject)
+        except PolicyException:
+            self.fail("No policy exception expected.")
 
-            subject = SubjectStub()
-            performer = StubPerformer()
-
-            try:
-                performer.perform(subject)
-            except PolicyException:
-                self.fail("No policy exception expected.")
-
-            with self.assertRaises(PolicyException):
-                subject.foo = False
-                performer.perform(subject)
-
-        except Exception as e:
-            self.fail(e)
+        with self.assertRaises(PolicyException):
+            subject.foo = False
+            performer.perform(subject)
 
 
 class Test_evaluate(TestCase):
     def test_evaluate(self):
+        subject = SubjectStub()
+        subject.foo = False
+        validator = StubValidator()
+
+        with self.assertRaises(PolicyBreachException):
+            with evaluate("Run 1 unittest") as report:
+                validator.validate(subject)
+                if not report:
+                    print(report.format())
+
         try:
-            subject = SubjectStub()
-            subject.foo = False
-            validator = StubValidator()
-
-            with self.assertRaises(PolicyBreachException):
-                with evaluate("Run unittest") as report:
-                    validator.validate(subject)
-
-            try:
-                with evaluate("Run unittest"):
-                    validator.validate(subject)
-            except PolicyBreachException as e:
-                print(e)  # Print policy breach
-
-        except Exception as e:
-            self.fail(e)
+            with evaluate("Run 2 unittest"):
+                validator.validate(subject)
+        except PolicyBreachException as e:
+            print(e)  # Print policy breach
 
 
 class Test_policy(TestCase):
     def test_policy(self):
-        try:
-            pass
-        except Exception as e:
-            self.fail(e)
+        self.fail()

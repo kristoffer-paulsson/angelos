@@ -36,21 +36,15 @@ class TestMisc(TestCase):
         self.fail()
 
     def test_to_ini(self):
-        try:
-            self.assertEqual(Misc.to_ini(True), "true")
-            self.assertEqual(Misc.to_ini(123), "123")
-            self.assertEqual(Misc.to_ini(.123), "0.123")
-            self.assertEqual(Misc.to_ini(None), "none")
-            self.assertEqual(Misc.to_ini("Hello, world!"), "Hello, world!")
-        except Exception as e:
-            self.fail(e)
+        self.assertEqual(Misc.to_ini(True), "true")
+        self.assertEqual(Misc.to_ini(123), "123")
+        self.assertEqual(Misc.to_ini(.123), "0.123")
+        self.assertEqual(Misc.to_ini(None), "none")
+        self.assertEqual(Misc.to_ini("Hello, world!"), "Hello, world!")
 
     def test_from_ini(self):
-        try:
-            self.assertEqual(Misc.from_ini("true"), True)
-            self.assertEqual(Misc.from_ini("123"), 123)
-            self.assertEqual(Misc.from_ini("0.123"), .123)
-            self.assertEqual(Misc.from_ini("none"), None)
-            self.assertEqual(Misc.from_ini("Hello, world!"), "Hello, world!")
-        except Exception as e:
-            self.fail(e)
+        self.assertEqual(Misc.from_ini("true"), True)
+        self.assertEqual(Misc.from_ini("123"), 123)
+        self.assertEqual(Misc.from_ini("0.123"), .123)
+        self.assertEqual(Misc.from_ini("none"), None)
+        self.assertEqual(Misc.from_ini("Hello, world!"), "Hello, world!")

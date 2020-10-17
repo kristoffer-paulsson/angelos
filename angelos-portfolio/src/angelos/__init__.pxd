@@ -1,3 +1,4 @@
+# cython: language_level=3
 #
 # Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #

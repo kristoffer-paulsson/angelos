@@ -18,7 +18,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Awaitable
+from typing import Awaitable, List, Any
 
 from angelos.lib.error import ContainerServiceNotConfigured
 from angelos.lib.ioc import Container
@@ -80,7 +80,7 @@ class FacadeExtension(FacadeFrozen):
         """Initialize facade extension."""
         FacadeFrozen.__init__(self, facade)
 
-    async def gather(self, *aws: Awaitable) -> bool:
+    async def gather(self, *aws: Awaitable) -> List[Any]:
         """Run multiple awaitables in asyncio.gather.
 
         If there is any exceptions they will be printed to the logs.
@@ -96,16 +96,18 @@ class FacadeExtension(FacadeFrozen):
             Success or failure.
 
         """
-        awaitable = asyncio.gather(*aws, return_exceptions=True)
+        awaitable = asyncio.gather(*aws)
         await asyncio.sleep(0)
-        results = await awaitable
-        exceptions = list(filter(lambda element: isinstance(element, Exception), results))
-        if exceptions:
-            for exc in exceptions:
-                logging.error(exc, exc_info=True)
-            return False
-        else:
-            return True
+        return await awaitable
+        # results = await awaitable
+        # print(results)
+        # exceptions = list(filter(lambda element: isinstance(element, Exception), results))
+        # if exceptions:
+        #    for exc in exceptions:
+        #        logging.error(exc, exc_info=True)
+        #    return False
+        # else:
+         #   return True
 
 
 class BaseFacade:

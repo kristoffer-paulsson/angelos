@@ -25,10 +25,7 @@ class TestStatement(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestVerified(TestCase):
@@ -39,10 +36,7 @@ class TestVerified(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestTrusted(TestCase):
@@ -53,10 +47,7 @@ class TestTrusted(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestRevoked(TestCase):
@@ -67,7 +58,4 @@ class TestRevoked(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

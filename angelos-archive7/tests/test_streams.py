@@ -221,28 +221,25 @@ class TestSingleStreamManager(BaseArchiveTestCase):
         self.fail()
 
     def test_run(self):
-        try:
-            data = bytes(os.urandom(2**20))
-            mgr = SingleStreamManager(os.path.join(self.home, "test.ar7"), self.secret)
-            stream = mgr.special_stream(SingleStreamManager.STREAM_DATA)
-            fileobj = VirtualFileObject(stream, "test", "wb+")
-            fileobj.write(data)
-            fileobj.close()
-            mgr.close()
-            del mgr
+        data = bytes(os.urandom(2**20))
+        mgr = SingleStreamManager(os.path.join(self.home, "test.ar7"), self.secret)
+        stream = mgr.special_stream(SingleStreamManager.STREAM_DATA)
+        fileobj = VirtualFileObject(stream, "test", "wb+")
+        fileobj.write(data)
+        fileobj.close()
+        mgr.close()
+        del mgr
 
-            mgr = SingleStreamManager(os.path.join(self.home, "test.ar7"), self.secret)
-            fileobj = VirtualFileObject(mgr.special_stream(SingleStreamManager.STREAM_DATA), "test")
-            data2 = fileobj.read()
+        mgr = SingleStreamManager(os.path.join(self.home, "test.ar7"), self.secret)
+        fileobj = VirtualFileObject(mgr.special_stream(SingleStreamManager.STREAM_DATA), "test")
+        data2 = fileobj.read()
 
-            self.assertEqual(
-                 hashlib.sha1(data).digest(),
-                 hashlib.sha1(data2).digest()
-            )
-            fileobj.close()
-            mgr.close()
-        except Exception as e:
-            self.fail(e)
+        self.assertEqual(
+             hashlib.sha1(data).digest(),
+             hashlib.sha1(data2).digest()
+        )
+        fileobj.close()
+        mgr.close()
 
 
 class TestFixedMultiStreamManager(TestCase):

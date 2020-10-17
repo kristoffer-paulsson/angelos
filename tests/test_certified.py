@@ -44,11 +44,8 @@ PREFIX = "tests.library.test_"
 
 if __name__ == '__main__':
     test = None
-    try:
-        # sys.path.append(os.path.join(os.path.abspath(os.curdir), "lib"))
-        sys.path.append(os.path.abspath(os.curdir))
-        loader = unittest.TestLoader()
-        unittest.TextTestRunner().run(unittest.TestSuite(
-            [loader.loadTestsFromModule(importlib.import_module(PREFIX + test)) for test in TESTS]))
-    except Exception as e:
-        logging.error(e, exc_info=True)
+    # sys.path.append(os.path.join(os.path.abspath(os.curdir), "lib"))
+    sys.path.append(os.path.abspath(os.curdir))
+    loader = unittest.TestLoader()
+    unittest.TextTestRunner().run(unittest.TestSuite(
+        [loader.loadTestsFromModule(importlib.import_module(PREFIX + test)) for test in TESTS]))

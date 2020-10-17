@@ -25,10 +25,7 @@ class TestPrivateKeys(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestKeys(TestCase):
@@ -39,10 +36,7 @@ class TestKeys(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestEntity(TestCase):
@@ -53,10 +47,7 @@ class TestEntity(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestPerson(TestCase):
@@ -67,10 +58,7 @@ class TestPerson(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestMinistry(TestCase):
@@ -81,10 +69,7 @@ class TestMinistry(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestChurch(TestCase):
@@ -95,7 +80,4 @@ class TestChurch(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

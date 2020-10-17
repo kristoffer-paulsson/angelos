@@ -18,6 +18,7 @@ import asyncio
 import datetime
 import logging
 import uuid
+from typing import List, Any
 
 from angelos.archive7.archive import Archive7
 from angelos.archive7.fs import TYPE_FILE
@@ -64,14 +65,11 @@ class Glue:
         doclist = []
 
         for data in datalist:
-            try:
-                doc = None
-                doc = PortfolioPolicy.deserialize(data)
-                Util.is_type(doc, _type)
-                doc.validate()
-                doclist.append(doc)
-            except Exception as e:
-                logging.error(e, exc_info=True)
+            doc = None
+            doc = PortfolioPolicy.deserialize(data)
+            Util.is_type(doc, _type)
+            doc.validate()
+            doclist.append(doc)
 
         return doclist
 
@@ -80,37 +78,34 @@ class Glue:
         doclist = []
 
         for data in datalist:
-            try:
-                doc = None
-                doc = PortfolioPolicy.deserialize(data)
-                Util.is_type(doc, _type)
-                if validate:
-                    doc.validate()
-                doclist.append((doc, None))
-            except Exception as e:
-                logging.error(e, exc_info=True)
-                doclist.append((doc if doc else data, str(e)))
+            doc = None
+            doc = PortfolioPolicy.deserialize(data)
+            Util.is_type(doc, _type)
+            if validate:
+                doc.validate()
+            doclist.append((doc, None))
 
         return doclist
 
     @staticmethod
-    def run_async(*aws, raise_exc=True):
+    def run_async(*aws, raise_exc=True) -> List[Any]:
         loop = asyncio.get_event_loop()
-        gathering = asyncio.gather(*aws, loop=loop, return_exceptions=True)
+        gathering = asyncio.gather(*aws, loop=loop)
         loop.run_until_complete(gathering)
 
         result_list = gathering.result()
-        exc = None
-        for result in result_list:
-            if isinstance(result, Exception):
-                exc = result if not exc else exc
-                logging.error("Operation failed: %s" % result)
-        if exc:
-            raise exc
-        if len(result_list) > 1:
-            return result_list
-        else:
-            return result_list[0]
+        return result_list if len(result_list) > 1 else result_list[0]
+        # exc = None
+        # for result in result_list:
+        #     if isinstance(result, Exception):
+        #        exc = result if not exc else exc
+        #        logging.error("Operation failed: %s" % result)
+        # if exc:
+        #    raise exc
+        # if len(result_list) > 1:
+        #    return result_list
+        # else:
+        #    return result_list[0]
 
 
 class Globber:

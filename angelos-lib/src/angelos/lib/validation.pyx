@@ -153,12 +153,12 @@ class Report:
         if failed:
             self.__failed.append(id(entry))
 
-    def printr(self):
+    def format(self, barrier="-"):
         """Print report."""
         return "{0}\n{1}{2}".format(
-            Util.headline("POLICY REPORT", "(Begin)"),
+            Util.headline("POLICY REPORT", "(Begin)", barrier),
             self,
-            Util.headline("POLICY REPORT", "(End)")
+            Util.headline("POLICY REPORT", "(End)", barrier)
         )
 
     def __str__(self):
@@ -202,11 +202,7 @@ class PolicyBreachException(AngelosException):
         self.report = report
 
     def __str__(self):
-        return "{0}\n{1}{2}".format(
-            Util.headline("POLICY BREACH", "(Begin)", "="),
-            self.report,
-            Util.headline("POLICY BREACH", "(End)", "=")
-        )
+        return self.report.format("=")
 
 
 def policy(section, sn, level=None):  # TODO: Write unittest

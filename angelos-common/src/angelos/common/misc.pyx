@@ -71,25 +71,21 @@ class Loop:
             self, coro: Awaitable,
             callback: Callable[[concurrent.futures.Future], None] = None, wait=False
     ) -> Any:
-        try:
-            future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
-            future.add_done_callback(self.__callback)
+        future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
+        future.add_done_callback(self.__callback)
 
-            if callback:
-                future.add_done_callback(callback)
+        if callback:
+            future.add_done_callback(callback)
 
-            if wait:
-                return future.result()
-            else:
-                return future
-        except Exception as e:
-            logging.error(e, exc_info=True)
-            raise e
+        if wait:
+            return future.result()
+        else:
+            return future
 
     def __callback(self, future: concurrent.futures.Future):
         exc = future.exception()
         if exc:
-            logging.error(exc, exc_info=True)
+            raise exc
 
 
 class Fiber(ABC):
@@ -192,11 +188,7 @@ class SharedResourceMixin:
 
         """
         await asyncio.sleep(0)
-        try:
-            return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
-        except Exception as e:
-            logging.error(e, exc_info=True)
-            raise RuntimeError(e)
+        return await asyncio.get_running_loop().run_in_executor(self.__pool, callback)
 
     async def _wild(self, callback: Callable) -> Any:
         """Protected method for executing a multi-thread sensitive private method.

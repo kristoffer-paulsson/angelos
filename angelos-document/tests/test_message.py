@@ -41,10 +41,7 @@ class TestNote(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestInstant(TestCase):
@@ -55,10 +52,7 @@ class TestInstant(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestMail(TestCase):
@@ -69,10 +63,7 @@ class TestMail(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestShare(TestCase):
@@ -83,10 +74,7 @@ class TestShare(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 class TestReport(TestCase):
@@ -97,7 +85,4 @@ class TestReport(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

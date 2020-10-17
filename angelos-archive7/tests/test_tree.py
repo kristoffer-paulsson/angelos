@@ -103,75 +103,63 @@ class TestSimpleBTree(TestTreeBase):
         return {uuid.uuid4(): os.urandom(self.VALUE_SIZE) for _ in range(self.ITERATIONS)}
 
     def test_insert(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            random.shuffle(keys)
-            for key in keys:
-                self.assertIsNotNone(self.tree.get(key))
-                self.assertEqual(self.tree.get(key), self.data[key])
-        except Exception as e:
-            self.fail(e)
+        random.shuffle(keys)
+        for key in keys:
+            self.assertIsNotNone(self.tree.get(key))
+            self.assertEqual(self.tree.get(key), self.data[key])
 
     def test_update(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            for key in keys[:self.ITERATIONS // 2]:
-                data = os.urandom(self.VALUE_SIZE)
-                self.data[key] = data
-                self.tree.update(key, data)
+        for key in keys[:self.ITERATIONS // 2]:
+            data = os.urandom(self.VALUE_SIZE)
+            self.data[key] = data
+            self.tree.update(key, data)
 
-            random.shuffle(keys)
-            for key in keys:
-                self.assertIsNotNone(self.tree.get(key))
-                self.assertEqual(self.tree.get(key), self.data[key])
-        except Exception as e:
-            self.fail(e)
+        random.shuffle(keys)
+        for key in keys:
+            self.assertIsNotNone(self.tree.get(key))
+            self.assertEqual(self.tree.get(key), self.data[key])
 
     def test_get(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            random.shuffle(keys)
-            for key in keys:
-                self.assertIsNotNone(self.tree.get(key))
-                self.assertEqual(self.tree.get(key), self.data[key])
-        except Exception as e:
-            self.fail(e)
+        random.shuffle(keys)
+        for key in keys:
+            self.assertIsNotNone(self.tree.get(key))
+            self.assertEqual(self.tree.get(key), self.data[key])
 
     def test_delete(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            for key in keys[:self.ITERATIONS // 2]:
-                self.tree.delete(key)
+        for key in keys[:self.ITERATIONS // 2]:
+            self.tree.delete(key)
 
-            for key in keys[:self.ITERATIONS // 2]:
-                with self.assertRaises(RecordError):
-                    self.tree.get(key)
+        for key in keys[:self.ITERATIONS // 2]:
+            with self.assertRaises(RecordError):
+                self.tree.get(key)
 
-            for key in keys[self.ITERATIONS // 2:]:
-                self.assertIsNotNone(self.tree.get(key))
-                self.assertEqual(self.tree.get(key), self.data[key])
-        except Exception as e:
-            self.fail(e)
+        for key in keys[self.ITERATIONS // 2:]:
+            self.assertIsNotNone(self.tree.get(key))
+            self.assertEqual(self.tree.get(key), self.data[key])
 
 
 class TestMultiBTree(TestTreeBase):
@@ -191,104 +179,88 @@ class TestMultiBTree(TestTreeBase):
         return data
 
     def test_insert(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            random.shuffle(keys)
-            for key in keys:
-                values = self.tree.get(key)
-                self.assertNotEqual(values, list())
-                self.assertEqual(set(values), set(self.data[key]))
-        except Exception as e:
-            self.fail(e)
+        random.shuffle(keys)
+        for key in keys:
+            values = self.tree.get(key)
+            self.assertNotEqual(values, list())
+            self.assertEqual(set(values), set(self.data[key]))
 
     def test_update(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            random.shuffle(keys)
-            for key in keys[len(keys) // 2:]:
-                insertions = list(os.urandom(self.VALUE_SIZE) for _ in range(random.randrange(1, 99)))
-                random.shuffle(self.data[key])
-                deletions = set(self.data[key][:random.randrange(0, len(self.data[key]))])
-                self.tree.update(key, insertions, deletions)
+        random.shuffle(keys)
+        for key in keys[len(keys) // 2:]:
+            insertions = list(os.urandom(self.VALUE_SIZE) for _ in range(random.randrange(1, 99)))
+            random.shuffle(self.data[key])
+            deletions = set(self.data[key][:random.randrange(0, len(self.data[key]))])
+            self.tree.update(key, insertions, deletions)
 
-                self.data[key] += insertions
-                new = list()
-                for item in self.data[key]:
-                    if item not in deletions:
-                        new.append(item)
-                self.data[key] = new
+            self.data[key] += insertions
+            new = list()
+            for item in self.data[key]:
+                if item not in deletions:
+                    new.append(item)
+            self.data[key] = new
 
-            cnt = 0
-            for key in keys:
-                cnt += 1
-                values = self.tree.get(key)
-                self.assertNotEqual(values, list())
-                self.assertEqual(set(values), set(self.data[key]))
-
-        except Exception as e:
-            self.fail(e)
+        cnt = 0
+        for key in keys:
+            cnt += 1
+            values = self.tree.get(key)
+            self.assertNotEqual(values, list())
+            self.assertEqual(set(values), set(self.data[key]))
 
     def test_get(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            random.shuffle(keys)
-            for key in keys:
-                values = self.tree.get(key)
-                self.assertNotEqual(values, list())
-                self.assertEqual(set(values), set(self.data[key]))
-        except Exception as e:
-            self.fail(e)
+        random.shuffle(keys)
+        for key in keys:
+            values = self.tree.get(key)
+            self.assertNotEqual(values, list())
+            self.assertEqual(set(values), set(self.data[key]))
 
     def test_delete(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            for key in keys[len(keys) // 2:]:
-                self.tree.delete(key)
+        for key in keys[len(keys) // 2:]:
+            self.tree.delete(key)
 
-            for key in keys[len(keys) // 2:]:
-                with self.assertRaises(RecordError):
-                    self.tree.get(key)
+        for key in keys[len(keys) // 2:]:
+            with self.assertRaises(RecordError):
+                self.tree.get(key)
 
-            for key in keys[:len(keys) // 2]:
-                values = self.tree.get(key)
-                self.assertNotEqual(values, list())
-                self.assertEqual(set(values), set(self.data[key]))
-        except Exception as e:
-            self.fail(e)
+        for key in keys[:len(keys) // 2]:
+            values = self.tree.get(key)
+            self.assertNotEqual(values, list())
+            self.assertEqual(set(values), set(self.data[key]))
 
     def test_traverse(self):
-        try:
-            self._tree()
-            keys = list(self.data.keys())
-            random.shuffle(keys)
+        self._tree()
+        keys = list(self.data.keys())
+        random.shuffle(keys)
 
-            for key in keys:
-                self.tree.insert(key, self.data[key])
+        for key in keys:
+            self.tree.insert(key, self.data[key])
 
-            random.shuffle(keys)
-            for key in keys:
-                values = set(self.data[key])
-                for item in self.tree.traverse(key):
-                    self.assertIn(item, values)
-        except Exception as e:
-            self.fail(e)
+        random.shuffle(keys)
+        for key in keys:
+            values = set(self.data[key])
+            for item in self.tree.traverse(key):
+                self.assertIn(item, values)

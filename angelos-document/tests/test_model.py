@@ -72,66 +72,46 @@ class BaseTestField(TestCase):
         kw_rec_true = {**self.keywords, **{"required": True}}
         kw_rec_false = {**self.keywords, **{"required": False}}
 
-        try:
-            instance = self.field(**self.keywords)
-            instance.validate(self.type_gen, "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**self.keywords)
+        instance.validate(self.type_gen, "test")
 
         with self.assertRaises(FieldError) as context:
             instance = self.field(**self.keywords)
             instance.validate(False, "test")
 
-        try:
-            instance = self.field(**kw_rec_true)
-            instance.validate(self.type_gen, "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**kw_rec_true)
+        instance.validate(self.type_gen, "test")
 
         with self.assertRaises(FieldError) as context:
             instance = self.field(**kw_rec_true)
             instance.validate(False, "test")
 
-        try:
-            instance = self.field(**kw_rec_false)
-            instance.validate(self.type_gen, "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**kw_rec_false)
+        instance.validate(self.type_gen, "test")
 
-        try:
-            instance = self.field(**kw_rec_false)
-            instance.validate(None, "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**kw_rec_false)
+        instance.validate(None, "test")
 
     def _test_multiple(self):
         kw_multi_true = {**self.keywords, **{"multiple": True}}
         kw_multi_false = {**self.keywords, **{"multiple": False}}
-        try:
-            instance = self.field(**self.keywords)
-            instance.validate(self.type_gen, "test")
-        except Exception as e:
-            self.fail(e)
+
+        instance = self.field(**self.keywords)
+        instance.validate(self.type_gen, "test")
 
         with self.assertRaises(FieldError) as context:
             instance = self.field(**self.keywords)
             instance.validate([self.type_gen, self.type_gen], "test")
 
-        try:
-            instance = self.field(**kw_multi_true)
-            instance.validate([self.type_gen, self.type_gen], "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**kw_multi_true)
+        instance.validate([self.type_gen, self.type_gen], "test")
 
         with self.assertRaises(FieldError) as context:
             instance = self.field(**kw_multi_true)
             instance.validate(self.type_gen, "test")
 
-        try:
-            instance = self.field(**kw_multi_false)
-            instance.validate(self.type_gen, "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**kw_multi_false)
+        instance.validate(self.type_gen, "test")
 
         with self.assertRaises(FieldError) as context:
             instance = self.field(**kw_multi_false)
@@ -141,11 +121,8 @@ class BaseTestField(TestCase):
         random.shuffle(self.types)
         for t in self.types:
             if t in self.instance.TYPES:
-                try:
-                    instance = self.field(**self.keywords)
-                    instance.validate(self.gen[t], "test")
-                except Exception as e:
-                    self.fail(e)
+                instance = self.field(**self.keywords)
+                instance.validate(self.gen[t], "test")
             else:
                 with self.assertRaises(FieldError) as context:
                     instance = self.field(**self.keywords)
@@ -153,11 +130,8 @@ class BaseTestField(TestCase):
 
     def _test_limit(self):
         kw_limit = {**self.keywords, **{"limit": 10}}
-        try:
-            instance = self.field(**kw_limit)
-            instance.validate(b'Hello', "test")
-        except Exception as e:
-            self.fail(e)
+        instance = self.field(**kw_limit)
+        instance.validate(b'Hello', "test")
 
         with self.assertRaises(FieldError) as context:
             instance = self.field(**kw_limit)
@@ -272,54 +246,33 @@ class TestBaseDocument(TestCase):
         return doc
 
     def test_build(self):
-        try:
-            doc = self._populate_test()
-            data = doc.export_bytes()
-            doc2 = TestDocument.build(data)
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        data = doc.export_bytes()
+        doc2 = TestDocument.build(data)
 
     def test_export(self):
-        try:
-            doc = self._populate_test()
-            data = doc.export()
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        data = doc.export()
 
     def test_export_str(self):
-        try:
-            doc = self._populate_test()
-            data = doc.export_str()
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        data = doc.export_str()
 
     def test_export_bytes(self):
-        try:
-            doc = self._populate_test()
-            data = doc.export_bytes()
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        data = doc.export_bytes()
 
     def test_export_yaml(self):
-        try:
-            doc = self._populate_test()
-            ymlstr = doc.export_yaml()
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        ymlstr = doc.export_yaml()
 
     def test__check_fields(self):
-        try:
-            doc = self._populate_test()
-            doc._check_fields()
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        doc._check_fields()
 
     def test_apply_rules(self):
-        try:
-            doc = self._populate_test()
-            self.assertTrue(doc.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        doc = self._populate_test()
+        self.assertTrue(doc.apply_rules())
 
     def test_validate(self):
         with self.assertRaises(NotImplementedError) as context:
@@ -327,34 +280,30 @@ class TestBaseDocument(TestCase):
             doc.validate()
 
     def test___eq__(self):
-        try:
-            doc = self._populate_test()
-            self.assertFalse(doc == True)
-            self.assertFalse(doc is True)
+        doc = self._populate_test()
+        self.assertFalse(doc == True)
+        self.assertFalse(doc is True)
 
-            my_copy = TestDocument2()
-            self.assertFalse(doc == my_copy)
-            self.assertFalse(doc is my_copy)
+        my_copy = TestDocument2()
+        self.assertFalse(doc == my_copy)
+        self.assertFalse(doc is my_copy)
 
-            my_copy = doc
-            self.assertTrue(doc == my_copy)
-            self.assertTrue(doc is my_copy)
+        my_copy = doc
+        self.assertTrue(doc == my_copy)
+        self.assertTrue(doc is my_copy)
 
-            my_copy = copy.copy(doc)
-            self.assertTrue(doc == my_copy)
-            self.assertFalse(doc is my_copy)
+        my_copy = copy.copy(doc)
+        self.assertTrue(doc == my_copy)
+        self.assertFalse(doc is my_copy)
 
-            my_copy = copy.deepcopy(doc)
-            self.assertTrue(doc == my_copy)
-            self.assertFalse(doc is my_copy)
+        my_copy = copy.deepcopy(doc)
+        self.assertTrue(doc == my_copy)
+        self.assertFalse(doc is my_copy)
 
-            my_copy = copy.deepcopy(doc)
-            my_copy.email = "john.doe@example.com"
-            self.assertFalse(doc == my_copy)
-            self.assertFalse(doc is my_copy)
-
-        except Exception as e:
-            self.fail(e)
+        my_copy = copy.deepcopy(doc)
+        my_copy.email = "john.doe@example.com"
+        self.assertFalse(doc == my_copy)
+        self.assertFalse(doc is my_copy)
 
 
 class TestDocumentField(BaseTestField):
@@ -367,11 +316,8 @@ class TestDocumentField(BaseTestField):
         random.shuffle(self.types)
         for t in self.types:
             if t == self.type:
-                try:
-                    instance = self.field()
-                    instance.validate(self.gen[t], "test")
-                except Exception as e:
-                    self.fail(e)
+                instance = self.field()
+                instance.validate(self.gen[t], "test")
             else:
                 with self.assertRaises(FieldError) as context:
                     instance = self.field()
@@ -383,15 +329,12 @@ class TestDocumentField(BaseTestField):
         self._test_types()
 
     def test_from_bytes(self):
-        try:
-            serialized = self.type().export_bytes()
-            instance = self.field(doc_class=TestDocument2)
-            self.assertIsInstance(
-                instance.from_bytes(serialized),
-                self.type,
-                "Could not restore document from bytes")
-        except Exception as e:
-            self.fail(e)
+        serialized = self.type().export_bytes()
+        instance = self.field(doc_class=TestDocument2)
+        self.assertIsInstance(
+            instance.from_bytes(serialized),
+            self.type,
+            "Could not restore document from bytes")
 
 
 class TestUuidField(BaseTestField):
@@ -400,36 +343,21 @@ class TestUuidField(BaseTestField):
     type_gen = uuid.uuid4()
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wint()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wint()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wint()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wint()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestIPField(BaseTestField):
@@ -438,36 +366,21 @@ class TestIPField(BaseTestField):
     type_gen = ipaddress.IPv4Address('192.168.0.1')
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wint()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wint()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wint()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wint()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestDateField(BaseTestField):
@@ -476,36 +389,21 @@ class TestDateField(BaseTestField):
     type_gen = datetime.date.today()
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestDateTimeField(BaseTestField):
@@ -514,36 +412,21 @@ class TestDateTimeField(BaseTestField):
     type_gen = datetime.datetime.now()
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str_wbytes()
-        except Exception as e:
-            self.fail(e)
+        self._test_str_wbytes()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestTypeField(BaseTestField):
@@ -552,36 +435,21 @@ class TestTypeField(BaseTestField):
     type_gen = 143
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wint()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wint()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wint()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wint()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestBinaryField(BaseTestField):
@@ -590,37 +458,22 @@ class TestBinaryField(BaseTestField):
     type_gen = b'6\xa9\xa1P\xd8\xd5H\x17\xa2P\x13\xff\xebv\x934'
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-            self._test_limit()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
+        self._test_limit()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str_wb64()
-        except Exception as e:
-            self.fail(e)
+        self._test_str_wb64()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestSignatureField(BaseTestField):
@@ -629,37 +482,22 @@ class TestSignatureField(BaseTestField):
     type_gen = b'6\xa9\xa1P\xd8\xd5H\x17\xa2P\x13\xff\xebv\x934'
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-            self._test_limit()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
+        self._test_limit()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str_wb64()
-        except Exception as e:
-            self.fail(e)
+        self._test_str_wb64()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestStringField(BaseTestField):
@@ -668,36 +506,21 @@ class TestStringField(BaseTestField):
     type_gen = "Hello, world!"
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestChoiceField(BaseTestField):
@@ -713,48 +536,30 @@ class TestChoiceField(BaseTestField):
         random.shuffle(choices)
         for c in choices:
             if c in self.keywords["choices"]:
-                try:
-                    instance = self.field(**self.keywords)
-                    instance.validate(c, "test")
-                except Exception as e:
-                    self.fail(e)
+                instance = self.field(**self.keywords)
+                instance.validate(c, "test")
             else:
                 with self.assertRaises(FieldError) as context:
                     instance = self.field(**self.keywords)
                     instance.validate(c, "test")
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-            self._test_choices()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
+        self._test_choices()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestRegexField(BaseTestField):
@@ -767,48 +572,30 @@ class TestRegexField(BaseTestField):
 
     def _test_regex(self):
         for s in self.regex_success:
-            try:
-                instance = self.field(**self.keywords)
-                instance.validate(s, "test")
-            except Exception as e:
-                self.fail(e)
+            instance = self.field(**self.keywords)
+            instance.validate(s, "test")
         for f in self.regex_failure:
             with self.assertRaises(FieldError) as context:
                 instance = self.field(**self.keywords)
                 instance.validate(f, "test")
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-            self._test_regex()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
+        self._test_regex()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()
 
 
 class TestEmailField(TestRegexField):
@@ -853,34 +640,19 @@ class TestEmailField(TestRegexField):
     ]
 
     def test_validate(self):
-        try:
-            self._test_required()
-            self._test_multiple()
-            self._test_types()
-            self._test_regex()
-        except Exception as e:
-            self.fail(e)
+        self._test_required()
+        self._test_multiple()
+        self._test_types()
+        self._test_regex()
 
     def test_from_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_str(self):
-        try:
-            self._test_str()
-        except Exception as e:
-            self.fail(e)
+        self._test_str()
 
     def test_bytes(self):
-        try:
-            self._test_bytes_wstr()
-        except Exception as e:
-            self.fail(e)
+        self._test_bytes_wstr()
 
     def test_yaml(self):
-        try:
-            self._test_yaml()
-        except Exception as e:
-            self.fail(e)
+        self._test_yaml()

@@ -59,13 +59,10 @@ class TestConnecting(BaseTestNetwork):
     @run_async
     async def test_connecting(self):
         """Connect client and server."""
-        try:
-            server = await DummyServer.start(
-                self.server.app.ioc,
-                host_keys=os.path.join(self.server.dir.name, "private.key"),
-                auth_client_keys=os.path.join(self.server.dir.name, "public.key")
-            )
-            client = DummyClient()
-            client.connect()
-        except Exception as e:
-            self.fail(e)
+        server = await DummyServer.start(
+            self.server.app.ioc,
+            host_keys=os.path.join(self.server.dir.name, "private.key"),
+            auth_client_keys=os.path.join(self.server.dir.name, "public.key")
+        )
+        client = DummyClient()
+        client.connect()

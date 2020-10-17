@@ -57,32 +57,26 @@ class NetworkIndexerTask(TaskFacadeExtension):
                 if (trusted.owner == portfolio.entity.id) and (
                         trusted.issuer == network_portfolio.entity.id
                 ):
-                    try:
-                        valid = True
-                        valid = trusted.validate() if valid else valid
-                        valid = (
-                            Crypto.verify(trusted, network_portfolio)
-                            if valid
-                            else valid
-                        )
-                    except Exception:
-                        valid = False
+                    valid = True
+                    valid = trusted.validate() if valid else valid
+                    valid = (
+                        Crypto.verify(trusted, network_portfolio)
+                        if valid
+                        else valid
+                    )
 
                     if valid:
                         valid_trusted = True
                 if (
                         trusted.issuer == portfolio.entity.id
                 ) and trusted.owner == network_portfolio.entity.id:
-                    try:
-                        valid = True
-                        valid = trusted.validate() if valid else valid
-                        valid = (
-                            Crypto.verify(trusted, portfolio)
-                            if valid
-                            else valid
-                        )
-                    except Exception:
-                        valid = False
+                    valid = True
+                    valid = trusted.validate() if valid else valid
+                    valid = (
+                        Crypto.verify(trusted, portfolio)
+                        if valid
+                        else valid
+                    )
 
                     if valid:
                         valid_trusting = True

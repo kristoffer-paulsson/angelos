@@ -25,39 +25,28 @@ class TestPreferencesData(BaseTestFacade):
 
     @run_async
     async def test___getitem__(self):
-            value = 1
-            self.facade.data.prefs["Value"] = value
-            self.assertEqual(value, self.facade.data.prefs["Value"])
-        except Exception as e:
-            self.fail(e)
+        value = 1
+        self.facade.data.prefs["Value"] = value
+        self.assertEqual(value, self.facade.data.prefs["Value"])
 
     @run_async
     async def test___setitem__(self):
-        try:
-            value = 1
-            self.facade.data.prefs["Value"] = value
-            self.assertEqual(value, self.facade.data.prefs["Value"])
-        except Exception as e:
-            self.fail(e)
+        value = 1
+        self.facade.data.prefs["Value"] = value
+        self.assertEqual(value, self.facade.data.prefs["Value"])
 
     @run_async
     async def test___delitem__(self):
-        try:
-            pass
-        except Exception as e:
-            self.fail(e)
+        self.fail(e)
 
     @run_async
     async def test_subscribe(self):
         self.observer = StubObserver()
         self.facade.data.prefs.subscribe("Value", self.observer)
 
-        try:
-            self.facade.data.prefs["Value"] = 123
-            await Misc.sleep()
-            self.assertEqual(self.observer.event.data["value"], 123)
-        except Exception as e:
-            self.fail(e)
+        self.facade.data.prefs["Value"] = 123
+        await Misc.sleep()
+        self.assertEqual(self.observer.event.data["value"], 123)
 
         del self.observer
 
@@ -66,13 +55,10 @@ class TestPreferencesData(BaseTestFacade):
         self.observer = StubObserver()
         self.facade.data.prefs.subscribe("Value", self.observer)
 
-        try:
-            self.facade.data.prefs.unsubscribe("Value", self.observer)
-            self.facade.data.prefs["Value"] = 123
-            await Misc.sleep()
-            self.assertEqual(self.observer.event, None)
-        except Exception as e:
-            self.fail(e)
+        self.facade.data.prefs.unsubscribe("Value", self.observer)
+        self.facade.data.prefs["Value"] = 123
+        await Misc.sleep()
+        self.assertEqual(self.observer.event, None)
 
         del self.observer
 
@@ -83,40 +69,28 @@ class TestClientData(BaseTestFacade):
 
     @run_async
     async def test___getitem__(self):
-        try:
-            value = 1
-            self.facade.data.client["Value"] = value
-            self.assertEqual(value, self.facade.data.client["Value"])
-        except Exception as e:
-            self.fail(e)
+        value = 1
+        self.facade.data.client["Value"] = value
+        self.assertEqual(value, self.facade.data.client["Value"])
 
     @run_async
     async def test___setitem__(self):
-        try:
-            value = 1
-            self.facade.data.client["Value"] = value
-            self.assertEqual(value, self.facade.data.client["Value"])
-        except Exception as e:
-            self.fail(e)
+        value = 1
+        self.facade.data.client["Value"] = value
+        self.assertEqual(value, self.facade.data.client["Value"])
 
     @run_async
     async def test___delitem__(self):
-        try:
-            pass
-        except Exception as e:
-            self.fail(e)
+        self.fail(e)
 
     @run_async
     async def test_subscribe(self):
         self.observer = StubObserver()
         self.facade.data.client.subscribe("Value", self.observer)
 
-        try:
-            self.facade.data.client["Value"] = 123
-            await Misc.sleep()
-            self.assertEqual(self.observer.event.data["value"], 123)
-        except Exception as e:
-            self.fail(e)
+        self.facade.data.client["Value"] = 123
+        await Misc.sleep()
+        self.assertEqual(self.observer.event.data["value"], 123)
 
         del self.observer
 
@@ -125,12 +99,9 @@ class TestClientData(BaseTestFacade):
         self.observer = StubObserver()
         self.facade.data.client.subscribe("Value", self.observer)
 
-        try:
-            self.facade.data.client.unsubscribe("Value", self.observer)
-            self.facade.data.client["Value"] = 123
-            await Misc.sleep()
-            self.assertEqual(self.observer.event, None)
-        except Exception as e:
-            self.fail(e)
+        self.facade.data.client.unsubscribe("Value", self.observer)
+        self.facade.data.client["Value"] = 123
+        await Misc.sleep()
+        self.assertEqual(self.observer.event, None)
 
         del self.observer

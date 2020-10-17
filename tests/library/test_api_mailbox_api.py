@@ -117,12 +117,9 @@ class TestMailboxAPI(TestCase):
 
     @run_async
     async def test_get_info_inbox(self):
-        try:
-            await self._dummy_mail()
-            letters = await self.facade.api.mailbox.load_inbox()
-            await self.facade.api.mailbox.get_info_inbox(letters.pop())
-        except Exception as e:
-            self.fail(e)
+        await self._dummy_mail()
+        letters = await self.facade.api.mailbox.load_inbox()
+        await self.facade.api.mailbox.get_info_inbox(letters.pop())
 
     @run_async
     async def test_get_info_outbox(self):
@@ -174,12 +171,9 @@ class TestMailboxAPI(TestCase):
 
     @run_async
     async def test_open_envelope(self):
-        try:
-            await self._dummy_mail()
-            letters = await self.facade.api.mailbox.load_inbox()
-            await self.facade.api.mailbox.open_envelope(letters.pop())
-        except Exception as e:
-            self.fail(e)
+        await self._dummy_mail()
+        letters = await self.facade.api.mailbox.load_inbox()
+        await self.facade.api.mailbox.open_envelope(letters.pop())
 
     @run_async
     async def test_store_letter(self):

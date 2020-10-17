@@ -81,33 +81,30 @@ class TestNetworkIndexerTask(TestCase):
 
     @run_async
     async def test__run(self):
-        try:
-            docs = set()
+        docs = set()
 
-            # Mutual trust
-            docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
-            docs.add(StatementPolicy.trusted(self.portfolios[0], self.portfolio))
+        # Mutual trust
+        docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[0]))
+        docs.add(StatementPolicy.trusted(self.portfolios[0], self.portfolio))
 
-            # One sided trust from facade
-            docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[1]))
+        # One sided trust from facade
+        docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[1]))
 
-            # One sided trust not from facade
-            docs.add(StatementPolicy.trusted(self.portfolios[2], self.portfolio))
+        # One sided trust not from facade
+        docs.add(StatementPolicy.trusted(self.portfolios[2], self.portfolio))
 
-            # Mutual trust but no network
-            docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[3]))
-            docs.add(StatementPolicy.trusted(self.portfolios[3], self.portfolio))
+        # Mutual trust but no network
+        docs.add(StatementPolicy.trusted(self.portfolio, self.portfolios[3]))
+        docs.add(StatementPolicy.trusted(self.portfolios[3], self.portfolio))
 
-            await self.facade.storage.vault.load_portfolio(self.portfolio.entity.id, PGroup.ALL)
+        await self.facade.storage.vault.load_portfolio(self.portfolio.entity.id, PGroup.ALL)
 
-            await self.facade.storage.vault.docs_to_portfolio(docs)
-            await TaskWaitress().wait_for(self.facade.task.network_index)
+        await self.facade.storage.vault.docs_to_portfolio(docs)
+        await TaskWaitress().wait_for(self.facade.task.network_index)
 
-            networks = OrderedDict(await self.facade.api.settings.networks())
+        networks = OrderedDict(await self.facade.api.settings.networks())
 
-            self.assertTrue(networks[str(self.portfolios[0].entity.id)])
-            self.assertFalse(networks[str(self.portfolios[1].entity.id)])
-            self.assertFalse(networks[str(self.portfolios[2].entity.id)])
-            self.assertNotIn(str(self.portfolios[3].entity.id), networks)
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(networks[str(self.portfolios[0].entity.id)])
+        self.assertFalse(networks[str(self.portfolios[1].entity.id)])
+        self.assertFalse(networks[str(self.portfolios[2].entity.id)])
+        self.assertNotIn(str(self.portfolios[3].entity.id), networks)

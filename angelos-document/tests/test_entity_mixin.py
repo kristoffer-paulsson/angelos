@@ -33,20 +33,14 @@ class TestPersonMixin(TestCase):
         del self.instance
 
     def test__check_names(self):
-        try:
-            PersonMixin._check_names(self.instance)
-        except Exception as e:
-            self.fail(e)
+        PersonMixin._check_names(self.instance)
 
         with self.assertRaises(DocumentError) as context:
             self.instance.given_name = "Judah"
             PersonMixin._check_names(self.instance)
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(PersonMixin.apply_rules(self.instance))
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(PersonMixin.apply_rules(self.instance))
 
 
 class TestMinistryMixin(TestCase):
@@ -57,10 +51,7 @@ class TestMinistryMixin(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())
 
 
 
@@ -72,7 +63,4 @@ class TestChurchMixin(TestCase):
         del self.instance
 
     def test_apply_rules(self):
-        try:
-            self.assertTrue(self.instance.apply_rules())
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(self.instance.apply_rules())

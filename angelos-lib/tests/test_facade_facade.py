@@ -104,14 +104,11 @@ class TestFacade(TestCase):
         for server in [True, False]:
             for t in self.TYPES:
                 self.set_up()
-                try:
-                    facade = await self._setup(
-                        self._portfolio(t, server), server)
-                    self._assert_extension(facade)
-                    facade.close()
-                except Exception as e:
-                    logging.error(e, exc_info=True)
-                    self.fail(e)
+                facade = await self._setup(
+                    self._portfolio(t, server), server)
+                print("Portfolio:", facade.data.portfolio)
+                self._assert_extension(facade)
+                facade.close()
                 self.tear_down()
 
     @run_async
@@ -119,15 +116,11 @@ class TestFacade(TestCase):
         for server in [True, False]:
             for t in self.TYPES:
                 self.set_up()
-                try:
-                    facade = await self._setup(
-                        self._portfolio(t, server), server)
-                    facade.close()
+                facade = await self._setup(
+                    self._portfolio(t, server), server)
+                facade.close()
 
-                    facade = await self._open()
-                    self._assert_extension(facade)
-                    facade.close()
-                except Exception as e:
-                    logging.error(e, exc_info=True)
-                    self.fail(e)
+                facade = await self._open()
+                self._assert_extension(facade)
+                facade.close()
                 self.tear_down()

@@ -41,27 +41,23 @@ from asyncssh.stream import SSHStreamSession
 class ClientsClient(SSHClient):
     async def mail(self):
         """Start mail replication operation."""
-        try:
-            writer, reader, _ = await self._connection.open_session(
-                subsystem="replicator", encoding=None
-            )
-            preset = self.ioc.facade.api.replication.create_preset(
-                Preset.T_MAIL,
-                Preset.CLIENT,
-                self.ioc.facade.data.portfolio.entity.id,
-            )
-            repclient = ReplicatorClient(self.ioc, preset)
-            session = ClientReplicatorSession()
-            handler = session.start_replicator_client(
-                repclient, reader, writer, "mail"
-            )
+        writer, reader, _ = await self._connection.open_session(
+            subsystem="replicator", encoding=None
+        )
+        preset = self.ioc.facade.api.replication.create_preset(
+            Preset.T_MAIL,
+            Preset.CLIENT,
+            self.ioc.facade.data.portfolio.entity.id,
+        )
+        repclient = ReplicatorClient(self.ioc, preset)
+        session = ClientReplicatorSession()
+        handler = session.start_replicator_client(
+            repclient, reader, writer, "mail"
+        )
 
-            await handler
-            # if asyncio.iscoroutine(handler):
-            #    self._connection.create_task(handler, stderr.logger)
-        except Exception as e:
-            logging.error(e, exc_info=True)
-            raise e
+        await handler
+        # if asyncio.iscoroutine(handler):
+        #    self._connection.create_task(handler, stderr.logger)
 
 
 class ClientReplicatorSession(SSHStreamSession, SSHClientSession):

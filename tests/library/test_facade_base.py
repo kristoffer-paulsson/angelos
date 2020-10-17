@@ -67,8 +67,5 @@ class TestBaseFacade(TestCase):
             await BaseFacade.open(self.home, self.instance.secret)
 
     def test_close(self):
-        try:
-            self.instance.close()
-            self.assertTrue(self.instance.closed)
-        except Exception as e:
-            self.fail(e)
+        self.instance.close()
+        self.assertTrue(self.instance.closed)

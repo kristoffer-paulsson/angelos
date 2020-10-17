@@ -502,15 +502,15 @@ class PortfolioMixin:
         for doc in files:
             ops.append(self.archive.load(filename=doc))
 
-        results = await asyncio.gather(*ops, return_exceptions=True)
+        results = await asyncio.gather(*ops)
 
         issuer = set()
         owner = set()
         for data in results:
-            if isinstance(data, Exception):
-                logging.warning("Failed to load document: %s" % data)
-                logging.error(data, exc_info=True)
-                continue
+            # if isinstance(data, Exception):
+            #    logging.warning("Failed to load document: %s" % data)
+            #    logging.error(data, exc_info=True)
+            #    continue
 
             document = PortfolioPolicy.deserialize(data)
 
@@ -579,14 +579,14 @@ class PortfolioMixin:
         for doc in files:
             ops.append(self.archive.load(filename=doc))
 
-        results = await asyncio.gather(*ops, return_exceptions=True)
+        results = await asyncio.gather(*ops)
 
         issuer = set()
         owner = set()
         for data in results:
-            if isinstance(data, Exception):
-                logging.warning("Failed to load document: %s" % data)
-                continue
+            # if isinstance(data, Exception):
+            #    logging.warning("Failed to load document: %s" % data)
+            #    continue
 
             document = PortfolioPolicy.deserialize(data)
 

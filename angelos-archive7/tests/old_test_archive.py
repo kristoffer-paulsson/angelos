@@ -86,240 +86,186 @@ class TestArchive7(BaseArchiveTestCase):
         fileobj.close()
 
     def test_setup(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        archive = Archive7.setup(self.filename, self.secret)
+        archive.close()
 
     def test_open(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            archive.close()
+        archive = Archive7.setup(self.filename, self.secret)
+        archive.close()
 
-            archive.open(self.filename, self.secret)
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        archive.open(self.filename, self.secret)
+        archive.close()
 
     def test_closed(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertFalse(archive.closed)
-            archive.close()
-            self.assertTrue(archive.closed)
-        except Exception as e:
-            self.fail(e)
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertFalse(archive.closed)
+        archive.close()
+        self.assertTrue(archive.closed)
 
     def test_close(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        archive = Archive7.setup(self.filename, self.secret)
+        archive.close()
 
     def test_stats(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            header = archive.stats()
-            archive.close()
+        archive = Archive7.setup(self.filename, self.secret)
+        header = archive.stats()
+        archive.close()
 
-            archive.open(self.filename, self.secret)
-            header2 = archive.stats()
-            archive.close()
+        archive.open(self.filename, self.secret)
+        header2 = archive.stats()
+        archive.close()
 
-            self.assertEqual(header.id, header2.id)
-            self.assertEqual(header.created, header2.created)
-        except Exception as e:
-            self.fail(e)
+        self.assertEqual(header.id, header2.id)
+        self.assertEqual(header.created, header2.created)
 
     @run_async
     async def test_info(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkdir("/first")
-            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkdir("/first")
+        await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
-            entry = await archive.info("/first/second.bin")
-            self.assertIsInstance(entry, EntryRecord)
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        entry = await archive.info("/first/second.bin")
+        self.assertIsInstance(entry, EntryRecord)
+        archive.close()
 
     def test_glob(self):
         self.fail()
 
     @run_async
     async def test_move(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkdir("/first")
-            await archive.mkdir("/second")
-            await archive.mkfile("/first/third.bin", os.urandom(2 ** 18))
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkdir("/first")
+        await archive.mkdir("/second")
+        await archive.mkfile("/first/third.bin", os.urandom(2 ** 18))
 
-            self.assertTrue(archive.isfile("/first/third.bin"))
-            await archive.move("/first/third.bin", "/second")
-            self.assertTrue(archive.isfile("/second/third.bin"))
-            self.assertFalse(archive.isfile("/first/third.bin"))
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(archive.isfile("/first/third.bin"))
+        await archive.move("/first/third.bin", "/second")
+        self.assertTrue(archive.isfile("/second/third.bin"))
+        self.assertFalse(archive.isfile("/first/third.bin"))
+        archive.close()
 
     @run_async
     async def test_chmod(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkfile("/first.bin", os.urandom(2 ** 18))
-            await archive.chmod(
-                "/first.bin", owner=uuid.UUID(int=3),
-                deleted=False, user="tester", group="tester", perms=0o755
-            )
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkfile("/first.bin", os.urandom(2 ** 18))
+        await archive.chmod(
+            "/first.bin", owner=uuid.UUID(int=3),
+            deleted=False, user="tester", group="tester", perms=0o755
+        )
+        archive.close()
 
     @run_async
     async def test_remove(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkdir("/first")
-            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkdir("/first")
+        await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
-            self.assertTrue(archive.isdir("/first"))
-            self.assertTrue(archive.isfile("/first/second.bin"))
+        self.assertTrue(archive.isdir("/first"))
+        self.assertTrue(archive.isfile("/first/second.bin"))
 
-            await archive.remove("/first/second.bin")
-            self.assertFalse(archive.isfile("/first/second.bin"))
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        await archive.remove("/first/second.bin")
+        self.assertFalse(archive.isfile("/first/second.bin"))
+        archive.close()
 
     @run_async
     async def test_rename(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkdir("/first")
-            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkdir("/first")
+        await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
-            self.assertTrue(archive.isdir("/first"))
-            self.assertTrue(archive.isfile("/first/second.bin"))
+        self.assertTrue(archive.isdir("/first"))
+        self.assertTrue(archive.isfile("/first/second.bin"))
 
-            await archive.rename("/first/second.bin", "third.db")
-            self.assertTrue(archive.isfile("/first/third.db"))
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        await archive.rename("/first/second.bin", "third.db")
+        self.assertTrue(archive.isfile("/first/third.db"))
+        archive.close()
 
     @run_async
     async def test_isdir(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkdir("/first")
-            await archive.mkdir("/first/second")
-            await archive.mkfile("/first/third.bin", os.urandom(2 ** 18))
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkdir("/first")
+        await archive.mkdir("/first/second")
+        await archive.mkfile("/first/third.bin", os.urandom(2 ** 18))
 
-            self.assertTrue(archive.isdir("/first"))
-            self.assertTrue(archive.isdir("/first/second"))
-            self.assertFalse(archive.isdir("/first/third.bin"))
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        self.assertTrue(archive.isdir("/first"))
+        self.assertTrue(archive.isdir("/first/second"))
+        self.assertFalse(archive.isdir("/first/third.bin"))
+        archive.close()
 
     @run_async
     async def test_isfile(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            await archive.mkdir("/first")
-            await archive.mkdir("/first/second")
-            await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
+        archive = Archive7.setup(self.filename, self.secret)
+        await archive.mkdir("/first")
+        await archive.mkdir("/first/second")
+        await archive.mkfile("/first/second.bin", os.urandom(2 ** 18))
 
-            self.assertFalse(archive.isfile("/first"))
-            self.assertFalse(archive.isfile("/first/second"))
-            self.assertTrue(archive.isfile("/first/second.bin"))
-            archive.close()
+        self.assertFalse(archive.isfile("/first"))
+        self.assertFalse(archive.isfile("/first/second"))
+        self.assertTrue(archive.isfile("/first/second.bin"))
+        archive.close()
 
-            self.analyze()
-        except Exception as e:
-            self.fail(e)
+        self.analyze()
 
     @run_async
     async def test_islink(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkdir("/first"), uuid.UUID)
-            self.assertIsInstance(await archive.mkfile("/first/second.bin", os.urandom(2 ** 18)), uuid.UUID)
-            self.assertIsInstance(await archive.link("/first/third", "/first/second.bin"), uuid.UUID)
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertIsInstance(await archive.mkdir("/first"), uuid.UUID)
+        self.assertIsInstance(await archive.mkfile("/first/second.bin", os.urandom(2 ** 18)), uuid.UUID)
+        self.assertIsInstance(await archive.link("/first/third", "/first/second.bin"), uuid.UUID)
 
-            self.assertTrue(archive.isdir("/first"))
-            self.assertTrue(archive.isfile("/first/second.bin"))
-            self.assertTrue(archive.islink("/first/third"))
-            archive.close()
+        self.assertTrue(archive.isdir("/first"))
+        self.assertTrue(archive.isfile("/first/second.bin"))
+        self.assertTrue(archive.islink("/first/third"))
+        archive.close()
 
-            self.analyze()
-        except Exception as e:
-            self.fail(e)
+        self.analyze()
 
     @run_async
     async def test_mkdir(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkdir("/first"), uuid.UUID)
-            self.assertIsInstance(await archive.mkdir("/first/second"), uuid.UUID)
-            self.assertIsInstance(await archive.mkdir("/first/second/third"), uuid.UUID)
-            archive.close()
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertIsInstance(await archive.mkdir("/first"), uuid.UUID)
+        self.assertIsInstance(await archive.mkdir("/first/second"), uuid.UUID)
+        self.assertIsInstance(await archive.mkdir("/first/second/third"), uuid.UUID)
+        archive.close()
 
-            self.analyze()
-        except Exception as e:
-            self.fail(e)
+        self.analyze()
 
     @run_async
     async def test_mkfile(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkfile("/first.bin", os.urandom(2 ** 20)), uuid.UUID)
-            archive.close()
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertIsInstance(await archive.mkfile("/first.bin", os.urandom(2 ** 20)), uuid.UUID)
+        archive.close()
 
-            self.analyze()
-        except Exception as e:
-            self.fail(e)
+        self.analyze()
 
     @run_async
     async def test_link(self):
-        try:
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkdir("/first"), uuid.UUID)
-            self.assertIsInstance(await archive.mkfile("/first/second.bin", os.urandom(2 ** 18)), uuid.UUID)
-            self.assertIsInstance(await archive.link("/first/third", "/first/second.bin"), uuid.UUID)
-            archive.close()
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertIsInstance(await archive.mkdir("/first"), uuid.UUID)
+        self.assertIsInstance(await archive.mkfile("/first/second.bin", os.urandom(2 ** 18)), uuid.UUID)
+        self.assertIsInstance(await archive.link("/first/third", "/first/second.bin"), uuid.UUID)
+        archive.close()
 
-            self.analyze()
-        except Exception as e:
-            self.fail(e)
+        self.analyze()
 
     @run_async
     async def test_save(self):
-        try:
-            filename = "/first.bin"
+        filename = "/first.bin"
 
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkfile(filename, os.urandom(2 ** 20)), uuid.UUID)
-            self.assertIsInstance(await archive.save(filename, os.urandom(2 ** 19)), uuid.UUID)
-            archive.close()
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertIsInstance(await archive.mkfile(filename, os.urandom(2 ** 20)), uuid.UUID)
+        self.assertIsInstance(await archive.save(filename, os.urandom(2 ** 19)), uuid.UUID)
+        archive.close()
 
-            self.analyze()
-        except Exception as e:
-            self.fail(e)
+        self.analyze()
 
     @run_async
     async def test_load(self):
-        try:
-            data = os.urandom(2 ** 20)
-            filename = "/first.bin"
+        data = os.urandom(2 ** 20)
+        filename = "/first.bin"
 
-            archive = Archive7.setup(self.filename, self.secret)
-            self.assertIsInstance(await archive.mkfile(filename, data), uuid.UUID)
-            self.assertEqual(await archive.load(filename), data)
-            archive.close()
-        except Exception as e:
-            self.fail(e)
+        archive = Archive7.setup(self.filename, self.secret)
+        self.assertIsInstance(await archive.mkfile(filename, data), uuid.UUID)
+        self.assertEqual(await archive.load(filename), data)
+        archive.close()
 
