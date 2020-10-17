@@ -53,13 +53,9 @@ class ImportPolicy(Policy):
         valid = False if entity.expires < today else valid
         valid = False if keys.expires < today else valid
 
-        try:
-            valid = False if not entity.validate() else valid
-            valid = False if not keys.validate() else valid
-            if datetime.date.today() > entity.expires:
-                valid = False
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        valid = False if not entity.validate() else valid
+        valid = False if not keys.validate() else valid
+        if datetime.date.today() > entity.expires:
             valid = False
 
         valid = False if not Crypto.verify(keys, self.__portfolio) else valid
@@ -91,20 +87,16 @@ class ImportPolicy(Policy):
             return document
 
         valid = True
-        try:
-            if document.issuer != self.__portfolio.entity.id:
-                valid = False
-            if datetime.date.today() > document.expires:
-                valid = False
-            valid = False if not document.validate() else valid
-            valid = (
-                False
-                if not Crypto.verify(document, self.__portfolio)
-                else valid
-            )
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        if document.issuer != self.__portfolio.entity.id:
             valid = False
+        if datetime.date.today() > document.expires:
+            valid = False
+        valid = False if not document.validate() else valid
+        valid = (
+            False
+            if not Crypto.verify(document, self.__portfolio)
+            else valid
+        )
 
         if valid:
             return document
@@ -126,20 +118,16 @@ class ImportPolicy(Policy):
             return node
 
         valid = True
-        try:
-            if node.issuer != self.__portfolio.entity.id:
-                valid = False
-            if node.domain != self.__portfolio.domain.id:
-                valid = False
-            if datetime.date.today() > node.expires:
-                valid = False
-            valid = False if not node.validate() else valid
-            valid = (
-                False if not Crypto.verify(node, self.__portfolio) else valid
-            )
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        if node.issuer != self.__portfolio.entity.id:
             valid = False
+        if node.domain != self.__portfolio.domain.id:
+            valid = False
+        if datetime.date.today() > node.expires:
+            valid = False
+        valid = False if not node.validate() else valid
+        valid = (
+            False if not Crypto.verify(node, self.__portfolio) else valid
+        )
 
         if valid:
             return node
@@ -155,22 +143,18 @@ class ImportPolicy(Policy):
             return document
 
         valid = True
-        try:
-            if document.owner != self.__portfolio.entity.id:
-                valid = False
-            if document.issuer != issuer.entity.id:
-                valid = False
-            if datetime.date.today() > document.expires:
-                valid = False
-            valid = False if not document.validate() else valid
-            valid = (
-                False
-                if not Crypto.verify(document, issuer.entity, issuer.keys)
-                else valid
-            )
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        if document.owner != self.__portfolio.entity.id:
             valid = False
+        if document.issuer != issuer.entity.id:
+            valid = False
+        if datetime.date.today() > document.expires:
+            valid = False
+        valid = False if not document.validate() else valid
+        valid = (
+            False
+            if not Crypto.verify(document, issuer.entity, issuer.keys)
+            else valid
+        )
 
         if valid:
             return document
@@ -181,22 +165,19 @@ class ImportPolicy(Policy):
         """Validate an envelope addressed to the internal portfolio."""
         Util.is_type(envelope, Envelope)
         valid = True
-        try:
-            if envelope.owner != self.__portfolio.entity.id:
-                valid = False
-            if envelope.issuer != sender.entity.id:
-                valid = False
-            if datetime.date.today() > envelope.expires:
-                valid = False
-            valid = False if not envelope.validate() else valid
-            valid = (
-                False
-                if not Crypto.verify(envelope, sender, exclude=["header"])
-                else valid
-            )
-        except Exception as e:
-            logging.error(e, exc_info=True)
+
+        if envelope.owner != self.__portfolio.entity.id:
             valid = False
+        if envelope.issuer != sender.entity.id:
+            valid = False
+        if datetime.date.today() > envelope.expires:
+            valid = False
+        valid = False if not envelope.validate() else valid
+        valid = (
+            False
+            if not Crypto.verify(envelope, sender, exclude=["header"])
+            else valid
+        )
 
         if valid:
             return envelope
@@ -207,18 +188,14 @@ class ImportPolicy(Policy):
         """Validate a message addressed to the internal portfolio."""
         Util.is_type(message, (Note, Instant, Mail))
         valid = True
-        try:
-            if message.owner != self.__portfolio.entity.id:
-                valid = False
-            if message.issuer != sender.entity.id:
-                valid = False
-            if datetime.date.today() > message.expires:
-                valid = False
-            valid = False if not message.validate() else valid
-            valid = False if not Crypto.verify(message, sender) else valid
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        if message.owner != self.__portfolio.entity.id:
             valid = False
+        if message.issuer != sender.entity.id:
+            valid = False
+        if datetime.date.today() > message.expires:
+            valid = False
+        valid = False if not message.validate() else valid
+        valid = False if not Crypto.verify(message, sender) else valid
 
         if valid:
             return message
@@ -236,26 +213,21 @@ class ImportUpdatePolicy(Policy):
         """Validate newkey generated keys."""
         valid = True
 
-        try:
-            if newkeys.issuer != self.__portfolio.entity.id:
-                valid = False
-            if datetime.date.today() > newkeys.expires:
-                valid = False
-            valid = False if not newkeys.validate() else valid
-
-            # Validate new key with old keys
-            valid = (
-                False if not Crypto.verify(newkeys, self.__portfolio) else valid
-            )
-
-            # Validate new key with itself
-            portfolio = copy.deepcopy(self.__portfolio)
-            portfolio.keys = set(newkeys)
-            valid = False if not Crypto.verify(newkeys, portfolio) else valid
-
-        except Exception as e:
-            logging.error(e, exc_info=True)
+        if newkeys.issuer != self.__portfolio.entity.id:
             valid = False
+        if datetime.date.today() > newkeys.expires:
+            valid = False
+        valid = False if not newkeys.validate() else valid
+
+        # Validate new key with old keys
+        valid = (
+            False if not Crypto.verify(newkeys, self.__portfolio) else valid
+        )
+
+        # Validate new key with itself
+        portfolio = copy.deepcopy(self.__portfolio)
+        portfolio.keys = set(newkeys)
+        valid = False if not Crypto.verify(newkeys, portfolio) else valid
 
         return valid
 
@@ -288,11 +260,7 @@ class ImportUpdatePolicy(Policy):
         elif isinstance(entity, Church):
             fields = ChurchPolicy.FIELDS
 
-        try:
-            valid = self.__dict_cmp(entity, fields)
-        except Exception as e:
-            logging.error(e, exc_info=True)
-            valid = False
+        valid = self.__dict_cmp(entity, fields)
 
         return valid
 

@@ -56,8 +56,8 @@ class ClientSession(SSHStreamSession, SSHClientSession):
                 else:
                     del (self._requests[data['request_id']])
 
-        except Exception:
-            logging.exception(f"There was an error processing the server response")
+        except Exception as exc:
+            logging.error(f"There was an error processing the server response", exc_info=True)
 
     def eof_received(self):
         logging.debug("Received EOF")

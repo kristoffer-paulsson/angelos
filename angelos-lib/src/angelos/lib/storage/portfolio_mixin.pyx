@@ -51,8 +51,7 @@ class PortfolioMixin:
         """Check that portfolio exists."""
         is_dir = await self.archive.isdir(path)
         if not is_dir:
-            raise Error.exception(Error.PORTFOLIO_EXISTS_NOT, {
-                "portfolio": eid})
+            raise Error.exception(Error.PORTFOLIO_EXISTS_NOT, {"portfolio": eid})
 
     async def write_file(self, filename: PurePosixPath, doc: DocumentT):
         """Write a document to the current archive."""

@@ -14,7 +14,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Cython implementation of a libsodium wrapper."""
-from typing import Union
+from typing import Union, Tuple
 
 from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_box_boxzerobytes, crypto_box_open_afternm, crypto_secretbox, crypto_secretbox_open, \
@@ -55,6 +55,27 @@ SIZE_AEAD_NPUB = crypto_aead_xchacha20poly1305_ietf_npubbytes()
 SIZE_AEAD_KEY = crypto_aead_xchacha20poly1305_ietf_keybytes()
 SIZE_AEAD_A = crypto_aead_xchacha20poly1305_ietf_abytes()
 
+
+class NaCl:
+    @staticmethod
+    def random_bytes(unsigned int size) -> bytes:
+        buffer = bytes(size)
+        randombytes(buffer, size)
+        return buffer
+
+    @classmethod
+    def random_nonce(cls) -> bytes:
+        return cls.random_bytes(SIZE_SECRETBOX_NONCE)
+
+    @classmethod
+    def random_aead_nonce(cls) -> bytes:
+        return cls.random_bytes(SIZE_AEAD_NPUB)
+
+    @classmethod
+    def salsa_key(cls) -> bytes:
+        return cls.random_bytes(SIZE_SECRETBOX_KEY)
+
+
 class BaseKey:
     """Base class for encryption and signing keys."""
 
@@ -84,23 +105,6 @@ class BaseKey:
         """Signature seed."""
         return self._seed
 
-    @staticmethod
-    def randombytes(unsigned int size) -> bytes:
-        buffer = bytes(size)
-        randombytes(buffer, size)
-        return buffer
-
-    @staticmethod
-    def rand_nonce() -> bytes:
-        return BaseKey.randombytes(SIZE_SECRETBOX_NONCE)
-
-    @staticmethod
-    def rand_aead_nonce() -> bytes:
-        return BaseKey.randombytes(SIZE_AEAD_NPUB)
-
-    def _salsa_key(self) -> bytes:
-        return BaseKey.randombytes(SIZE_SECRETBOX_KEY)
-
 
 class SecretBox(BaseKey):
     def __init__(self, key: bytes = None):
@@ -114,7 +118,7 @@ class SecretBox(BaseKey):
             raise ValueError('Invalid key')
 
     def encrypt(self, message: bytes) -> bytes:
-        nonce = BaseKey.rand_nonce()
+        nonce = NaCl.random_nonce()
         pad = bytes(SIZE_SECRETBOX_ZERO) + message
         pad_len = len(pad)
         crypto = bytes(pad_len)
@@ -145,7 +149,7 @@ class Signer(BaseKey):
             if len(self._seed) != SIZE_SIGN_SEED:
                 raise ValueError("Invalid seed bytes")
         else:
-            self._seed = BaseKey.randombytes(SIZE_SIGN_SEED)
+            self._seed = NaCl.random_bytes(SIZE_SIGN_SEED)
 
         self._sk = bytes(SIZE_SIGN_SECRETKEY)
         self._vk = bytes(SIZE_SIGN_PUBLICKEY)
@@ -249,7 +253,7 @@ class CryptoBox:
                 raise RuntimeError("Unable to compute shared key")
 
     def encrypt(self, message: bytes) -> bytes:
-        nonce = BaseKey.rand_nonce()
+        nonce = NaCl.random_nonce()
         pad = bytes(SIZE_BOX_ZERO) + message
         pad_len = len(pad)
         crypto = bytes(pad_len)
@@ -287,6 +291,8 @@ class NetworkBox:
 
     def encrypt(self, message: bytes, data: bytes) -> bytes:
         cdef unsigned long long crypto_len
+        cdef unsigned long long *crypto_len_p = NULL
+        crypto_len_p = &crypto_len
 
         data_len = len(data)
         if len(data_len) > 255:
@@ -294,9 +300,9 @@ class NetworkBox:
 
         msg_len = len(message)
         crypto = bytes(msg_len + SIZE_AEAD_A)
-        nonce = BaseKey.rand_aead_nonce()
+        nonce = NaCl.random_aead_nonce()
         fail = crypto_aead_xchacha20poly1305_ietf_encrypt(
-            crypto, crypto_len,
+            crypto, crypto_len_p,
             message, msg_len,
             data, data_len, NULL, nonce, self._tx
         )
@@ -304,8 +310,10 @@ class NetworkBox:
             raise RuntimeError("Unable to encrypt messsage")
         return str(chr(data_len)).encode() + data + nonce + crypto
 
-    def decrypt(self, crypto: bytes) -> (bytes, bytes):
+    def decrypt(self, crypto: bytes) -> Tuple[bytes, bytes]:
         cdef unsigned long long msg_len
+        cdef unsigned long long *msg_len_p = NULL
+        msg_len_p = &msg_len
 
         data_len = ord(crypto[0])
         data = crypto[1:data_len]
@@ -313,7 +321,7 @@ class NetworkBox:
         message = bytes(len(crypto) - 1+data_len+SIZE_AEAD_NPUB - SIZE_AEAD_A)
 
         fail = crypto_aead_xchacha20poly1305_ietf_decrypt(
-            message, msg_len,
+            message, msg_len_p,
             NULL,
             crypto[1+data_len+SIZE_AEAD_NPUB:], len(crypto[1+data_len+SIZE_AEAD_NPUB:]),
             data, data_len, nonce, self._rx
@@ -323,20 +331,6 @@ class NetworkBox:
             raise RuntimeError("Unable to decrypt message")
 
         return message, data
-
-    def decrypt(self, ctxt, aadLen):
-        '''
-        Decrypt the given message, if no nonce or aad are given they will be
-        extracted from the message
-        '''
-        aad = ctxt[:aadLen]
-        nonce = ctxt[aadLen:aadLen+libnacl.crypto_aead_aes256gcm_NPUBBYTES]
-        ctxt = ctxt[aadLen+libnacl.crypto_aead_aes256gcm_NPUBBYTES:]
-        if len(nonce) != libnacl.crypto_aead_aes256gcm_NPUBBYTES:
-            raise ValueError('Invalid nonce')
-        if self.usingAES:
-            return libnacl.crypto_aead_aes256gcm_decrypt(ctxt, aad, nonce, self.sk)
-        return libnacl.crypto_aead_chacha20poly1305_ietf_decrypt(ctxt, aad, nonce, self.sk)
 
 
 class ServerBox(NetworkBox):

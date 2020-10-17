@@ -29,6 +29,29 @@ from angelos.archive7.base import DATA_SIZE
 from angelos.archive7.streams import DynamicMultiStreamManager, Registry, DataStream, VirtualFileObject
 from angelos.archive7.tree import SimpleBTree, MultiBTree, RecordError
 
+
+class VirtualFSError(RuntimeError):
+    """Errors from virtual file system."""
+    NOT_ABSOLUTE_PATH = ("Must be an absolute path.", 100)
+    PATH_EXISTS_ALREADY = ("Key already exists in paths", 101)
+    LINK_TARGET_ERROR = ("Target of link doesn't exist", 102)
+    LINK_TO_LINK = ("Target of a link must be file or directory, not another link", 103)
+    UNKNOWN_ENTRY_TYPE = ("Entry type is unknown", 104)
+    PATH_EXISTS_NOT = ("Entry doesn't exist", 105)
+    FILES_IN_DIR = ("Can't delete directory because of files", 106)
+    UNKNOWN_DELETE_LEVEL = ("Delete level unknown", 107)
+    IDENTITY_NO_ENTRY = ("No entry for identity.", 108)
+    NOT_A_DIR = ("Is not a directory", 109)
+    FILE_ALREADY_OPEN = ("File already open.", 110)
+    NOT_A_FILE = ("Record not of type file.", 111)
+    ENTRY_DELETED = ("Record is considered deleted.", 112)
+
+
+class InvalidPath(RuntimeWarning):
+    """Failed to resolve path."""
+    pass
+
+
 TYPE_FILE = b"f"  # Represents a file
 TYPE_LINK = b"l"  # Represents a link
 TYPE_DIR = b"d"  # Represents a directory
@@ -67,7 +90,7 @@ class EntryRecord:
         self.group = group  # Unix group
         self.perms = perms  # Unix permissions
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return struct.pack(
             EntryRecord.FORMAT,
             self.type,
@@ -94,7 +117,7 @@ class EntryRecord:
         )
 
     @staticmethod
-    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+    def meta_unpack(data: Union[bytes, bytearray]) -> "EntryRecord":
         metadata = struct.unpack(EntryRecord.FORMAT, data)
         return EntryRecord(
             type=metadata[0],
@@ -114,7 +137,8 @@ class EntryRecord:
 
     @staticmethod
     def dir(name: str, parent: uuid.UUID = None, owner: uuid.UUID = None, created: datetime.datetime = None,
-            modified: datetime.datetime = None, user: str = None, group: str = None, perms: int = None):
+            modified: datetime.datetime = None, user: str = None, group: str = None, perms: int = None
+            ) -> "EntryRecord":
         kwargs = {
             "type": TYPE_DIR,
             "identity": uuid.uuid4(),
@@ -142,7 +166,8 @@ class EntryRecord:
 
     @staticmethod
     def link(name: str, link: uuid.UUID, parent: uuid.UUID = None, created: datetime.datetime = None,
-             modified: datetime.datetime = None, user: str = None, group: str = None, perms: str = None):
+             modified: datetime.datetime = None, user: str = None, group: str = None, perms: str = None
+             ) -> "EntryRecord":
         """Generate entry for file link."""
 
         kwargs = {
@@ -172,7 +197,7 @@ class EntryRecord:
     @staticmethod
     def file(name: str, stream: uuid.UUID, identity: uuid.UUID = None, parent: uuid.UUID = None,
              owner: uuid.UUID = None, created: datetime.datetime = None, modified: datetime.datetime = None,
-             length: int = None, user: str = None, group: str = None, perms: int = None):
+             length: int = None, user: str = None, group: str = None, perms: int = None) -> "EntryRecord":
         """Entry header for file."""
 
         kwargs = {
@@ -206,7 +231,7 @@ class EntryRecord:
         return EntryRecord(**kwargs)
 
     @staticmethod
-    def err(identity: uuid.UUID, parent: uuid.UUID):
+    def err(identity: uuid.UUID, parent: uuid.UUID) -> "EntryRecord":
         """Generate entry for file link."""
 
         kwargs = {
@@ -223,7 +248,7 @@ class EntryRegistry(Registry):
 
     __slots__ = []
 
-    def _init_tree(self):
+    def _init_tree(self) -> SimpleBTree:
         return SimpleBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_ENTRIES),
@@ -246,7 +271,7 @@ class PathRecord:
         self.type = type_  # Entry type
         self.id = identity
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return struct.pack(
             PathRecord.FORMAT,
             self.type,
@@ -254,7 +279,7 @@ class PathRecord:
         )
 
     @staticmethod
-    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+    def meta_unpack(data: Union[bytes, bytearray]) -> "PathRecord":
         metadata = struct.unpack(PathRecord.FORMAT, data)
         return PathRecord(
             type_=metadata[0],
@@ -262,7 +287,7 @@ class PathRecord:
         )
 
     @staticmethod
-    def path(type_: bytes, identity: uuid.UUID):
+    def path(type_: bytes, identity: uuid.UUID) -> "PathRecord":
         """Entry header for file."""
         return PathRecord(
             type_=type_,
@@ -275,7 +300,7 @@ class PathRegistry(Registry):
 
     __slots__ = []
 
-    def _init_tree(self):
+    def _init_tree(self) -> SimpleBTree:
         return SimpleBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_PATHS),
@@ -296,14 +321,14 @@ class ListingRecord:
     def __init__(self, identity: uuid.UUID):
         self.id = identity
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return struct.pack(
             PathRecord.FORMAT,
             self.id.bytes,
         )
 
     @staticmethod
-    def meta_unpack(data: Union[bytes, bytearray]) -> tuple():
+    def meta_unpack(data: Union[bytes, bytearray]) -> "ListingRecord":
         metadata = struct.unpack(ListingRecord.FORMAT, data)
         return ListingRecord(
             identity=uuid.UUID(bytes=metadata[0])
@@ -315,7 +340,7 @@ class ListingRegistry(Registry):
 
     __slots__ = []
 
-    def _init_tree(self):
+    def _init_tree(self) -> MultiBTree:
         return MultiBTree.factory(
             VirtualFileObject(
                 self._manager.special_stream(FileSystemStreamManager.STREAM_LISTINGS),
@@ -369,7 +394,7 @@ class HierarchyTraverser(Iterable):
         self.__paths = paths
         self.__listings = listings
 
-    def _get_entry(self, item: uuid.UUID):
+    def _get_entry(self, item: uuid.UUID) -> EntryRecord:
         try:
             meta = self.__entries.tree.get(key=item)
         except RecordError:
@@ -379,16 +404,13 @@ class HierarchyTraverser(Iterable):
 
     def _iterate_dir(self, record: EntryRecord):
         self.__segments.append(record.name.decode())
-        # yield record, os.sep + os.path.join(*self.__segments)[5:]
         yield record, PurePosixPath(*self.__segments)
         for item in self.__listings.tree.traverse(record.id):
             entry = self._get_entry(uuid.UUID(bytes=item))
             if entry.type == TYPE_ERR:
                 entry.parent = record.id
-                # yield entry, os.sep + os.path.join(*self.__segments, "<error>")[5:]
                 yield entry, PurePosixPath(*self.__segments, "<error>")
             elif entry.type != TYPE_DIR:
-                # yield entry, os.sep + os.path.join(*self.__segments, entry.name.decode())[5:]
                 yield entry, PurePosixPath(*self.__segments, entry.name.decode())
             else:
                 for entry2, path in self._iterate_dir(entry):
@@ -398,33 +420,15 @@ class HierarchyTraverser(Iterable):
     def __iter__(self):
         entry = self._get_entry(self.__identity)
         if entry.type != TYPE_DIR:
-            # yield entry, os.sep + os.path.join(*self.__segments, entry.name.decode())[5:]
             yield entry, PurePosixPath(*self.__segments, entry.name.decode())
         else:
             for entry2, path in self._iterate_dir(entry):
                 yield entry2, path
 
     @property
-    def path(self) -> str:
+    def path(self) -> PurePosixPath:
         """Current path."""
-        return os.path.join(*self.__segments)
-
-
-class VirtualFSError(RuntimeError):
-    """Errors from virtual file system."""
-    NOT_ABSOLUTE_PATH = ("Must be an absolute path.", 100)
-    PATH_EXISTS_ALREADY = ("Key already exists in paths", 101)
-    LINK_TARGET_ERROR = ("Target of link doesn't exist", 102)
-    LINK_TO_LINK = ("Target of a link must be file or directory, not another link", 103)
-    UNKNOWN_ENTRY_TYPE = ("Entry type is unknown", 104)
-    PATH_EXISTS_NOT = ("Entry doesn't exist", 105)
-    FILES_IN_DIR = ("Can't delete directory because of files", 106)
-    UNKNOWN_DELETE_LEVEL = ("Delete level unknown", 107)
-    IDENTITY_NO_ENTRY = ("No entry for identity.", 108)
-    NOT_A_DIR = ("Is not a directory", 109)
-    FILE_ALREADY_OPEN = ("File already open.", 110)
-    NOT_A_FILE = ("Record not of type file.", 111)
-    ENTRY_DELETED = ("Record is considered deleted.", 112)
+        return PurePosixPath(*self.__segments)
 
 
 class FileSystemStreamManager(DynamicMultiStreamManager):
@@ -448,7 +452,6 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         self.__listings = ListingRegistry(self)
 
     def __install(self):
-        # entry = EntryRecord.dir(name="root", parent=uuid.UUID(int=0))
         entry = EntryRecord.dir(name="/", parent=uuid.UUID(int=0))
         entry.id = uuid.UUID(int=0)
         path = PathRecord.path(entry.type, entry.id)
@@ -474,7 +477,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
 
         DynamicMultiStreamManager._close(self)
 
-    def __path_from_entry(self, entry: EntryRecord):
+    def __path_from_entry(self, entry: EntryRecord) -> uuid.UUID:
         return uuid.uuid5(entry.parent, entry.name.decode())
 
     def __follow_link(self, identity: uuid.UUID) -> EntryRecord:
@@ -502,7 +505,7 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
             try:
                 metadata = self.__paths.tree.get(key=uuid.uuid5(parent, part))
             except RecordError:
-                return None
+                raise InvalidPath({"parent": parent, "part": part})
 
             path = PathRecord.meta_unpack(metadata)
             if follow_link and path.type == TYPE_LINK:
@@ -589,9 +592,9 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 Unix permissions
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
-
-        if entry is None:
+        try:
+            entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        except RecordError:
             raise VirtualFSError(*VirtualFSError.PATH_EXISTS_NOT)
 
         if owner:
@@ -621,10 +624,11 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 Delete level
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
-
-        if entry is None:
+        try:
+            entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        except RecordError:
             raise VirtualFSError(*VirtualFSError.PATH_EXISTS_NOT)
+
 
         if entry.type == TYPE_DIR:
             if self.__listings.tree.get(key=entry.id):
@@ -652,10 +656,10 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
             raise VirtualFSError(*VirtualFSError.UNKNOWN_DELETE_LEVEL)
 
     def search_entry(self, identity: uuid.UUID) -> EntryRecord:
-        meta = self.__entries.tree.get(key=identity)
-        if not meta:
+        try:
+            return EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        except RecordError:
             raise VirtualFSError(*VirtualFSError.IDENTITY_NO_ENTRY, {"identity", identity})
-        return EntryRecord.meta_unpack(meta)
 
     def change_parent(self, identity: uuid.UUID, parent: uuid.UUID):
         """Change parent of an entry i.e. changing directory.
@@ -667,12 +671,14 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 New parent UUID number
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
-        if entry is None:
+        try:
+            entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        except RecordError:
             raise VirtualFSError(*VirtualFSError.PATH_EXISTS_NOT, {"entry": identity})
 
-        new_parent = EntryRecord.meta_unpack(self.__entries.tree.get(key=parent))
-        if new_parent is None:
+        try:
+            new_parent = EntryRecord.meta_unpack(self.__entries.tree.get(key=parent))
+        except RecordError:
             raise VirtualFSError(*VirtualFSError.PATH_EXISTS_NOT, {"parent", new_parent})
 
         if new_parent.type != TYPE_DIR:
@@ -708,8 +714,9 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
                 New name to change to
 
         """
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
-        if entry is None:
+        try:
+            entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        except RecordError:
             raise VirtualFSError(*VirtualFSError.PATH_EXISTS_NOT, {"identity", identity})
 
         path_key = uuid.uuid5(entry.parent, name)
@@ -744,7 +751,10 @@ class FileSystemStreamManager(DynamicMultiStreamManager):
         if identity in self.__descriptors.keys():
             raise VirtualFSError(*VirtualFSError.FILE_ALREADY_OPEN)
 
-        entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        try:
+            entry = EntryRecord.meta_unpack(self.__entries.tree.get(key=identity))
+        except RecordError:
+            raise VirtualFSError(*VirtualFSError.PATH_EXISTS_NOT, {"identity", identity})
 
         if not entry.type == TYPE_FILE:
             raise VirtualFSError(*VirtualFSError.NOT_A_FILE)

@@ -68,7 +68,8 @@ scan = {
                 str(Path("tarball/libsodium/libsodium/x64/Release/v142/static/libsodium.lib").absolute())
             ],
             "export_symbols": [
-                "crypto_box_beforenm", "crypto_sign_bytes", "crypto_secretbox_open", "crypto_scalarmult_base"
+                "crypto_box_beforenm", "crypto_sign_bytes", "crypto_secretbox_open", "crypto_scalarmult_base",
+                "crypto_aead_xchacha20poly1305_ietf_keybytes", "crypto_kx_client_session_keys"
             ],
         } if sys.platform == "win32" else {
             "extra_objects": [str(Path("usr/local/lib/libsodium.a"))],

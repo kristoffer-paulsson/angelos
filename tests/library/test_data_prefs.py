@@ -25,7 +25,6 @@ class TestPreferencesData(BaseTestFacade):
 
     @run_async
     async def test___getitem__(self):
-        try:
             value = 1
             self.facade.data.prefs["Value"] = value
             self.assertEqual(value, self.facade.data.prefs["Value"])

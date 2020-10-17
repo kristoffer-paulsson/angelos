@@ -24,7 +24,7 @@ import uuid
 from pathlib import Path, PurePosixPath
 from typing import Union
 
-from angelos.archive7.fs import Delete
+from angelos.archive7.fs import Delete, InvalidPath, EntryRecord
 from angelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, TYPE_FILE, \
     HierarchyTraverser
 from angelos.common.misc import SharedResourceMixin
@@ -201,7 +201,7 @@ class Archive7(SharedResourceMixin):
     async def info(self, *args, **kwargs):
         return await self._run(functools.partial(self.__info, *args, **kwargs))
 
-    def __info(self, filename: PurePosixPath):
+    def __info(self, filename: PurePosixPath) -> EntryRecord:
         """Information about a file.
 
         Args:
@@ -212,11 +212,10 @@ class Archive7(SharedResourceMixin):
             File entry from registry
 
         """
-        identity = self.__manager.resolve_path(filename)
-        if not identity:
+        try:
+            return self.__manager.search_entry(self.__manager.resolve_path(filename))
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
-
-        return self.__manager.search_entry(identity)
 
     async def glob(
             self,
@@ -229,7 +228,7 @@ class Archive7(SharedResourceMixin):
             deleted: bool = False,
             user: str = None,
             group: str = None
-    ):
+    ) -> set:
         """Glob the file system in the archive."""
         sq = Archive7.Query(pattern=name)
         if id:
@@ -260,13 +259,12 @@ class Archive7(SharedResourceMixin):
 
     def __move(self, filename: PurePosixPath, dirname: PurePosixPath):
         """Move file/dir to another directory."""
-        identity = self.__manager.resolve_path(filename)
-        if not identity:
-            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
-        parent = self.__manager.resolve_path(dirname)
-        if not parent:
-            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": dirname})
-        self.__manager.change_parent(identity, parent)
+        try:
+            identity = self.__manager.resolve_path(filename)
+            parent = self.__manager.resolve_path(dirname)
+            self.__manager.change_parent(identity, parent)
+        except InvalidPath:
+            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"filename": filename, "dirname": dirname})
 
     async def chmod(self, *args, **kwargs):
         return await self._run(functools.partial(self.__chmod, *args, **kwargs))
@@ -282,67 +280,64 @@ class Archive7(SharedResourceMixin):
             perms: int = None,
     ):
         """Update ID/owner or deleted status for an entry."""
-        identity = self.__manager.resolve_path(filename)
-        if not identity:
+        try:
+            self.__manager.update_entry(
+                self.__manager.resolve_path(filename),
+                owner=owner, deleted=deleted, user=user, group=group, perms=perms
+            )
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
-
-        self.__manager.update_entry(
-            identity, owner=owner, deleted=deleted,
-            user=user, group=group, perms=perms
-        )
 
     async def remove(self, *args, **kwargs):
         return await self._run(functools.partial(self.__remove, *args, **kwargs))
 
     def __remove(self, filename: PurePosixPath, mode: int = None):
         """Remove file or dir."""
-        identity = self.__manager.resolve_path(filename)
-        if not identity:
+        try:
+            self.__manager.delete_entry(
+                self.__manager.resolve_path(filename), mode if mode else self.__delete)
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
-        self.__manager.delete_entry(identity, mode if mode else self.__delete)
 
     async def rename(self, *args, **kwargs):
         return await self._run(functools.partial(self.__rename, *args, **kwargs))
 
     def __rename(self, filename: PurePosixPath, dest: str):
         """Rename file or directory."""
-        identity = self.__manager.resolve_path(filename)
-        if not identity:
+        try:
+            self.__manager.change_name(self.__manager.resolve_path(filename), dest)
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
-        self.__manager.change_name(identity, dest)
 
     async def isdir(self, *args, **kwargs):
         return await self._run(functools.partial(self.__isdir, *args, **kwargs))
 
     def __isdir(self, dirname: PurePosixPath) -> bool:
         """Check if a path is a known directory."""
-        identity = self.__manager.resolve_path(dirname, True)
-        if not identity:
+        try:
+            return self.__manager.search_entry(self.__manager.resolve_path(dirname, True)).type == TYPE_DIR
+        except InvalidPath:
             return False
-        entry = self.__manager.search_entry(identity)
-        return entry.type == TYPE_DIR
 
     async def isfile(self, *args, **kwargs):
         return await self._run(functools.partial(self.__isfile, *args, **kwargs))
 
     def __isfile(self, filename: PurePosixPath) -> bool:
         """Check if a path is a known file."""
-        identity = self.__manager.resolve_path(filename, True)
-        if not identity:
+        try:
+            return self.__manager.search_entry(self.__manager.resolve_path(filename, True)).type == TYPE_FILE
+        except InvalidPath:
             return False
-        entry = self.__manager.search_entry(identity)
-        return entry.type == TYPE_FILE
 
     async def islink(self, *args, **kwargs):
         return await self._run(functools.partial(self.__islink, *args, **kwargs))
 
     def __islink(self, filename: PurePosixPath) -> bool:
         """Check if a path is a known link."""
-        identity = self.__manager.resolve_path(filename, False)
-        if not identity:
+        try:
+            return self.__manager.search_entry(self.__manager.resolve_path(filename, False)).type == TYPE_LINK
+        except InvalidPath:
             return False
-        entry = self.__manager.search_entry(identity)
-        return entry.type == TYPE_LINK
 
     async def mkdir(self, *args, **kwargs):
         return await self._run(functools.partial(self.__mkdir, *args, **kwargs))
@@ -360,12 +355,15 @@ class Archive7(SharedResourceMixin):
             name        The full path and name of new directory
             returns     the entry ID
         """
-        parent = self.__manager.resolve_path(dirname.parent)
-        if not parent:
+        try:
+            return self.__manager.create_entry(
+                TYPE_DIR, dirname.parts[-1],
+                self.__manager.resolve_path(dirname.parent),
+                user=user, group=group, perms=perms
+            )
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": dirname.parent})
-        return self.__manager.create_entry(
-            TYPE_DIR, dirname.parts[-1], parent, user=user, group=group, perms=perms
-        )
+
 
     async def mkfile(self, *args, **kwargs):
         return await self._run(functools.partial(self.__mkfile, *args, **kwargs))
@@ -384,10 +382,10 @@ class Archive7(SharedResourceMixin):
             perms: int = None
     ) -> uuid.UUID:
         """Create a new file."""
-        parent = self.__manager.resolve_path(filename.parent)
-
-        if not parent:
-            raise OSError("Parent directory not found")
+        try:
+            parent = self.__manager.resolve_path(filename.parent)
+        except InvalidPath:
+            raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"parent": filename.parent})
 
         identity = self.__manager.create_entry(
             type_=TYPE_FILE,
@@ -424,12 +422,16 @@ class Archive7(SharedResourceMixin):
             perms: int = None
     ) -> uuid.UUID:
         """Create a new link to file or directory."""
-        parent = self.__manager.resolve_path(filename.parent)
-        if not parent:
+        try:
+            parent = self.__manager.resolve_path(filename.parent)
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename.parent})
-        owner = self.__manager.resolve_path(target)
-        if not owner:
+
+        try:
+            owner = self.__manager.resolve_path(target)
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"target": target})
+
         return self.__manager.create_entry(
             type_=TYPE_LINK,
             name=filename.parts[-1],
@@ -450,9 +452,11 @@ class Archive7(SharedResourceMixin):
         if not modified:
             modified = datetime.datetime.now()
 
-        identity = self.__manager.resolve_path(filename, True)
-        if not identity:
+        try:
+            identity = self.__manager.resolve_path(filename, True)
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
+
         vfd = self.__manager.open(identity, "wb")
         vfd.write(data)
         vfd.truncate()
@@ -466,13 +470,13 @@ class Archive7(SharedResourceMixin):
 
     def __load(self, filename: PurePosixPath) -> bytes:
         """Load data from a file."""
-        identity = self.__manager.resolve_path(filename, True)
-        if not identity:
+        try:
+            vfd = self.__manager.open(self.__manager.resolve_path(filename, True), "rb")
+            data = vfd.read()
+            vfd.close()
+            return data
+        except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
-        vfd = self.__manager.open(identity, "rb")
-        data = vfd.read()
-        vfd.close()
-        return data
 
     async def search(self, query: "Archive7.Query"):
         """Search is an async generator that iterates over the file system hierarchy.

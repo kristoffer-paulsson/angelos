@@ -116,12 +116,11 @@ class StatementPolicy(Policy):
             if (
                 verified.owner == owner.entity.id
             ) and verified.issuer == issuer.entity.id:
-                try:
-                    valid = True
-                    valid = verified.validate() if valid else valid
-                    valid = Crypto.verify(verified, issuer) if valid else valid
-                except Exception:
-                    valid = False
+
+                valid = True
+                valid = verified.validate() if valid else valid
+                valid = Crypto.verify(verified, issuer) if valid else valid
+
                 if valid:
                     valid_verified = verified
 
@@ -137,12 +136,11 @@ class StatementPolicy(Policy):
             if (
                 trusted.owner == owner.entity.id
             ) and trusted.issuer == issuer.entity.id:
-                try:
-                    valid = True
-                    valid = trusted.validate() if valid else valid
-                    valid = Crypto.verify(trusted, issuer) if valid else valid
-                except Exception:
-                    valid = False
+
+                valid = True
+                valid = trusted.validate() if valid else valid
+                valid = Crypto.verify(trusted, issuer) if valid else valid
+
                 if valid:
                     valid_trusted = trusted
 

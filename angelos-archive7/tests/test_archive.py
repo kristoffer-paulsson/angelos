@@ -16,7 +16,7 @@ import copy
 import os
 import random
 from collections import Counter
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 from tempfile import TemporaryDirectory
 from unittest.case import TestCase
 
@@ -37,8 +37,8 @@ class TestArchive7(TestCase):
         random.seed(0)
         cls.dir = TemporaryDirectory()
         cls.secret = os.urandom(32)
-        cls.filename = os.path.join(cls.dir.name, "test.ar7")
-        if os.path.exists(cls.filename):
+        cls.filename = Path(cls.dir.name, "test.ar7")
+        if cls.filename.exists():
             raise OSError("File shouldn't be there.")
         cls.owner = Generate.uuid()
         cls.archive = Archive7.setup(cls.filename, cls.secret, owner=cls.owner)
