@@ -20,7 +20,7 @@ from angelos.document.model import TypeField, UuidField
 
 class Statement(Document):
     """Short summary."""
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -42,7 +42,7 @@ class Verified(Statement, OwnerMixin):
     """
     type = TypeField(value=int(DocType.STAT_VERIFIED))
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -51,9 +51,10 @@ class Verified(Statement, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.STAT_VERIFIED)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.STAT_VERIFIED)
+        ])
 
 
 class Trusted(Statement, OwnerMixin):
@@ -66,7 +67,7 @@ class Trusted(Statement, OwnerMixin):
     """
     type = TypeField(value=int(DocType.STAT_TRUSTED))
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -75,9 +76,10 @@ class Trusted(Statement, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.STAT_TRUSTED)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.STAT_TRUSTED)
+        ])
 
 
 class Revoked(Statement):
@@ -93,7 +95,7 @@ class Revoked(Statement):
     type = TypeField(value=int(DocType.STAT_REVOKED))
     issuance = UuidField()
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -102,6 +104,7 @@ class Revoked(Statement):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.STAT_REVOKED)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.STAT_REVOKED)
+        ])

@@ -16,9 +16,13 @@
 """Module docstring."""
 import datetime
 
+from angelos.common.policy import policy
 from angelos.document.document import DocType, Document, OwnerMixin, DocumentError
 from angelos.document.model import BaseDocument, StringField, DateField, BinaryField, DocumentField, UuidField, \
     TypeField, DateTimeField
+
+
+MESSAGE_EXPIRY_PERIOD = 31
 
 
 class Attachment(BaseDocument):
@@ -57,17 +61,14 @@ class Message(Document, OwnerMixin):
     body = StringField(required=False)
     posted = DateTimeField()
 
-    def _check_expiry_period(self):
-        """Checks the expiry time period.
+    def period(self) -> float:
+        """The Delta period to expiry date.
 
-        The time period between update date and
-        expiry date should not be less than 31 days.
+        Returns (datetime.timedelta):
+            The Delta period.
+
         """
-        if self.expires:
-            if (self.expires - self.created) < datetime.timedelta(31 - 1):
-                raise DocumentError(
-                    *DocumentError.DOCUMENT_SHORT_EXPIRY,
-                    {"expected": datetime.timedelta(31), "current": self.expires - self.created})
+        return MESSAGE_EXPIRY_PERIOD
 
 
 class Note(Message):
@@ -80,7 +81,7 @@ class Note(Message):
     """
     type = TypeField(value=int(DocType.COM_NOTE))
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -89,9 +90,10 @@ class Note(Message):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.COM_NOTE)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.COM_NOTE)
+        ])
 
 
 class Instant(Message):
@@ -110,7 +112,7 @@ class Instant(Message):
     body = BinaryField()
     mime = StringField()
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -119,9 +121,10 @@ class Instant(Message):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.COM_INSTANT)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.COM_INSTANT)
+        ])
 
 
 class Mail(Message):
@@ -140,7 +143,7 @@ class Mail(Message):
     subject = StringField(required=False)
     attachments = DocumentField(required=False, doc_class=Attachment, multiple=True)
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -149,9 +152,10 @@ class Mail(Message):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.COM_MAIL)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.COM_MAIL)
+        ])
 
 
 class Share(Mail):
@@ -164,7 +168,7 @@ class Share(Mail):
     """
     type = TypeField(value=int(DocType.COM_SHARE))
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -173,8 +177,10 @@ class Share(Mail):
             Description of returned object.
 
         """
-        self._check_doc_type(DocType.COM_SHARE)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.COM_SHARE)
+        ])
 
 
 class Report(Mail):
@@ -187,7 +193,7 @@ class Report(Mail):
     """
     type = TypeField(value=int(DocType.COM_REPORT))
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -196,5 +202,7 @@ class Report(Mail):
             Description of returned object.
 
         """
-        self._check_doc_type(DocType.COM_REPORT)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.COM_REPORT)
+        ])

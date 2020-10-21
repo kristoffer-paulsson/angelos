@@ -12,7 +12,12 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-"""Scanners that comply with namespace packages."""
+"""Scanners that comply with namespace packages.
+
+Rules to implement:
+    Enforce method/function return typing:
+        regex: "def [\w].*\):"
+"""
 import os
 from pathlib import Path
 from typing import Union

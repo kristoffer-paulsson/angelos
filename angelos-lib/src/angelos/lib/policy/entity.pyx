@@ -21,7 +21,7 @@ from angelos.document.types import EntityT
 from angelos.bin.nacl import DualSecret
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.policy import Policy
-from angelos.lib.policy.portfolio import PrivatePortfolio
+from angelos.portfolio.collection import PrivatePortfolio
 from angelos.lib.policy.types import (
     EntityDataT,
     PersonData,
@@ -63,14 +63,11 @@ class BaseEntityPolicy(Policy):
         privkeys.validate()
         keys.validate()
 
-        portfolio = PrivatePortfolio()
-        portfolio.entity = entity
-        portfolio.privkeys = privkeys
-        portfolio.keys.add(keys)
+        portfolio = PrivatePortfolio({entity, privkeys, keys}, False)
         return portfolio
 
     @staticmethod
-    def update(portfolio: PrivatePortfolioABC) -> bool:
+    def update(portfolio: PrivatePortfolio) -> bool:
         """Renew the identity document expiry date"""
 
         entity = portfolio.entity
@@ -105,7 +102,7 @@ class BaseEntityPolicy(Policy):
         return True
 
     @staticmethod
-    def newkeys(portfolio: PrivatePortfolioABC) -> bool:
+    def newkeys(portfolio: PrivatePortfolio) -> bool:
         """Issue a new pair of keys"""
         box = DualSecret()
 
@@ -155,11 +152,11 @@ class PersonPolicy(BaseEntityPolicy):
     FIELDS = ("family_name",)
 
     @staticmethod
-    def generate(person_data: PersonData) -> PrivatePortfolioABC:
+    def generate(person_data: PersonData) -> PrivatePortfolio:
         return BaseEntityPolicy._generate(Person, person_data)
 
     @staticmethod
-    def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
+    def change(portfolio: PrivatePortfolio, changed: dict) -> bool:
         return BaseEntityPolicy._change(
             portfolio.entity, changed, PersonPolicy.FIELDS
         )
@@ -171,11 +168,11 @@ class MinistryPolicy(BaseEntityPolicy):
     FIELDS = ("vision", "ministry")
 
     @staticmethod
-    def generate(ministry_data: MinistryData) -> PrivatePortfolioABC:
+    def generate(ministry_data: MinistryData) -> PrivatePortfolio:
         return BaseEntityPolicy._generate(Ministry, ministry_data)
 
     @staticmethod
-    def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
+    def change(portfolio: PrivatePortfolio, changed: dict) -> bool:
         return BaseEntityPolicy._change(
             portfolio.entity, changed, MinistryPolicy.FIELDS
         )
@@ -187,11 +184,11 @@ class ChurchPolicy(BaseEntityPolicy):
     FIELDS = ("state", "nation")
 
     @staticmethod
-    def generate(church_data: ChurchData) -> PrivatePortfolioABC:
+    def generate(church_data: ChurchData) -> PrivatePortfolio:
         return BaseEntityPolicy._generate(Church, church_data)
 
     @staticmethod
-    def change(portfolio: PrivatePortfolioABC, changed: dict) -> bool:
+    def change(portfolio: PrivatePortfolio, changed: dict) -> bool:
         return BaseEntityPolicy._change(
             portfolio.entity, changed, ChurchPolicy.FIELDS
         )

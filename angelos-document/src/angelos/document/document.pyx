@@ -18,10 +18,11 @@ import datetime
 import uuid
 
 import msgpack
+from angelos.common.policy import policy, PolicyException
 from angelos.document.model import DocumentMeta, BaseDocument, UuidField, DateField, TypeField, SignatureField
 
 
-class DocumentError(RuntimeError):
+class DocumentError(PolicyException):
     DOCUMENT_SHORT_EXPIRY = ("Expiry date to short", 604)
     DOCUMENT_INVALID_TYPE = ("Invalid type set", 605)
     DOCUMENT_PERSON_NAMES = ("Given name not in names", 606)
@@ -30,6 +31,9 @@ class DocumentError(RuntimeError):
     DOCUMENT_UPDATED_NOT_LATEST = ("Document updated earlier than created", 612)
     DOCUMENT_WRONG_ID = ("Document ID is not the same as Containing document.", 613)
     DOCUMENT_OWNER_IS_ISSUER = ("Document owner can not be the same as issuer.", 614)
+
+
+DOCUMENT_EXPIRY_PERIOD = 13 * 365 / 12
 
 
 class IssueMixin(metaclass=DocumentMeta):
@@ -67,7 +71,8 @@ class OwnerMixin(metaclass=DocumentMeta):
     """
     owner = UuidField()
 
-    def _check_issuer(self):
+    @policy(b"C", 22)
+    def _check_issuer(self) -> bool:
         """Checks that the issuer is not the owner.
 
         Documents having an "owner" field should not be self issued.
@@ -75,6 +80,7 @@ class OwnerMixin(metaclass=DocumentMeta):
         if hasattr(self, "issuer"):  # TODO: Check if attribute check for "issue" can be implemented differently.
             if self.issuer == self.owner:
                 raise DocumentError(*DocumentError.DOCUMENT_OWNER_IS_ISSUER, {"owner": self.owner})
+        return True
 
     def apply_rules(self) -> bool:
         """Short summary.
@@ -85,8 +91,9 @@ class OwnerMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
-        self._check_issuer()
-        return True
+        return all([
+            self._check_issuer()
+        ])
 
 
 class UpdatedMixin(metaclass=DocumentMeta):
@@ -99,27 +106,15 @@ class UpdatedMixin(metaclass=DocumentMeta):
     """
     updated = DateField(required=False)
 
-    def _check_expiry_period(self):  # FIXME: Investigate if and how this conflicts with the Document implementation.
-        """Checks that the expiry time period.
-
-        The time period between update date and
-        expiry date should not be less than 13 months.
-        """
-        if bool(self.updated) and hasattr(self, "expires"):
-            if (self.expires - self.updated) < datetime.timedelta(
-                13 * 365 / 12 - 1
-            ):
-                raise DocumentError(
-                    *DocumentError.DOCUMENT_SHORT_EXPIRY,
-                    {"expected": datetime.timedelta(13 * 365 / 12),  "current": self.expires - self.updated})
-
-    def _check_updated_latest(self):
+    @policy(b"C", 23)
+    def _check_updated_latest(self) -> bool:
         """Checks that updated is newer than created."""
         if bool(self.updated) and hasattr(self, "created"):
             if self.created > self.updated:
                 raise DocumentError(
                     *DocumentError.DOCUMENT_UPDATED_NOT_LATEST,
                     {"id": getattr(self, "id", None)})
+        return True
 
     def apply_rules(self) -> bool:
         """Applies all class related rules to document.
@@ -130,9 +125,9 @@ class UpdatedMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
-        self._check_updated_latest()
-        self._check_expiry_period()
-        return True
+        return all([
+            self._check_updated_latest()
+        ])
 
     def renew(self):
         """Short summary.
@@ -176,24 +171,28 @@ class Document(IssueMixin, BaseDocument):
     created = DateField(init=datetime.date.today)
     expires = DateField(
         init=lambda: (
-            datetime.date.today() + datetime.timedelta(13 * 365 / 12)
+            datetime.date.today() + datetime.timedelta(DOCUMENT_EXPIRY_PERIOD)
         )
     )
     type = TypeField(value=0)
 
-    def _check_expiry_period(self):
+    @policy(b"C", 24)
+    def _check_expiry_period(self) -> bool:
         """Checks the expiry time period.
 
         The time period between update date and
         expiry date should not be less than 13 months.
         """
-        touched = self.get_touched()
-        if (self.expires - touched) < datetime.timedelta(13 * 365 / 12 - 1):
-            raise DocumentError(
-                *DocumentError.DOCUMENT_SHORT_EXPIRY,
-                {"expected": datetime.timedelta(13 * 365 / 12), "current": self.expires - touched})
+        if self.expires:
+            touched = self.get_touched()
+            if (self.expires - touched) < datetime.timedelta(self.period() - 1):
+                raise DocumentError(
+                    *DocumentError.DOCUMENT_SHORT_EXPIRY,
+                    {"expected": datetime.timedelta(self.period()), "current": self.expires - touched})
+        return True
 
-    def _check_doc_type(self, _type):
+    @policy(b"C", 25)
+    def _check_doc_type(self, _type) -> bool:
         """Checks that document type is set.
 
         This check is called from each finalized document!
@@ -213,15 +212,16 @@ class Document(IssueMixin, BaseDocument):
             raise DocumentError(
                 *DocumentError.DOCUMENT_INVALID_TYPE,
                 {"expected": _type, "current": self.type})
+        return True
 
-    def period(self) -> datetime.timedelta:  # TODO: Implement expiry period as a method on all documents.
+    def period(self) -> float:  # TODO: Implement expiry period as a method on all documents.
         """The Delta period to expiry date.
 
         Returns (datetime.timedelta):
             The Delta period.
 
         """
-        return datetime.timedelta(13 * 365 / 12)
+        return DOCUMENT_EXPIRY_PERIOD
 
     def get_touched(self) -> datetime.date:
         """Latest touch, created or updated date."""
@@ -243,6 +243,7 @@ class Document(IssueMixin, BaseDocument):
         """Correct owner of document."""
         return self.owner if getattr(self, "owner", None) else self.issuer
 
+    @policy(b"D", 26, "Document")
     def validate(self) -> bool:
         """Validate document according to the rules.
 
@@ -250,11 +251,15 @@ class Document(IssueMixin, BaseDocument):
             True if everything validates.
 
         """
+        valid = list()
         classes = set(self.__class__.mro())
+
         for cls in classes:
             if hasattr(cls, "apply_rules"):
-                cls.apply_rules(self)
+                valid.append(cls.apply_rules(self))
 
+        if not all(valid):
+            raise PolicyException()
         return True
 
     def is_way_old(self) -> bool:  # FIXME: Write a unittest.
@@ -274,7 +279,7 @@ class Document(IssueMixin, BaseDocument):
             Description of returned object.
 
         """
-        month = self.expires - datetime.timedelta(days=365 / 12)
+        month = self.expires - datetime.timedelta(days=self.period())
         today = datetime.date.today()
         return month <= today <= self.expires
 

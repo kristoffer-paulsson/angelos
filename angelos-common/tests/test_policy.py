@@ -14,7 +14,7 @@
 #
 from unittest import TestCase
 
-from angelos.lib.validation import BasePolicyApplier, PolicyMixin, \
+from angelos.common.policy import BasePolicyApplier, PolicyMixin, \
     PolicyValidator, PolicyPerformer, PolicyException, policy, evaluate, PolicyBreachException
 
 

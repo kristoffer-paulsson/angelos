@@ -22,7 +22,7 @@ from angelos.lib.operation.operation import Operation
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.domain import DomainPolicy, NodePolicy, NetworkPolicy
 from angelos.lib.policy.entity import PersonPolicy, MinistryPolicy, ChurchPolicy
-from angelos.lib.policy.portfolio import PrivatePortfolio
+from angelos.portfolio.collection import PrivatePortfolio
 from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
 
 
@@ -53,6 +53,7 @@ class BaseSetupOperation(Operation):
             if not NetworkPolicy.generate(portfolio):
                 raise RuntimeError("Node document not generated")
 
+        portfolio.freeze()
         return True
 
     @staticmethod

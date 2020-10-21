@@ -17,6 +17,7 @@
 import ipaddress
 from typing import Union
 
+from angelos.common.policy import policy
 from angelos.document.document import DocType, Document, UpdatedMixin, ChangeableMixin, DocumentError
 from angelos.document.model import BaseDocument, StringField, IPField, UuidField, DocumentField, TypeField, ChoiceField
 
@@ -62,7 +63,7 @@ class Domain(Document, UpdatedMixin):
     """
     type = TypeField(value=int(DocType.NET_DOMAIN))
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -71,9 +72,10 @@ class Domain(Document, UpdatedMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.NET_DOMAIN)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.NET_DOMAIN)
+        ])
 
 
 class Node(Document, UpdatedMixin):
@@ -101,12 +103,14 @@ class Node(Document, UpdatedMixin):
     serial = StringField()
     location = DocumentField(required=False, doc_class=Location)
 
+    @policy(b"C", 27)
     def _check_location(self):
         if self.location and self.role == "server":
             if not (self.location.hostname or self.location.ip):
                 raise DocumentError(*DocumentError.DOCUMENT_NO_LOCATION)
+        return True
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -115,10 +119,11 @@ class Node(Document, UpdatedMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.NET_NODE)
-        self._check_location()
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.NET_NODE),
+            self._check_location()
+        ])
 
     def iploc(self) -> Union[ipaddress.IPv4Address, ipaddress.IPv6Address]:
         """IP address for a location."""
@@ -141,16 +146,18 @@ class Network(Document, ChangeableMixin):
     domain = UuidField()
     hosts = DocumentField(doc_class=Host, multiple=True)
 
-    def _check_host(self):
+    @policy(b"C", 28)
+    def _check_host(self) -> bool:
         for host in self.hosts if self.hosts else []:
             if not (host.hostname or host.ip):
                 raise DocumentError(*DocumentError.DOCUMENT_NO_HOST)
+        return True
 
     def changeables(self) -> tuple:
         """Fields that are changeable when updating."""
         return "hosts",
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -159,10 +166,11 @@ class Network(Document, ChangeableMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.NET_NETWORK)
-        self._check_host()
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.NET_NETWORK),
+            self._check_host()
+        ])
 
     def iploc(self) -> Union[ipaddress.IPv4Address, ipaddress.IPv6Address]:
         """IP address for a location from document."""

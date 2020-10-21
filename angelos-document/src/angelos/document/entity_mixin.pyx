@@ -14,6 +14,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Entity mixin for shared fields."""
+from angelos.common.policy import policy
 from angelos.document.document import DocumentError
 from angelos.document.model import DocumentMeta, ChoiceField, DateField, StringField
 
@@ -40,14 +41,16 @@ class PersonMixin(metaclass=DocumentMeta):
     family_name = StringField()
     given_name = StringField()
 
-    def _check_names(self):
+    @policy(b"C", 29)
+    def _check_names(self) -> bool:
         """Check that given name is among names."""
         if self.given_name not in self.names:
             raise DocumentError(
                 *DocumentError.DOCUMENT_PERSON_NAMES,
                 {"name": self.given_name, "not_in": self.names})
+        return True
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -56,8 +59,9 @@ class PersonMixin(metaclass=DocumentMeta):
             Description of returned object.
 
         """
-        self._check_names()
-        return True
+        return all([
+            self._check_names()
+        ])
 
 
 class MinistryMixin(metaclass=DocumentMeta):
@@ -77,7 +81,7 @@ class MinistryMixin(metaclass=DocumentMeta):
     ministry = StringField()
     founded = DateField()
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -109,7 +113,7 @@ class ChurchMixin(metaclass=DocumentMeta):
     region = StringField(required=False)
     country = StringField(required=False)
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns

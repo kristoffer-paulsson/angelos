@@ -16,9 +16,13 @@
 """Module docstring."""
 import datetime
 
+from angelos.common.policy import policy
 from angelos.document.document import DocType, Document, OwnerMixin, DocumentError
 from angelos.document.model import BaseDocument, DateField, StringField, UuidField, DocumentField, BinaryField, \
     TypeField, SignatureField, DateTimeField
+
+
+ENVELOPE_EXPIRY_PERIOD = 31
 
 
 class Header(BaseDocument):
@@ -65,24 +69,22 @@ class Envelope(Document, OwnerMixin):
     """
     type = TypeField(value=int(DocType.COM_ENVELOPE))
     expires = DateField(
-        init=lambda: (datetime.date.today() + datetime.timedelta(31))
+        init=lambda: (datetime.date.today() + datetime.timedelta(ENVELOPE_EXPIRY_PERIOD))
     )
     message = BinaryField(limit=131072)
     header = DocumentField(required=False, doc_class=Header, multiple=True)
     posted = DateTimeField()
 
-    def _check_expiry_period(self):
-        """Checks the expiry time period.
+    def period(self) -> float:
+        """The Delta period to expiry date.
 
-        The time period between update date and
-        expiry date should not be less than 31 days.
+        Returns (datetime.timedelta):
+            The Delta period.
+
         """
-        if (self.expires - self.created) < datetime.timedelta(31 - 1):
-            raise DocumentError(
-                *DocumentError.DOCUMENT_SHORT_EXPIRY,
-                {"expected": datetime.timedelta(31), "current": self.expires - self.created})
+        return ENVELOPE_EXPIRY_PERIOD
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -91,6 +93,7 @@ class Envelope(Document, OwnerMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.COM_ENVELOPE)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.COM_ENVELOPE)
+        ])

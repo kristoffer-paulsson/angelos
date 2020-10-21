@@ -16,6 +16,7 @@
 """Policy classes for Domain and Nodes."""
 import ipaddress
 import platform
+from typing import Union
 
 from angelos.lib.automatic import Network as AutoNet
 from angelos.lib.const import Const
@@ -23,7 +24,7 @@ from angelos.document.domain import Domain, Node, Location, Network, Host
 from angelos.common.misc import Misc
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.policy import Policy
-from angelos.lib.policy.types import PrivatePortfolioABC, Union
+from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
 
 
 class NodePolicy(Policy):
@@ -33,12 +34,14 @@ class NodePolicy(Policy):
 
     @staticmethod
     def current(
-        portfolio: PrivatePortfolioABC,
+        portfolio: PrivatePortfolio,
         role: int = Const.A_ROLE_PRIMARY,
         server: bool = False,
         ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ):
         """Generate node document from the current node."""
+        if portfolio.is_frozen():
+            raise FrozenPortfolioError()
 
         if role == Const.A_ROLE_BACKUP:
             role = "backup"
@@ -76,14 +79,14 @@ class NodePolicy(Policy):
 
         node = Crypto.sign(node, portfolio)
         node.validate()
-        portfolio.nodes.add(node)
+        portfolio.documents().add(node)
 
         return True
 
     def generate(self, **kwargs):
         raise NotImplementedError()
 
-    def update(self, portfolio: PrivatePortfolioABC, node: Node) -> bool:
+    def update(self, portfolio: PrivatePortfolio, node: Node) -> bool:
         if node in portfolio.nodes:
             portfolio.nodes.remove(node)
 
@@ -98,8 +101,11 @@ class NodePolicy(Policy):
 
 class DomainPolicy(Policy):
     @staticmethod
-    def generate(portfolio: PrivatePortfolioABC):
+    def generate(portfolio: PrivatePortfolio):
         """Generate domain document from currently running node."""
+        if portfolio.is_frozen():
+            raise FrozenPortfolioError()
+
         if portfolio.domain:
             return False
 
@@ -107,11 +113,11 @@ class DomainPolicy(Policy):
 
         domain = Crypto.sign(domain, portfolio)
         domain.validate()
-        portfolio.domain = domain
+        portfolio.documents().add(domain)
 
         return True
 
-    def update(self, portfolio: PrivatePortfolioABC, domain: Domain) -> bool:
+    def update(self, portfolio: PrivatePortfolio, domain: Domain) -> bool:
         if portfolio.domain:
             portfolio.domain = None
 
@@ -126,7 +132,7 @@ class DomainPolicy(Policy):
 
 class NetworkPolicy(Policy):
     @staticmethod
-    def generate(portfolio: PrivatePortfolioABC):
+    def generate(portfolio: PrivatePortfolio):
         """Generate network document from currently running node."""
         if not portfolio.nodes:
             raise ValueError("At least one node necessary to generate network")
@@ -158,7 +164,7 @@ class NetworkPolicy(Policy):
 
         return True
 
-    def update(self, portfolio: PrivatePortfolioABC, network: Network) -> bool:
+    def update(self, portfolio: PrivatePortfolio, network: Network) -> bool:
         if network in portfolio.network:
             portfolio.network = None
 

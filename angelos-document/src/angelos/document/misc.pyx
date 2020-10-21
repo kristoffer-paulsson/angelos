@@ -16,10 +16,14 @@
 """Miscellaneous documents."""
 import datetime
 
+from angelos.common.policy import policy
 from angelos.document.document import Document, DocType, DocumentError
 from angelos.document.envelope import Envelope
 from angelos.document.messages import Message
 from angelos.document.model import TypeField, DateField, DocumentField, UuidField
+
+
+LETTER_EXPIRY_PERIOD = 3 * 365 / 12
 
 
 class StoredLetter(Document):
@@ -41,24 +45,13 @@ class StoredLetter(Document):
     id = UuidField()
     type = TypeField(value=int(DocType.CACHED_MSG))
     expires = DateField(
-        init=lambda: (datetime.date.today() + datetime.timedelta(3 * 365 / 12))
+        init=lambda: (datetime.date.today() + datetime.timedelta(LETTER_EXPIRY_PERIOD))
     )
     envelope = DocumentField(doc_class=Envelope)
     message = DocumentField(doc_class=Message)
 
-    def _check_expiry_period(self):
-        """Checks the expiry time period.
-
-        The time period between update date and
-        expiry date should not be less than 90 days.
-        """
-        if self.expires:
-            if (self.expires - self.created) < datetime.timedelta(3 * 365 / 12 - 1):
-                raise DocumentError(
-                    *DocumentError.DOCUMENT_SHORT_EXPIRY,
-                    {"expected": datetime.timedelta(91), "current": self.expires - self.created})
-
-    def _check_document_id(self):
+    @policy(b"E", 30)
+    def _check_document_id(self) -> bool:
         # if not self.message and self.id:
         #    return
         slid = getattr(self, "id", None)
@@ -67,8 +60,18 @@ class StoredLetter(Document):
 
         if slid != mid:
             raise DocumentError(*DocumentError.DOCUMENT_WRONG_ID, {"expected": self.message.id, "current": self.id})
+        return True
 
-    def apply_rules(self):
+    def period(self) -> datetime.timedelta:
+        """The Delta period to expiry date.
+
+        Returns (datetime.timedelta):
+            The Delta period.
+
+        """
+        return LETTER_EXPIRY_PERIOD
+
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -77,7 +80,8 @@ class StoredLetter(Document):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.CACHED_MSG)
-        self._check_document_id()
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.CACHED_MSG),
+            self._check_document_id()
+        ])

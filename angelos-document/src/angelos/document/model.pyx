@@ -32,9 +32,10 @@ from typing import Any, Union, Callable, Type
 # TODO:
 #   Add support for fromisoformat in Python 3.6
 #   datetime.date(int(date_str[0:4]), int(date_str[5:7]), int(date_str[8:10]))
+from angelos.common.policy import PolicyException, policy
 
 
-class FieldError(RuntimeError):
+class FieldError(PolicyException):
     """Exception class for errors with fields."""
     FIELD_NOT_SET = ("Required value is not set", 600)
     FIELD_NOT_MULTIPLE = ("Value is list, but not set to multiple", 601)
@@ -97,12 +98,14 @@ class Field(ABC):
         self.multiple = multiple
         self.init = init
 
+    @policy(b"A", 1)
     def _check_required(self, value: Any, name: str) -> bool:
-        """1A-0001: Check that a field marked as required isn't empty. Required fields are mandatory."""
+        """1A-0001: Check that a field marked as required is not empty. Required fields are mandatory."""
         if self.required and not bool(value):
             raise FieldError(*FieldError.FIELD_NOT_SET, {"field": name})
         return True
 
+    @policy(b"A", 2)
     def _check_multiple(self, value: Any, name: str) -> bool:
         """1A-0002: Check that multifield isn't assigned non-list items directly, this goes both ways.
         A multifield must have a list."""
@@ -112,6 +115,7 @@ class Field(ABC):
             raise FieldError(*FieldError.FIELD_IS_MULTIPLE, {"type": type(self), "value": value, "field": name})
         return True
 
+    @policy(b"A", 3)
     def _check_types(self, value: Any, name: str) -> bool:
         """1A-0003: Check that a field is assigned an item of a specified type only.
         The specified item types are required."""
@@ -122,8 +126,9 @@ class Field(ABC):
                     {"expected": str(self.TYPES), "current": type(v), "field": name})
         return True
 
+    @policy(b"B", 4, "Field")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate according to basic field functionality.
+        """1B-0004: Apply mandatory field checks to base field.
 
         Parameters
         ----------
@@ -138,10 +143,12 @@ class Field(ABC):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Abstract to restore field from bytes.
@@ -362,7 +369,7 @@ class BaseDocument(metaclass=DocumentMeta):
         """
         if key not in self._fields:
             raise FieldError(*FieldError.FIELD_UNKNOWN, {"name", key})
-        if not self._fields[key].validate(value, key):
+        if not self._fields[key].validate(value, name=key):
             raise FieldError(*FieldError.FIELD_INVALID_TYPE, {"name": key, "value": value})
         object.__setattr__(self, key, value)
 
@@ -495,10 +502,12 @@ class BaseDocument(metaclass=DocumentMeta):
         """
         return self.export(conv_yaml)
 
-    def _check_fields(self):
+    @policy(b"C", 5)
+    def _check_fields(self) -> bool:
         """Validate all fields individually in the document."""
         for name in self._fields.keys():
-            self._fields[name].validate(getattr(self, name), name)
+            self._fields[name].validate(getattr(self, name), name=name)
+        return True
 
     def apply_rules(self) -> bool:
         """Apply all rules on BaseDocument level.
@@ -509,9 +518,11 @@ class BaseDocument(metaclass=DocumentMeta):
             Result of validation.
 
         """
-        self._check_fields()
-        return True
+        return all([
+            self._check_fields()
+        ])
 
+    # @policy(b"I", 0)
     def validate(self) -> bool:
         """Abstract document validator.
 
@@ -561,7 +572,9 @@ class DocumentField(Field):
         Field.__init__(self, value, required, multiple, init)
         self.type = doc_class
 
+    @policy(b"A", 6)
     def _check_document(self, value: Any, name: str) -> bool:
+        """1A-0006: Do validation of all documents."""
         for v in value if isinstance(value, list) else [value]:
             if isinstance(v, self.type):
                 v.apply_rules()
@@ -573,8 +586,9 @@ class DocumentField(Field):
                     {"expected": type(self.type), "current": type(v), "field": name})
         return True
 
+    @policy(b"B", 7, "DocumentField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate DocType and inherited validation logic.
+        """1B-0007: Apply mandatory field checks to document field.
 
         Parameters
         ----------
@@ -589,11 +603,13 @@ class DocumentField(Field):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_document(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: Union[bytes, dict]) -> Any:
         """Restore field from bytes.
@@ -616,8 +632,9 @@ class UuidField(Field):
     """UUID field."""
     TYPES = (uuid.UUID,)
 
+    @policy(b"B", 8, "UuidField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate data type as UUID and inherited validation logic.
+        """1B-0008: Apply mandatory field checks to uuid field.
 
         Parameters
         ----------
@@ -632,11 +649,13 @@ class UuidField(Field):
             Result of validation.
 
         """
-        return all([
+        if not  all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -707,8 +726,9 @@ class IPField(Field):
     """IP address field."""
     TYPES = (ipaddress.IPv4Address, ipaddress.IPv6Address)
 
+    @policy(b"B", 9, "IPField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate data type as IPvXAddress and inherited validation logic.
+        """1B-0009: Apply mandatory field checks to IP-address field.
 
         Parameters
         ----------
@@ -723,11 +743,13 @@ class IPField(Field):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -813,8 +835,9 @@ class DateField(Field):
     """Date field."""
     TYPES = (datetime.date,)
 
+    @policy(b"B", 10, "DateField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as Date and inherited validation logic.
+        """1B-0010: Apply mandatory field checks to date field.
 
         Parameters
         ----------
@@ -829,11 +852,13 @@ class DateField(Field):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -904,8 +929,9 @@ class DateTimeField(Field):
     """Date and time field."""
     TYPES = (datetime.datetime,)
 
+    @policy(b"B", 11, "DateTimeField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as DateTime and inherited validation logic.
+        """1B-0011: Apply mandatory field checks to date time field.
 
         Parameters
         ----------
@@ -920,11 +946,13 @@ class DateTimeField(Field):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -997,8 +1025,9 @@ class TypeField(Field):
     """Document type field"""
     TYPES = (int,)
 
+    @policy(b"B", 12, "TypeField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as Int and inherited validation logic.
+        """1B-0009: Apply mandatory field checks to type field.
 
         Parameters
         ----------
@@ -1013,11 +1042,13 @@ class TypeField(Field):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -1118,7 +1149,9 @@ class BinaryField(Field):
         Field.__init__(self, value, required, multiple, init)
         self.limit = limit
 
+    @policy(b"A", 13)
     def _check_limit(self, value: Any, name: str) -> bool:
+        """1A-0013: Check that size of bytes is within limit."""
         for v in value if isinstance(value, list) else [value]:
             if not isinstance(v, type(None)) and len(v) > self.limit:
                 raise FieldError(
@@ -1126,9 +1159,9 @@ class BinaryField(Field):
                     {"limit": self.limit, "size": len(v), "field": name})
         return True
 
+    @policy(b"B", 14, "BinaryField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as Bytes and within limits and inherited
-        validation logic.
+        """1B-0014: Apply mandatory field checks to bytes field.
 
         Parameters
         ----------
@@ -1143,12 +1176,14 @@ class BinaryField(Field):
             Result of validation.
 
         """
-        return all([
+        if not  all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name),
             self._check_limit(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -1249,8 +1284,9 @@ class SignatureField(BinaryField):
         BinaryField.__init__(self, value, required, multiple, init, limit)
         self.redo = False
 
+    @policy(b"B", 15, "SignatureField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as String and inherited validation logic.
+        """1B-0015: Apply mandatory field checks to signature field.
 
         Parameters
         ----------
@@ -1265,20 +1301,23 @@ class SignatureField(BinaryField):
             Result of validation.
 
         """
-        return all([
+        if not all([
             True if self.redo else self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name),
             self._check_limit(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
 
 class StringField(Field):
     """String field."""
     TYPES = (str,)
 
+    @policy(b"B", 16, "StringField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as String and inherited validation logic.
+        """1B-0016: Apply mandatory field checks to string field.
 
         Parameters
         ----------
@@ -1293,11 +1332,13 @@ class StringField(Field):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
     def from_bytes(self, v: bytes) -> Any:
         """Restore field from bytes.
@@ -1399,14 +1440,17 @@ class ChoiceField(StringField):
             raise FieldError(*FieldError.FIELD_INVALID_TYPE, {"expected": str, "given": choices})
         self.choices = choices
 
+    @policy(b"A", 17)
     def _check_choices(self, value: Any, name: str) -> bool:
+        """1A-0017: Check that choice is of available value."""
         for v in value if isinstance(value, list) else [value]:
             if not isinstance(v, type(None)) and v not in self.choices:
                 raise FieldError(*FieldError.FIELD_INVALID_CHOICE, {"expected": self.choices, "current": v})
         return True
 
+    @policy(b"B", 18, "ChoiceField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate field type as String and inherited validation logic.
+        """1B-0016: Apply mandatory field checks to choice field.
 
         Parameters
         ----------
@@ -1421,12 +1465,14 @@ class ChoiceField(StringField):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name),
             self._check_choices(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
 
 class RegexField(StringField):
@@ -1460,14 +1506,17 @@ class RegexField(StringField):
     ):
         Field.__init__(self, value, required, multiple, init)
 
+    @policy(b"A", 19)
     def _check_regex(self, value: Any, name: str) -> bool:
+        """1A-0019: Check that field value comply with said regular expression."""
         for v in value if isinstance(value, list) else [value]:
             if not isinstance(v, type(None)) and not bool(re.match(self.REGEX[0], v)):
                 raise FieldError(*FieldError.FIELD_INVALID_REGEX, {"value": v, "field": name})
         return True
 
+    @policy(b"B", 20, "RegexField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate as Email address and inherited validation logic.
+        """1B-0020: Apply mandatory field checks to regex field.
 
         Parameters
         ----------
@@ -1482,12 +1531,14 @@ class RegexField(StringField):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name),
             self._check_regex(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True
 
 
 class EmailField(RegexField):
@@ -1525,8 +1576,9 @@ class EmailField(RegexField):
     ):
         Field.__init__(self, value, required, multiple, init)
 
+    @policy(b"B", 21, "EmailField")
     def validate(self, value: Any, name: str) -> bool:
-        """Validate as Email address and inherited validation logic.
+        """1B-0021: Apply mandatory field checks to email field.
 
         Parameters
         ----------
@@ -1541,9 +1593,11 @@ class EmailField(RegexField):
             Result of validation.
 
         """
-        return all([
+        if not all([
             self._check_required(value, name),
             self._check_multiple(value, name),
             self._check_types(value, name),
             self._check_regex(value, name)
-        ])
+        ]):
+            raise PolicyException()
+        return True

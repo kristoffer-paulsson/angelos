@@ -38,7 +38,7 @@ class PrivateKeys(Document):
     seed = BinaryField()
     signature = SignatureField()
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -47,9 +47,10 @@ class PrivateKeys(Document):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.KEYS_PRIVATE)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.KEYS_PRIVATE)
+        ])
 
 
 class Keys(Document):
@@ -71,7 +72,7 @@ class Keys(Document):
     public = BinaryField()
     signature = SignatureField(multiple=True)
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -80,14 +81,15 @@ class Keys(Document):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.KEYS)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.KEYS)
+        ])
 
 
 class Entity(Document, ChangeableMixin):
     """Short summary."""
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         return True
 
 
@@ -105,7 +107,7 @@ class Person(Entity, PersonMixin):
         """Fields that are changeable when updating."""
         return "family_name",
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -114,9 +116,10 @@ class Person(Entity, PersonMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.ENTITY_PERSON)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.ENTITY_PERSON)
+        ])
 
 
 class Ministry(Entity, MinistryMixin):
@@ -133,7 +136,7 @@ class Ministry(Entity, MinistryMixin):
         """Fields that are changeable when updating."""
         return "vision",
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -142,9 +145,10 @@ class Ministry(Entity, MinistryMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.ENTITY_MINISTRY)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.ENTITY_MINISTRY)
+        ])
 
 
 class Church(Entity, ChurchMixin):
@@ -161,7 +165,7 @@ class Church(Entity, ChurchMixin):
         """Fields that are changeable when updating."""
         return "region", "country"
 
-    def apply_rules(self):
+    def apply_rules(self) -> bool:
         """Short summary.
 
         Returns
@@ -170,6 +174,7 @@ class Church(Entity, ChurchMixin):
             Description of returned object.
 
         """
-        self._check_expiry_period()
-        self._check_doc_type(DocType.ENTITY_CHURCH)
-        return True
+        return all([
+            self._check_expiry_period(),
+            self._check_doc_type(DocType.ENTITY_CHURCH)
+        ])

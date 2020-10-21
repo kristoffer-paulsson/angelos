@@ -71,12 +71,6 @@ class TestUpdatedMixin(TestCase):
         self.assertEqual(
             UpdatedMixin.apply_rules(self._populate_doc()), True)
 
-    def test__check_expiry_period(self):
-        UpdatedMixin._check_expiry_period(self._populate_doc())
-
-        with self.assertRaises(DocumentError) as context:
-            UpdatedMixin.apply_rules(self._populate_doc(1))
-
     def test__check_updated_latest(self):
         UpdatedMixin._check_updated_latest(self._populate_doc())
 
