@@ -15,7 +15,7 @@
 #
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.bin.nacl import DualSecret
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, evaluate, PolicyException
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException
 from angelos.document.entities import PrivateKeys, Keys, Person, Ministry, Church
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.types import PersonData, MinistryData, ChurchData

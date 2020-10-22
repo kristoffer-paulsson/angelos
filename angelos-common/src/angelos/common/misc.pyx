@@ -371,6 +371,8 @@ class Misc:
         address.add(ipaddress.ip_address("127.0.0.1"))
 
         address = list(address)
+        address.sort()
+        address.reverse()
         return address
 
     @staticmethod

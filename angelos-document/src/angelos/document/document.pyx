@@ -214,7 +214,7 @@ class Document(IssueMixin, BaseDocument):
                 {"expected": _type, "current": self.type})
         return True
 
-    def period(self) -> float:  # TODO: Implement expiry period as a method on all documents.
+    def period(self) -> float:
         """The Delta period to expiry date.
 
         Returns (datetime.timedelta):
