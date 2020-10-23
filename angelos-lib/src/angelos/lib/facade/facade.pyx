@@ -25,7 +25,7 @@ from angelos.lib.data.portfolio import PortfolioData
 from angelos.lib.data.prefs import PreferencesData
 from angelos.lib.data.server import ServerData
 from angelos.document.entities import Person, Ministry, Church
-from angelos.lib.facade.base import BaseFacade
+from angelos.lib.facade.base import BaseFacade, FacadeError
 from angelos.lib.policy.portfolio import PrivatePortfolio
 from angelos.lib.task.contact_sync import ContactPortfolioSyncTask
 
@@ -228,14 +228,14 @@ class Facade:
     def _check_role(cls, role: int) -> int:
         """Check that vault role is valid."""
         if role not in (Const.A_ROLE_PRIMARY, Const.A_ROLE_BACKUP):
-            raise ValueError("Illegal role")
+            raise FacadeError(*FacadeError.ILLEGAL_ROLE)
         return role
 
     @classmethod
     def _check_type(cls, portfolio: PrivatePortfolio, server: bool) -> None:
         """Check that entity type is valid and calculate vault type."""
         if not portfolio.entity:
-            raise ValueError("No entity present in portfolio")
+            raise FacadeError(*FacadeError.MISSING_ENTITY)
 
         entity_type = type(portfolio.entity)
         if entity_type is Person:
@@ -245,4 +245,4 @@ class Facade:
         elif entity_type is Church:
             return Const.A_TYPE_CHURCH_SERVER if server else Const.A_TYPE_CHURCH_CLIENT
         else:
-            raise TypeError("Entity in portfolio of unknown type")
+            raise FacadeError(*FacadeError.UNKNOWN_ENTITY_TYPE)

@@ -47,7 +47,7 @@ class CreateDomainMixin(PolicyMixin):
             raise FrozenPortfolioError()
 
         if self._portfolio.domain:
-            raise DomainCreateException(**DomainCreateException.DOMAIN_IN_PORTFOLIO)
+            raise DomainCreateException(*DomainCreateException.DOMAIN_IN_PORTFOLIO)
 
         domain = Domain(nd={"issuer": self._portfolio.entity.id})
 

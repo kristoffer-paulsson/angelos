@@ -106,7 +106,6 @@ class TestFacade(TestCase):
                 self.set_up()
                 facade = await self._setup(
                     self._portfolio(t, server), server)
-                print("Portfolio:", facade.data.portfolio)
                 self._assert_extension(facade)
                 facade.close()
                 self.tear_down()

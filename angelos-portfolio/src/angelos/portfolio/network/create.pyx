@@ -48,13 +48,13 @@ class CreateNetworkMixin(PolicyMixin):
             raise FrozenPortfolioError()
 
         if self._portfolio.network:
-            raise NetworkCreateException(**NetworkCreateException.NETWORK_ALREADY_PRESENT)
+            raise NetworkCreateException(*NetworkCreateException.NETWORK_ALREADY_PRESENT)
 
         if not self._portfolio.domain:
-            raise NetworkCreateException(**NetworkCreateException.DOMAIN_NOT_PRESENT)
+            raise NetworkCreateException(*NetworkCreateException.DOMAIN_NOT_PRESENT)
 
         if not self._portfolio.nodes:
-            raise NetworkCreateException(**NetworkCreateException.NODES_NOT_PRESENT)
+            raise NetworkCreateException(*NetworkCreateException.NODES_NOT_PRESENT)
 
         hosts = []
         for node in self._portfolio.nodes:

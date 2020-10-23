@@ -24,7 +24,7 @@ from angelos.document.domain import Domain, Node, Location, Network, Host
 from angelos.common.misc import Misc
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.policy import Policy
-from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.collection import PrivatePortfolio
 
 
 class NodePolicy(Policy):
@@ -40,9 +40,6 @@ class NodePolicy(Policy):
         ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address] = None
     ):
         """Generate node document from the current node."""
-        if portfolio.is_frozen():
-            raise FrozenPortfolioError()
-
         if role == Const.A_ROLE_BACKUP:
             role = "backup"
         else:
@@ -79,7 +76,7 @@ class NodePolicy(Policy):
 
         node = Crypto.sign(node, portfolio)
         node.validate()
-        portfolio.documents().add(node)
+        portfolio.nodes.add(node)
 
         return True
 
@@ -103,9 +100,6 @@ class DomainPolicy(Policy):
     @staticmethod
     def generate(portfolio: PrivatePortfolio):
         """Generate domain document from currently running node."""
-        if portfolio.is_frozen():
-            raise FrozenPortfolioError()
-
         if portfolio.domain:
             return False
 
@@ -113,7 +107,7 @@ class DomainPolicy(Policy):
 
         domain = Crypto.sign(domain, portfolio)
         domain.validate()
-        portfolio.documents().add(domain)
+        portfolio.domain = domain
 
         return True
 

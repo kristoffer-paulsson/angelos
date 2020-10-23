@@ -62,7 +62,7 @@ class CreateNodeMixin(PolicyMixin):
             raise FrozenPortfolioError()
 
         if not self._portfolio.domain:
-            raise NodeCreateException(**NodeCreateException.DOMAIN_NOT_IN_PORTFOLIO)
+            raise NodeCreateException(*NodeCreateException.DOMAIN_NOT_IN_PORTFOLIO)
 
         if self._role == Const.A_ROLE_BACKUP:
             self._role = "backup"

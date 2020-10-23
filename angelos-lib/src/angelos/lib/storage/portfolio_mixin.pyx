@@ -16,22 +16,21 @@
 """Mixin for enforcing portfolio policy's before importing."""
 import asyncio
 import copy
-import logging
 import uuid
 from pathlib import PurePosixPath
 from typing import Tuple, List, Set, Any
 
+from angelos.document.statements import Verified, Trusted, Revoked
 from angelos.document.types import StatementT, DocumentT
 from angelos.lib.error import Error
+from angelos.lib.helper import Glue
 from angelos.lib.policy.accept import EntityKeysPortfolioValidatePolicy, IssuedDocumentPortfolioValidatePolicy, \
     NodePortfolioValidatePolicy, ImportPolicy, ProfileUpdatePortfolioPolicy, NetworkUpdatePortfolioPolicy, \
     StatementImportPortfolioPolicy, EntityUpdatePortfolioPolicy, PrivateKeysImportPortfolioPolicy, \
     NodeUpdatePortfolioPolicy, DomainUpdatePortfolioPolicy, KeysImportPortfolioPolicy
-from angelos.lib.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PrivatePortfolio, PORTFOLIO_PATTERN, \
-    Portfolio, PField, PGroup, DocSet
-from angelos.common.utils import Util
-
-from angelos.lib.helper import Glue
+from angelos.lib.policy.portfolio import PortfolioPolicy, DOCUMENT_PATH, PORTFOLIO_PATTERN, PField, PGroup, DocSet, \
+    DOCUMENT_PATTERN
+from angelos.lib.policy.portfolio import PrivatePortfolio, Portfolio
 
 
 class PortfolioMixin:
@@ -41,7 +40,7 @@ class PortfolioMixin:
 
     def portfolio_path(self, eid: uuid.UUID) -> PurePosixPath:
         """Generate portfolio path for a particular entity id."""
-        return  PurePosixPath("{0}{1}".format(self.PATH_PORTFOLIOS[0], eid))
+        return PurePosixPath(*self.PATH_PORTFOLIOS[0].parts, str(eid))
 
     async def portfolio_files(self, path: PurePosixPath, owner: uuid.UUID = None):
         """Glob a list of all files in a portfolio."""
@@ -391,14 +390,15 @@ class PortfolioMixin:
                 )
             )
             for doc in documents.get_issuer(issuer_id):
-                if not Util.is_typing(doc, StatementT):
+                if not isinstance(doc, (Verified, Trusted, Revoked)):
                     raise Error.exception(Error.PORTFOLIO_NOT_STATEMENT, {
                         "document": doc.id, "issuer": doc.issuer})
                 if policy.issued_document(doc):
-                    filename = PurePosixPath(DOCUMENT_PATH[doc.type].format(
-                        dir="{0}{1}".format(self.PATH_PORTFOLIOS[0], doc.owner),
-                        file=doc.id,
-                    ))
+                    filename = PurePosixPath(
+                        *self.PATH_PORTFOLIOS[0].parts,
+                        str(doc.owner),
+                        str(doc.id) + DOCUMENT_PATTERN[doc.type]
+                    )
                     ops.append(await self.write_file(filename, doc))
                 else:
                     rejected.add(doc)
@@ -492,11 +492,13 @@ class PortfolioMixin:
         result = await self.portfolio_files(dirname, owner=eid)
 
         files = set()
+        patterns = set()
         for field in config:
-            pattern = PORTFOLIO_PATTERN[field]
-            for filename in result:
-                if pattern == str(PurePosixPath(filename.parent, filename.stem)):
-                    files.add(filename)
+            patterns.add(PORTFOLIO_PATTERN[field])
+
+        for filename in result:
+            if filename.suffix in patterns:
+                files.add(filename)
 
         ops = list()
         for doc in files:
@@ -507,13 +509,7 @@ class PortfolioMixin:
         issuer = set()
         owner = set()
         for data in results:
-            # if isinstance(data, Exception):
-            #    logging.warning("Failed to load document: %s" % data)
-            #    logging.error(data, exc_info=True)
-            #    continue
-
             document = PortfolioPolicy.deserialize(data)
-
             if document.issuer != eid:
                 owner.add(document)
             else:
@@ -552,11 +548,13 @@ class PortfolioMixin:
         result = await self.portfolio_files(dirname, owner=eid)
 
         files = set()
+        patterns = set()
         for field in config:
-            pattern = PORTFOLIO_PATTERN[field]
-            for filename in result:
-                if pattern == str(PurePosixPath(filename.parent, filename.stem)):
-                    files.add(filename)
+            patterns.add(PORTFOLIO_PATTERN[field])
+
+        for filename in result:
+            if filename.suffix in patterns:
+                files.add(filename)
 
         available = set()
         for filename in files:
@@ -584,12 +582,7 @@ class PortfolioMixin:
         issuer = set()
         owner = set()
         for data in results:
-            # if isinstance(data, Exception):
-            #    logging.warning("Failed to load document: %s" % data)
-            #    continue
-
             document = PortfolioPolicy.deserialize(data)
-
             if document.issuer != eid:
                 owner.add(document)
             else:

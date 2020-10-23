@@ -26,6 +26,16 @@ from angelos.lib.policy.portfolio import PGroup
 from angelos.common.utils import Util
 
 
+class FacadeError(RuntimeError):
+    """Thrown when error happens in or with a Facade."""
+    EXTENSION_ATTR_OCCUPIED = ("Extension attribute already occupied.", 100)
+    EXTENSION_ATTR_OCCUPIED_STORAGE = ("Extension storage attribute already occupied.", 101)
+    POST_INIT_DONE = ("Post init already done", 102)
+    ILLEGAL_ROLE = ("Illegal role", 103)
+    MISSING_ENTITY = ("No entity present in portfolio", 104)
+    UNKNOWN_ENTITY_TYPE = ("Entity in portfolio of unknown type", 105)
+
+
 class FacadeFrozen:
     """Base class for instances owned by the Facade.
 
@@ -177,8 +187,10 @@ class BaseFacade:
             for ext_cls in getattr(self, attr, []):
                 attribute = ext_cls.ATTRIBUTE[0]
                 if attribute in config.keys():
-                    raise RuntimeError(
-                        "Extension attribute \"%s\" in \"%s\" already occupied." % (attribute, attr))
+                    raise FacadeError(*FacadeError.EXTENSION_ATTR_OCCUPIED, {
+                        "to_be": attribute,
+                        "exists": attr
+                    })
                 config[attribute] = generator(ext_cls, self)
 
             return Container(config)
@@ -211,8 +223,10 @@ class BaseFacade:
             for storage_cls in self.STORAGES:
                 attribute = storage_cls.ATTRIBUTE[0]
                 if attribute in config.keys():
-                    raise RuntimeError(
-                        "Extension attribute \"%s\" in \"%s\"already occupied." % (attribute, self.__storages.__name__))
+                    raise FacadeError(*FacadeError.EXTENSION_ATTR_OCCUPIED_STORAGE, {
+                        "to_be": attribute,
+                        "exists": self.__storages.__name__
+                    })
 
                 if os.path.isfile(storage_cls.filename(self.__home_dir)):
                     config[attribute] = generator(storage_cls, self, self.__home_dir, self.__secret)
@@ -255,7 +269,7 @@ class BaseFacade:
 
     def _check_post_init(self) -> None:
         if self.__post_init:
-            raise RuntimeError("Post init already done")
+            raise FacadeError(*FacadeError.POST_INIT_DONE)
 
     @property
     def path(self) -> Path:

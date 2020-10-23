@@ -21,7 +21,7 @@ from angelos.document.types import EntityT
 from angelos.bin.nacl import DualSecret
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.policy import Policy
-from angelos.portfolio.collection import PrivatePortfolio
+from angelos.lib.policy.portfolio import PrivatePortfolio
 from angelos.lib.policy.types import (
     EntityDataT,
     PersonData,
@@ -63,7 +63,11 @@ class BaseEntityPolicy(Policy):
         privkeys.validate()
         keys.validate()
 
-        portfolio = PrivatePortfolio({entity, privkeys, keys}, False)
+        portfolio = PrivatePortfolio()
+        portfolio.entity = entity
+        portfolio.privkeys = privkeys
+        portfolio.keys.add(keys)
+
         return portfolio
 
     @staticmethod
