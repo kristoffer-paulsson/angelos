@@ -14,7 +14,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Creating new domain document for new portfolio."""
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy
 from angelos.document.domain import Domain
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
@@ -30,9 +30,10 @@ class BaseCreateDomain(PolicyPerformer):
     def __init__(self):
         super().__init__()
         self._portfolio = None
+        self._domain = None
 
     def _setup(self):
-        pass
+        self._domain = None
 
     def _clean(self):
         pass
@@ -49,19 +50,19 @@ class CreateDomainMixin(PolicyMixin):
         if self._portfolio.domain:
             raise DomainCreateException(*DomainCreateException.DOMAIN_IN_PORTFOLIO)
 
-        domain = Domain(nd={"issuer": self._portfolio.entity.id})
+        self._domain = Domain(nd={"issuer": self._portfolio.entity.id})
 
-        domain = Crypto.sign(domain, self._portfolio)
-        domain.validate()
-        self._portfolio.documents().add(domain)
+        self._domain = Crypto.sign(self._domain, self._portfolio)
+        self._domain.validate()
+        self._portfolio.documents().add(self._domain)
 
 
 class CreateDomain(BaseCreateDomain, CreateDomainMixin):
     """Generate domain document and add to private portfolio."""
 
     @policy(b'I', 0, "Domain:Create")
-    def perform(self, portfolio: PrivatePortfolio) -> bool:
+    def perform(self, portfolio: PrivatePortfolio) -> Domain:
         """Perform building of person portfolio."""
         self._portfolio = portfolio
         self._applier()
-        return True
+        return self._domain

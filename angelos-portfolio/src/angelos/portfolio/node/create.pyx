@@ -77,23 +77,19 @@ class CreateNodeMixin(PolicyMixin):
         hostname = urlunparse(urlparse(self._hostname)[:2] + ("", "", "", ""))
         location = None
         if self._server:
-            location = Location(
-                nd={
-                    "hostname": [hostname] if hostname else [],
-                    "ip": [self._ip],
-                }
-            )
+            location = Location(nd={
+                "hostname": [hostname] if hostname else [],
+                "ip": [self._ip]
+            })
 
-        node = Node(
-            nd={
-                "domain": self._portfolio.domain.id,
-                "role": role,
-                "device": self._device,
-                "serial": self._serial,
-                "issuer": self._portfolio.entity.id,
-                "location": location,
-            }
-        )
+        node = Node(nd={
+            "domain": self._portfolio.domain.id,
+            "role": role,
+            "device": self._device,
+            "serial": self._serial,
+            "issuer": self._portfolio.entity.id,
+            "location": location
+        })
 
         node = Crypto.sign(node, self._portfolio)
         node.validate()

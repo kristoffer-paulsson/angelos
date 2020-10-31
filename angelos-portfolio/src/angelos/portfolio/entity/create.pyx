@@ -45,22 +45,25 @@ class CreateEntityMixin(PolicyMixin):
 
         entity = self._klass(nd=dict(self._data._asdict()))
         entity.issuer = entity.id
-        entity.signature = box.signature(entity.issuer.bytes + Crypto.document_data(entity))
-
         privkeys = PrivateKeys(nd={"issuer": entity.id, "secret": box.sk, "seed": box.seed})
-        privkeys.signature = box.signature(privkeys.issuer.bytes + Crypto.document_data(privkeys))
-
         keys = Keys(nd={"issuer": entity.id, "public": box.pk, "verify": box.vk})
-        keys.signature = [box.signature(keys.issuer.bytes + Crypto.document_data(keys))]
+
+        self._portfolio = PrivatePortfolio({entity, privkeys, keys}, False)
+
+        entity = Crypto.sign(entity, self._portfolio)
+        privkeys = Crypto.sign(privkeys, self._portfolio, multiple=True)
+        keys = Crypto.sign(keys, self._portfolio, multiple=True)
 
         if not all([
             entity.validate(),
             privkeys.validate(),
-            keys.validate()
+            keys.validate(),
+            Crypto.verify(entity, self._portfolio),
+            Crypto.verify(keys, self._portfolio),
+            Crypto.verify(privkeys, self._portfolio)
         ]):
             raise PolicyException()
-
-        self._portfolio = PrivatePortfolio({entity, privkeys, keys}, False)
+        return True
 
 
 class CreatePersonEntity(BaseCreateEntity, CreateEntityMixin):

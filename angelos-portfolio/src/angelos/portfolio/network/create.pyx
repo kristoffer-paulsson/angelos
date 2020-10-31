@@ -31,9 +31,11 @@ class BaseCreateNetwork(PolicyPerformer):
     def __init__(self):
         super().__init__()
         self._portfolio = None
+        self._network = None
 
     def _setup(self):
-        pass
+        self._portfolio = None
+        self._network = None
 
     def _clean(self):
         pass
@@ -69,7 +71,7 @@ class CreateNetworkMixin(PolicyMixin):
                     )
                 )
 
-        network = Network(
+        self._network = Network(
             nd={
                 "domain": self._portfolio.domain.id,
                 "hosts": hosts,
@@ -77,17 +79,17 @@ class CreateNetworkMixin(PolicyMixin):
             }
         )
 
-        network = Crypto.sign(network, self._portfolio)
-        network.validate()
-        self._portfolio.documents().add(network)
+        self._network = Crypto.sign(self._network, self._portfolio)
+        self._network.validate()
+        self._portfolio.documents().add(self._network)
 
 
 class CreateNetwork(BaseCreateNetwork, CreateNetworkMixin):
     """Generate network document and add to private portfolio."""
 
     @policy(b'I', 0, "Network:Create")
-    def perform(self, portfolio: PrivatePortfolio) -> bool:
+    def perform(self, portfolio: PrivatePortfolio) -> Network:
         """Perform building of network."""
         self._portfolio = portfolio
         self._applier()
-        return True
+        return self._network

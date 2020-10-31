@@ -28,7 +28,7 @@ from angelos.meta.fake import Generate
 
 
 class TestArchive7(TestCase):
-    FILE_COUNT = 128
+    FILE_COUNT = 1024
     # TODO: Make archive7 stable with thousands of files.
 
     @classmethod

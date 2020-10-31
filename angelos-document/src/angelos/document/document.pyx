@@ -141,7 +141,7 @@ class UpdatedMixin(metaclass=DocumentMeta):
         today = datetime.date.today()
         self.updated = today
         if hasattr(self, "expires"):
-            setattr(self, "expires", today + datetime.timedelta(13 * 365 / 12))
+            setattr(self, "expires", today + datetime.timedelta(self.period()))
         if hasattr(self, "signature"):
             self._fields["signature"].redo = True
             setattr(self, "signature", None)
@@ -153,6 +153,17 @@ class ChangeableMixin(UpdatedMixin):
     def changeables(self) -> tuple:
         """Fields that are allowed to change when updated."""
         return tuple()
+
+    # FIXME: Write unittests.
+    def morpheme(self, stem: "Document") -> bool:
+        """Compare to documents that they are not different beyond allowed change."""
+        if not self.fields() == stem.fields():
+            return False
+        unmorphed = set(self.fields()) - set(list(self.changeables()) + ["signature", "expires", "updated"])
+        same = list()
+        for name in unmorphed:
+            same.append(getattr(self, name) == getattr(stem, name))
+        return all(same)
 
 
 class Document(IssueMixin, BaseDocument):
@@ -225,7 +236,7 @@ class Document(IssueMixin, BaseDocument):
 
     def get_touched(self) -> datetime.date:
         """Latest touch, created or updated date."""
-        return self.updated if getattr(self, "updated", None) else self.created
+        return getattr(self, "updated", None) or self.created
 
     def __lt__(self, other):
         return self.get_touched() < other.get_touched()
@@ -241,7 +252,7 @@ class Document(IssueMixin, BaseDocument):
 
     def get_owner(self) -> uuid.UUID:
         """Correct owner of document."""
-        return self.owner if getattr(self, "owner", None) else self.issuer
+        return getattr(self, "owner", None) or self.issuer
 
     @policy(b"D", 26, "Document")
     def validate(self) -> bool:
@@ -287,6 +298,7 @@ class Document(IssueMixin, BaseDocument):
         """Compare two documents to see if they are the same even if other fields mismatch."""
         return (self.id.bytes == document.id.bytes) and (self.issuer.bytes == document.issuer.bytes)
 
+    # TODO: Deprecated, remove when nothing depends.
     def save(self) -> bytes:
         """Serialize document.
 
@@ -303,6 +315,7 @@ class Document(IssueMixin, BaseDocument):
         )
 
 
+# TODO: Deprecated, remove when nothing depends.
 class DocType:
     """Short summary."""
     NONE = 0

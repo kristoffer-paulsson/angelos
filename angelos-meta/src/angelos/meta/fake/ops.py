@@ -134,6 +134,7 @@ class Operations:
 
         # Verify trusted network
         networks = {net[0] for net in await client.api.settings.networks() if net[1]}
+        print("Networks:", networks)
         if str(server.data.portfolio.entity.id) not in networks:
             return False
 

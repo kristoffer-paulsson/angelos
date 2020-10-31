@@ -396,7 +396,7 @@ class PortfolioMixin:
                 if policy.issued_document(doc):
                     filename = PurePosixPath(
                         *self.PATH_PORTFOLIOS[0].parts,
-                        str(doc.owner),
+                        str(doc.issuer),  # doc.owner
                         str(doc.id) + DOCUMENT_PATTERN[doc.type]
                     )
                     ops.append(await self.write_file(filename, doc))
@@ -414,7 +414,7 @@ class PortfolioMixin:
 
         """
         result = await self.search(
-            self.PATH_PORTFOLIOS[0] + "*/*.ent",
+            str(self.PATH_PORTFOLIOS[0]) + "*/*.ent",
             link=True,
             limit=None,
             deleted=False,

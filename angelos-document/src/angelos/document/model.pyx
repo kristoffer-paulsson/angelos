@@ -303,14 +303,14 @@ class DocumentMeta(type):
             if "_fields" in base.__dict__:
                 fields = {**fields, **base.__dict__["_fields"]}
 
-        for fname, field in namespace.items():
+        for field_name, field in namespace.items():
             if isinstance(field, Field):
-                fields[fname] = field
+                fields[field_name] = field
 
         ns = namespace.copy()
-        for fname in fields.keys():
-            if fname in ns:
-                del ns[fname]
+        for field_name in fields.keys():
+            if field_name in ns:
+                del ns[field_name]
 
         ns["_fields"] = fields
 
@@ -395,6 +395,12 @@ class BaseDocument(metaclass=DocumentMeta):
     def __hash__(self):
         """Used for dictionary lookup of documents."""
         return hash(tuple(sorted(itertools.chain(self.export_bytes()))))
+
+    # FIXME: Create unittest for this one.
+    @classmethod
+    def fields(cls) -> tuple:
+        """Tuple of all field names."""
+        return tuple(cls._fields.keys())
 
     @classmethod
     def build(cls: DocumentMeta, data: dict) -> DocumentMeta:

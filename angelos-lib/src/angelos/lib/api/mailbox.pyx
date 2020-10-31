@@ -17,6 +17,7 @@
 import asyncio
 import datetime
 import uuid
+from pathlib import PurePosixPath
 from typing import Set, Any, Tuple
 
 from angelos.lib.error import Error
@@ -124,7 +125,7 @@ class MailboxAPI(ApiFacadeExtension):
         """
         return await self.__load_letters(self.PATH_SENT[0] + "*")
 
-    async def __info_mail(self, filename: str) -> Tuple[
+    async def __info_mail(self, filename: PurePosixPath) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
         """Get info about a mail.
 
@@ -172,7 +173,7 @@ class MailboxAPI(ApiFacadeExtension):
             len(mail.attachments) if mail.attachments is list else int(bool(mail.attachments))
         )
 
-    async def __info_draft(self, filename: str) -> Tuple[
+    async def __info_draft(self, filename: PurePosixPath) -> Tuple[
         bool, uuid.UUID, str, str, uuid.UUID, int]:
         """Get info about a draft.
 
@@ -213,7 +214,7 @@ class MailboxAPI(ApiFacadeExtension):
             len(mail.attachments) if mail.attachments is list else int(bool(mail.attachments))
         )
 
-    async def __info_inbox_envelope(self, filename: str) -> Tuple[
+    async def __info_inbox_envelope(self, filename: PurePosixPath) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime, bool, bool, bool]:
         """Get info about an envelope.
 
@@ -260,7 +261,7 @@ class MailboxAPI(ApiFacadeExtension):
             envelope.posted,
         ) + status
 
-    async def __info_outbox_envelope(self, filename: str) -> Tuple[
+    async def __info_outbox_envelope(self, filename: PurePosixPath) -> Tuple[
         bool, uuid.UUID, str, datetime.datetime]:
         """Get info about an envelope.
 
@@ -308,9 +309,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
             dir=MailboxAPI.PATH_INBOX[0], file=envelope_id
-        )
+        ))
         return await self.__info_inbox_envelope(filename)
 
     async def get_info_outbox(self,  envelope_id: uuid.UUID) -> Tuple[
@@ -323,9 +324,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
             dir=MailboxAPI.PATH_OUTBOX[0], file=envelope_id
-        )
+        ))
         return await self.__info_outbox_envelope(filename)
 
     async def get_info_draft(self, message_id: uuid.UUID) -> Tuple[
@@ -338,9 +339,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        )
+        ))
         return await self.__info_draft(filename)
 
     async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
@@ -353,9 +354,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_READ[0], file=message_id
-        )
+        ))
         return await self.__info_mail(filename)
 
     async def get_info_trash(self, message_id: uuid.UUID) -> Tuple[
@@ -368,9 +369,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_TRASH[0], file=message_id
-        )
+        ))
         return await self.__info_mail(filename)
 
     async def get_info_sent(self, message_id: uuid.UUID) -> Tuple[
@@ -383,12 +384,12 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_SENT[0], file=message_id
-        )
+        ))
         return await self.__info_mail(filename)
 
-    async def __simple_load(self, filename) -> MessageT:
+    async def __simple_load(self, filename: PurePosixPath) -> MessageT:
         """Loads messages without policy checks.
 
         Only use on messages you trust have been validated and
@@ -413,9 +414,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_READ[0], file=message_id
-        )
+        ))
         return await self.__simple_load(filename)
 
     async def get_draft(self, message_id: uuid.UUID) -> MessageT:
@@ -427,9 +428,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        )
+        ))
         return await self.__simple_load(filename)
 
     async def get_trash(self, message_id: uuid.UUID) -> MessageT:
@@ -441,9 +442,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_TRASH[0], file=message_id
-        )
+        ))
         return await self.__simple_load(filename)
 
     async def get_sent(self, message_id: uuid.UUID) -> MessageT:
@@ -455,9 +456,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_SENT[0], file=message_id
-        )
+        ))
         return await self.__simple_load(filename)
 
     async def move_trash(self, message_id: uuid.UUID):
@@ -474,9 +475,9 @@ class MailboxAPI(ApiFacadeExtension):
                 MailboxAPI.PATH_DRAFT[0],
                 MailboxAPI.PATH_SENT[0]
         ):
-            filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=path.rstrip("/"), file=message_id
-            )
+            ))
             archive = self.facade.storage.vault.archive
             is_file = await archive.isfile(filename)
             if is_file:
@@ -492,9 +493,9 @@ class MailboxAPI(ApiFacadeExtension):
         trash = await self.load_trash()
         archive = self.facade.storage.vault.archive
         for message_id in trash:
-            filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+            filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_TRASH[0], file=message_id
-            )
+            ))
             is_file = await archive.isfile(filename)
             if is_file:
                 await archive.remove(filename)
@@ -521,9 +522,9 @@ class MailboxAPI(ApiFacadeExtension):
 
             save_list.append(
                 self.facade.storage.vault.save(
-                    DOCUMENT_PATH[envelope.type].format(
+                    PurePosixPath(DOCUMENT_PATH[envelope.type].format(
                         dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
-                    ),
+                    )),
                     envelope,
                 )
             )
@@ -555,9 +556,9 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
         doc_list = await self.facade.storage.vault.search_docs(
-            path=DOCUMENT_PATH[doc_type_num].format(
+            path=PurePosixPath(DOCUMENT_PATH[doc_type_num].format(
                 dir=box_dir, file=doc_id
-            ),
+            )),
             limit=1,
         )
         if not doc_list:
@@ -578,9 +579,9 @@ class MailboxAPI(ApiFacadeExtension):
 
         """
         result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+            PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
-            ),
+            )),
             envelope,
         )
         if isinstance(result, Exception):
@@ -601,7 +602,8 @@ class MailboxAPI(ApiFacadeExtension):
         vault = self.facade.storage.vault
 
         # Load and deserialize file into envelope document based on document ID.
-        path = DOCUMENT_PATH[DocType.COM_ENVELOPE].format(dir=MailboxAPI.PATH_INBOX[0], file=envelope_id)
+        path = PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+            dir=MailboxAPI.PATH_INBOX[0], file=envelope_id))
         envelope = PortfolioPolicy.deserialize(await vault.archive.load(path))
 
         # Load sender portfolio.
@@ -652,16 +654,16 @@ class MailboxAPI(ApiFacadeExtension):
         letter.validate()
 
         await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.CACHED_MSG].format(
-                dir=MailboxAPI.PATH_CACHE[0], file=letter.id),
+            PurePosixPath(DOCUMENT_PATH[DocType.CACHED_MSG].format(
+                dir=MailboxAPI.PATH_CACHE[0], file=letter.id)),
             letter,
             document_file_id_match=False
         )
 
         await self.facade.storage.vault.delete(
-            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+            PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
-            )
+            ))
         )
 
     async def save_read(self, message: Mail):
@@ -675,9 +677,9 @@ class MailboxAPI(ApiFacadeExtension):
 
         """
         await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_MAIL].format(
+            PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_READ[0], file=message.id
-            ),
+            )),
             message
         )
 
@@ -715,9 +717,9 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = DOCUMENT_PATH[DocType.COM_MAIL].format(
+        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
             dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        )
+        ))
         archive = self.facade.storage.vault.archive
         is_file = await archive.isfile(filename)
         if is_file:
@@ -733,9 +735,9 @@ class MailboxAPI(ApiFacadeExtension):
 
         """
         result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
+            PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
                 dir=MailboxAPI.PATH_OUTBOX[0], file=envelope.id
-            ),
+            )),
             envelope,
         )
         if result != envelope.id:
@@ -751,9 +753,9 @@ class MailboxAPI(ApiFacadeExtension):
 
         """
         result = await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_MAIL].format(
+            PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_SENT[0], file=message.id
-            ),
+            )),
             message,
         )
 
@@ -774,9 +776,9 @@ class MailboxAPI(ApiFacadeExtension):
         new_draft = builder.message(subject, body, reply).draft()
 
         await self.facade.storage.vault.save(
-            DOCUMENT_PATH[DocType.COM_MAIL].format(
+            PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
                 dir=MailboxAPI.PATH_DRAFT[0], file=new_draft.id
-            ),
+            )),
             new_draft,
         )
         await self.remove_draft(new_draft.id)

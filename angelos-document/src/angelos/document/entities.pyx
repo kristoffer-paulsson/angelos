@@ -36,7 +36,7 @@ class PrivateKeys(Document):
     type = TypeField(value=int(DocType.KEYS_PRIVATE))
     secret = BinaryField()
     seed = BinaryField()
-    signature = SignatureField()
+    signature = SignatureField(multiple=True)
 
     def apply_rules(self) -> bool:
         """Short summary.

@@ -48,8 +48,37 @@ class TreeNodeError(RuntimeError):
     BLOB_SIZE_INVALID = ("Blob size larger than fits in page data", 12)
 
 
+class PagerError(RuntimeError):
+    """Pager related errors."""
+    UNEVEN_LENGTH = ("File of uneven length compared to page siz.", 020)
+    META_SIZE_INVALID = ("Data is not of meta size.", 021)
+    OUT_OF_BOUNDS = ("Out of bounds", 022)
+    PAGE_SIZE_INVALID = ("Data size different from page size.", 023)
+    SEEK_OFFEST_ERROR = ("Failed to seek to offset", 024)
+    WRITE_FAILED = ("Didn't write all data", 025)
+
+
+class BPlusTreeError(RuntimeError):
+    """Errors that happens inside the B+Trees."""
+    CONFIGURATION_ERROR = ("Class configuration doesn't match saved tree.", 30)
+    CONFIG_SIZE_ERROR = ("Page size is to small, mode is needed.", 31)
+    CONFIG_ORDER_ERROR = ("Order can never be less than 4.", 32)
+    WRONG_NODE_KIND = ("Got unknown node type.", 33)
+    SEARCH_ERROR = ("Page search error, can not be None.", 34)
+    ITER_CUSTOM_ERROR = ("Cannot iterate with a custom step.", 35)
+    ITER_BACKWARD_ERROR = ("Cannot iterate backwards", 36)
+    CLEAVE_ERROR = ("Failed splitting node, to few entries", 37)
+    VALUE_SIZE_ERROR = ("Value is larger than allowed size", 38)
+    PAGE_ITER_ERROR = ("Iteration over pages or values in pages not complete", 39)
+
+
 class EntryNotFound(RuntimeWarning):
     """Entry not found in node based on key."""
+    pass
+
+
+class RecordError(RuntimeWarning):
+    """Record lookup failure."""
     pass
 
 
@@ -615,16 +644,6 @@ class RootNode(ReferenceNode):
         return node
 
 
-class PagerError(RuntimeError):
-    """Pager related errors."""
-    UNEVEN_LENGTH = ("File of uneven length compared to page siz.", 020)
-    META_SIZE_INVALID = ("Data is not of meta size.", 021)
-    OUT_OF_BOUNDS = ("Out of bounds", 022)
-    PAGE_SIZE_INVALID = ("Data size different from page size.", 023)
-    SEEK_OFFEST_ERROR = ("Failed to seek to offset", 024)
-    WRITE_FAILED = ("Didn't write all data", 025)
-
-
 class Pager(Mapping):
     """Pager that wraps pages written to a file object, indexed like a list."""
 
@@ -754,25 +773,6 @@ class Transact(ContextDecorator, AbstractContextManager):
 
         self.__evaluate()
         return None
-
-
-class RecordError(LookupError):
-    """Record lookup failure."""
-
-
-class BPlusTreeError(RuntimeError):
-    """Errors that happens inside the B+Trees."""
-    CONFIGURATION_ERROR = ("Class configuration doesn't match saved tree.", 30)
-    CONFIG_SIZE_ERROR = ("Page size is to small, mode is needed.", 31)
-    CONFIG_ORDER_ERROR = ("Order can never be less than 4.", 32)
-    WRONG_NODE_KIND = ("Got unknown node type.", 33)
-    SEARCH_ERROR = ("Page search error, can not be None.", 34)
-    ITER_CUSTOM_ERROR = ("Cannot iterate with a custom step.", 35)
-    ITER_BACKWARD_ERROR = ("Cannot iterate backwards", 36)
-    CLEAVE_ERROR = ("Failed splitting node, to few entries", 37)
-    VALUE_SIZE_ERROR = ("Value is larger than allowed size", 38)
-    PAGE_ITER_ERROR = ("Iteration over pages or values in pages not complete", 39)
-
 
 
 class Tree(ABC):

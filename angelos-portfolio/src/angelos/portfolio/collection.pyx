@@ -16,7 +16,7 @@
 import collections
 import pprint
 import uuid
-from typing import Union, Tuple
+from typing import Union, Tuple, Any
 
 from angelos.common.policy import PolicyException, policy
 from angelos.document.document import Document
@@ -28,8 +28,13 @@ from angelos.document.profiles import PersonProfile, MinistryProfile, ChurchProf
 from angelos.document.statements import Verified, Trusted, Revoked
 
 
-class FrozenPortfolioError(RuntimeError):
+class FrozenPortfolioError(RuntimeWarning):
     """Complaining on frozen portfolio when it must be mutable."""
+    pass
+
+
+class WrongPortfolioIdentity(RuntimeWarning):
+    """Complaining of wrong portfolio identity assigned."""
     pass
 
 
@@ -59,6 +64,11 @@ class Portfolio:
     def owner(self):
         """Statements owned by entity."""
         return self.get_owner(self.get_subset(Document), self.entity.id)
+
+    def filter(self, docs: set) -> set:
+        """Filter out the current portfolio documents against given set."""
+        ids = {doc.id for doc in docs}
+        return {doc for doc in self.__docs if doc.id not in ids}
 
     def get_type(self, docs: set, doc_cls: Union[DocumentMeta, Tuple[DocumentMeta, ...]]) -> set:
         return {doc for doc in docs if isinstance(doc, doc_cls)}
@@ -358,6 +368,38 @@ class Operations:
     def _check_nodes_expired(p: Portfolio) -> bool:
         """Not one nodes document may have expired."""
         if any([n.is_expired() for n in p.nodes]):
+            raise PolicyException()
+        return True
+
+    @policy(b"I", 0)
+    def _check_portfolio_overflow(portfolio: Portfolio) -> bool:
+        """Check that there are no illicit documents in portfolio."""
+        docs = {portfolio.entity, portfolio.profile, portfolio.network} | portfolio.keys \
+               | portfolio.verified_issuer | portfolio.trusted_issuer | portfolio.revoked_issuer \
+               | portfolio.verified_owner | portfolio.trusted_owner | portfolio.revoked_owner
+        if isinstance(portfolio, PrivatePortfolio):
+            docs |= {portfolio.privkeys, portfolio.domain} | portfolio.nodes
+        if collections.Counter(docs) != collections.Counter(portfolio.documents()):
+            raise PolicyException()
+        return True
+
+    @policy(b"I", 0)
+    def _check_portfolio_issued(portfolio: Portfolio) -> bool:
+        """Check that there are only issued documents in portfolio."""
+        if collections.Counter(portfolio.issuer()) != collections.Counter(portfolio.documents()):
+            raise PolicyException()
+        return True
+
+    @policy(b"I", 0)
+    def _check_portfolio_owned(portfolio: Portfolio) -> bool:
+        """Check that there are only owned and issued documents in portfolio."""
+        if collections.Counter(portfolio.issuer() | portfolio.owned()) != collections.Counter(portfolio.documents()):
+            raise PolicyException()
+        return True
+
+    @policy(b'I', 0)
+    def _check_same_fieldnames(self) -> bool:
+        if not self._entity.fields() == self._portfolio.entity.fields():
             raise PolicyException()
         return True
 

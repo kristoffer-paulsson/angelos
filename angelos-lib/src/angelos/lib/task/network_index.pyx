@@ -16,6 +16,7 @@
 """A task for indexing networks in relation to portfolios."""
 import csv
 import io
+from pathlib import PurePosixPath
 
 from angelos.lib.storage.portfolio_mixin import DOCUMENT_PATH
 from angelos.document.document import DocType
@@ -33,7 +34,7 @@ class NetworkIndexerTask(TaskFacadeExtension):
 
     __network_list = None
 
-    async def __validate_trust(self, filename: str, portfolio: PrivatePortfolio):
+    async def __validate_trust(self, filename: PurePosixPath, portfolio: PrivatePortfolio):
         vault = self.facade.storage.vault
         network = PortfolioPolicy.deserialize(await vault.archive.load(filename))
         network_portfolio = await vault.load_portfolio(
