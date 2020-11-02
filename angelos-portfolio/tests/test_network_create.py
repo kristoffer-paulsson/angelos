@@ -13,7 +13,10 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
-import pyximport; pyximport.install()
+import pyximport;
+from angelos.portfolio.collection import PrivatePortfolio
+
+pyximport.install()
 from angelos.portfolio.node.create import CreateNode
 from angelos.portfolio.domain.create import CreateDomain
 from angelos.portfolio.network.create import CreateNetwork

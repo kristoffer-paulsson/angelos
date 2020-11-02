@@ -13,23 +13,23 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
-import pyximport; pyximport.install()
-from angelos.portfolio.node.update import UpdateNode
-from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
+import copy
+from unittest import TestCase
 
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
 from angelos.meta.fake import Generate
+from angelos.portfolio.node.accept import AcceptUpdatedNode
+from angelos.portfolio.node.update import UpdateNode
+from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
 
-from unittest import TestCase
 
-
-class TestUpdateDomain(TestCase):
-    def test_perform(self):
+class TestAcceptUpdatedEntity(TestCase):
+    def test_validate(self):
         portfolio = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
-        node = set(portfolio.nodes).pop()
-        with evaluate("Node:Update") as r:
-            node = UpdateNode().perform(portfolio, node)
-            # self.assertEqual(node, portfolio.node)
+        ext_portfolio = copy.deepcopy(portfolio)
+        node = UpdateNode().perform(ext_portfolio, set(ext_portfolio.nodes).pop())
+        with evaluate("Node:AcceptUpdate") as r:
+            AcceptUpdatedNode().validate(portfolio, node)
             print(portfolio)
             print(r.format())

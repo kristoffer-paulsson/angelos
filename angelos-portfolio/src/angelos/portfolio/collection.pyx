@@ -16,7 +16,7 @@
 import collections
 import pprint
 import uuid
-from typing import Union, Tuple, Any
+from typing import Union, Tuple, Iterator, Set
 
 from angelos.common.policy import PolicyException, policy
 from angelos.document.document import Document
@@ -38,14 +38,14 @@ class WrongPortfolioIdentity(RuntimeWarning):
     pass
 
 
-class Portfolio:
+class Portfolio(collections.abc.Collection):
     """Collection of public documents belonging and related to an entity."""
 
-    def __init__(self, docs: set, frozen: bool = True):
+    def __init__(self, docs: Set[Document], frozen: bool = True):
         self.__docs = docs
         self.__frozen = frozen
 
-    def documents(self) -> set:
+    def documents(self) -> Set[Document]:
         """Portfolio original documents."""
         return set(self.__docs) if self.__frozen else self.__docs
 
@@ -57,43 +57,67 @@ class Portfolio:
         """True if portfolio is frozen, else false."""
         return self.__frozen
 
-    def issuer(self):
+    def issuer(self) -> Set[Document]:
         """Statements issued by entity."""
         return self.get_issuer(self.get_subset(Document), self.entity.id)
 
-    def owner(self):
+    def owner(self) -> Set[Document]:
         """Statements owned by entity."""
         return self.get_owner(self.get_subset(Document), self.entity.id)
 
-    def filter(self, docs: set) -> set:
+    def filter(self, docs: Set[Document]) -> Set[Document]:
         """Filter out the current portfolio documents against given set."""
         ids = {doc.id for doc in docs}
         return {doc for doc in self.__docs if doc.id not in ids}
 
-    def get_type(self, docs: set, doc_cls: Union[DocumentMeta, Tuple[DocumentMeta, ...]]) -> set:
+    def get_type(self, docs: set, doc_cls: Union[DocumentMeta, Tuple[DocumentMeta, ...]]) -> Set[Document]:
+        """Get set of documents filtered by class."""
         return {doc for doc in docs if isinstance(doc, doc_cls)}
 
-    def get_issuer(self, docs: set, issuer: uuid.UUID) -> set:
+    def get_issuer(self, docs: Set[Document], issuer: uuid.UUID) -> Set[Document]:
+        """Get set of documents based on issuer."""
         return {doc for doc in docs if getattr(doc, "issuer", None) == issuer}
 
-    def get_owner(self, docs: set, owner: uuid.UUID) -> set:
+    def get_owner(self, docs: Set[Document], owner: uuid.UUID) -> Set[Document]:
+        """Get set of documents based on owner."""
         return {doc for doc in docs if getattr(doc, "owner", None) == owner}
 
-    def get_not_expired(self, docs: set) -> set:
+    def get_id(self, doc_id: uuid.UUID) -> Document:
+        """Get document based on id."""
+        docs = {doc for doc in self.__docs if doc.id == doc_id}
+        return docs.pop() if docs else None
+
+    def get_not_expired(self, docs: Set[Document]) -> Set[Document]:
+        """Get set of documents based on expiry date."""
         return {doc for doc in docs if not doc.is_expired()}
 
-    def get_doc(self, types):
+    def get_doc(self, types) -> Document:
+        """Get first document from set of document class."""
         docs = self.get_type(self.__docs, types)
         return docs.pop() if docs else None
 
-    def get_subset(self, types) -> set:
+    def get_subset(self, types: Union[DocumentMeta, Tuple[DocumentMeta, ...]]) -> Set[Document]:
+        """Get a subset of classes based on document class."""
         docs = self.get_type(self.__docs, types)
         return docs if docs else set()
 
-    def __eq__(self, other):
+    def __len__(self) -> int:
+        return len(self.__docs)
+
+    def __iter__(self) -> Iterator[Document]:
+        for doc in self.__docs:
+            yield doc
+
+    def __contains__(self, document: Document) -> bool:
+        for doc in self.__docs:
+            if doc.id == document.id:
+                return True
+        return False
+
+    def __eq__(self, other: "Portfolio") -> bool:
         return collections.Counter(self.__docs) == collections.Counter(other.documents())
 
-    def __str__(self):
+    def __str__(self) -> str:
         output = ""
 
         for doc in self.__docs:
@@ -103,72 +127,72 @@ class Portfolio:
         return output
 
     @property
-    def entity(self):
+    def entity(self) -> Union[Person, Ministry, Church]:
         """Entity that owns the portfolio."""
         return self.get_doc((Person, Ministry, Church))
 
     @property
-    def profile(self):
+    def profile(self) -> Union[PersonProfile, MinistryProfile, ChurchProfile]:
         """Profile for the entity."""
         return self.get_doc((PersonProfile, MinistryProfile, ChurchProfile))
 
     @property
-    def keys(self) -> set:
+    def keys(self) -> Set[Keys]:
         """Public keys."""
         return self.get_subset(Keys)
 
     @property
-    def network(self):
+    def network(self) -> Network:
         """Network for the entity."""
         return self.get_doc(Network)
 
     @property
-    def statements(self) -> set:
+    def statements(self) -> Set[Union[Verified, Trusted, Revoked]]:
         """Statements."""
         return self.get_subset((Verified, Trusted, Revoked))
 
     @property
-    def verified(self) -> set:
+    def verified(self) -> Set[Verified]:
         """Verification statements."""
         return self.get_subset(Verified)
 
     @property
-    def trusted(self) -> set:
+    def trusted(self) -> Set[Trusted]:
         """Trust statements."""
         return self.get_subset(Trusted)
 
     @property
-    def revoked(self) -> set:
+    def revoked(self) -> Set[Revoked]:
         """Revokes of statements."""
         return self.get_subset(Revoked)
 
     @property
-    def verified_issuer(self):
+    def verified_issuer(self) -> Set[Verified]:
         """Verification statements issued by entity."""
         return self.get_issuer(self.get_subset(Verified), self.entity.id)
 
     @property
-    def trusted_issuer(self):
+    def trusted_issuer(self) -> Set[Trusted]:
         """Trust statements issued by entity."""
         return self.get_issuer(self.get_subset(Trusted), self.entity.id)
 
     @property
-    def revoked_issuer(self):
+    def revoked_issuer(self) -> Set[Revoked]:
         """Revokes of statements issued by entity."""
         return self.get_issuer(self.get_subset(Revoked), self.entity.id)
 
     @property
-    def verified_owner(self):
+    def verified_owner(self) -> Set[Verified]:
         """Verification statements owned by entity."""
         return self.get_owner(self.get_subset(Verified), self.entity.id)
 
     @property
-    def trusted_owner(self):
+    def trusted_owner(self) -> Set[Trusted]:
         """Trust statements owned by entity."""
         return self.get_owner(self.get_subset(Trusted), self.entity.id)
 
     @property
-    def revoked_owner(self):
+    def revoked_owner(self) -> Set[Revoked]:
         """Revokes of statements owned by entity."""
         return self.get_owner(self.get_subset(Revoked), self.entity.id)
 
@@ -177,17 +201,17 @@ class PrivatePortfolio(Portfolio):
     """Private documents of an entity."""
 
     @property
-    def privkeys(self):
+    def privkeys(self) -> PrivateKeys:
         """Private keys of entity."""
         return self.get_doc(PrivateKeys)
 
     @property
-    def domain(self):
+    def domain(self) -> Domain:
         """Domain for the entity."""
         return self.get_doc(Domain)
 
     @property
-    def nodes(self) -> set:
+    def nodes(self) -> Set[Node]:
         """Nodes of the current domain."""
         return self.get_subset(Node)
 

@@ -14,10 +14,10 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Updating a node document for a portfolio."""
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException, PolicyValidator
-from angelos.document.domain import Domain, Node
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy
+from angelos.document.domain import Node
 from angelos.lib.policy.crypto import Crypto
-from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.collection import PrivatePortfolio
 
 
 class NodeUpdateException(RuntimeError):
@@ -33,7 +33,7 @@ class BaseUpdateNode(PolicyPerformer):
         self._node = None
 
     def _setup(self):
-        self._node = None
+        pass
 
     def _clean(self):
         self._portfolio = None

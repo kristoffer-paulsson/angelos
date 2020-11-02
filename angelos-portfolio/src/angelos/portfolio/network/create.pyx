@@ -34,11 +34,10 @@ class BaseCreateNetwork(PolicyPerformer):
         self._network = None
 
     def _setup(self):
-        self._portfolio = None
         self._network = None
 
     def _clean(self):
-        pass
+        self._portfolio = None
 
 
 class CreateNetworkMixin(PolicyMixin):
@@ -58,7 +57,7 @@ class CreateNetworkMixin(PolicyMixin):
         if not self._portfolio.nodes:
             raise NetworkCreateException(*NetworkCreateException.NODES_NOT_PRESENT)
 
-        hosts = []
+        hosts = list()
         for node in self._portfolio.nodes:
             if node.role == "server":
                 hosts.append(
