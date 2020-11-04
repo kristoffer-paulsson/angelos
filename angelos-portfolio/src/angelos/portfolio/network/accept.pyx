@@ -70,20 +70,19 @@ class AcceptNetworkChecker:
         return True
 
 
-class AcceptNetworkMixin(AcceptNetworkChecker, PolicyMixin):
+class ValidateNetworkMixin(AcceptNetworkChecker, PolicyMixin):
     """Logic for validating a Network for a Portfolio."""
 
     def apply(self) -> bool:
         """Perform logic to validate network for current."""
         if self._portfolio.network:
-            raise NetworkAcceptException(*NetworkAcceptException.NETWORK_ALREADY_PORTFOLIO)
+            raise NetworkAcceptException(*NetworkAcceptException.NETWORK_ALREADY_IN_PORTFOLIO)
 
         if not all([
-            self._check_node_issuer(),
-            self._check_node_domain(),
-            self._check_node_expired(),
-            self._check_node_valid(),
-            self._check_node_verify(),
+            self._check_network_issuer(),
+            self._check_network_expired(),
+            self._check_network_valid(),
+            self._check_network_verify(),
         ]):
             raise PolicyException()
 
@@ -92,7 +91,7 @@ class AcceptNetworkMixin(AcceptNetworkChecker, PolicyMixin):
         return True
 
 
-class AcceptNetwork(BaseAcceptNetwork, AcceptNetworkMixin):
+class ValidateNetwork(BaseAcceptNetwork, ValidateNetworkMixin):
     """Validate network."""
 
     @policy(b'I', 0, "Network:Accept")
@@ -124,11 +123,10 @@ class AcceptUpdatedNetworkMixin(AcceptNetworkChecker, PolicyMixin):
             raise NetworkAcceptException(*NetworkAcceptException.NETWORK_NOT_IN_PORTFOLIO)
 
         if not all([
-            self._check_node_issuer(),
-            self._check_node_domain(),
-            self._check_node_expired(),
-            self._check_node_valid(),
-            self._check_node_verify(),
+            self._check_network_issuer(),
+            self._check_network_expired(),
+            self._check_network_valid(),
+            self._check_network_verify(),
             self._check_fields_unchanged()
         ]):
             raise PolicyException()
