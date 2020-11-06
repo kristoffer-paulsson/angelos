@@ -56,7 +56,7 @@ class RemoveRevokedMixin(PolicyMixin):
         if not isinstance(self._statement, (Trusted, Verified, type(None))):
             raise StatementRemoveException(*StatementRemoveException.WRONG_TYPE)
 
-        self._issuer.__init__(self._issuer.filter({self._statement}) | {self._revoked})
+        self._issuer.__init__(self._issuer.filter({self._statement, self._revoked}) | {self._revoked})
         return True
 
 

@@ -139,7 +139,7 @@ class AcceptUpdatedNetworkMixin(AcceptNetworkChecker, PolicyMixin):
 class AcceptUpdatedNetwork(BaseAcceptNetwork, AcceptUpdatedNetworkMixin):
     """Validate updated network."""
 
-    @policy(b'I', 0, "Network:AcceptUpdate")
+    @policy(b'I', 0, "Network:AcceptUpdated")
     def validate(self, portfolio: Portfolio, network: Network) -> bool:
         """Perform validation of updated network for portfolio."""
         self._portfolio = portfolio

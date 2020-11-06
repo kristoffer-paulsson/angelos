@@ -182,7 +182,7 @@ class Helper:
     PATH = PurePosixPath("/portfolios/")
 
     @classmethod
-    def document_meta(cls, document: Document) -> Tuple[(datetime.datetime, datetime.datetime, uuid.UUID)]:
+    def document_meta(cls, document: Document) -> Tuple[datetime.datetime, datetime.datetime, uuid.UUID]:
         """Calculates the correct meta information about a document to be updated
 
         Args:

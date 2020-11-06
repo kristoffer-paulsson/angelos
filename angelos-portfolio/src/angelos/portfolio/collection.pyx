@@ -215,6 +215,10 @@ class PrivatePortfolio(Portfolio):
         """Nodes of the current domain."""
         return self.get_subset(Node)
 
+    def to_portfolio(self) -> Portfolio:
+        """Create portfolio filtering private portfolio specific documents."""
+        return Portfolio(self.filter({self.privkeys, self.domain} | self.nodes))
+
 
 class Operations:
     """Operations carried out on a portfolio, policies applied."""

@@ -16,7 +16,6 @@
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
 from angelos.document.statements import Trusted, Verified, Revoked
-from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import Portfolio
 from angelos.portfolio.policy import DocumentPolicy
 
@@ -48,15 +47,13 @@ class ValidateStatementMixin(DocumentPolicy, PolicyMixin):
             self._check_document_verify()
         ]):
             raise PolicyException()
-
-        self.add()
         return True
 
 
 class ValidateTrustedStatement(BaseValidateStatement, ValidateStatementMixin):
     """Validate a trusted statement."""
 
-    @policy(b'I', 0, "Trusted:Validate")
+    @policy(b'I', 0, "Trusted:ValidatePortfolio")
     def validate(self, portfolio: Portfolio, trusted: Trusted) -> bool:
         """Perform validation of trusted statement for portfolio."""
         self._portfolio = portfolio
@@ -68,9 +65,9 @@ class ValidateTrustedStatement(BaseValidateStatement, ValidateStatementMixin):
 class ValidateVerifiedStatement(BaseValidateStatement, ValidateStatementMixin):
     """Validate a statement."""
 
-    @policy(b'I', 0, "Verified:Validate")
+    @policy(b'I', 0, "Verified:ValidatePortfolio")
     def validate(self, portfolio: Portfolio, verified: Verified) -> bool:
-        """Perform validation of verified statement for portfolio."""
+        """Perform validation of trusted statement for portfolio."""
         self._portfolio = portfolio
         self._document = verified
         self._applier()
@@ -80,10 +77,10 @@ class ValidateVerifiedStatement(BaseValidateStatement, ValidateStatementMixin):
 class ValidateRevokedStatement(BaseValidateStatement, ValidateStatementMixin):
     """Validate a statement."""
 
-    @policy(b'I', 0, "Revoked:Validate")
+    @policy(b'I', 0, "Revoked:ValidatePortfolio")
     def validate(self, portfolio: Portfolio, revoked: Revoked) -> bool:
         """Perform validation of revoked statement for portfolio."""
         self._portfolio = portfolio
-        self._document = revoked
+        self._statement = revoked
         self._applier()
         return True
