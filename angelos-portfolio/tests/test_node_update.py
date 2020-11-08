@@ -13,7 +13,10 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
-import pyximport; pyximport.install()
+from angelos.portfolio.domain.create import CreateDomain
+from angelos.portfolio.entity.create import CreatePersonEntity
+from angelos.portfolio.node.create import CreateNode
+
 from angelos.portfolio.node.update import UpdateNode
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
 
@@ -24,12 +27,15 @@ from angelos.meta.fake import Generate
 from unittest import TestCase
 
 
-class TestUpdateDomain(TestCase):
+class TestUpdateNode(TestCase):
     def test_perform(self):
-        portfolio = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
-        node = set(portfolio.nodes).pop()
-        with evaluate("Node:Update") as r:
+        data = PersonData(**Generate.person_data()[0])
+        portfolio = CreatePersonEntity().perform(data)
+        CreateDomain().perform(portfolio)
+        node = CreateNode().current(portfolio, server=True)
+
+        self.assertIsNotNone(portfolio.domain)
+        with evaluate("Node:Update") as report:
             node = UpdateNode().perform(portfolio, node)
-            # self.assertEqual(node, portfolio.node)
-            print(portfolio)
-            print(r.format())
+            self.assertIn(node, portfolio.nodes)
+            self.assertTrue(report)

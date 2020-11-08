@@ -14,10 +14,11 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Creating new domain document for new portfolio."""
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException
 from angelos.document.domain import Domain
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.policy import DocumentPolicy
 
 
 class DomainCreateException(RuntimeError):
@@ -25,22 +26,14 @@ class DomainCreateException(RuntimeError):
     DOMAIN_IN_PORTFOLIO = ("Domain document already present in portfolio.", 100)
 
 
-class BaseCreateDomain(PolicyPerformer):
-    """Initialize the domain generator"""
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._domain = None
+class CreateDomain(DocumentPolicy, PolicyPerformer, PolicyMixin):
+    """Generate domain document and add to private portfolio."""
 
     def _setup(self):
-        self._domain = None
+        self._document = None
 
     def _clean(self):
         pass
-
-
-class CreateDomainMixin(PolicyMixin):
-    """Logic for generating Domain for a new PrivatePortfolio."""
 
     def apply(self) -> bool:
         """Perform logic to create a new domain with portfolio."""
@@ -50,19 +43,22 @@ class CreateDomainMixin(PolicyMixin):
         if self._portfolio.domain:
             raise DomainCreateException(*DomainCreateException.DOMAIN_IN_PORTFOLIO)
 
-        self._domain = Domain(nd={"issuer": self._portfolio.entity.id})
+        self._document = Domain(nd={"issuer": self._portfolio.entity.id})
+        self._document = Crypto.sign(self._document, self._portfolio)
 
-        self._domain = Crypto.sign(self._domain, self._portfolio)
-        self._domain.validate()
-        self._portfolio.documents().add(self._domain)
+        if not all([
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify()
+        ]):
+            raise PolicyException()
 
-
-class CreateDomain(BaseCreateDomain, CreateDomainMixin):
-    """Generate domain document and add to private portfolio."""
+        self._add()
 
     @policy(b'I', 0, "Domain:Create")
     def perform(self, portfolio: PrivatePortfolio) -> Domain:
         """Perform building of person portfolio."""
         self._portfolio = portfolio
         self._applier()
-        return self._domain
+        return self._document

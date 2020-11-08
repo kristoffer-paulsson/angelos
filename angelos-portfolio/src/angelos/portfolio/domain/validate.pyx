@@ -16,18 +16,12 @@
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
 from angelos.document.domain import Domain
-from angelos.portfolio.collection import Portfolio, PrivatePortfolio
-from angelos.portfolio.policy import DocumentPolicy, UpdatablePolicy
+from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.policy import UpdatablePolicy
 
 
-class BaseValidateDomain(PolicyValidator):
-    """Initialize the updated entity validator."""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._document = None
-        self._former = None
+class ValidateDomain(UpdatablePolicy, PolicyValidator, PolicyMixin):
+    """Validate updated domain."""
 
     def _setup(self):
         pass
@@ -36,10 +30,6 @@ class BaseValidateDomain(PolicyValidator):
         self._portfolio = None
         self._document = None
         self._former = None
-
-
-class ValidateDomainMixin(DocumentPolicy, UpdatablePolicy, PolicyMixin):
-    """Logic for validating and updated Entity for a Portfolio."""
 
     def apply(self) -> bool:
         """Perform logic to validate updated domain with current."""
@@ -53,11 +43,7 @@ class ValidateDomainMixin(DocumentPolicy, UpdatablePolicy, PolicyMixin):
             raise PolicyException()
         return True
 
-
-class ValidateDomain(BaseValidateDomain, ValidateDomainMixin):
-    """Validate updated domain."""
-
-    @policy(b'I', 0, "Domain:ValidatePrivatePortfolio")
+    @policy(b'I', 0, "Domain:ValidatePrivate")
     def validate(self, portfolio: PrivatePortfolio, domain: Domain) -> bool:
         """Perform validation of updated domain for portfolio."""
         self._portfolio = portfolio

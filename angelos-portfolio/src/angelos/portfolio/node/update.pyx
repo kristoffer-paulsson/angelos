@@ -14,23 +14,21 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Updating a node document for a portfolio."""
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException
 from angelos.document.domain import Node
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.policy import UpdatablePolicy
 
 
 class NodeUpdateException(RuntimeError):
     """Problems with the process that is not policy."""
     NODE_NOT_IN_PORTFOLIO = ("Node document not present in portfolio.", 100)
+    DOMAIN_NOT_IN_PORTFOLIO = ("Domain not present in portfolio.", 101)
 
 
-class BaseUpdateNode(PolicyPerformer):
-    """Initialize the node updater"""
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._node = None
+class UpdateNode(UpdatablePolicy, PolicyPerformer, PolicyMixin):
+    """Update node document for private portfolio."""
 
     def _setup(self):
         pass
@@ -38,27 +36,32 @@ class BaseUpdateNode(PolicyPerformer):
     def _clean(self):
         self._portfolio = None
 
-
-class UpdateNodeMixin(PolicyMixin):
-    """Logic for updating Node for a PrivatePortfolio."""
-
     def apply(self) -> bool:
         """Perform logic to update a node with portfolio."""
-        if self._node not in self._portfolio.nodes:
+        if self._document not in self._portfolio.nodes:
             raise NodeUpdateException(*NodeUpdateException.NODE_NOT_IN_PORTFOLIO)
 
-        self._node.renew()
-        Crypto.sign(self._node, self._portfolio)
-        self._node.validate()
+        if not self._portfolio.domain:
+            raise NodeUpdateException(*NodeUpdateException.DOMAIN_NOT_IN_PORTFOLIO)
 
+        self._former = self._document
+        self._document.renew()
+        Crypto.sign(self._document, self._portfolio)
 
-class UpdateNode(BaseUpdateNode, UpdateNodeMixin):
-    """Update node document for private portfolio."""
+        if not all([
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+            self._check_fields_unchanged() if self._former else True
+        ]):
+            raise PolicyException()
+        return True
 
     @policy(b'I', 0, "Node:Update")
     def perform(self, portfolio: PrivatePortfolio, node: Node) -> Node:
         """Perform node update of private portfolio."""
         self._portfolio = portfolio
-        self._node = node
+        self._document = node
         self._applier()
-        return self._node
+        return self._document

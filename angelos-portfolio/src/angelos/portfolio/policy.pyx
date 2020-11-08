@@ -28,7 +28,8 @@ class DocumentPolicy:
 
     def _add(self):
         """Add a document to portfolio."""
-        self._portfolio.__init__(self._portfolio.documents() | {self._document})
+        self._portfolio.__init__(
+            self._portfolio.documents() | {self._document}, frozen=self._portfolio.is_frozen())
 
     @policy(b'I', 0)
     def _check_document_issuer(self) -> bool:
@@ -55,6 +56,14 @@ class DocumentPolicy:
         return True
 
 
+class IssuePolicy(DocumentPolicy):
+    """Policies for issuing documents."""
+
+    def __init__(self):
+        DocumentPolicy.__init__(self)
+        self._owner = None
+
+
 class UpdatablePolicy(DocumentPolicy):
     """Policies for updatable and changeable documents."""
 
@@ -64,11 +73,12 @@ class UpdatablePolicy(DocumentPolicy):
 
     def _update(self):
         """Update document in portfolio. by replacing old."""
-        self._portfolio.__init__(self._portfolio.filter(self._former) | {self._document})
+        self._portfolio.__init__(
+            self._portfolio.filter(self._former) | {self._document}, frozen=self._portfolio.is_frozen())
 
     @policy(b'I', 0)
     def _check_fields_unchanged(self) -> bool:
-        exclude = DocumentHelper.exclude(self._document)
-        if DocumentHelper.flatten_document(self._document, exclude) == DocumentHelper.flatten_document(self._former, exclude):
+        exclude = DocumentHelper.excludes(self._document)
+        if DocumentHelper.flatten_document(self._document, exclude) != DocumentHelper.flatten_document(self._former, exclude):
             raise PolicyException()
         return True

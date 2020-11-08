@@ -19,6 +19,7 @@ from typing import Union
 from angelos.common.policy import PolicyPerformer, PolicyMixin, policy
 from angelos.document.statements import Revoked, Trusted, Verified
 from angelos.portfolio.collection import Portfolio
+from angelos.portfolio.policy import DocumentPolicy
 
 
 class StatementRemoveException(RuntimeError):
@@ -26,47 +27,38 @@ class StatementRemoveException(RuntimeError):
     WRONG_TYPE = ("Revoked is not trusted or verified document type.", 101)
 
 
-class BaseRemoveRevoked(PolicyPerformer):
-    """Initialize the revoke analyzer"""
+class RemoveRevokedStatement(DocumentPolicy, PolicyMixin, PolicyPerformer):
+    """Remove revoked statement for portfolio."""
+
     def __init__(self):
         super().__init__()
-        self._issuer = None
         self._revoked = None
-        self._statement = None
 
     def _setup(self):
-        self._statement = None
+        self._document = None
 
     def _clean(self):
-        self._issuer = None
+        self._portfolio = None
         self._revoked = None
-
-
-class RemoveRevokedMixin(PolicyMixin):
-    """Logic for removed revoked statement from portfolio."""
 
     def apply(self) -> bool:
         """Perform logic to remove a revoked statement."""
 
-        if not self._revoked.issuer == self._issuer.entity.id:
+        if not self._revoked.issuer == self._portfolio.entity.id:
             raise StatementRemoveException(*StatementRemoveException.WRONG_ISSUER)
 
-        self._statement = self._issuer.get_id(self._revoked.issuance)
+        self._document = self._portfolio.get_id(self._revoked.issuance)
 
-        if not isinstance(self._statement, (Trusted, Verified, type(None))):
+        if not isinstance(self._document, (Trusted, Verified, type(None))):
             raise StatementRemoveException(*StatementRemoveException.WRONG_TYPE)
 
-        self._issuer.__init__(self._issuer.filter({self._statement, self._revoked}) | {self._revoked})
+        self._portfolio.__init__(self._portfolio.filter({self._document, self._revoked}) | {self._revoked})
         return True
-
-
-class RemoveRevokedStatement(BaseRemoveRevoked, RemoveRevokedMixin):
-    """Remove revoked statement for portfolio."""
 
     @policy(b'I', 0, "Revoked:Remove")
     def perform(self, issuer: Portfolio, revoked: Revoked) -> Union[Trusted, Verified]:
         """Perform removal of revoked statement."""
-        self._issuer = issuer
+        self._portfolio = issuer
         self._revoked = revoked
         self._applier()
-        return self._statement
+        return self._document

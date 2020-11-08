@@ -16,28 +16,18 @@
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
 from angelos.document.statements import Trusted, Verified, Revoked
-from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import Portfolio
 from angelos.portfolio.policy import DocumentPolicy
 
 
-class BaseValidateStatement(PolicyValidator):
-    """Initialize the statement validator"""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._document = None
+class AcceptStatementMixin(DocumentPolicy, PolicyMixin):
+    """Logic for validating a statement for a Portfolio."""
 
     def _setup(self):
         pass
 
     def _clean(self):
         pass
-
-
-class ValidateStatementMixin(DocumentPolicy, PolicyMixin):
-    """Logic for validating a statement for a Portfolio."""
 
     def apply(self) -> bool:
         """Perform logic to validate a statement."""
@@ -49,11 +39,11 @@ class ValidateStatementMixin(DocumentPolicy, PolicyMixin):
         ]):
             raise PolicyException()
 
-        self.add()
+        self._add()
         return True
 
 
-class ValidateTrustedStatement(BaseValidateStatement, ValidateStatementMixin):
+class AcceptTrustedStatement(AcceptStatementMixin, PolicyValidator):
     """Validate a trusted statement."""
 
     @policy(b'I', 0, "Trusted:Validate")
@@ -65,7 +55,7 @@ class ValidateTrustedStatement(BaseValidateStatement, ValidateStatementMixin):
         return True
 
 
-class ValidateVerifiedStatement(BaseValidateStatement, ValidateStatementMixin):
+class AcceptVerifiedStatement(AcceptStatementMixin, PolicyValidator):
     """Validate a statement."""
 
     @policy(b'I', 0, "Verified:Validate")
@@ -77,7 +67,7 @@ class ValidateVerifiedStatement(BaseValidateStatement, ValidateStatementMixin):
         return True
 
 
-class ValidateRevokedStatement(BaseValidateStatement, ValidateStatementMixin):
+class AcceptRevokedStatement(AcceptStatementMixin, PolicyValidator):
     """Validate a statement."""
 
     @policy(b'I', 0, "Revoked:Validate")

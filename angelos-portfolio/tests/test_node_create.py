@@ -13,23 +13,32 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
-import pyximport; pyximport.install()
-from angelos.portfolio.node.create import CreateNode
-from angelos.portfolio.domain.create import CreateDomain
+from unittest import TestCase
+
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
 from angelos.meta.fake import Generate
+from angelos.portfolio.collection import FrozenPortfolioError
+from angelos.portfolio.domain.create import CreateDomain
 from angelos.portfolio.entity.create import CreatePersonEntity
+from angelos.portfolio.node.create import CreateNode, NodeCreateException
 
-from unittest import TestCase
 
-
-class TestUpdateNode(TestCase):
+class TestCreateNode(TestCase):
     def test_current(self):
         data = PersonData(**Generate.person_data()[0])
         portfolio = CreatePersonEntity().perform(data)
-        CreateDomain().perform(portfolio)
-        with evaluate("Node:Create") as r:
+
+        with self.assertRaises(NodeCreateException):
             CreateNode().current(portfolio, server=True)
-            print(r.format())
-            print(portfolio)
+
+        CreateDomain().perform(portfolio)
+        with evaluate("Node:Create") as report:
+            node = CreateNode().current(portfolio, server=True)
+            self.assertIsNotNone(node)
+            self.assertIn(node, portfolio.nodes)
+            self.assertTrue(report)
+
+        portfolio.freeze()
+        with self.assertRaises(FrozenPortfolioError):
+            CreateNode().current(portfolio, server=True)

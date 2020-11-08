@@ -20,23 +20,14 @@ from angelos.portfolio.collection import Portfolio
 from angelos.portfolio.policy import DocumentPolicy
 
 
-class BaseValidateStatement(PolicyValidator):
-    """Initialize the statement validator"""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._document = None
+class ValidateStatementMixin(DocumentPolicy, PolicyMixin):
+    """Logic for validating a statement for a Portfolio."""
 
     def _setup(self):
         pass
 
     def _clean(self):
         pass
-
-
-class ValidateStatementMixin(DocumentPolicy, PolicyMixin):
-    """Logic for validating a statement for a Portfolio."""
 
     def apply(self) -> bool:
         """Perform logic to validate a statement."""
@@ -50,37 +41,37 @@ class ValidateStatementMixin(DocumentPolicy, PolicyMixin):
         return True
 
 
-class ValidateTrustedStatement(BaseValidateStatement, ValidateStatementMixin):
+class ValidateTrustedStatement(ValidateStatementMixin, PolicyValidator):
     """Validate a trusted statement."""
 
-    @policy(b'I', 0, "Trusted:ValidatePortfolio")
-    def validate(self, portfolio: Portfolio, trusted: Trusted) -> bool:
+    @policy(b'I', 0, "Trusted:Validate")
+    def validate(self, issuer: Portfolio, trusted: Trusted) -> bool:
         """Perform validation of trusted statement for portfolio."""
-        self._portfolio = portfolio
+        self._portfolio = issuer
         self._document = trusted
         self._applier()
         return True
 
 
-class ValidateVerifiedStatement(BaseValidateStatement, ValidateStatementMixin):
+class ValidateVerifiedStatement(ValidateStatementMixin, PolicyValidator):
     """Validate a statement."""
 
-    @policy(b'I', 0, "Verified:ValidatePortfolio")
-    def validate(self, portfolio: Portfolio, verified: Verified) -> bool:
+    @policy(b'I', 0, "Verified:Validate")
+    def validate(self, issuer: Portfolio, verified: Verified) -> bool:
         """Perform validation of trusted statement for portfolio."""
-        self._portfolio = portfolio
+        self._portfolio = issuer
         self._document = verified
         self._applier()
         return True
 
 
-class ValidateRevokedStatement(BaseValidateStatement, ValidateStatementMixin):
+class ValidateRevokedStatement(ValidateStatementMixin, PolicyValidator):
     """Validate a statement."""
 
-    @policy(b'I', 0, "Revoked:ValidatePortfolio")
-    def validate(self, portfolio: Portfolio, revoked: Revoked) -> bool:
+    @policy(b'I', 0, "Revoked:Validate")
+    def validate(self, issuer: Portfolio, revoked: Revoked) -> bool:
         """Perform validation of revoked statement for portfolio."""
-        self._portfolio = portfolio
-        self._statement = revoked
+        self._portfolio = issuer
+        self._document = revoked
         self._applier()
         return True

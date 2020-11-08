@@ -22,17 +22,18 @@ from angelos.document.domain import Location, Node
 from angelos.lib.const import Const
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.policy import DocumentPolicy
 
 
 class NodeCreateException(RuntimeError):
     DOMAIN_NOT_IN_PORTFOLIO = ("Domain not present in portfolio.", 100)
 
 
-class BaseCreateNode(PolicyPerformer):
-    """Initialize the node generator"""
+class CreateNode(DocumentPolicy, PolicyPerformer, PolicyMixin):
+    """Generate node document and add to private portfolio."""
+
     def __init__(self):
         super().__init__()
-        self._portfolio = None
         self._device = Node
         self._serial = Node
         self._role = None
@@ -41,14 +42,10 @@ class BaseCreateNode(PolicyPerformer):
         self._hostname = None
 
     def _setup(self):
-        pass
+        self._document = None
 
     def _clean(self):
         pass
-
-
-class CreateNodeMixin(PolicyMixin):
-    """Logic fo generating Node for a new PrivatePortfolio."""
 
     @policy(b"I", 0)
     def _check_domain_issuer(self):
@@ -82,7 +79,7 @@ class CreateNodeMixin(PolicyMixin):
                 "ip": [self._ip]
             })
 
-        node = Node(nd={
+        self._document = Node(nd={
             "domain": self._portfolio.domain.id,
             "role": role,
             "device": self._device,
@@ -90,20 +87,23 @@ class CreateNodeMixin(PolicyMixin):
             "issuer": self._portfolio.entity.id,
             "location": location
         })
+        self._document = Crypto.sign(self._document, self._portfolio)
 
-        node = Crypto.sign(node, self._portfolio)
-        node.validate()
-        self._portfolio.documents().add(node)
+        if not all([
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify()
+        ]):
+            raise PolicyException()
 
-
-class CreateNode(BaseCreateNode, CreateNodeMixin):
-    """Generate node document and add to private portfolio."""
+        self._add()
 
     @policy(b'I', 0, "Node:Create")
     def perform(
             self, portfolio: PrivatePortfolio, device: str, serial: str, ip: Union[IPv4Address, IPv6Address] = None,
             hostname: str = None, role: int=Const.A_ROLE_PRIMARY, server: bool = False
-    ) -> bool:
+    ) -> Node:
         """Perform building of person portfolio."""
         self._portfolio = portfolio
         self._device = device
@@ -114,10 +114,10 @@ class CreateNode(BaseCreateNode, CreateNodeMixin):
         self._server = server
 
         self._applier()
-        return True
+        return self._document
 
     def current(self, portfolio: PrivatePortfolio, ip: Union[IPv4Address, IPv6Address] = None,
-            hostname: str = None, role: int = Const.A_ROLE_PRIMARY, server: bool = False) -> bool:
+            hostname: str = None, role: int = Const.A_ROLE_PRIMARY, server: bool = False) -> Node:
         """Generate node from current device and system configuration."""
         import platform
         from angelos.common.misc import Misc

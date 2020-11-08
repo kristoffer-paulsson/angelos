@@ -19,18 +19,20 @@ from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
 from angelos.meta.fake import Generate
 from angelos.portfolio.domain.create import CreateDomain
-from angelos.portfolio.domain.update import UpdateDomain
 from angelos.portfolio.entity.create import CreatePersonEntity
+from angelos.portfolio.node.create import CreateNode
+from angelos.portfolio.node.validate import ValidateNode
 
 
-class TestUpdateDomain(TestCase):
+class TestValidateNode(TestCase):
     def test_perform(self):
         data = PersonData(**Generate.person_data()[0])
         portfolio = CreatePersonEntity().perform(data)
         CreateDomain().perform(portfolio)
+        node = CreateNode().current(portfolio, server=True)
 
-        self.assertIsNotNone(portfolio.domain)
-        with evaluate("Domain:Update") as report:
-            domain = UpdateDomain().perform(portfolio)
-            self.assertIs(domain, portfolio.domain)
+        self.assertIn(node, portfolio.nodes)
+        with evaluate("Node:Validate") as report:
+            ValidateNode().validate(portfolio, node)
+            self.assertIn(node, portfolio.nodes)
             self.assertTrue(report)

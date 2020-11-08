@@ -26,22 +26,20 @@ class TestCreateTrustedStatement(TestCase):
     def test_perform(self):
         issuer = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
         owner = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
-        with evaluate("Trusted:Create") as r:
-            statement = CreateTrustedStatement().perform(issuer, owner)
-            self.assertIn(statement, issuer.trusted_issuer)
-            print(r.format())
-            print(issuer)
+        with evaluate("Trusted:Create") as report:
+            trusted = CreateTrustedStatement().perform(issuer, owner)
+            self.assertIn(trusted, issuer.trusted_issuer)
+        self.assertTrue(report)
 
 
 class TestCreateVerifiedStatement(TestCase):
     def test_perform(self):
         issuer = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
         owner = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
-        with evaluate("Verified:Create") as r:
-            statement = CreateVerifiedStatement().perform(issuer, owner)
-            self.assertIn(statement, issuer.verified_issuer)
-            print(r.format())
-            print(issuer)
+        with evaluate("Verified:Create") as report:
+            verified = CreateVerifiedStatement().perform(issuer, owner)
+            self.assertIn(verified, issuer.verified_issuer)
+        self.assertTrue(report)
 
 
 class TestCreateRevokedStatement(TestCase):
@@ -49,11 +47,11 @@ class TestCreateRevokedStatement(TestCase):
         issuer = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
         owner = SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0]))
         statement = CreateVerifiedStatement().perform(issuer, owner)
-        with evaluate("Trusted:Create") as r:
+        self.assertIn(statement, issuer.verified_issuer)
+        with evaluate("Trusted:Create") as report:
             revoked = CreateRevokedStatement().perform(issuer, statement)
             self.assertIn(revoked, issuer.revoked_issuer)
-            print(r.format())
-            print(issuer)
+        self.assertTrue(report)
 
 
 

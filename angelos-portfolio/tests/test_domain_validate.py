@@ -13,24 +13,31 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
+import copy
 from unittest import TestCase
 
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
 from angelos.meta.fake import Generate
 from angelos.portfolio.domain.create import CreateDomain
-from angelos.portfolio.domain.update import UpdateDomain
+from angelos.portfolio.domain.validate import ValidateDomain
 from angelos.portfolio.entity.create import CreatePersonEntity
 
 
-class TestUpdateDomain(TestCase):
-    def test_perform(self):
+class TestValidateDomain(TestCase):
+    def test_validate(self):
         data = PersonData(**Generate.person_data()[0])
         portfolio = CreatePersonEntity().perform(data)
-        CreateDomain().perform(portfolio)
+        ext_portfolio = copy.deepcopy(portfolio)
+        domain = CreateDomain().perform(portfolio)
 
         self.assertIsNotNone(portfolio.domain)
-        with evaluate("Domain:Update") as report:
-            domain = UpdateDomain().perform(portfolio)
-            self.assertIs(domain, portfolio.domain)
+        with evaluate("Domain:Validate") as report:
+            ValidateDomain().validate(portfolio, domain)
             self.assertTrue(report)
+
+        self.assertIsNone(ext_portfolio.domain)
+        with evaluate("Domain:Validate") as report:
+            ValidateDomain().validate(ext_portfolio, domain)
+            self.assertTrue(report)
+

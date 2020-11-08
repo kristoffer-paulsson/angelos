@@ -14,10 +14,11 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Updating a domain document for a portfolio."""
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException, PolicyValidator
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException
 from angelos.document.domain import Domain
 from angelos.lib.policy.crypto import Crypto
-from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.policy import UpdatablePolicy
 
 
 class DomainUpdateException(RuntimeError):
@@ -25,40 +26,38 @@ class DomainUpdateException(RuntimeError):
     DOMAIN_NOT_IN_PORTFOLIO = ("Domain document not present in portfolio.", 100)
 
 
-class BaseUpdateDomain(PolicyPerformer):
-    """Initialize the domain updater"""
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._domain = None
+class UpdateDomain(UpdatablePolicy, PolicyPerformer, PolicyMixin):
+    """Update domain document for private portfolio."""
 
     def _setup(self):
-        self._domain = None
+        self._document = None
 
     def _clean(self):
         self._portfolio = None
-
-
-class UpdateDomainMixin(PolicyMixin):
-    """Logic for updating Domain for a PrivatePortfolio."""
 
     def apply(self) -> bool:
         """Perform logic to update a domain with portfolio."""
         if not self._portfolio.domain:
             raise DomainUpdateException(*DomainUpdateException.DOMAIN_NOT_IN_PORTFOLIO)
 
-        self._domain = self._portfolio.domain
-        self._domain.renew()
-        Crypto.sign(self._domain, self._portfolio)
-        self._domain.validate()
+        self._former = self._portfolio.domain
+        self._document = self._portfolio.domain
+        self._document.renew()
+        Crypto.sign(self._document, self._portfolio)
 
-
-class UpdateDomain(BaseUpdateDomain, UpdateDomainMixin):
-    """Update domain document for private portfolio."""
+        if not all([
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+            self._check_fields_unchanged() if self._former else True
+        ]):
+            raise PolicyException()
+        return True
 
     @policy(b'I', 0, "Domain:Update")
     def perform(self, portfolio: PrivatePortfolio) -> Domain:
         """Perform domain update of private portfolio."""
         self._portfolio = portfolio
         self._applier()
-        return self._domain
+        return self._document

@@ -325,7 +325,7 @@ class BasePolicyApplier(ABC):
 
     def _applier(self) -> bool:
         self._setup()
-        success = all([cls.apply(self) for cls in self.__class__.mro()[3:-3] if hasattr(cls, "apply")])
+        success = all([cls.apply(self) for cls in self.__class__.mro()[0:-2] if hasattr(cls, "apply")])
         self._clean()
         return success
 
