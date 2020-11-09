@@ -18,36 +18,46 @@ from unittest import TestCase
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import ChurchData
 from angelos.meta.fake import Generate
-from angelos.portfolio.collection import Portfolio
-from angelos.portfolio.network.accept import ValidateNetwork, AcceptUpdatedNetwork
+from angelos.portfolio.domain.create import CreateDomain
+from angelos.portfolio.entity.create import CreateChurchEntity
+from angelos.portfolio.network.accept import AcceptUpdatedNetwork, AcceptNetwork
+from angelos.portfolio.network.create import CreateNetwork
 from angelos.portfolio.network.update import UpdateNetwork
-from angelos.portfolio.portfolio.setup import SetupChurchPortfolio
+from angelos.portfolio.node.create import CreateNode
+from angelos.portfolio.portfolio.setup import IPv4Address
 
 
-def new_data(first: dict, second: dict, changeables: tuple):
-    """Populate new data with old not changeable data."""
-    for name, field in first.items():
-        if name not in changeables:
-            second[name] = field
-
-
-class TestValidateNetwork(TestCase):
+class TestAcceptNetwork(TestCase):
     def test_validate(self):
-        private = SetupChurchPortfolio().perform(ChurchData(**Generate.church_data()[0]), server=True)
-        portfolio = Portfolio(private.filter({private.network}))
-        network = UpdateNetwork().perform(private)
-        with evaluate("Network:Validate") as r:
-            ValidateNetwork().validate(portfolio, network)
-            print(r.format())
-            print(portfolio)
+        portfolio = CreateChurchEntity().perform(ChurchData(**Generate.church_data()[0]))
+        CreateDomain().perform(portfolio)
+        CreateNode().current(portfolio, server=True)
+
+        foreign_porfolio = portfolio.to_portfolio()
+        self.assertIsNone(foreign_porfolio.network)
+        network = CreateNetwork().perform(portfolio)
+
+        with evaluate("Network:Accept") as report:
+            AcceptNetwork().validate(foreign_porfolio, network)
+            self.assertIs(network, foreign_porfolio.network)
+        self.assertTrue(report)
 
 
-class TestAcceptUpdatedEntity(TestCase):
+class TestAcceptUpdatedNetwork(TestCase):
     def test_validate(self):
-        private = SetupChurchPortfolio().perform(ChurchData(**Generate.church_data()[0]), server=True)
-        portfolio = Portfolio(private.documents())
-        network = UpdateNetwork().perform(private)
-        with evaluate("Person:AcceptUpdate") as r:
-            portfolio = AcceptUpdatedNetwork().validate(portfolio, network)
-            print(portfolio)
-            print(r.format())
+        portfolio = CreateChurchEntity().perform(ChurchData(**Generate.church_data()[0]))
+        CreateDomain().perform(portfolio)
+        CreateNode().current(portfolio, server=True)
+
+        foreign_porfolio = portfolio.to_portfolio()
+        self.assertIsNone(foreign_porfolio.network)
+        network = CreateNetwork().perform(portfolio)
+        AcceptNetwork().validate(foreign_porfolio, network)
+
+        CreateNode().perform(portfolio, device="test", serial="1234567890", ip=IPv4Address("127.0.0.1"), server=True)
+        network = UpdateNetwork().perform(portfolio)
+
+        with evaluate("Network:AcceptUpdated") as report:
+            AcceptUpdatedNetwork().validate(foreign_porfolio, network)
+            self.assertIs(network, foreign_porfolio.network)
+        self.assertTrue(report)

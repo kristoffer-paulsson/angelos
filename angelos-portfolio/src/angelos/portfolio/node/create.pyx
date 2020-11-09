@@ -22,6 +22,7 @@ from angelos.document.domain import Location, Node
 from angelos.lib.const import Const
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.node.policy import NodePolicy
 from angelos.portfolio.policy import DocumentPolicy
 
 
@@ -29,7 +30,7 @@ class NodeCreateException(RuntimeError):
     DOMAIN_NOT_IN_PORTFOLIO = ("Domain not present in portfolio.", 100)
 
 
-class CreateNode(DocumentPolicy, PolicyPerformer, PolicyMixin):
+class CreateNode(DocumentPolicy, NodePolicy, PolicyPerformer, PolicyMixin):
     """Generate node document and add to private portfolio."""
 
     def __init__(self):
@@ -47,12 +48,6 @@ class CreateNode(DocumentPolicy, PolicyPerformer, PolicyMixin):
     def _clean(self):
         pass
 
-    @policy(b"I", 0)
-    def _check_domain_issuer(self):
-        """The domain must have same issuer as issuing entity."""
-        if self._portfolio.domain.issuer != self._portfolio.entity.issuer:
-            raise PolicyException()
-
     def apply(self) -> bool:
         """Perform logic to create a new node with new portfolio."""
         if self._portfolio.is_frozen():
@@ -68,8 +63,6 @@ class CreateNode(DocumentPolicy, PolicyPerformer, PolicyMixin):
                 role = "server"
             else:
                 role = "client"
-
-        self._check_domain_issuer()
 
         hostname = urlunparse(urlparse(self._hostname)[:2] + ("", "", "", ""))
         location = None
@@ -93,7 +86,9 @@ class CreateNode(DocumentPolicy, PolicyPerformer, PolicyMixin):
             self._check_document_issuer(),
             self._check_document_expired(),
             self._check_document_valid(),
-            self._check_document_verify()
+            self._check_document_verify(),
+            self._check_domain_issuer(),
+            self._check_node_domain()
         ]):
             raise PolicyException()
 

@@ -13,18 +13,15 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
-from angelos.portfolio.domain.create import CreateDomain
-from angelos.portfolio.entity.create import CreatePersonEntity
-from angelos.portfolio.node.create import CreateNode
-
-from angelos.portfolio.node.update import UpdateNode
-from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
+from unittest import TestCase
 
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
 from angelos.meta.fake import Generate
-
-from unittest import TestCase
+from angelos.portfolio.domain.create import CreateDomain
+from angelos.portfolio.entity.create import CreatePersonEntity
+from angelos.portfolio.node.create import CreateNode
+from angelos.portfolio.node.update import UpdateNode
 
 
 class TestUpdateNode(TestCase):

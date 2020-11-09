@@ -20,24 +20,20 @@ from angelos.document.entities import PrivateKeys, Keys, Person, Ministry, Churc
 from angelos.lib.policy.crypto import Crypto
 from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
 from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.policy import DocumentPolicy
 
 
-class BaseCreateEntity(PolicyPerformer):
-    """Initialize the entity generator"""
+class CreateEntityMixin(DocumentPolicy, PolicyPerformer, PolicyMixin):
+    """Logic fo generating Entity, Keys and PrivateKeys for a new PrivatePortfolio."""
+
     def __init__(self):
         super().__init__()
         self._data = None
         self._klass = None
-        self._portfolio = None
 
     def _clean(self):
         self._data = None
-
-
-class CreateEntityMixin(PolicyMixin):
-    """Logic fo generating Entity, Keys and PrivateKeys for a new PrivatePortfolio."""
-
-    # TODO: Add cryptographical verification at the end.
+        self._document = None
 
     def apply(self) -> bool:
         """Perform logic to create a new entity with its new portfolio."""
@@ -54,19 +50,36 @@ class CreateEntityMixin(PolicyMixin):
         privkeys = Crypto.sign(privkeys, self._portfolio, multiple=True)
         keys = Crypto.sign(keys, self._portfolio, multiple=True)
 
-        if not all([
-            entity.validate(),
-            privkeys.validate(),
-            keys.validate(),
-            Crypto.verify(entity, self._portfolio),
-            Crypto.verify(keys, self._portfolio),
-            Crypto.verify(privkeys, self._portfolio)
-        ]):
+        self._document = entity
+        valid = [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+
+        self._document = privkeys
+        valid += [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+
+        self._document = keys
+        valid += [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+
+        if not all(valid):
             raise PolicyException()
         return True
 
 
-class CreatePersonEntity(BaseCreateEntity, CreateEntityMixin):
+class CreatePersonEntity(CreateEntityMixin):
     """Generate new person portfolio from data."""
     def _setup(self):
         self._klass = Person
@@ -79,7 +92,7 @@ class CreatePersonEntity(BaseCreateEntity, CreateEntityMixin):
         return self._portfolio
 
 
-class CreateMinistryEntity(BaseCreateEntity, CreateEntityMixin):
+class CreateMinistryEntity(CreateEntityMixin):
     """Generate new ministry portfolio from data."""
     def _setup(self):
         self._klass = Ministry
@@ -92,7 +105,7 @@ class CreateMinistryEntity(BaseCreateEntity, CreateEntityMixin):
         return self._portfolio
 
 
-class CreateChurchEntity(BaseCreateEntity, CreateEntityMixin):
+class CreateChurchEntity(CreateEntityMixin):
     """Generate new church portfolio from data."""
     def _setup(self):
         self._klass = Church

@@ -29,9 +29,11 @@ class TestCreateNetwork(TestCase):
     def test_perform(self):
         data = ChurchData(**Generate.church_data()[0])
         portfolio = CreateChurchEntity().perform(data)
-        CreateDomain().perform(portfolio)
+        domain = CreateDomain().perform(portfolio)
         CreateNode().current(portfolio, server=True)
-        with evaluate("Network:Create") as r:
-            CreateNetwork().perform(portfolio)
-            print(r.format())
-            print(portfolio)
+        with evaluate("Network:Create") as report:
+            network = CreateNetwork().perform(portfolio)
+            self.assertIs(network, portfolio.network)
+            self.assertEqual(network.domain, domain.id)
+            self.assertEqual(len(network.hosts), 1)
+        self.assertTrue(report)

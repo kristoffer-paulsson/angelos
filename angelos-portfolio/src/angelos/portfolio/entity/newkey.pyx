@@ -21,13 +21,14 @@ from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyEx
 from angelos.document.entities import PrivateKeys, Keys
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.policy import DocumentPolicy
 
 
-class BaseNewKeys(PolicyPerformer):
-    """Initialize the new keys generator."""
+class NewKeys(DocumentPolicy, PolicyPerformer, PolicyMixin):
+    """Generate new keys and privkeys document of a portfolio."""
+
     def __init__(self):
         super().__init__()
-        self._portfolio = None
         self._keys = None
         self._privkeys = None
 
@@ -38,49 +39,58 @@ class BaseNewKeys(PolicyPerformer):
     def _clean(self):
         pass
 
-
-class NewKeysMixin(PolicyMixin):
-    """Logic for generating new Keys and PrivateKeys for an existing PrivatePortfolio."""
-
     def apply(self) -> bool:
         """Perform logic to generate new keys with its new portfolio."""
         box = DualSecret()
+        real = self._portfolio
 
         self._privkeys = PrivateKeys(nd={
-            "issuer": self._portfolio.entity.id,
+            "issuer": real.entity.id,
             "secret": box.sk,
             "seed": box.seed,
         })
         self._keys = Keys(nd={
-            "issuer": self._portfolio.entity.id,
+            "issuer": real.entity.id,
             "public": box.pk,
             "verify": box.vk,
         })
 
-        self._privkeys = Crypto.sign(self._privkeys, self._portfolio, multiple=True)
-        self._keys = Crypto.sign(self._keys, self._portfolio, multiple=True)
-        portfolio = PrivatePortfolio({self._portfolio.entity, self._privkeys, self._keys}, frozen=False)
-        self._privkeys = Crypto.sign(self._privkeys, portfolio, multiple=True)
-        self._keys = Crypto.sign(self._keys, portfolio, multiple=True)
+        self._privkeys = Crypto.sign(self._privkeys, real, multiple=True)
+        self._keys = Crypto.sign(self._keys, real, multiple=True)
+        temp = PrivatePortfolio({real.entity, self._privkeys, self._keys}, frozen=False)
+        self._privkeys = Crypto.sign(self._privkeys, temp, multiple=True)
+        self._keys = Crypto.sign(self._keys, temp, multiple=True)
 
-        if not all([
-                self._privkeys.validate(),
-                self._keys.validate(),
-                Crypto.verify(self._privkeys, self._portfolio),
-                Crypto.verify(self._keys, self._portfolio),
-                Crypto.verify(self._privkeys, portfolio),
-                Crypto.verify(self._keys, portfolio)
-            ]):
+        self._portfolio = real
+        self._document = self._privkeys
+        valid = [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+        self._portfolio = temp
+        valid += [self._check_document_verify()]
+
+        self._portfolio = real
+        self._document = self._keys
+        valid += [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+        self._portfolio = temp
+        valid += [self._check_document_verify()]
+
+        if not all(valid):
             raise PolicyException()
 
-        docs = portfolio.documents()
-        docs |= (self._portfolio.filter(portfolio.documents()) - {self._portfolio.privkeys})
+        self._portfolio = real
+        docs = temp.documents()
+        docs |= (self._portfolio.filter(temp.documents()) - {self._portfolio.privkeys})
         self._portfolio.__init__(docs)
         return True
-
-
-class NewKeys(BaseNewKeys, NewKeysMixin):
-    """Generate new keys and privkeys document of a portfolio."""
 
     @policy(b'I', 0, "Keys:New")
     def perform(self, portfolio: PrivatePortfolio) -> Tuple[Keys, PrivateKeys]:

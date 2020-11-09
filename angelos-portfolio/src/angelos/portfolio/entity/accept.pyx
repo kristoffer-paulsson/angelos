@@ -15,94 +15,57 @@
 #
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
-from angelos.document.entities import Entity, Keys, PrivateKeys
+from angelos.document.entities import Entity, Keys
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import Portfolio
+from angelos.portfolio.policy import DocumentPolicy, UpdatablePolicy
 
 
-class BaseValidateEntity(PolicyValidator):
-    """Initialize the entity validator"""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._entity = None
-        self._keys = None
+class AcceptEntity(DocumentPolicy, PolicyValidator, PolicyMixin):
+    """Valid an entity and its keys."""
 
     def _setup(self):
-        self._entity = self._portfolio.entity
-        self._keys = Crypto.latest_keys(self._portfolio.keys)
+        pass
 
     def _clean(self):
-        self._entity = None
-        self._keys = None
-
-
-class ValidateEntityMixin(PolicyMixin):
-    """Logic for validating a new Entity and Keys from a Portfolio."""
-
-    @policy(b'I', 0)
-    def _check_entity_expired(self) -> bool:
-        if self._entity.is_expired():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_keys_expired(self) -> bool:
-        if self._keys.is_expired():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_entity_valid(self) -> bool:
-        if not self._entity.validate():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_keys_valid(self) -> bool:
-        if not self._keys.validate():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_entity_verify(self) -> bool:
-        if not Crypto.verify(self._entity, self._portfolio):
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_keys_verify(self) -> bool:
-        if not Crypto.verify(self._keys, self._portfolio):
-            raise PolicyException()
-        return True
+        self._document = None
 
     @policy(b'I', 0)
     def _check_entity_keys_overlap(self) -> bool:
-        touched = self._entity.get_touched()
-        if not self._keys.created <= touched and self._keys.expires >= touched:
+        keys = Crypto.latest_keys(self._portfolio.keys)
+        touched = self._portfolio.entity.get_touched()
+
+        if not keys.created <= touched and keys.expires >= touched:
             raise PolicyException()
         return True
 
     def apply(self) -> bool:
         """Perform logic to validate a new entity with its keys."""
-        if not all([
-            self._check_entity_keys_overlap(),
-            self._check_entity_expired(),
-            self._check_keys_expired(),
-            self._check_entity_valid(),
-            self._check_keys_valid(),
-            self._check_entity_verify(),
-            self._check_keys_verify()
-        ]):
+        self._document = self._portfolio.entity
+        valid = [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+
+        self._document = Crypto.latest_keys(self._portfolio.keys)
+        valid += [
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]
+
+        valid += [
+            self._check_entity_keys_overlap()
+        ]
+
+        if not all(valid):
             raise PolicyException()
         return True
 
-
-class ValidateEntity(BaseValidateEntity, ValidateEntityMixin):
-    """Valid an entity and its keys."""
-
-    @policy(b'I', 0, "Entity:Validate")
+    @policy(b'I', 0, "Entity:Accept")
     def validate(self, portfolio: Portfolio) -> bool:
         """Perform validation of entity and keys from portfolio."""
         self._portfolio = portfolio
@@ -110,197 +73,78 @@ class ValidateEntity(BaseValidateEntity, ValidateEntityMixin):
         return True
 
 
-class BaseAcceptUpdatedEntity(PolicyValidator):
-    """Initialize the updated entity validator."""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._entity = None
+class AcceptUpdatedEntity(UpdatablePolicy, PolicyValidator, PolicyMixin):
+    """Validate an entity."""
 
     def _setup(self):
         pass
 
     def _clean(self):
-        self._entity = None
-
-
-class AcceptUpdatedEntityMixin(PolicyMixin):
-    """Logic for validating and updated Entity for a Portfolio."""
-
-    @policy(b'I', 0)
-    def _check_entity_expired(self) -> bool:
-        if self._entity.is_expired():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_entity_valid(self) -> bool:
-        if not self._entity.validate():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_entity_verify(self) -> bool:
-        if not Crypto.verify(self._entity, self._portfolio):
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_entity_morpheme(self) -> bool:
-        if not self._entity.morpheme(self._portfolio.entity):
-            raise PolicyException()
-        return True
+        self._portfolio = None
+        self._document = None
+        self._former = None
 
     def apply(self) -> bool:
         """Perform logic to validate updated entity with current."""
         if not all([
-            self._check_entity_expired(),
-            self._check_entity_valid(),
-            self._check_entity_verify(),
-            self._check_entity_morpheme()
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+            self._check_fields_unchanged()
         ]):
             raise PolicyException()
 
-        docs = self._portfolio.filter({self._portfolio.entity}) | {self._entity}
-        self._portfolio.__init__(docs)
+        self._update()
         return True
 
-
-class AcceptUpdatedEntity(BaseAcceptUpdatedEntity, AcceptUpdatedEntityMixin):
-    """Validate an entity."""
-
-    @policy(b'I', 0, "Entity:AcceptUpdate")
+    @policy(b'I', 0, "Entity:AcceptUpdated")
     def validate(self, portfolio: Portfolio, entity: Entity) -> bool:
         """Perform validation of entity and keys from portfolio."""
         self._portfolio = portfolio
-        self._entity = entity
+        self._document = entity
+        self._former = portfolio.entity
         self._applier()
         return True
 
 
-class BaseAcceptNewKeys(PolicyValidator):
-    """Initialize the new keys validator."""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._entity = None
-        self._keys = None
-        self._privkeys = None
+class AcceptNewKeys(DocumentPolicy, PolicyValidator, PolicyMixin):
+    """Validate new keys."""
 
     def _setup(self):
-        self._entity = self._portfolio.entity
+        pass
 
     def _clean(self):
-        self._entity = None
-        self._keys = None
-        self._privkeys = None
-
-
-class AcceptNewKeysMixin(PolicyMixin):
-    """Logic for validating new keys for a Portfolio."""
-
-    @policy(b'I', 0)
-    def _check_keys_issuer(self) -> bool:
-        if self._keys.issuer != self._portfolio.entity.id:
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_keys_expired(self) -> bool:
-        if self._keys.is_expired():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_keys_valid(self) -> bool:
-        if not self._keys.validate():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_keys_verify(self) -> bool:
-        if not Crypto.verify(self._keys, self._portfolio):
-            raise PolicyException()
-        return True
+        self._document = None
+        self._portfolio = None
 
     @policy(b'I', 0)
     def _check_keys_self_verify(self, portfolio:Portfolio) -> bool:
-        if not Crypto.verify(self._keys, portfolio):
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_privkeys_issuer(self) -> bool:
-        if self._privkeys.issuer != self._portfolio.entity.id:
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_privkeys_expired(self) -> bool:
-        if self._privkeys.is_expired():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_privkeys_valid(self) -> bool:
-        if not self._privkeys.validate():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_privkeys_verify(self) -> bool:
-        if not Crypto.verify(self._privkeys, self._portfolio):
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_privkeys_self_verify(self, portfolio:Portfolio) -> bool:
-        if not Crypto.verify(self._privkeys, portfolio):
+        if not Crypto.verify(self._document, portfolio):
             raise PolicyException()
         return True
 
     def apply(self) -> bool:
         """Perform logic to validate new keys."""
-        portfolio = Portfolio({self._portfolio.entity, self._keys})
+        portfolio = Portfolio({self._portfolio.entity, self._document})
 
         valid = [
-            self._check_keys_issuer(),
-            self._check_keys_expired(),
-            self._check_keys_valid(),
-            self._check_keys_verify(),
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
             self._check_keys_self_verify(portfolio)
         ]
-
-        if self._privkeys:
-            valid += [
-                self._check_privkeys_issuer(),
-                self._check_privkeys_expired(),
-                self._check_privkeys_valid(),
-                self._check_privkeys_verify(),
-                self._check_privkeys_self_verify(portfolio)
-            ]
-
         if not all(valid):
             raise PolicyException()
 
-        if self._privkeys:
-            docs = {self._keys, self._privkeys} | (self._portfolio.documents() - {self._portfolio.privkeys})
-        else:
-            docs = {self._keys} | self._portfolio.documents()
-        self._portfolio.__init__(docs)
+        self._add()
         return True
 
-
-class AcceptNewKeys(BaseAcceptNewKeys, AcceptNewKeysMixin):
-    """Validate new keys."""
-
     @policy(b'I', 0, "Keys:Accept")
-    def validate(self, portfolio: Portfolio, keys: Keys, privkeys: PrivateKeys = None) -> bool:
+    def validate(self, portfolio: Portfolio, keys: Keys) -> bool:
         """Perform validation of new keys for portfolio."""
         self._portfolio = portfolio
-        self._keys = keys
-        self._privkeys = privkeys
+        self._document = keys
         self._applier()
         return True

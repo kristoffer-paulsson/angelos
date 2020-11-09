@@ -217,7 +217,8 @@ class PrivatePortfolio(Portfolio):
 
     def to_portfolio(self) -> Portfolio:
         """Create portfolio filtering private portfolio specific documents."""
-        return Portfolio(self.filter({self.privkeys, self.domain} | self.nodes))
+        return Portfolio(self.filter(
+            {self.privkeys} if self.privkeys else {} | {self.domain} if self.domain else {} | self.nodes))
 
 
 class Operations:

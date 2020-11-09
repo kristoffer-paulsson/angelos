@@ -24,25 +24,22 @@ from unittest import TestCase
 class TestSetupPersonPortfolio(TestCase):
     def test_perform(self):
         data = PersonData(**Generate.person_data()[0])
-        with evaluate("Person:Setup") as r:
+        with evaluate("Person:Setup") as report:
             portfolio = SetupPersonPortfolio().perform(data)
-            print(r.format())
-            print(portfolio)
+        self.assertTrue(report)
 
 
 class TestSetupMinistryPortfolio(TestCase):
     def test_perform(self):
         data = MinistryData(**Generate.ministry_data()[0])
-        with evaluate("Ministry:Setup") as r:
+        with evaluate("Ministry:Setup") as report:
             portfolio = SetupMinistryPortfolio().perform(data)
-            print(r.format())
-            print(portfolio)
+        self.assertTrue(report)
 
 
 class TestSetupChurchPortfolio(TestCase):
     def test_perform(self):
         data = ChurchData(**Generate.church_data()[0])
-        with evaluate("Church:Setup") as r:
+        with evaluate("Church:Setup") as report:
             portfolio = SetupChurchPortfolio().perform(data, server=True)
-            print(r.format())
-            print(portfolio)
+        self.assertTrue(report)

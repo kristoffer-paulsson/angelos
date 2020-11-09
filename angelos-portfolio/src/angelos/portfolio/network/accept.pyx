@@ -16,8 +16,8 @@
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
 from angelos.document.domain import Network
-from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import Portfolio
+from angelos.portfolio.policy import UpdatablePolicy, DocumentPolicy
 
 
 class NetworkAcceptException(RuntimeError):
@@ -26,52 +26,15 @@ class NetworkAcceptException(RuntimeError):
     NETWORK_NOT_IN_PORTFOLIO = ("Network document not present in portfolio.", 101)
 
 
-class BaseAcceptNetwork(PolicyValidator):
-    """Initialize the network validator."""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._network = None
+class AcceptNetwork(DocumentPolicy, PolicyValidator, PolicyMixin):
+    """Validate network."""
 
     def _setup(self):
         pass
 
     def _clean(self):
         self._portfolio = None
-        self._network = None
-
-
-class AcceptNetworkChecker:
-    """Common policy checkers for network accept."""
-
-    @policy(b'I', 0)
-    def _check_network_issuer(self) -> bool:
-        if self._network.issuer != self._portfolio.entity.id:
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_network_expired(self) -> bool:
-        if self._network.is_expired():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_network_valid(self) -> bool:
-        if not self._network.validate():
-            raise PolicyException()
-        return True
-
-    @policy(b'I', 0)
-    def _check_network_verify(self) -> bool:
-        if not Crypto.verify(self._network, self._portfolio):
-            raise PolicyException()
-        return True
-
-
-class ValidateNetworkMixin(AcceptNetworkChecker, PolicyMixin):
-    """Logic for validating a Network for a Portfolio."""
+        self._document = None
 
     def apply(self) -> bool:
         """Perform logic to validate network for current."""
@@ -79,43 +42,35 @@ class ValidateNetworkMixin(AcceptNetworkChecker, PolicyMixin):
             raise NetworkAcceptException(*NetworkAcceptException.NETWORK_ALREADY_IN_PORTFOLIO)
 
         if not all([
-            self._check_network_issuer(),
-            self._check_network_expired(),
-            self._check_network_valid(),
-            self._check_network_verify(),
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify()
         ]):
             raise PolicyException()
 
-        docs = self._portfolio.documents() | {self._network}
-        self._portfolio.__init__(docs)
+        self._add()
         return True
-
-
-class ValidateNetwork(BaseAcceptNetwork, ValidateNetworkMixin):
-    """Validate network."""
 
     @policy(b'I', 0, "Network:Accept")
     def validate(self, portfolio: Portfolio, network: Network) -> bool:
         """Perform validation of network for portfolio."""
         self._portfolio = portfolio
-        self._network = network
+        self._document = network
         self._applier()
         return True
 
 
-class AcceptUpdatedNetworkMixin(AcceptNetworkChecker, PolicyMixin):
-    """Logic for validating an updated Network for a Portfolio."""
+class AcceptUpdatedNetwork(UpdatablePolicy, PolicyValidator, PolicyMixin):
+    """Validate updated network."""
 
-    @policy(b'I', 0)
-    def _check_fields_unchanged(self) -> bool:
-        unchanged = set(self._network.fields()) - set(["signature", "expires", "updated", "hosts"])
-        same = list()
-        for name in unchanged:
-            same.append(getattr(self._network, name) == getattr(self._portfolio.network, name))
+    def _setup(self):
+        pass
 
-        if not all(same):
-            raise PolicyException()
-        return True
+    def _clean(self):
+        self._portfolio = None
+        self._document = None
+        self._former = None
 
     def apply(self) -> bool:
         """Perform logic to validate updated network with current."""
@@ -123,26 +78,22 @@ class AcceptUpdatedNetworkMixin(AcceptNetworkChecker, PolicyMixin):
             raise NetworkAcceptException(*NetworkAcceptException.NETWORK_NOT_IN_PORTFOLIO)
 
         if not all([
-            self._check_network_issuer(),
-            self._check_network_expired(),
-            self._check_network_valid(),
-            self._check_network_verify(),
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
             self._check_fields_unchanged()
         ]):
             raise PolicyException()
 
-        docs = self._portfolio.filter({self._portfolio.network}) | {self._network}
-        self._portfolio.__init__(docs)
+        self._update()
         return True
-
-
-class AcceptUpdatedNetwork(BaseAcceptNetwork, AcceptUpdatedNetworkMixin):
-    """Validate updated network."""
 
     @policy(b'I', 0, "Network:AcceptUpdated")
     def validate(self, portfolio: Portfolio, network: Network) -> bool:
         """Perform validation of updated network for portfolio."""
         self._portfolio = portfolio
-        self._network = network
+        self._document = network
+        self._former = portfolio.get_id(network.id)
         self._applier()
         return True

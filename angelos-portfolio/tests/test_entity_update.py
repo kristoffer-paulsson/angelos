@@ -13,7 +13,6 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
-import pyximport; pyximport.install()
 from angelos.portfolio.entity.update import UpdatePersonEntity, UpdateMinistryEntity, UpdateChurchEntity
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
@@ -36,10 +35,9 @@ class TestUpdatePersonEntity(TestCase):
         portfolio = CreatePersonEntity().perform(PersonData(**first))
         new_data(first, second, portfolio.entity.changeables())
         data = PersonData(**second)
-        with evaluate("Person:Update") as r:
+        with evaluate("Person:Update") as report:
             entity = UpdatePersonEntity().perform(portfolio, data)
-            print(portfolio)
-            print(r.format())
+        self.assertTrue(report)
 
 
 class TestUpdateMinistryEntity(TestCase):
@@ -48,10 +46,9 @@ class TestUpdateMinistryEntity(TestCase):
         portfolio = CreateMinistryEntity().perform(MinistryData(**first))
         new_data(first, second, portfolio.entity.changeables())
         data = MinistryData(**second)
-        with evaluate("Ministry:Update") as r:
+        with evaluate("Ministry:Update") as report:
             entity = UpdateMinistryEntity().perform(portfolio, data)
-            print(portfolio)
-            print(r.format())
+        self.assertTrue(report)
 
 
 class TestUpdateChurchEntity(TestCase):
@@ -60,7 +57,6 @@ class TestUpdateChurchEntity(TestCase):
         portfolio = CreateChurchEntity().perform(ChurchData(**first))
         new_data(first, second, portfolio.entity.changeables())
         data = ChurchData(**second)
-        with evaluate("Ministry:Update") as r:
+        with evaluate("Ministry:Update") as report:
             entity = UpdateChurchEntity().perform(portfolio, data)
-            print(portfolio)
-            print(r.format())
+        self.assertTrue(report)

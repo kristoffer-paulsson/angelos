@@ -31,7 +31,7 @@ class TestCreateDomain(TestCase):
             domain = CreateDomain().perform(portfolio)
             self.assertIsNotNone(domain)
             self.assertIs(domain, portfolio.domain)
-            self.assertTrue(report)
+        self.assertTrue(report)
 
         with self.assertRaises(DomainCreateException):
             CreateDomain().perform(portfolio)

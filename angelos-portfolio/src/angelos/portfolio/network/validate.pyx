@@ -17,17 +17,11 @@
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
 from angelos.document.domain import Network
 from angelos.portfolio.collection import Portfolio
-from angelos.portfolio.policy import DocumentPolicy, UpdatablePolicy
+from angelos.portfolio.policy import UpdatablePolicy
 
 
-class BaseValidateNetwork(PolicyValidator):
-    """Initialize the network validator."""
-
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._document = None
-        self._former = None
+class ValidateNetwork(UpdatablePolicy, PolicyValidator, PolicyMixin):
+    """Validate network."""
 
     def _setup(self):
         pass
@@ -36,10 +30,6 @@ class BaseValidateNetwork(PolicyValidator):
         self._portfolio = None
         self._document = None
         self._former = None
-
-
-class ValidateNetworkMixin(DocumentPolicy, UpdatablePolicy, PolicyMixin):
-    """Logic for validating a Network for a Portfolio."""
 
     def apply(self) -> bool:
         """Perform logic to validate network for current."""
@@ -53,15 +43,11 @@ class ValidateNetworkMixin(DocumentPolicy, UpdatablePolicy, PolicyMixin):
             raise PolicyException()
         return True
 
-
-class ValidateNetwork(BaseValidateNetwork, ValidateNetworkMixin):
-    """Validate network."""
-
-    @policy(b'I', 0, "Network:ValidatePortfolio")
+    @policy(b'I', 0, "Network:Validate")
     def validate(self, portfolio: Portfolio, network: Network) -> bool:
         """Perform validation of network for portfolio."""
         self._portfolio = portfolio
         self._document = network
-        self._former = portfolio.get_id(network)
+        self._former = portfolio.get_id(network.id)
         self._applier()
         return True

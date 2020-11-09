@@ -37,7 +37,7 @@ class TestCreateNode(TestCase):
             node = CreateNode().current(portfolio, server=True)
             self.assertIsNotNone(node)
             self.assertIn(node, portfolio.nodes)
-            self.assertTrue(report)
+        self.assertTrue(report)
 
         portfolio.freeze()
         with self.assertRaises(FrozenPortfolioError):

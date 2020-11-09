@@ -14,10 +14,12 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Creating new domain document for new portfolio."""
-from angelos.common.policy import PolicyPerformer, PolicyMixin, policy
+from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyException
 from angelos.document.domain import Network, Host
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio, FrozenPortfolioError
+from angelos.portfolio.node.policy import NodePolicy
+from angelos.portfolio.policy import DocumentPolicy
 
 
 class NetworkCreateException(RuntimeError):
@@ -26,22 +28,14 @@ class NetworkCreateException(RuntimeError):
     NETWORK_ALREADY_PRESENT = ("Check that there is not already a network document", 103)
 
 
-class BaseCreateNetwork(PolicyPerformer):
-    """Initialize the network generator"""
-    def __init__(self):
-        super().__init__()
-        self._portfolio = None
-        self._network = None
+class CreateNetwork(DocumentPolicy, NodePolicy, PolicyPerformer, PolicyMixin):
+    """Generate network document and add to private portfolio."""
 
     def _setup(self):
-        self._network = None
+        self._document = None
 
     def _clean(self):
         self._portfolio = None
-
-
-class CreateNetworkMixin(PolicyMixin):
-    """Logic for generating Network for a new PrivatePortfolio."""
 
     def apply(self) -> bool:
         """Perform logic to create a new network with portfolio."""
@@ -70,25 +64,30 @@ class CreateNetworkMixin(PolicyMixin):
                     )
                 )
 
-        self._network = Network(
+        self._document = Network(
             nd={
                 "domain": self._portfolio.domain.id,
                 "hosts": hosts,
                 "issuer": self._portfolio.entity.id,
             }
         )
+        self._document = Crypto.sign(self._document, self._portfolio)
 
-        self._network = Crypto.sign(self._network, self._portfolio)
-        self._network.validate()
-        self._portfolio.documents().add(self._network)
+        if not all([
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+            self._check_domain_issuer(),
+            self._check_node_domain()
+        ]):
+            raise PolicyException()
 
-
-class CreateNetwork(BaseCreateNetwork, CreateNetworkMixin):
-    """Generate network document and add to private portfolio."""
+        self._add()
 
     @policy(b'I', 0, "Network:Create")
     def perform(self, portfolio: PrivatePortfolio) -> Network:
         """Perform building of network."""
         self._portfolio = portfolio
         self._applier()
-        return self._network
+        return self._document

@@ -16,26 +16,33 @@
 from unittest import TestCase
 
 from angelos.common.policy import evaluate
+from angelos.lib.policy.types import ChurchData
 from angelos.meta.fake import Generate
 from angelos.portfolio.domain.create import CreateDomain
 from angelos.portfolio.entity.create import CreateChurchEntity
+from angelos.portfolio.network.accept import AcceptNetwork
+from angelos.portfolio.network.validate import ValidateNetwork
 from angelos.portfolio.network.create import CreateNetwork
 from angelos.portfolio.network.update import UpdateNetwork
-from angelos.portfolio.node.create import CreateNode, IPv4Address
-from angelos.portfolio.portfolio.setup import ChurchData
+from angelos.portfolio.node.create import CreateNode
+from angelos.portfolio.portfolio.setup import IPv4Address
 
 
-class TestUpdateNetwork(TestCase):
-    def test_perform(self):
+class TestValidateNetwork(TestCase):
+    def test_validate(self):
         portfolio = CreateChurchEntity().perform(ChurchData(**Generate.church_data()[0]))
-        domain = CreateDomain().perform(portfolio)
+        CreateDomain().perform(portfolio)
         CreateNode().current(portfolio, server=True)
-        CreateNetwork().perform(portfolio)
+
+        foreign_porfolio = portfolio.to_portfolio()
+        self.assertIsNone(foreign_porfolio.network)
+        network = CreateNetwork().perform(portfolio)
+        AcceptNetwork().validate(foreign_porfolio, network)
 
         CreateNode().perform(portfolio, device="test", serial="1234567890", ip=IPv4Address("127.0.0.1"), server=True)
-        with evaluate("Network:Update") as report:
-            network = UpdateNetwork().perform(portfolio)
-            self.assertIs(network, portfolio.network)
-            self.assertEqual(network.domain, domain.id)
-            self.assertEqual(len(network.hosts), 2)
+        network = UpdateNetwork().perform(portfolio)
+
+        with evaluate("Network:Validate") as report:
+            ValidateNetwork().validate(foreign_porfolio, network)
+            self.assertIs(network, foreign_porfolio.network)
         self.assertTrue(report)

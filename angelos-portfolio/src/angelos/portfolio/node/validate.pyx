@@ -17,10 +17,11 @@
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
 from angelos.document.domain import Node
 from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.node.policy import NodePolicy
 from angelos.portfolio.policy import UpdatablePolicy
 
 
-class ValidateNode(UpdatablePolicy, PolicyMixin, PolicyValidator):
+class ValidateNode(UpdatablePolicy, NodePolicy, PolicyMixin, PolicyValidator):
     """Validate updated domain."""
 
     def _setup(self):
@@ -44,6 +45,7 @@ class ValidateNode(UpdatablePolicy, PolicyMixin, PolicyValidator):
             self._check_document_expired(),
             self._check_document_valid(),
             self._check_document_verify(),
+            self._check_domain_issuer() if self._portfolio.domain else True,
             self._check_node_domain() if self._portfolio.domain else True,
             self._check_fields_unchanged() if self._former else True
         ]):

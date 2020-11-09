@@ -18,6 +18,7 @@ from angelos.common.policy import PolicyPerformer, PolicyMixin, policy, PolicyEx
 from angelos.document.domain import Node
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio
+from angelos.portfolio.node.policy import NodePolicy
 from angelos.portfolio.policy import UpdatablePolicy
 
 
@@ -27,7 +28,7 @@ class NodeUpdateException(RuntimeError):
     DOMAIN_NOT_IN_PORTFOLIO = ("Domain not present in portfolio.", 101)
 
 
-class UpdateNode(UpdatablePolicy, PolicyPerformer, PolicyMixin):
+class UpdateNode(UpdatablePolicy, NodePolicy, PolicyPerformer, PolicyMixin):
     """Update node document for private portfolio."""
 
     def _setup(self):
@@ -53,6 +54,8 @@ class UpdateNode(UpdatablePolicy, PolicyPerformer, PolicyMixin):
             self._check_document_expired(),
             self._check_document_valid(),
             self._check_document_verify(),
+            self._check_domain_issuer(),
+            self._check_node_domain(),
             self._check_fields_unchanged() if self._former else True
         ]):
             raise PolicyException()

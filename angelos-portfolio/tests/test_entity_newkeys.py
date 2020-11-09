@@ -13,6 +13,8 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Security tests putting the policies to the test."""
+import copy
+
 import pyximport; pyximport.install()
 from angelos.portfolio.entity.newkey import NewKeys
 from angelos.common.policy import evaluate
@@ -26,10 +28,8 @@ from unittest import TestCase
 class TestNewKeys(TestCase):
     def test_perform(self):
         portfolio = CreatePersonEntity().perform(PersonData(**Generate.person_data()[0]))
-        privkeys = portfolio.privkeys
-        keys = portfolio.keys
-        with evaluate("Keys:New") as r:
-            NewKeys().perform(portfolio)
-            print(portfolio)
-            print(r.format())
-        self.assertNotEqual(privkeys, portfolio.privkeys)
+        old_privkeys = copy.deepcopy(portfolio.privkeys)
+        with evaluate("Keys:New") as report:
+            _, privkeys = NewKeys().perform(portfolio)
+        self.assertTrue(report)
+        self.assertNotEqual(privkeys, old_privkeys)
