@@ -34,7 +34,8 @@ class SubPackages:
         "angelos.meta": "angelos-meta",
         "angelos.psi": "angelos-psi",
         "angelos.common": "angelos-common",
-        "angelos.portfolio": "angelos-portfolio", # Development
+        "angelos.portfolio": "angelos-portfolio",
+        "angelos.facade": "angelos-facade",
         "angelos.bin": "angelos-bin",
         "angelos.document": "angelos-document",
         "angelos.archive7": "angelos-archive7",

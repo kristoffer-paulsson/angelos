@@ -32,12 +32,6 @@ class ValidateNode(UpdatablePolicy, NodePolicy, PolicyMixin, PolicyValidator):
         self._document = None
         self._former = None
 
-    @policy(b'I', 0)
-    def _check_node_domain(self) -> bool:
-        if self._document.domain != self._portfolio.domain.id:
-            raise PolicyException()
-        return True
-
     def apply(self) -> bool:
         """Perform logic to validate updated domain with current."""
         if not all([
@@ -57,6 +51,6 @@ class ValidateNode(UpdatablePolicy, NodePolicy, PolicyMixin, PolicyValidator):
         """Perform validation of updated node for portfolio."""
         self._portfolio = portfolio
         self._document = node
-        self._former = portfolio.get_id(node)
+        self._former = portfolio.get_id(node.id)
         self._applier()
         return True

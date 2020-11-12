@@ -14,10 +14,12 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Helper utilities for documents."""
-import sys
+import datetime
+import uuid
 from typing import Tuple
 
 import msgpack
+from angelos.common.utils import Util
 
 
 class Definitions:
@@ -121,16 +123,9 @@ class Definitions:
 
     # FIXME: Write unittests.
     @classmethod
-    def extension(cls, doc_type: int) -> str:
-        """Get file extension for document type."""
-        return cls.EXTENSION[doc_type]
-
-    # FIXME: Write unittests.
-    @classmethod
     def klass(cls, doc_type: int) -> type:
         """Get class for document type."""
-        module, klass = cls.CLASS[doc_type]
-        return getattr(sys.modules[module], klass)
+        return Util.klass(*cls.CLASS[doc_type])
 
 
 class Helper:
@@ -219,3 +214,25 @@ class Helper:
         """Build document from stream of bytes."""
         doc_obj = msgpack.unpackb(data, raw=False)
         return Definitions.klass(int.from_bytes(doc_obj["type"], byteorder="big")).build(doc_obj)
+
+    # FIXME: Write unittests.
+    @classmethod
+    def extension(cls, doc_type: int) -> str:
+        """Get file extension for document type."""
+        return Definitions.EXTENSION[doc_type]
+
+    @classmethod
+    def meta(cls, document: "Document") -> Tuple[datetime.datetime, datetime.datetime, uuid.UUID]:
+        """Calculates the correct meta information about a document to be updated
+
+        Args:
+            document (Document):
+                Enter a valid Document.
+
+        Returns (datetime.datetime, datetime.datetime, uuid.UUID):
+            Correct meta-data (created datetime, touched datetime, owner).
+
+        """
+        return datetime.datetime.combine(
+            document.created, datetime.datetime.min.time()), datetime.datetime.combine(
+            document.get_touched(), datetime.datetime.min.time()), document.get_owner()

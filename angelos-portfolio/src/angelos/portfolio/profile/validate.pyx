@@ -15,13 +15,13 @@
 #
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
-from angelos.document.domain import Network
+from angelos.document.profiles import Profile
 from angelos.portfolio.collection import Portfolio
 from angelos.portfolio.policy import DocumentPolicy
 
 
-class ValidateNetwork(DocumentPolicy, PolicyValidator, PolicyMixin):
-    """Validate network."""
+class ValidateProfile(DocumentPolicy, PolicyValidator, PolicyMixin):
+    """Validate updated profile."""
 
     def _setup(self):
         pass
@@ -31,7 +31,7 @@ class ValidateNetwork(DocumentPolicy, PolicyValidator, PolicyMixin):
         self._document = None
 
     def apply(self) -> bool:
-        """Perform logic to validate network for current."""
+        """Perform logic to validate updated profile with current."""
         if not all([
             self._check_document_issuer(),
             self._check_document_expired(),
@@ -41,10 +41,10 @@ class ValidateNetwork(DocumentPolicy, PolicyValidator, PolicyMixin):
             raise PolicyException()
         return True
 
-    @policy(b'I', 0, "Network:Validate")
-    def validate(self, portfolio: Portfolio, network: Network) -> bool:
-        """Perform validation of network for portfolio."""
+    @policy(b'I', 0, "Profile:Validate")
+    def validate(self, portfolio: Portfolio, profile: Profile) -> bool:
+        """Perform validation of updated domain for portfolio."""
         self._portfolio = portfolio
-        self._document = network
+        self._document = profile
         self._applier()
         return True

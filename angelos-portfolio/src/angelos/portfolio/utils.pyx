@@ -141,7 +141,7 @@ class Groups:
 class Definitions:
     """Definitions for portfolios."""
 
-    EXTENSION = {
+    SUFFIXES = {
         Fields.ENTITY: ".ent",
         Fields.PROFILE: ".pfl",
         Fields.PRIVKEYS: ".pky",
@@ -182,17 +182,6 @@ class Helper:
     PATH = PurePosixPath("/portfolios/")
 
     @classmethod
-    def document_meta(cls, document: Document) -> Tuple[datetime.datetime, datetime.datetime, uuid.UUID]:
-        """Calculates the correct meta information about a document to be updated
-
-        Args:
-            document (Document):
-                Enter a valid Document.
-
-        Returns (datetime.datetime, datetime.datetime, uuid.UUID):
-            Correct meta-data (created datetime, touched datetime, owner).
-
-        """
-        return datetime.datetime.combine(
-            document.created, datetime.datetime.min.time()), datetime.datetime.combine(
-            document.get_touched(), datetime.datetime.min.time()), document.get_owner()
+    def group_suffix(cls, group: Tuple[str]) -> Tuple[str]:
+        """Suffixes of fields from a group."""
+        return {Definitions.SUFFIXES[field] for field in group}

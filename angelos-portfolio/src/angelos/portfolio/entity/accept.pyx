@@ -15,9 +15,9 @@
 #
 """Creating new entity portfolio for Person, Ministry and Church including Keys and PrivateKeys documents."""
 from angelos.common.policy import PolicyMixin, policy, PolicyException, PolicyValidator
-from angelos.document.entities import Entity, Keys
+from angelos.document.entities import Entity, Keys, PrivateKeys
 from angelos.lib.policy.crypto import Crypto
-from angelos.portfolio.collection import Portfolio
+from angelos.portfolio.collection import Portfolio, PrivatePortfolio
 from angelos.portfolio.policy import DocumentPolicy, UpdatablePolicy
 
 
@@ -146,5 +146,39 @@ class AcceptNewKeys(DocumentPolicy, PolicyValidator, PolicyMixin):
         """Perform validation of new keys for portfolio."""
         self._portfolio = portfolio
         self._document = keys
+        self._applier()
+        return True
+
+
+class AcceptPrivateKeys(UpdatablePolicy, PolicyValidator, PolicyMixin):
+    """Validate private keys."""
+
+    def _setup(self):
+        pass
+
+    def _clean(self):
+        self._portfolio = None
+        self._document = None
+        self._privkeys = None
+
+    def apply(self) -> bool:
+        """Perform logic to validate private keys."""
+        if not all([
+            self._check_document_issuer(),
+            self._check_document_expired(),
+            self._check_document_valid(),
+            self._check_document_verify(),
+        ]):
+            raise PolicyException()
+
+        self._update()
+        return True
+
+    @policy(b'I', 0, "PrivateKeys:Accept")
+    def validate(self, portfolio: PrivatePortfolio, privkeys: PrivateKeys) -> bool:
+        """Perform validation of updated domain for portfolio."""
+        self._portfolio = portfolio
+        self._document = privkeys
+        self._former = portfolio.privkeys
         self._applier()
         return True

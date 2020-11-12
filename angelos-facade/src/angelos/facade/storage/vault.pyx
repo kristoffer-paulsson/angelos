@@ -16,19 +16,18 @@
 """Vault."""
 import datetime
 import io
-import logging
 import uuid
 from pathlib import PurePosixPath, Path
 from typing import List, Dict, Any, Optional, Callable
 
 from angelos.archive7.archive import TYPE_LINK, Archive7
 from angelos.archive7.fs import TYPE_FILE
+from angelos.document.utils import Helper as DocumentHelper
+from angelos.facade.facade import StorageFacadeExtension
+from angelos.facade.storage.portfolio_mixin import PortfolioMixin
 from angelos.lib.const import Const
-from angelos.lib.policy.portfolio import PrivatePortfolio, PortfolioPolicy
-
 from angelos.lib.helper import Glue, Globber
-from angelos.lib.storage.portfolio_mixin import PortfolioMixin
-from angelos.lib.storage.storage import StorageFacadeExtension
+from angelos.portfolio.collection import PrivatePortfolio
 
 
 class VaultStorage(StorageFacadeExtension, PortfolioMixin):
@@ -85,7 +84,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
     @classmethod
     async def setup(
             cls, home_dir: Path, secret: bytes,
-            portfolio: PrivatePortfolio, vtype=None, vrole=None
+            portfolio: PrivatePortfolio, vault_type: int = None, vault_role: int = None
     ) -> object:
         """Create and setup the whole Vault according to policy's.
 
@@ -106,8 +105,8 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             owner=portfolio.entity.id,
             node=next(iter(portfolio.nodes)).id,
             domain=portfolio.domain.id,
-            vtype=vtype,
-            vrole=vrole
+            vault_type=vault_type,
+            vault_role=vault_role
         )
 
     async def save(self, filename: PurePosixPath, document, document_file_id_match=True):
@@ -130,7 +129,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
 
         return await self.archive.mkfile(
             filename=filename,
-            data=PortfolioPolicy.serialize(document),
+            data=DocumentHelper.serialize(document),
             id=file_id,
             owner=owner,
             created=created,
@@ -174,7 +173,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
 
         return await self.archive.save(
             filename=filename,
-            data=PortfolioPolicy.serialize(document),
+            data=DocumentHelper.serialize(document),
             modified=updated,
         )
 
