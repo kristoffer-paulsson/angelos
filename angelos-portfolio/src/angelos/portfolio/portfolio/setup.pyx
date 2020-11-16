@@ -74,14 +74,8 @@ class SetupPersonPortfolio(BaseSetupEntity, SetupEntityMixin):
         self._klass = CreatePersonEntity
 
     @policy(b'I', 0, "Person:Setup")
-    def perform(
-            self,
-            data: PersonData,
-            ip: Union[IPv4Address, IPv6Address] = None,
-            hostname: str = None,
-            role: int=Const.A_ROLE_PRIMARY,
-            server: bool = False
-    ) -> PrivatePortfolio:
+    def perform(self, data: PersonData, ip: Union[IPv4Address, IPv6Address] = None,
+            hostname: str = None, role: int=Const.A_ROLE_PRIMARY, server: bool = False) -> PrivatePortfolio:
         """Perform building of person portfolio."""
         self._data = data
         self._ip = ip
@@ -99,14 +93,8 @@ class SetupMinistryPortfolio(BaseSetupEntity, SetupEntityMixin):
         self._klass = CreateMinistryEntity
 
     @policy(b'I', 0, "Ministry:Setup")
-    def perform(
-            self,
-            data: MinistryData,
-            ip: Union[IPv4Address, IPv6Address] = None,
-            hostname: str = None,
-            role: int=Const.A_ROLE_PRIMARY,
-            server: bool = False
-    ) -> PrivatePortfolio:
+    def perform(self, data: MinistryData, ip: Union[IPv4Address, IPv6Address] = None,
+            hostname: str = None, role: int=Const.A_ROLE_PRIMARY, server: bool = False) -> PrivatePortfolio:
         """Perform building of person portfolio."""
         self._data = data
         self._ip = ip
@@ -124,14 +112,8 @@ class SetupChurchPortfolio(BaseSetupEntity, SetupEntityMixin):
         self._klass = CreateChurchEntity
 
     @policy(b'I', 0, "Church:Setup")
-    def perform(
-            self,
-            data: ChurchData,
-            ip: Union[IPv4Address, IPv6Address] = None,
-            hostname: str = None,
-            role: int=Const.A_ROLE_PRIMARY,
-            server: bool = False
-    ) -> PrivatePortfolio:
+    def perform(self, data: ChurchData, ip: Union[IPv4Address, IPv6Address] = None,
+            hostname: str = None, role: int=Const.A_ROLE_PRIMARY, server: bool = False) -> PrivatePortfolio:
         """Perform building of person portfolio."""
         self._data = data
         self._ip = ip

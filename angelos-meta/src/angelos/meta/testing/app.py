@@ -16,21 +16,20 @@
 import asyncio
 import collections
 import json
-import os
 import uuid
 from tempfile import TemporaryDirectory
 
 from angelos.common.misc import BaseData
 from angelos.lib.automatic import Automatic, Path
 from angelos.lib.const import Const
-from angelos.lib.facade.facade import Facade, TypeFacadeMixin, ClientFacadeMixin, ServerFacadeMixin
+from angelos.facade.facade import Facade, TypeFacadeMixin, ClientFacadeMixin, ServerFacadeMixin
 from angelos.lib.ioc import Handle, ContainerAware, Config, Container
-from angelos.lib.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation
-from angelos.lib.policy.portfolio import PGroup
 from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
 from angelos.lib.ssh.ssh import SessionManager
 from angelos.lib.starter import Starter
 from angelos.meta.fake import Generate
+from angelos.portfolio.portfolio.setup import SetupPersonPortfolio, SetupMinistryPortfolio, SetupChurchPortfolio
+from angelos.portfolio.utils import Groups
 
 ENV_DEFAULT = {"name": "Logo"}
 
@@ -126,55 +125,31 @@ class Configuration(Config, Container):
         }
 
 
-class BaseApplicationStub(ContainerAware):
-    """Application stub base class."""
-
-    def __init__(self):
-        """Initialize configuration."""
-        ContainerAware.__init__(self, Configuration())
-
-
-class StubApplication(BaseApplicationStub):
+class StubApplication(ContainerAware):
     """Facade loader and environment."""
 
     def __init__(self, facade: Facade):
         """Load the facade."""
-        BaseApplicationStub.__init__(self)
+        ContainerAware.__init__(self, Configuration())
         self.ioc.facade = facade
 
-    @staticmethod
-    async def _open(home_dir: Path, secret: bytes) -> TypeFacadeMixin:
-        return await Facade.open(home_dir, secret)
+    @classmethod
+    async def open(cls, home_dir: Path, secret: bytes) -> TypeFacadeMixin:
+        return Facade(home_dir, secret)
 
-    @staticmethod
-    async def _create(home_dir: Path, secret: bytes, data: BaseData, server: bool) -> TypeFacadeMixin:
+    @classmethod
+    async def create(cls, home_dir: Path, secret: bytes, data: BaseData) -> TypeFacadeMixin:
         """Implement facade generation logic here."""
         if isinstance(data, PersonData):
-            portfolio = SetupPersonOperation.create(data, server=True)
+            portfolio = SetupPersonPortfolio.perform(data, server=cls.STUB_SERVER)
         elif isinstance(data, MinistryData):
-            portfolio = SetupMinistryOperation.create(data, server=True)
+            portfolio = SetupMinistryPortfolio.perform(data, server=cls.STUB_SERVER)
         elif isinstance(data, ChurchData):
-            portfolio = SetupChurchOperation.create(data, server=True)
+            portfolio = SetupChurchPortfolio.perform(data, server=cls.STUB_SERVER)
         else:
-            raise RuntimeError()
+            raise TypeError()
 
-        return await Facade.setup(
-            home_dir,
-            secret,
-            Const.A_ROLE_PRIMARY,
-            server,
-            portfolio=portfolio
-        )
-
-    @staticmethod
-    async def open(home_dir: Path, secret: bytes) -> ClientFacadeMixin:
-        """Facade open abstract method."""
-        raise NotImplementedError()
-
-    @staticmethod
-    async def create(home_dir: Path, secret: bytes, data: BaseData) -> ServerFacadeMixin:
-        """Facade create abstract method."""
-        raise NotImplementedError()
+        return Facade(home_dir, secret, Const.A_ROLE_PRIMARY, cls.STUB_SERVER, portfolio=portfolio)
 
     def stop(self):
         """Stop."""
@@ -184,15 +159,7 @@ class StubApplication(BaseApplicationStub):
 class StubServer(StubApplication):
     """Stub server for simulations and testing."""
 
-    @staticmethod
-    async def open(home_dir: Path, secret: bytes) -> ServerFacadeMixin:
-        """Open stub server."""
-        return StubServer(await StubApplication._open(home_dir, secret))
-
-    @staticmethod
-    async def create(home_dir: Path, secret: bytes, data: BaseData) -> ServerFacadeMixin:
-        """Create stub server."""
-        return StubServer(await StubApplication._create(home_dir, secret, data, True))
+    STUB_SERVER = True
 
     async def listen(self):
         """Listen for clients."""
@@ -208,30 +175,18 @@ class StubServer(StubApplication):
 class StubClient(StubApplication):
     """Stub client for simulations and testing."""
 
-    @staticmethod
-    async def open(home_dir: Path, secret: bytes) -> ClientFacadeMixin:
-        """Open stub client."""
-        return StubClient(await StubApplication._open(home_dir, secret))
-
-    @staticmethod
-    async def create(home_dir: Path, secret: bytes, data: BaseData) -> ClientFacadeMixin:
-        """Create stub client."""
-        return StubClient(await StubApplication._create(home_dir, secret, data, False))
+    STUB_SERVER = False
 
     async def connect(self):
         """Connect to server."""
         cnid = uuid.UUID(self.ioc.facade.data.client["CurrentNetwork"])
-        host = await self.ioc.facade.storage.vault.load_portfolio(cnid, PGroup.SHARE_MIN_COMMUNITY)
+        host = await self.ioc.facade.storage.vault.load_portfolio(cnid, Groups.SHARE_MIN_COMMUNITY)
         _, client = await Starter().clients_client(self.ioc.facade.data.portfolio, host, 5 + 8000, ioc=self.ioc)
         return client
 
 
 class ApplicationContext:
     """Environmental context for a stub application."""
-
-    #app = None
-    #dir = None
-    #secret = None
 
     def __init__(self, tmp_dir: TemporaryDirectory, secret: bytes, app):
         self.dir = tmp_dir
@@ -243,6 +198,7 @@ class ApplicationContext:
         """Set up stub application environment."""
         secret = Generate.new_secret()
         tmp_dir = TemporaryDirectory()
+        print(app_cls)
         app = await app_cls.create(Path(tmp_dir.name), secret, data)
         return cls(tmp_dir, secret, app)
 
@@ -256,22 +212,15 @@ class StubMaker:
     """Maker of stubs."""
 
     TYPES = (
-        (SetupPersonOperation, Generate.person_data, PersonData),
-        (SetupMinistryOperation, Generate.ministry_data, MinistryData),
-        (SetupChurchOperation, Generate.church_data, ChurchData)
+        (SetupPersonPortfolio, Generate.person_data, PersonData),
+        (SetupMinistryPortfolio, Generate.ministry_data, MinistryData),
+        (SetupChurchPortfolio, Generate.church_data, ChurchData)
     )
 
     @classmethod
     async def __setup(cls, operation, generator, home: Path, secret: bytes, server: bool):
-        return await Facade.setup(
-            home,
-            secret,
-            Const.A_ROLE_PRIMARY,
-            server,
-            portfolio=operation.create(
-                generator()[0],
-                server=server)
-        )
+        return Facade(home, secret, Const.A_ROLE_PRIMARY, server,
+            portfolio=operation.perform(generator()[0], server=server))
 
     @classmethod
     async def create_person_facade(cls, homedir: Path, secret: bytes, server: bool = False) -> Facade:
@@ -289,8 +238,7 @@ class StubMaker:
             The generated facade instance.
 
         """
-        return await cls.__setup(
-            SetupPersonOperation, Generate.person_data, homedir, secret, server)
+        return await cls.__setup(SetupPersonPortfolio, Generate.person_data, homedir, secret, server)
 
     @classmethod
     async def create_ministry_facade(cls, homedir: Path, secret: bytes, server: bool = False) -> Facade:
@@ -308,8 +256,7 @@ class StubMaker:
             The generated facade instance.
 
         """
-        return await cls.__setup(
-            SetupMinistryOperation, Generate.ministry_data, homedir, secret, server)
+        return await cls.__setup(SetupMinistryPortfolio, Generate.ministry_data, homedir, secret, server)
 
     @classmethod
     async def create_church_facade(cls, homedir: Path, secret: bytes, server: bool = True) -> bytes:
@@ -327,8 +274,7 @@ class StubMaker:
             The generated facade instance.
 
         """
-        return await cls.__setup(
-            SetupChurchOperation, Generate.church_data, homedir, secret, server)
+        return await cls.__setup(SetupChurchPortfolio, Generate.church_data, homedir, secret, server)
 
     @classmethod
     async def create_server(cls) -> ApplicationContext:

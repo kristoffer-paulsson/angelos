@@ -58,7 +58,8 @@ RELEASE = ""
 
 scan = {
     "glob": [
-        str(Path("angelos/bin/*.pyx"))
+        str(Path("angelos/bin/*.pyx")),
+        str(Path("angelos/bin/mac/*.pyx")) if sys.platform == "darwin" else str(Path("angelos/bin/win/*.pyx")) if sys.platform == "win32" else str(Path("angelos/bin/nix/*.pyx")),
     ],
     "extra": {
         "angelos.bin.nacl": {
@@ -74,7 +75,7 @@ scan = {
         } if sys.platform == "win32" else {
             "extra_objects": [str(Path("usr/local/lib/libsodium.a"))],
             "include_dirs": [str(Path("usr/local/include").absolute())]  # CentOS specific only (?)
-        }
+        },
     },
     "basic": {
     }

@@ -91,39 +91,39 @@ class Definitions:
     CLASS = {
         0: type(None),  # NONE
 
-        1: ("angelos.documents.entities", "PrivateKeys"),  # KEYS_PRIVATE
+        1: ("angelos.document.entities", "PrivateKeys"),  # KEYS_PRIVATE
 
-        10: ("angelos.documents.entities", "Keys"),  # KEYS
+        10: ("angelos.document.entities", "Keys"),  # KEYS
 
-        20: ("angelos.documents.entities", "Person"),  # ENTITY_PERSON
-        21: ("angelos.documents.entities", "Ministry"),  # ENTITY_MINISTRY
-        22: ("angelos.documents.entities", "Church"),  # ENTITY_CHURCH
-        30: ("angelos.documents.profile", "PersonProfile"),  # PROF_PERSON
-        31: ("angelos.documents.profile", "MinistryProfile"),  # PROF_MINISTRY
-        32: ("angelos.documents.profile", "ChurchProfile"),  # PROF_CHURCH
+        20: ("angelos.document.entities", "Person"),  # ENTITY_PERSON
+        21: ("angelos.document.entities", "Ministry"),  # ENTITY_MINISTRY
+        22: ("angelos.document.entities", "Church"),  # ENTITY_CHURCH
+        30: ("angelos.document.profile", "PersonProfile"),  # PROF_PERSON
+        31: ("angelos.document.profile", "MinistryProfile"),  # PROF_MINISTRY
+        32: ("angelos.document.profile", "ChurchProfile"),  # PROF_CHURCH
 
-        40: ("angelos.documents.domain", "Domain"),  # NET_DOMAIN
-        41: ("angelos.documents.domain", "Node"),  # NET_NODE
-        42: ("angelos.documents.domain", "Network"),  # NET_NETWORK
+        40: ("angelos.document.domain", "Domain"),  # NET_DOMAIN
+        41: ("angelos.document.domain", "Node"),  # NET_NODE
+        42: ("angelos.document.domain", "Network"),  # NET_NETWORK
 
-        50: ("angelos.documents.statements", "Verified"),  # STAT_VERIFIED
-        51: ("angelos.documents.statements", "Trusted"),  # STAT_TRUSTED
-        52: ("angelos.documents.statements", "Revoked"),  # STAT_REVOKED
+        50: ("angelos.document.statements", "Verified"),  # STAT_VERIFIED
+        51: ("angelos.document.statements", "Trusted"),  # STAT_TRUSTED
+        52: ("angelos.document.statements", "Revoked"),  # STAT_REVOKED
 
-        60: ("angelos.documents.envelope", "Envelope"),  # COM_ENVELOPE
+        60: ("angelos.document.envelope", "Envelope"),  # COM_ENVELOPE
 
-        70: ("angelos.documents.messages", "Note"),  # COM_NOTE
-        71: ("angelos.documents.messages", "Instant"),  # COM_INSTANT
-        72: ("angelos.documents.messages", "Mail"),  # COM_MAIL
-        73: ("angelos.documents.messages", "Share"),  # COM_SHARE
-        74: ("angelos.documents.messages", "Report"),  # COM_REPORT
+        70: ("angelos.document.messages", "Note"),  # COM_NOTE
+        71: ("angelos.document.messages", "Instant"),  # COM_INSTANT
+        72: ("angelos.document.messages", "Mail"),  # COM_MAIL
+        73: ("angelos.document.messages", "Share"),  # COM_SHARE
+        74: ("angelos.document.messages", "Report"),  # COM_REPORT
 
-        700: ("angelos.documents.misc", "StoredLetter")  # CACHED_MSG
+        700: ("angelos.document.misc", "StoredLetter")  # CACHED_MSG
     }
 
     # FIXME: Write unittests.
     @classmethod
-    def klass(cls, doc_type: int) -> type:
+    def klass(cls, doc_type: int) -> "DocumentMeta":
         """Get class for document type."""
         return Util.klass(*cls.CLASS[doc_type])
 

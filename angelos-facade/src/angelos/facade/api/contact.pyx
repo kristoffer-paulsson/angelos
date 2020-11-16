@@ -17,8 +17,7 @@
 import uuid
 from typing import Tuple, Set
 
-from angelos.angelos.api.api import ApiFacadeExtension
-from angelos.lib.facade.base import BaseFacade
+from angelos.facade.facade import ApiFacadeExtension, Facade
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -31,7 +30,7 @@ class ContactAPI(ApiFacadeExtension):
     PATH_FRIENDS = ("/contacts/friends/",)
     PATH_FAVORITES = ("/contacts/favorites/",)
 
-    def __init__(self, facade: BaseFacade):
+    def __init__(self, facade: Facade):
         """Initialize the Contacts."""
         ApiFacadeExtension.__init__(self, facade)
 

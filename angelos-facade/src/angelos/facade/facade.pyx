@@ -17,7 +17,6 @@ import asyncio
 import atexit
 import logging
 import math
-import sys
 import time
 import uuid
 import datetime
@@ -30,6 +29,7 @@ from angelos.common.misc import Loop, Misc
 from angelos.common.utils import Util
 from angelos.document.entities import Person, Ministry, Church
 from angelos.lib.const import Const
+from angelos.lib.reactive import NotifierMixin, ObserverMixin, Event
 from angelos.portfolio.collection import PrivatePortfolio
 from angelos.portfolio.utils import Groups
 
@@ -44,6 +44,7 @@ class FacadeError(RuntimeError):
     UNKNOWN_ENTITY_TYPE = ("Entity in portfolio of unknown type", 105)
     EXTENSION_NOT_FOUND = ("Facade extension not found within namespace.", 106)
     EXTENSION_NO_TUPLE = ("Expected a tuple configuration.", 107)
+    EXTENSION_ATTR_MISMATCH = ("The attribute and name didn't match.", "108")
 
 
 class FacadeFrozen:
@@ -141,7 +142,7 @@ class StorageFacadeExtension(FacadeExtension):
     @classmethod
     def filename(cls, dir_name: Path) -> Path:
         """"""
-        return Path(dir_name, cls.CONCEAL[0])
+        return dir_name.joinpath(cls.CONCEAL[0])
 
     @classmethod
     async def _hierarchy(cls, archive):
@@ -171,7 +172,7 @@ class DataFacadeExtension(FacadeExtension):
         FacadeExtension.__init__(self, facade)
 
 
-class TaskFacadeExtension(FacadeExtension):
+class TaskFacadeExtension(FacadeExtension, NotifierMixin):
     """Task extension that runs as a background job in the facade."""
 
     INVOKABLE = (False,)
@@ -186,6 +187,7 @@ class TaskFacadeExtension(FacadeExtension):
     def __init__(self, facade: "Facade"):
         """Initialize the task."""
         FacadeExtension.__init__(self, facade)
+        NotifierMixin.__init__(self)
 
         self.__loop = Misc.get_loop()
         self.__running = False
@@ -255,21 +257,21 @@ class TaskFacadeExtension(FacadeExtension):
         """Standard preparations before execution."""
         self.__time_end = 0
         self.__running = True
-        # self.notify_all(self.ACTION_START, {"name": self.ATTRIBUTE[0]})
+        self.notify_all(self.ACTION_START, {"name": self.ATTRIBUTE[0]})
         self.__time_start = time.monotonic_ns()
         return True
 
     def __end(self) -> None:
         """Standard cleanup after execution."""
         self.__time_end = time.monotonic_ns()
-        # self.notify_all(self.ACTION_COMPLETE, {"name": self.ATTRIBUTE[0]})
+        self.notify_all(self.ACTION_COMPLETE, {"name": self.ATTRIBUTE[0]})
         self.__running = False
         if self.__period:
             self.__next_run()
 
     def _progress(self, progress: float=0):
         """Notify observers made progress."""
-        # self.notify_all(self.ACTION_PROGRESS, {"name": self.ATTRIBUTE[0], "progress": progress})
+        self.notify_all(self.ACTION_PROGRESS, {"name": self.ATTRIBUTE[0], "progress": progress})
 
     async def _run(self) -> None:
         """Actual task logic to be implemented here."""
@@ -295,8 +297,8 @@ class TaskFacadeExtension(FacadeExtension):
         exc = task.exception()
         if exc:
             logging.error(exc, exc_info=True)
-            # self.notify_all(self.ACTION_CRASH, {
-            #    "name": self.ATTRIBUTE[0], "task": self.__task, "exception": exc})
+            self.notify_all(self.ACTION_CRASH, {
+                "name": self.ATTRIBUTE[0], "task": self.__task, "exception": exc})
         else:
             logging.info("Task \"%s\" finished execution" % self.ATTRIBUTE[0])
 
@@ -307,6 +309,30 @@ class TaskFacadeExtension(FacadeExtension):
         await self._run()
         await self._finalize()
         self.__end()
+
+
+class TaskWaitress(ObserverMixin):
+    """Observer that lets you wait for a facade extension task."""
+    def __init__(self):
+        ObserverMixin.__init__(self)
+        self.__waitress = asyncio.Event()
+
+    async def notify(self, event: Event) -> None:
+        """Receive action-complete event."""
+        if event.action == TaskFacadeExtension.ACTION_COMPLETE:
+            self.__waitress.set()
+
+    async def wait(self) -> None:
+        """Halt execution and wait for event to happen."""
+        self.__waitress.clear()
+        await self.__waitress.wait()
+
+    async def wait_for(self, notifier: NotifierMixin) -> None:
+        """Subscribe to, invoke, and wait for notifier."""
+        notifier.subscribe(self)
+        self.__waitress.clear()
+        notifier.invoke()
+        await self.__waitress.wait()
 
 
 class FacadeNamespace(FacadeFrozen):
@@ -322,9 +348,7 @@ class FacadeNamespace(FacadeFrozen):
             if name not in self.__config:
                 raise FacadeError(*FacadeError.EXTENSION_NOT_FOUND)
             elif isinstance(self.__config[name], tuple):
-                module, klass = self.__config[name]
-                cls = getattr(sys.modules[module], klass)
-                self.__instances[name] = cls(self.facade)
+                self.__instances[name] = Util.klass(*self.__config[name])(self.facade)
             else:
                 raise FacadeError(*FacadeError.EXTENSION_NO_TUPLE)
         return self.__instances[name]
@@ -366,16 +390,32 @@ class Facade(metaclass=FacadeMeta):
         """"""
         self.__home_dir = home_dir
         self.__secret = secret
-
-        self.__portfolio = portfolio
+        self.__closed = False
 
         vault.facade = self
-        self.__storage = FacadeNamespace(self, self.STORAGES, {"vault": vault})
-        self.__api = FacadeNamespace(self, self.APIS)
-        self.__data = FacadeNamespace(self, self.DATAS)
-        self.__task = FacadeNamespace(self, self.TASKS)
+        header = vault.archive.stats()
+        storages = {"vault": vault}
+        for name, pkg in self.STORAGES.items():
+            storage_cls = Util.klass(*pkg)
+            if name != storage_cls.ATTRIBUTE[0]:
+                raise FacadeError(*FacadeError.EXTENSION_ATTRIBUTE_MISMATCH)
+            if home_dir.joinpath(storage_cls.CONCEAL[0]).is_file():
+                storages[name] = storage_cls(self, home_dir, secret)
+            else:
+                storages[name] = Loop.main().run(storage_cls.setup(
+                    self, home_dir, secret,
+                    owner=header.owner, node=header.node, domain=header.domain,
+                    vault_type=header.type, vault_role=header.role
+                ), wait=True)
 
-        self.__closed = False
+        portfolio = Util.klass("angelos.facade.data.portfolio", "PortfolioData")(portfolio.documents())
+        portfolio.facade = self
+        datas = {"portfolio": portfolio}
+
+        self.__storage = FacadeNamespace(self, self.STORAGES, storages)
+        self.__api = FacadeNamespace(self, self.APIS)
+        self.__data = FacadeNamespace(self, self.DATAS, datas)
+        self.__task = FacadeNamespace(self, self.TASKS)
 
     @property
     def path(self) -> Path:
@@ -434,7 +474,7 @@ class Facade(metaclass=FacadeMeta):
     def _open(cls, home_dir: Path, secret: bytes) -> Tuple["VaultStorage", PrivatePortfolio, bytes]:
         """"""
         vault_cls = Util.klass("angelos.facade.storage.vault", "VaultStorage")
-        vault = Loop.main().run(vault_cls(home_dir, secret), wait=True)
+        vault = vault_cls(None, home_dir, secret)
         stats = vault.archive.stats()
         portfolio = Loop.main().run(vault.load_portfolio(stats.owner, Groups.ALL), wait=True)
 
@@ -492,7 +532,7 @@ class TypeFacadeMixin:
     }
     DATAS = {
         "portfolio": ("angelos.facade.data.portfolio", "PortfolioData"),
-        "preferences": ("angelos.facade.data.preferences", "PreferencesData")
+        "prefs": ("angelos.facade.data.prefs", "PreferencesData")
     }
     TASKS = {
         "contact_sync": ("angelos.facade.task.contact_sync", "ContactPortfolioSyncTask"),

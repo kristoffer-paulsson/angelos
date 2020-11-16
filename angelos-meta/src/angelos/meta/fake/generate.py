@@ -25,8 +25,8 @@ from .lipsum import MALE_NAMES, FEMALE_NAMES, LIPSUM_WORDS, CHURCHES, LIPSUM_LIN
 class Generate:
     """Generate proper fake data."""
 
-    @staticmethod
-    def person_data(num=1):
+    @classmethod
+    def person_data(cls, num=1):
         """Generate random entity data for number of person entities."""
         identities = []
         for i in range(num):
@@ -56,8 +56,8 @@ class Generate:
 
         return identities
 
-    @staticmethod
-    def ministry_data(num=1):
+    @classmethod
+    def ministry_data(cls, num=1):
         """Generate random entity data for number of ministry entities."""
         ministries = []
         for i in range(num):
@@ -75,8 +75,8 @@ class Generate:
 
         return ministries
 
-    @staticmethod
-    def church_data(num=1):
+    @classmethod
+    def church_data(cls, num=1):
         """Generate random entity data for number of church entities."""
         churches = []
         for i in range(num):
@@ -94,22 +94,22 @@ class Generate:
 
         return churches
 
-    @staticmethod
-    def lipsum() -> bytes:
+    @classmethod
+    def lipsum(cls) -> bytes:
         """Random lipsum data generator."""
         return (
             "\n".join(random.choices(LIPSUM_LINES, k=random.randrange(1, 10)))
         ).encode("utf-8")
 
-    @staticmethod
-    def lipsum_sentence() -> str:
+    @classmethod
+    def lipsum_sentence(cls) -> str:
         """Random sentence"""
         return (
             " ".join(random.choices(LIPSUM_WORDS, k=random.randrange(3, 10)))
         ).capitalize()
 
-    @staticmethod
-    def filename(postfix=".txt"):
+    @classmethod
+    def filename(cls, postfix=".txt"):
         """Random file name generator."""
         return (
                 "".join(
@@ -121,18 +121,18 @@ class Generate:
                 + postfix
         )
 
-    @staticmethod
-    def uuid():
+    @classmethod
+    def uuid(cls):
         """Random uuid."""
         return uuid.uuid4()
 
-    @staticmethod
-    def ipv4():
+    @classmethod
+    def ipv4(cls):
         """Random uuid."""
         return ipaddress.IPv4Address(os.urandom(4))
 
-    @staticmethod
-    def new_secret() -> bytes:
+    @classmethod
+    def new_secret(cls) -> bytes:
         """Generate encryption key.
 
         Returns (bytes):

@@ -15,19 +15,23 @@
 from angelos.document.document import DocType
 
 from angelos.common.misc import Misc
+from angelos.document.messages import Mail
+from angelos.facade.facade import Facade
 from angelos.lib.policy.message import MessagePolicy, EnvelopePolicy
-from angelos.lib.policy.portfolio import DOCUMENT_PATH, PGroup
+from angelos.lib.policy.portfolio import DOCUMENT_PATH
 from angelos.lib.policy.verify import StatementPolicy
 from angelos.lib.task.task import TaskWaitress
 from angelos.meta.fake import Generate
 from angelos.meta.testing.app import StubMaker
+from angelos.portfolio.collection import Portfolio
+from angelos.portfolio.utils import Groups
 
 
 class Operations:
     """Application, facade and portfolio operations."""
 
-    @staticmethod
-    async def trust_mutual(f1: "Facade", f2: "Facade"):
+    @classmethod
+    async def trust_mutual(cls, f1: Facade, f2: Facade):
         """Make two facades mutually trust each other."""
 
         docs = set()
@@ -43,8 +47,8 @@ class Operations:
         await TaskWaitress().wait_for(f1.task.contact_sync)
         await TaskWaitress().wait_for(f2.task.contact_sync)
 
-    @staticmethod
-    async def send_mail(sender: "Facade", recipient: "Portfolio") -> "Mail":
+    @classmethod
+    async def send_mail(cls, sender: Facade, recipient: Portfolio) -> Mail:
         """Generate one mail to recipient using a facade saving the mail to the outbox."""
         builder = MessagePolicy.mail(sender.data.portfolio, recipient)
         message = builder.message(Generate.lipsum_sentence(), Generate.lipsum().decode()).done()
@@ -52,8 +56,8 @@ class Operations:
         await sender.api.mailbox.save_outbox(envelope)
         return message
 
-    @staticmethod
-    async def inject_mail(server: "Facade", sender: "Facade", recipient: "Portfolio") -> "Mail":
+    @classmethod
+    async def inject_mail(cls, server: "Facade", sender: "Facade", recipient: "Portfolio") -> "Mail":
         """Generate one mail to recipient using a facade injecting the mail to the server."""
         builder = MessagePolicy.mail(sender.data.portfolio, recipient)
         message = builder.message(Generate.lipsum_sentence(), Generate.lipsum().decode()).done()
@@ -64,15 +68,15 @@ class Operations:
             ), envelope)
         return message
 
-    @staticmethod
-    async def portfolios(num: int, portfolio_list: list, server: bool = False, types: int = 0):
+    @classmethod
+    async def portfolios(cls, num: int, portfolio_list: list, server: bool = False, types: int = 0):
         """Generate random portfolios based on input data."""
 
         for person in StubMaker.TYPES[types][1](num):
             portfolio_list.append(StubMaker.TYPES[types][0].create(person, server=server))
 
-    @staticmethod
-    async def cross_authenticate(server: "Facade", client: "Facade", preselect: bool = True) -> bool:
+    @classmethod
+    async def cross_authenticate(cls, server: Facade, client: Facade, preselect: bool = True) -> bool:
         """Cross authenticate a server and a client.
 
         The facade will import each others portfolios, then they will trust each other and update the portfolios.
@@ -94,14 +98,14 @@ class Operations:
         # Client --> Server
         # Export the public client portfolio
         client_data = await client.storage.vault.load_portfolio(
-            client.data.portfolio.entity.id, PGroup.SHARE_MAX_USER)
+            client.data.portfolio.entity.id, Groups.SHARE_MAX_USER)
 
         # Add client portfolio to server
         await server.storage.vault.add_portfolio(client_data)
 
         # Load server data from server vault
         server_data = await server.storage.vault.load_portfolio(
-            server.data.portfolio.entity.id, PGroup.SHARE_MAX_COMMUNITY)
+            server.data.portfolio.entity.id, Groups.SHARE_MAX_COMMUNITY)
 
         # Add server portfolio to client
         await client.storage.vault.add_portfolio(server_data)
@@ -117,7 +121,7 @@ class Operations:
         # Client <-- -" Server
         # Load client data from server vault
         client_data = await server.storage.vault.load_portfolio(
-            client.data.portfolio.entity.id, PGroup.SHARE_MAX_USER)
+            client.data.portfolio.entity.id, Groups.SHARE_MAX_USER)
 
         # Saving server trust for client to client
         await client.storage.vault.docs_to_portfolio(client_data.owner.trusted)

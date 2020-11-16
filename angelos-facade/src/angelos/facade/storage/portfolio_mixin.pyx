@@ -74,7 +74,7 @@ class PortfolioMixin:
 
     async def remove_file(self, doc: Revoked):
         """Remove a revoked statement to the current archive."""
-        files = await self.archive.glob(id=doc.issuance)
+        files = await self.archive.glob(str(self.PATH_PORTFOLIOS[0].joinpath("/*/*")), id=doc.issuance)
         for path in files:
            await self.archive.remove(filename=path)
 
@@ -91,7 +91,7 @@ class PortfolioMixin:
                 ValidateProfile().validate(portfolio, portfolio.profile)
 
             if portfolio.network:
-                ValidateNetwork.validate(portfolio, portfolio.network)
+                ValidateNetwork().validate(portfolio, portfolio.network)
 
             for trusted in portfolio.trusted_issuer:
                 ValidateTrustedStatement().validate(portfolio, trusted)
@@ -200,7 +200,7 @@ class PortfolioMixin:
                         statements.add(issuance)
 
         await self.gather(*[await self.write_file(self.PATH_PORTFOLIOS[0].joinpath(
-            str(issuance.issuer), str(issuance.id) + DocumentHelper.extension(
+            str(issuance.owner), str(issuance.id) + DocumentHelper.extension(
                 issuance.type)), issuance) for issuance in statements])
 
         await self.gather(*[await self.remove_file(issuance) for issuance in revokes])
@@ -264,7 +264,7 @@ class PortfolioMixin:
         await self.portfolio_exists_not(dirname, eid)
 
         files = await self.portfolio_files(dirname, owner=eid)
-        pattern = PortfolioHelper.suffixes(config)
+        pattern = PortfolioHelper.group_suffix(config)
         files = {filename for filename in files if filename.suffix in pattern}
         docs_data = await asyncio.gather(*[self.archive.load(filename) for filename in files])
         documents = {DocumentHelper.deserialize(data) for data in docs_data}
@@ -279,7 +279,7 @@ class PortfolioMixin:
         await self.portfolio_exists_not(dirname, eid)
 
         files = await self.portfolio_files(dirname, owner=eid)
-        pattern = PortfolioHelper.suffixes(config)
+        pattern = PortfolioHelper.group_suffix(config)
         doc_ids = {str(doc.id) for doc in portfolio.documents()}
         files = {filename for filename in files if filename.suffix in pattern and filename.stem not in doc_ids}
         docs_data = await asyncio.gather(*[self.archive.load(filename) for filename in files])
