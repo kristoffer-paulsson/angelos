@@ -47,8 +47,8 @@ class Operations:
         await f1.storage.vault.add_portfolio(f2.data.portfolio.to_portfolio())
         await f2.storage.vault.add_portfolio(f1.data.portfolio.to_portfolio())
 
-        await f1.storage.vault.docs_to_portfolio(docs)
-        await f2.storage.vault.docs_to_portfolio(docs)
+        await f1.storage.vault.statements_portfolio(docs)
+        await f2.storage.vault.statements_portfolio(docs)
 
         await TaskWaitress().wait_for(f1.task.contact_sync)
         await TaskWaitress().wait_for(f2.task.contact_sync)
@@ -122,7 +122,7 @@ class Operations:
             server.data.portfolio, client.data.portfolio)
 
         # Saving server trust for client to server
-        await server.storage.vault.docs_to_portfolio(set([trust]))
+        await server.storage.vault.statements_portfolio(set([trust]))
 
         # Client <-- -" Server
         # Load client data from server vault
@@ -130,14 +130,14 @@ class Operations:
             client.data.portfolio.entity.id, PGroup.SHARE_MAX_USER)
 
         # Saving server trust for client to client
-        await client.storage.vault.docs_to_portfolio(client_data.owner.trusted)
+        await client.storage.vault.statements_portfolio(client_data.owner.trusted)
 
         # Client -" Server
         # Trust the server portfolio
         trust = StatementPolicy.trusted(client.data.portfolio, server.data.portfolio)
 
         # Saving client trust for server to client
-        await client.storage.vault.docs_to_portfolio(set([trust]))
+        await client.storage.vault.statements_portfolio(set([trust]))
 
         # Client (index network)
         await TaskWaitress().wait_for(client.task.network_index)

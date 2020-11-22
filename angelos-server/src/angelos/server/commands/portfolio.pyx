@@ -70,11 +70,11 @@ class PortfolioCommand(Command):
             try:
                 statements = portfolio.issuer.to_set() | portfolio.owner.to_set()
                 await self.__facade.storage.vault.import_portfolio(portfolio)
-                await self.__facade.storage.vault.docs_to_portfolio(statements)
+                await self.__facade.storage.vault.statements_portfolio(statements)
             except PortfolioAlreadyExists as e:
                 statements = portfolio.issuer.to_set() | portfolio.owner.to_set()
                 await self.__facade.storage.vault.update_portfolio(portfolio)
-                await self.__facade.storage.vault.docs_to_portfolio(statements)
+                await self.__facade.storage.vault.statements_portfolio(statements)
 
     async def __export(self, entity_id, group):
         if entity_id == "self":
@@ -174,7 +174,7 @@ class PortfolioCommand(Command):
             )
 
         if statement:
-            await self.__facade.storage.vault.docs_to_portfolio(set([statement]))
+            await self.__facade.storage.vault.statements_portfolio(set([statement]))
             self._io << "\nSaved statement changes to portfolio.\n"
 
     async def __list(self):

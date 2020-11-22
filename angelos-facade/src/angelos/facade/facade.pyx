@@ -15,9 +15,11 @@
 #
 import asyncio
 import atexit
+import io
 import logging
 import math
 import time
+import traceback
 import uuid
 import datetime
 from pathlib import Path, PurePosixPath
@@ -296,7 +298,7 @@ class TaskFacadeExtension(FacadeExtension, NotifierMixin):
     def __done(self, task):
         exc = task.exception()
         if exc:
-            logging.error(exc, exc_info=True)
+            Util.log_exception(exc)
             self.notify_all(self.ACTION_CRASH, {
                 "name": self.ATTRIBUTE[0], "task": self.__task, "exception": exc})
         else:

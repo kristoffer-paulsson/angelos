@@ -22,6 +22,8 @@ from angelos.lib.starter import Starter
 from angelos.meta.fake import Generate
 from angelos.meta.testing import run_async
 from angelos.portfolio.collection import PrivatePortfolio, Portfolio
+from angelos.portfolio.envelope.wrap import WrapEnvelope
+from angelos.portfolio.message.create import CreateMail
 from angelos.portfolio.portfolio.setup import SetupChurchPortfolio, SetupPersonPortfolio
 from angelos.portfolio.statement.create import CreateTrustedStatement
 from angelos.portfolio.utils import Groups
@@ -212,8 +214,8 @@ class Operations:
         await f1.storage.vault.accept_portfolio(f2.data.portfolio.to_portfolio())
         await f2.storage.vault.accept_portfolio(f1.data.portfolio.to_portfolio())
 
-        await f1.storage.vault.docs_to_portfolio(docs)
-        await f2.storage.vault.docs_to_portfolio(docs)
+        await f1.storage.vault.statements_portfolio(docs)
+        await f2.storage.vault.statements_portfolio(docs)
 
         await TaskWaitress().wait_for(f1.task.contact_sync)
         await TaskWaitress().wait_for(f2.task.contact_sync)
@@ -221,9 +223,9 @@ class Operations:
     @classmethod
     async def send_mail(cls, sender: Facade, recipient: Portfolio) -> Mail:
         """Generate one mail to recipient using a facade saving the mail to the outbox."""
-        builder = MessagePolicy.mail(sender.data.portfolio, recipient)
+        builder = CreateMail().perform(sender.data.portfolio, recipient)
         message = builder.message(Generate.lipsum_sentence(), Generate.lipsum().decode()).done()
-        envelope = EnvelopePolicy.wrap(sender.data.portfolio, recipient, message)
+        envelope = WrapEnvelope().perform(sender.data.portfolio, recipient, message)
         await sender.api.mailbox.save_outbox(envelope)
         return message
 
@@ -268,7 +270,7 @@ class Operations:
         trust = CreateTrustedStatement().perform(server.data.portfolio, client.data.portfolio)
 
         # Saving server trust for client to server
-        await server.storage.vault.docs_to_portfolio(set([trust]))
+        await server.storage.vault.statements_portfolio(set([trust]))
 
         # Client <-- -" Server
         # Load client data from server vault
@@ -276,14 +278,14 @@ class Operations:
             client.data.portfolio.entity.id, Groups.SHARE_MAX_USER)
 
         # Saving server trust for client to client
-        await client.storage.vault.docs_to_portfolio(client_data.trusted_owner)
+        await client.storage.vault.statements_portfolio(client_data.trusted_owner)
 
         # Client -" Server
         # Trust the server portfolio
         trust = CreateTrustedStatement().perform(client.data.portfolio, server.data.portfolio)
 
         # Saving client trust for server to client
-        await client.storage.vault.docs_to_portfolio(set([trust]))
+        await client.storage.vault.statements_portfolio(set([trust]))
 
         # Client (index network)
         await TaskWaitress().wait_for(client.task.network_index)

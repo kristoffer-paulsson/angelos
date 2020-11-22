@@ -24,12 +24,9 @@ import datetime
 import importlib
 import logging
 import os
-import subprocess
 import sys
 import traceback
-from asyncio import Task
-from os import PathLike
-from typing import Callable, Union, Any, List, Tuple, Type
+from typing import Union, Any, Type
 
 
 class Event(asyncio.Event):
@@ -121,6 +118,11 @@ class Util:
         """Print exception and traceback using the python print() method."""
         print("Critical error. ({})".format(exc))
         traceback.print_exception(type(exc), exc, exc.__traceback__)
+
+    @staticmethod
+    def log_exception(exc: Exception):
+        """Log exception and traceback using the logging.critical() method."""
+        logging.critical(exc, exc_info=(type(exc), exc, exc.__traceback__))
 
     # TODO: Deprecate this one.
     @staticmethod

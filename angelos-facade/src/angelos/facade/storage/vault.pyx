@@ -239,7 +239,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         async for entry, path in self.archive.search(sq):
             if link and entry.type == TYPE_LINK:
                 followed = self.archive._Archive7__manager._FileSystemStreamManager__follow_link(entry.id)
-                result[link.id] = fields(path, followed)
+                result[entry.id] = fields(path, followed)
             else:
                 result[entry.id] = fields(path, entry)
 

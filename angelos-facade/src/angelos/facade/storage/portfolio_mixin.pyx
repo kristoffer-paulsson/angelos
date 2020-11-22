@@ -60,15 +60,15 @@ class PortfolioMixin:
         if not is_dir:
             raise Error.exception(Error.PORTFOLIO_EXISTS_NOT, {"portfolio": eid})
 
-    async def write_file(self, filename: PurePosixPath, doc: Document):
+    async def write_file(self, filename: PurePosixPath, doc: Document, issuer_as_owner: bool = False):
         """Write a document to the current archive."""
         is_file = await self.archive.isfile(filename)
         if is_file:
            return self.archive.save(filename=filename, data=DocumentHelper.serialize(doc))
         else:
-            created, updated, owner = DocumentHelper.meta(doc)
+            created, updated, owner, doc_id= DocumentHelper.meta(doc, issuer_as_owner)
             return self.archive.mkfile(
-                filename=filename, data=DocumentHelper.serialize(doc), id=doc.id,
+                filename=filename, data=DocumentHelper.serialize(doc), id=doc_id,
                 created=created, modified=updated, owner=owner
             )
 
@@ -177,7 +177,7 @@ class PortfolioMixin:
 
         return report
 
-    async def docs_to_portfolio(self, documents: Set[Union[Revoked, Trusted, Verified]]):
+    async def statements_portfolio(self, documents: Set[Union[Revoked, Trusted, Verified]]):
         """Import a bunch of statements to several portfolios.
 
         This method applies policies including revoked.
@@ -232,19 +232,29 @@ class PortfolioMixin:
 
         await self.archive.mkdir(dirname)
 
-        files = list()
-        for doc in portfolio.documents():
-            files.append((dirname.joinpath(str(doc.id) + DocumentHelper.extension(doc.type)), doc))
+        await self.gather(*[
+            await self.write_file(
+                dirname.joinpath(str(doc.id) + DocumentHelper.extension(doc.type)),
+                doc, doc.get_owner() != doc.issuer) for doc in portfolio.issuer()
+        ])
 
-        ops = list()
-        for doc in files:
-            created, updated, owner = DocumentHelper.meta(doc[1])
-            ops.append(self.archive.mkfile(
-                filename=doc[0], data=DocumentHelper.serialize(doc[1]), id=doc[1].id,
-                created=created, modified=updated, owner=owner,
-            ))
+        return True
 
-        return await self.gather(*ops)
+        # TODO: Remove if no inconvenience is discovered.
+
+        # files = list()
+        # for doc in portfolio.documents():
+        #    files.append((dirname.joinpath(str(doc.id) + DocumentHelper.extension(doc.type)), doc))
+
+        # ops = list()
+        # for doc in files:
+        #    created, updated, owner = DocumentHelper.meta(doc[1])
+        #    ops.append(self.archive.mkfile(
+        #        filename=doc[0], data=DocumentHelper.serialize(doc[1]), id=doc[1].id,
+        #        created=created, modified=updated, owner=owner,
+        #    ))
+
+        # return await self.gather(*ops)
 
     async def save_portfolio(self, portfolio: Portfolio) -> bool:
         """Save a changed portfolio.
@@ -253,8 +263,11 @@ class PortfolioMixin:
         dirname = self.portfolio_path(portfolio.entity.id)
         await self.portfolio_exists_not(dirname, portfolio.entity.id)
 
-        self.gather(*[await self.write_file(
-            dirname.joinpath(str(doc.id) + DocumentHelper.extension(doc.type)), doc) for doc in portfolio.issuer()])
+        self.gather(*[
+            await self.write_file(
+                dirname.joinpath(str(doc.id) + DocumentHelper.extension(doc.type)),
+                doc, doc.get_owner() != doc.issuer) for doc in portfolio.issuer()
+        ])
 
         return True
 

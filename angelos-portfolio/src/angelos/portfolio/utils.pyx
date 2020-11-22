@@ -14,12 +14,9 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Helper utilities for portfolios."""
-import datetime
-import uuid
 from pathlib import PurePosixPath
 from typing import Tuple
 
-from angelos.document.document import Document
 from angelos.document.domain import Domain, Node, Network
 from angelos.document.entities import Person, Ministry, Church, PrivateKeys, Keys
 from angelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
@@ -138,6 +135,57 @@ class Groups:
     )
 
 
+class MimeTypes:
+    TEXT = "text/plain"
+    MARKDOWN = "text/markdown"
+    HTML = "text/html"
+    RTF = "text/rtf"
+    VCARD = "text/vcard"
+    CALENDAR = "text/calendar"
+
+    JPEG = "image/jpeg"
+    WEBP = "image/webp"
+    PNG = "image/png"
+    TIFF = "image/tiff"
+    BMP = "image/bmp"
+
+    MP4_A = "audio/mp4"
+    MPEG_A = "audio/mpeg"
+    AAC = "audio/aac"
+    WEBM = "audio/webm"
+    VORBIS = "audio/vorbis"
+
+    MP4 = "video/mp4"
+    MPEG = "video/mpeg"
+    QUICKTIME = "video/quicktime"
+    H261 = "video/h261"
+    H263 = "video/h263"
+    H264 = "video/h264"
+    H265 = "video/h265"
+    OGG = "video/ogg"
+
+    ZIP = "application/zip"
+    _7Z = "application/x-7z-compressed"
+
+
+class ReportType:
+    UNSOLICITED = "Unsolicited"
+    SPAM = "Spam"
+    SUSPICIOUS = "Suspicious"
+    HARMFUL = "Harmful"
+    DEFAMATION = "Defamation"
+    OFFENSIVE = "Offensive"
+    HATEFUL = "Hateful"
+    SEDITION = "Sedition"
+    HARASSMENT = "Harassment"
+    MENACE = "Menace"
+    BLACKMAIL = "Blackmail"
+    SOLICITATION = "Solicitation"
+    CONSPIRACY = "Conspiracy"
+    GRAPHIC = "Graphic"
+    ADULT = "Adult"
+
+
 class Definitions:
     """Definitions for portfolios."""
 
@@ -173,6 +221,24 @@ class Definitions:
         Fields.OWNER_VERIFIED: (Verified, ),
         Fields.OWNER_TRUSTED: (Trusted, ),
         Fields.OWNER_REVOKED: (Revoked, ),
+    }
+
+    REPORT = {
+        ReportType.UNSOLICITED: "Unwanted messages you do not wish to receive.",
+        ReportType.SPAM: "Unsolicited advertisement.",
+        ReportType.SUSPICIOUS: "Professional messages that seem to be deceptive or fraudulent.",
+        ReportType.HARMFUL: "Promotion of behaviors or actions which harmful if carried out.",
+        ReportType.DEFAMATION: "A message which content is defaming or slanderous towards someone.",
+        ReportType.OFFENSIVE: "A message which content is detestable or repulsive.",
+        ReportType.HATEFUL: "A message that is malicious or insulting and spreads hate.",
+        ReportType.SEDITION: "Sedition to mischief and spread hate or commit crimes.",
+        ReportType.HARASSMENT: "A message is considered to be harassment or stalking.",
+        ReportType.MENACE: "A message is intimidating and menacing or contains direct threats.",
+        ReportType.BLACKMAIL: "A message that intimidates you to conform to demands.",
+        ReportType.SOLICITATION: "Solicitation for criminal purposes.",
+        ReportType.CONSPIRACY: "Conspiracy to commit a crime.",
+        ReportType.GRAPHIC: "Undesirable graphic content.",
+        ReportType.ADULT: "Mature content of sexual nature.",
     }
 
 

@@ -17,7 +17,9 @@
 import uuid
 from typing import Tuple, Set
 
-from angelos.facade.facade import ApiFacadeExtension, Facade
+from angelos.facade.facade import ApiFacadeExtension, Facade, PurePosixPath
+from angelos.facade.storage.portfolio_mixin import PortfolioMixin
+from angelos.portfolio.utils import Definitions, Fields
 
 
 class ContactAPI(ApiFacadeExtension):
@@ -25,16 +27,16 @@ class ContactAPI(ApiFacadeExtension):
 
     ATTRIBUTE = ("contact",)
 
-    PATH_BLOCKED = ("/contacts/blocked/",)
-    PATH_ALL = ("/contacts/all/",)
-    PATH_FRIENDS = ("/contacts/friends/",)
-    PATH_FAVORITES = ("/contacts/favorites/",)
+    PATH_BLOCKED = (PurePosixPath("/contacts/blocked/"),)
+    PATH_ALL = (PurePosixPath("/contacts/all/"),)
+    PATH_FRIENDS = (PurePosixPath("/contacts/friends/"),)
+    PATH_FAVORITES = (PurePosixPath("/contacts/favorites/"),)
 
     def __init__(self, facade: Facade):
         """Initialize the Contacts."""
         ApiFacadeExtension.__init__(self, facade)
 
-    async def __load_contacts(self, pattern: str) -> Set[Tuple[uuid.UUID]]:
+    async def __load_contacts(self, pattern: PurePosixPath) -> Set[Tuple[uuid.UUID]]:
         """Loads all contacts according to pattern.
 
         Args:
@@ -46,7 +48,7 @@ class ContactAPI(ApiFacadeExtension):
 
         """
         result = await self.facade.storage.vault.search(
-            pattern,
+            str(pattern),
             link=True,
             limit=0,
             deleted=False,
@@ -54,7 +56,7 @@ class ContactAPI(ApiFacadeExtension):
         )
         return set(result.keys())
 
-    async def __link(self, path: str, eid: uuid.UUID):
+    async def __link(self, path: PurePosixPath, eid: uuid.UUID):
         """Link a contact to a portfolio entity.
 
         Args:
@@ -64,12 +66,14 @@ class ContactAPI(ApiFacadeExtension):
                 Portfolio entity ID
 
         """
+        eid_str = str(eid)
         await self.facade.storage.vault.link(
-            path + str(eid),
-            self.facade.storage.vault.PATH_PORTFOLIOS[0] + str(eid) + "/" + str(eid) + ".ent"
+            path.joinpath(eid_str),
+            PortfolioMixin.PATH_PORTFOLIOS[0].joinpath(
+                eid_str, eid_str + Definitions.SUFFIXES[Fields.ENTITY])
         )
 
-    async def __unlink(self, path: str, eid: uuid.UUID):
+    async def __unlink(self, path: PurePosixPath, eid: uuid.UUID):
         """Remove contact by unlink portfolio entity.
 
         Args:
@@ -79,7 +83,7 @@ class ContactAPI(ApiFacadeExtension):
                 Portfolio entity ID
 
         """
-        await self.facade.storage.vault.delete(path + str(eid))
+        await self.facade.storage.vault.delete(path.joinpath(str(eid)))
 
     async def load_all(self) -> Set[Tuple[str, uuid.UUID]]:
         """Load a list of all contacts, that is not blocked.
@@ -88,7 +92,7 @@ class ContactAPI(ApiFacadeExtension):
             List of tuples with portfolio path and ID.
 
         """
-        return await self.__load_contacts(self.PATH_ALL[0] + "*")
+        return await self.__load_contacts(self.PATH_ALL[0].joinpath("*"))
 
     async def status(self, eid: uuid.UUID) -> Tuple[bool, bool, bool]:
         """Check the status of a contact against the categories if they are favorites and/or friends.
@@ -110,9 +114,9 @@ class ContactAPI(ApiFacadeExtension):
         #    return favorites, friends, blocked
         # return await archive.execute(check)
 
-        favorites = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
-        friends = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
-        blocked = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+        favorites = await archive.islink(self.PATH_FAVORITES[0].joinpath(str(eid)))
+        friends = await archive.islink(self.PATH_FRIENDS[0].joinpath(str(eid)))
+        blocked = await archive.islink(self.PATH_BLOCKED[0].joinpath(str(eid)))
         return favorites, friends, blocked
 
     async def load_blocked(self) -> Set[Tuple[str, uuid.UUID]]:
@@ -122,7 +126,7 @@ class ContactAPI(ApiFacadeExtension):
             List of tuples with portfolio path and ID.
 
         """
-        return await self.__load_contacts(self.PATH_BLOCKED[0] + "*")
+        return await self.__load_contacts(self.PATH_BLOCKED[0].joinpath("*"))
 
     async def block(self, *entities: uuid.UUID) -> bool:
         """Put entities in the blocked category.
@@ -145,16 +149,16 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to block.
             """
-            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FAVORITES[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
-            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FRIENDS[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
-            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            is_link = await archive.islink(self.PATH_ALL[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_ALL[0], eid)
-            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            is_link = await archive.islink(self.PATH_BLOCKED[0].joinpath(str(eid)))
             if not is_link:
                 await self.__link(self.PATH_BLOCKED[0], eid)
 
@@ -179,10 +183,10 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to unblock.
             """
-            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            is_link = await archive.islink(self.PATH_BLOCKED[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
-            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            is_link = await archive.islink(self.PATH_ALL[0].joinpath(str(eid)))
             if not is_link:
                 await self.__link(self.PATH_ALL[0], eid)
 
@@ -195,7 +199,7 @@ class ContactAPI(ApiFacadeExtension):
             List of tuples with portfolio path and ID.
 
         """
-        return await self.__load_contacts(self.PATH_FRIENDS[0] + "*")
+        return await self.__load_contacts(self.PATH_FRIENDS[0].joinpath("*"))
 
     async def friend(self, *entities: uuid.UUID) -> bool:
         """Put entities in the friends category.
@@ -218,13 +222,13 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to friend.
             """
-            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            is_link = await archive.islink(self.PATH_BLOCKED[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
-            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FRIENDS[0].joinpath(str(eid)))
             if not is_link:
                 await self.__link(self.PATH_FRIENDS[0], eid)
-            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            is_link = await archive.islink(self.PATH_ALL[0].joinpath(str(eid)))
             if not is_link:
                 await self.__link(self.PATH_ALL[0], eid)
 
@@ -249,7 +253,7 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to unfriend.
             """
-            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FRIENDS[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
 
@@ -262,7 +266,7 @@ class ContactAPI(ApiFacadeExtension):
             List of tuples with portfolio path and ID.
 
         """
-        return await self.__load_contacts(self.PATH_FAVORITES[0] + "*")
+        return await self.__load_contacts(self.PATH_FAVORITES[0].joinpath("*"))
 
     async def favorite(self, *entities: uuid.UUID) -> bool:
         """Put entities in the favorite category.
@@ -283,13 +287,13 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to favorite.
             """
-            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            is_link = await archive.islink(self.PATH_BLOCKED[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
-            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FAVORITES[0].joinpath(str(eid)))
             if not is_link:
                 await self.__link(self.PATH_FAVORITES[0], eid)
-            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            is_link = await archive.islink(self.PATH_ALL[0].joinpath(str(eid)))
             if not is_link:
                 await self.__link(self.PATH_ALL[0], eid)
 
@@ -314,7 +318,7 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to unfavorite.
             """
-            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FAVORITES[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
 
@@ -339,16 +343,16 @@ class ContactAPI(ApiFacadeExtension):
                 eid (uuid.UUID):
                     Entity ID to remove.
             """
-            is_link = await archive.islink(self.PATH_FAVORITES[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FAVORITES[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_FAVORITES[0], eid)
-            is_link = await archive.islink(self.PATH_FRIENDS[0] + str(eid))
+            is_link = await archive.islink(self.PATH_FRIENDS[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_FRIENDS[0], eid)
-            is_link = await archive.islink(self.PATH_ALL[0] + str(eid))
+            is_link = await archive.islink(self.PATH_ALL[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_ALL[0], eid)
-            is_link = await archive.islink(self.PATH_BLOCKED[0] + str(eid))
+            is_link = await archive.islink(self.PATH_BLOCKED[0].joinpath(str(eid)))
             if is_link:
                 await self.__unlink(self.PATH_BLOCKED[0], eid)
 

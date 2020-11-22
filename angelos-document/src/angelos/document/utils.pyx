@@ -222,7 +222,9 @@ class Helper:
         return Definitions.EXTENSION[doc_type]
 
     @classmethod
-    def meta(cls, document: "Document") -> Tuple[datetime.datetime, datetime.datetime, uuid.UUID]:
+    def meta(
+            cls, document: "Document", issuer_as_owner: bool = False
+    ) -> Tuple[datetime.datetime, datetime.datetime, uuid.UUID, uuid.UUID]:
         """Calculates the correct meta information about a document to be updated
 
         Args:
@@ -233,6 +235,9 @@ class Helper:
             Correct meta-data (created datetime, touched datetime, owner).
 
         """
-        return datetime.datetime.combine(
-            document.created, datetime.datetime.min.time()), datetime.datetime.combine(
-            document.get_touched(), datetime.datetime.min.time()), document.get_owner()
+        return (
+            datetime.datetime.combine(document.created, datetime.datetime.min.time()),
+            datetime.datetime.combine(document.get_touched(), datetime.datetime.min.time()),
+            document.issuer if issuer_as_owner else document.get_owner(),
+            uuid.uuid4() if issuer_as_owner else document.id
+        )

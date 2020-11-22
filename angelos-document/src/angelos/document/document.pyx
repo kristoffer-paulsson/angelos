@@ -154,17 +154,6 @@ class ChangeableMixin(UpdatedMixin):
         """Fields that are allowed to change when updated."""
         return tuple()
 
-    # FIXME: Write unittests.
-    def morpheme(self, stem: "Document") -> bool:
-        """Compare to documents that they are not different beyond allowed change."""
-        if not self.fields() == stem.fields():
-            return False
-        unmorphed = set(self.fields()) - set(list(self.changeables()) + ["signature", "expires", "updated"])
-        same = list()
-        for name in unmorphed:
-            same.append(getattr(self, name) == getattr(stem, name))
-        return all(same)
-
 
 class Document(IssueMixin, BaseDocument):
     """Short summary.

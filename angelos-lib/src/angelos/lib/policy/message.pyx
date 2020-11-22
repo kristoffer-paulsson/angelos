@@ -384,13 +384,11 @@ class EnvelopePolicy(Policy):
         if operation not in ("SEND", "RTE", "RECV"):
             raise ValueError("Illegal header operation.")
 
-        header = Header(
-            nd={
-                "op": operation,
-                "issuer": handler.entity.id,
-                "timestamp": datetime.datetime.utcnow(),
-            }
-        )
+        header = Header(nd={
+            "op": operation,
+            "issuer": handler.entity.id,
+            "timestamp": datetime.datetime.utcnow()
+        })
 
         header = Crypto.sign_header(envelope, header, handler)
         envelope.header.append(header)

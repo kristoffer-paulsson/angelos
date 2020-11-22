@@ -99,7 +99,7 @@ class TestNetworkIndexerTask(TestCase):
 
         await self.facade.storage.vault.load_portfolio(self.portfolio.entity.id, PGroup.ALL)
 
-        await self.facade.storage.vault.docs_to_portfolio(docs)
+        await self.facade.storage.vault.statements_portfolio(docs)
         await TaskWaitress().wait_for(self.facade.task.network_index)
 
         networks = OrderedDict(await self.facade.api.settings.networks())
