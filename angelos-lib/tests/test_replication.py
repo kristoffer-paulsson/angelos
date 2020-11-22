@@ -169,6 +169,7 @@ class TestFullReplication(TestCase):
         self.client1 = await StubMaker.create_client()
         self.client2 = await StubMaker.create_client()
 
+
     def tearDown(self) -> None:
         """Clean up test network"""
         del self.server

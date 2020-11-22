@@ -325,6 +325,10 @@ class TestFullReplication(TestCase):
         self.client1 = await ApplicationContext.create_client()
         self.client2 = await ApplicationContext.create_client()
 
+        print("SERVER", self.server.app.ioc.facade)
+        print("CLIENT 1", self.client1.app.ioc.facade)
+        print("CLIENT 2", self.client2.app.ioc.facade)
+
     def tearDown(self) -> None:
         """Clean up test network"""
         del self.server

@@ -15,6 +15,7 @@
 #
 import datetime
 
+from angelos.common.policy import PolicyException
 from angelos.document.envelope import Envelope, Header
 from angelos.lib.policy.crypto import Crypto
 from angelos.portfolio.collection import PrivatePortfolio
@@ -23,7 +24,7 @@ from angelos.portfolio.collection import PrivatePortfolio
 class EnvelopePolicy:
     def _add_header(self, handler: PrivatePortfolio, envelope: Envelope, operation: str):
         if operation not in ("SEND", "RTE", "RECV"):
-            raise ValueError("Illegal header operation.")
+            raise PolicyException()
 
         header = Header(nd={
             "op": operation,

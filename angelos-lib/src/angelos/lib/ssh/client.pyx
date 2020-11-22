@@ -14,27 +14,19 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Module docstring."""
+import asyncio
 import logging
 import uuid
-import asyncio
 
-from angelos.lib.policy.portfolio import PGroup
-from angelos.lib.policy.verify import StatementPolicy
-from angelos.lib.replication.handler import (
-    ReplicatorServerHandler, ReplicatorClientHandler)
+from angelos.facade.operation import ValidateTrust
 from angelos.lib.replication.endpoint import ReplicatorServer, ReplicatorClient
+from angelos.lib.replication.handler import ReplicatorServerHandler, ReplicatorClientHandler
 from angelos.lib.replication.preset import Preset
-from angelos.lib.ssh.ssh import SSHServer, SSHClient
 from angelos.lib.ssh.nacl import NaClKey
-
-from asyncssh import (
-    SSHServerSession,
-    SSHReader,
-    SSHWriter,
-    BreakReceived,
-    SignalReceived,
-    SSHClientSession,
-)
+from angelos.lib.ssh.ssh import SSHServer, SSHClient
+from angelos.portfolio.statement.validate import ValidateTrustedStatement
+from angelos.portfolio.utils import Groups
+from asyncssh import SSHServerSession, SSHReader, SSHWriter, BreakReceived, SignalReceived, SSHClientSession
 from asyncssh.stream import SSHStreamSession
 
 
@@ -87,20 +79,12 @@ class ClientsServer(SSHServer):
 
         try:
             issuer = uuid.UUID(username)
-            self._portfolio = await self.ioc.facade.storage.vault.load_portfolio(
-                issuer, PGroup.CLIENT_AUTH
-            )
+            self._portfolio = await self.ioc.facade.storage.vault.load_portfolio(issuer, Groups.CLIENT_AUTH)
 
-            statement = StatementPolicy.validate_trusted(
-                self.ioc.facade.data.portfolio, self._portfolio)
-            logging.info(statement)
-            if statement:
-                self._client_keys = [
-                    NaClKey.factory(key) for key in self._portfolio.keys
-                ]
+            if ValidateTrust().validate(self.ioc.facade.data.portfolio, self._portfolio):
+                self._client_keys = [NaClKey.factory(key) for key in self._portfolio.keys]
             else:
-                logging.warning(
-                    "Unauthorized user: %s" % username)
+                logging.warning("Unauthorized user: %s" % username)
                 self._conn.close()
         except OSError as e:
             logging.error("User not found: %s" % username)

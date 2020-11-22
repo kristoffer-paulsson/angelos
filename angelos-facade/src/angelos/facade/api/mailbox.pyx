@@ -20,19 +20,23 @@ import uuid
 from pathlib import PurePosixPath
 from typing import Set, Any, Tuple
 
+from angelos.document.utils import Helper as DocumentHelper, Definitions
 from angelos.lib.error import Error
 from angelos.document.types import MessageT
 from angelos.lib.policy.format import PrintPolicy
 from angelos.facade.facade import ApiFacadeExtension, Facade
-from angelos.document.document import DocType
 from angelos.document.envelope import Envelope
 from angelos.document.messages import Message, Mail
 from angelos.document.misc import StoredLetter
 from angelos.lib.helper import Glue
-from angelos.lib.policy.accept import ImportPolicy
 from angelos.lib.policy.crypto import Crypto
-from angelos.lib.policy.message import EnvelopePolicy, MessagePolicy
-from angelos.lib.policy.portfolio import DOCUMENT_PATH, PortfolioPolicy, PGroup
+from angelos.portfolio.envelope.open import OpenEnvelope
+from angelos.portfolio.envelope.receive import ReceiveEnvelope
+from angelos.portfolio.envelope.validate import ValidateEnvelope
+from angelos.portfolio.envelope.wrap import WrapEnvelope
+from angelos.portfolio.message.create import CreateMail
+from angelos.portfolio.message.validate import ValidateMessage
+from angelos.portfolio.utils import Groups
 
 
 class MailboxAPI(ApiFacadeExtension):
@@ -40,13 +44,17 @@ class MailboxAPI(ApiFacadeExtension):
 
     ATTRIBUTE = ("mailbox",)
 
-    PATH_INBOX = ("/messages/inbox",)
-    PATH_OUTBOX = ("/messages/outbox",)
-    PATH_READ = ("/messages/read",)
-    PATH_DRAFT = ("/messages/drafts",)
-    PATH_TRASH = ("/messages/trash",)
-    PATH_SENT = ("/messages/sent",)
-    PATH_CACHE = ("/cache/msg",)
+    PATH_INBOX = (PurePosixPath("/messages/inbox"),)
+    PATH_OUTBOX = (PurePosixPath("/messages/outbox"),)
+    PATH_READ = (PurePosixPath("/messages/read"),)
+    PATH_DRAFT = (PurePosixPath("/messages/drafts"),)
+    PATH_TRASH = (PurePosixPath("/messages/trash"),)
+    PATH_SENT = (PurePosixPath("/messages/sent"),)
+    PATH_CACHE = (PurePosixPath("/cache/msg"),)
+
+    SUFFIX_ENVELOPE = DocumentHelper.extension(Definitions.COM_ENVELOPE)
+    SUFFIX_MAIL = DocumentHelper.extension(Definitions.COM_MAIL)
+    SUFFIX_CHACHED = DocumentHelper.extension(Definitions.CACHED_MSG)
 
     def __init__(self, facade: Facade):
         """Initialize the Mail."""
@@ -64,27 +72,27 @@ class MailboxAPI(ApiFacadeExtension):
 
     async def load_inbox(self) -> Set[uuid.UUID]:
         """Load envelopes from the inbox."""
-        return await self.__load_letters(self.PATH_INBOX[0] + "*")
+        return await self.__load_letters(str(self.PATH_INBOX[0].joinpath("*")))
 
     async def load_outbox(self) -> Set[uuid.UUID]:
         """Load letters from outbox folder."""
-        return await self.__load_letters(self.PATH_OUTBOX[0] + "*")
+        return await self.__load_letters(str(self.PATH_OUTBOX[0].joinpath("*")))
 
     async def load_read(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
-        return await self.__load_letters(self.PATH_READ[0] + "*")
+        return await self.__load_letters(str(self.PATH_READ[0].joinpath("*")))
 
     async def load_drafts(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
-        return await self.__load_letters(self.PATH_DRAFT[0] + "*")
+        return await self.__load_letters(str(self.PATH_DRAFT[0].joinpath("*")))
 
     async def load_trash(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
-        return await self.__load_letters(self.PATH_TRASH[0] + "*")
+        return await self.__load_letters(str(self.PATH_TRASH[0].joinpath("*")))
 
     async def load_sent(self) -> Set[uuid.UUID]:
         """Load read folder from the messages store."""
-        return await self.__load_letters(self.PATH_SENT[0] + "*")
+        return await self.__load_letters(str(self.PATH_SENT[0].joinpath("*")))
 
     async def __info_mail(self, filename: PurePosixPath) -> Tuple[
         bool, uuid.UUID, str, str, datetime.datetime, uuid.UUID, int]:
@@ -92,12 +100,11 @@ class MailboxAPI(ApiFacadeExtension):
         error = False
 
         letter = await self.facade.storage.vault.archive.load(filename)
-        mail = PortfolioPolicy.deserialize(letter)
+        mail = DocumentHelper.deserialize(letter)
         if not isinstance(mail, Mail):
             error = True
-        sender = await self.facade.storage.vault.load_portfolio(mail.issuer, PGroup.VERIFIER)
-        policy = ImportPolicy(self.facade.data.portfolio)
-        message = policy.message(sender, mail)
+        sender = await self.facade.storage.vault.load_portfolio(mail.issuer, Groups.VERIFIER)
+        message = ValidateMessage().validate(self.facade.data.portfolio, sender, mail)
         if not message:
             error = True
 
@@ -117,17 +124,13 @@ class MailboxAPI(ApiFacadeExtension):
         error = False
 
         letter = await self.facade.storage.vault.archive.load(filename)
-        mail = PortfolioPolicy.deserialize(letter)
+        mail = DocumentHelper.deserialize(letter)
         if not isinstance(mail, Mail):
             error = True
-        receiver = await self.facade.storage.vault.load_portfolio(mail.owner, PGroup.VERIFIER)
+        receiver = await self.facade.storage.vault.load_portfolio(mail.owner, Groups.VERIFIER)
 
         return (
-            error,
-            mail.owner,
-            mail.subject,
-            PrintPolicy.title(receiver),
-            mail.reply,
+            error, mail.owner, mail.subject, PrintPolicy.title(receiver), mail.reply,
             len(mail.attachments) if mail.attachments is list else int(bool(mail.attachments))
         )
 
@@ -137,12 +140,11 @@ class MailboxAPI(ApiFacadeExtension):
         error = False
 
         letter = await self.facade.storage.vault.archive.load(filename)
-        envelope = PortfolioPolicy.deserialize(letter)
+        envelope = DocumentHelper.deserialize(letter)
         if not isinstance(envelope, Envelope):
             error = True
-        sender = await self.facade.storage.vault.load_portfolio(envelope.issuer, PGroup.VERIFIER)
-        policy = ImportPolicy(self.facade.data.portfolio)
-        message = policy.envelope(sender, envelope)
+        sender = await self.facade.storage.vault.load_portfolio(envelope.issuer, Groups.VERIFIER)
+        message = ValidateEnvelope().validate(self.facade.data.portfolio, sender, envelope)
         status = await self.facade.api.contact.status(envelope.issuer)
 
         if not message:
@@ -160,12 +162,11 @@ class MailboxAPI(ApiFacadeExtension):
         """Get info about an envelope."""
         error = False
 
-
         letter = await self.facade.storage.vault.archive.load(filename)
-        envelope = PortfolioPolicy.deserialize(letter)
+        envelope = DocumentHelper.deserialize(letter)
         if not isinstance(envelope, Envelope):
             error = True
-        receiver = await self.facade.storage.vault.load_portfolio(envelope.owner, PGroup.VERIFIER)
+        receiver = await self.facade.storage.vault.load_portfolio(envelope.owner, Groups.VERIFIER)
         if not envelope.validate():
             error = True
 
@@ -186,9 +187,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-            dir=MailboxAPI.PATH_INBOX[0], file=envelope_id
-        ))
+        filename = MailboxAPI.PATH_INBOX[0].joinpath(str(envelope_id) + self.SUFFIX_ENVELOPE)
         return await self.__info_inbox_envelope(filename)
 
     async def get_info_outbox(self,  envelope_id: uuid.UUID) -> Tuple[
@@ -201,9 +200,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-            dir=MailboxAPI.PATH_OUTBOX[0], file=envelope_id
-        ))
+        filename = MailboxAPI.PATH_OUTBOX[0].joinpath(str(envelope_id) + self.SUFFIX_ENVELOPE)
         return await self.__info_outbox_envelope(filename)
 
     async def get_info_draft(self, message_id: uuid.UUID) -> Tuple[
@@ -216,9 +213,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        ))
+        filename = MailboxAPI.PATH_DRAFT[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__info_draft(filename)
 
     async def get_info_read(self, message_id: uuid.UUID) -> Tuple[
@@ -231,9 +226,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_READ[0], file=message_id
-        ))
+        filename = MailboxAPI.PATH_READ[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__info_mail(filename)
 
     async def get_info_trash(self, message_id: uuid.UUID) -> Tuple[
@@ -246,9 +239,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_TRASH[0], file=message_id
-        ))
+        filename = MailboxAPI.PATH_TRASH[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__info_mail(filename)
 
     async def get_info_sent(self, message_id: uuid.UUID) -> Tuple[
@@ -261,14 +252,12 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_SENT[0], file=message_id
-        ))
+        filename = MailboxAPI.PATH_SENT[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__info_mail(filename)
 
     async def __simple_load(self, filename: PurePosixPath) -> MessageT:
         """Loads messages without policy checks."""
-        return PortfolioPolicy.deserialize(await self.facade.storage.vault.archive.load(filename))
+        return DocumentHelper.deserialize(await self.facade.storage.vault.archive.load(filename))
 
     async def get_read(self, message_id: uuid.UUID) -> MessageT:
         """
@@ -279,9 +268,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_READ[0], file=message_id
-        ))
+        filename =  MailboxAPI.PATH_READ[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__simple_load(filename)
 
     async def get_draft(self, message_id: uuid.UUID) -> MessageT:
@@ -293,9 +280,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        ))
+        filename =  MailboxAPI.PATH_DRAFT[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__simple_load(filename)
 
     async def get_trash(self, message_id: uuid.UUID) -> MessageT:
@@ -307,9 +292,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_TRASH[0], file=message_id
-        ))
+        filename =  MailboxAPI.PATH_TRASH[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__simple_load(filename)
 
     async def get_sent(self, message_id: uuid.UUID) -> MessageT:
@@ -321,9 +304,7 @@ class MailboxAPI(ApiFacadeExtension):
         Returns:
 
         """
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_SENT[0], file=message_id
-        ))
+        filename =  MailboxAPI.PATH_SENT[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         return await self.__simple_load(filename)
 
     async def move_trash(self, message_id: uuid.UUID):
@@ -340,9 +321,7 @@ class MailboxAPI(ApiFacadeExtension):
                 MailboxAPI.PATH_DRAFT[0],
                 MailboxAPI.PATH_SENT[0]
         ):
-            filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=path.rstrip("/"), file=message_id
-            ))
+            filename = path.joinpath(str(message_id) + self.SUFFIX_MAIL)
             archive = self.facade.storage.vault.archive
             is_file = await archive.isfile(filename)
             if is_file:
@@ -358,9 +337,7 @@ class MailboxAPI(ApiFacadeExtension):
         trash = await self.load_trash()
         archive = self.facade.storage.vault.archive
         for message_id in trash:
-            filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_TRASH[0], file=message_id
-            ))
+            filename =  MailboxAPI.PATH_TRASH[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
             is_file = await archive.isfile(filename)
             if is_file:
                 await archive.remove(filename)
@@ -373,38 +350,29 @@ class MailboxAPI(ApiFacadeExtension):
         save_list = list()
 
         for envelope in envelopes:
-            envelope = EnvelopePolicy.receive(self.facade.data.portfolio, envelope)
+            envelope = ReceiveEnvelope().perform(self.facade.data.portfolio, envelope)
             if not envelope:
                 reject.add(envelope)
                 continue
 
             save_list.append(
                 self.facade.storage.vault.save(
-                    PurePosixPath(DOCUMENT_PATH[envelope.type].format(
-                        dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
-                    )),
-                    envelope,
-                )
-            )
+                    MailboxAPI.PATH_INBOX[0].joinpath(str(envelope.id) + self.SUFFIX_MAIL), envelope))
 
         result = await asyncio.gather(*save_list)
         return True, reject, result
 
     async def load_envelope(self, envelope_id: uuid.UUID) -> Envelope:
         """Load specific envelope from the inbox."""
-        return await self._load_doc(envelope_id, DocType.COM_ENVELOPE, MailboxAPI.PATH_INBOX[0], Envelope)
+        return await self._load_doc(envelope_id, Definitions.COM_ENVELOPE, MailboxAPI.PATH_INBOX[0], Envelope)
 
     async def load_message(self, message_id: uuid.UUID) -> Mail:
         """Load specific message from the read folder."""
-        return await self._load_doc(message_id, DocType.COM_MAIL, MailboxAPI.PATH_READ[0], Mail)
+        return await self._load_doc(message_id, Definitions.COM_MAIL, MailboxAPI.PATH_READ[0], Mail)
 
-    async def _load_doc(self, doc_id: uuid.UUID, doc_type_num, box_dir, doc_class) -> Any:
+    async def _load_doc(self, doc_id: uuid.UUID, doc_type_num: int, box_dir: PurePosixPath, doc_class) -> Any:
         doc_list = await self.facade.storage.vault.search_docs(
-            path=PurePosixPath(DOCUMENT_PATH[doc_type_num].format(
-                dir=box_dir, file=doc_id
-            )),
-            limit=1,
-        )
+            path=box_dir.joinpath(str(doc_id) + DocumentHelper.extension(doc_type_num)), limit=1)
         if not doc_list:
             return None
         result = Glue.doc_validate_report(doc_list, doc_class)
@@ -416,11 +384,7 @@ class MailboxAPI(ApiFacadeExtension):
     async def import_envelope(self, envelope: Envelope):
         """Imports an envelope to inbox."""
         result = await self.facade.storage.vault.save(
-            PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
-            )),
-            envelope,
-        )
+            MailboxAPI.PATH_INBOX[0].joinpath(str(envelope.id) + self.SUFFIX_MAIL), envelope)
         if isinstance(result, Exception):
             raise result
         return True
@@ -430,13 +394,12 @@ class MailboxAPI(ApiFacadeExtension):
         vault = self.facade.storage.vault
 
         # Load and deserialize file into envelope document based on document ID.
-        path = PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-            dir=MailboxAPI.PATH_INBOX[0], file=envelope_id))
-        envelope = PortfolioPolicy.deserialize(await vault.archive.load(path))
+        path =  MailboxAPI.PATH_INBOX[0].joinpath(str(envelope_id) + self.SUFFIX_ENVELOPE)
+        envelope = DocumentHelper.deserialize(await vault.archive.load(path))
 
         # Load sender portfolio.
-        sender = await vault.load_portfolio(envelope.issuer, PGroup.VERIFIER)
-        message = EnvelopePolicy.open(self.facade.data.portfolio, sender, envelope)
+        sender = await vault.load_portfolio(envelope.issuer, Groups.VERIFIER)
+        message = OpenEnvelope().perform(self.facade.data.portfolio, sender, envelope)
 
         # move mail to read, and make complaint backup
         await self.store_letter(envelope, message)
@@ -471,26 +434,16 @@ class MailboxAPI(ApiFacadeExtension):
         letter.validate()
 
         await self.facade.storage.vault.save(
-            PurePosixPath(DOCUMENT_PATH[DocType.CACHED_MSG].format(
-                dir=MailboxAPI.PATH_CACHE[0], file=letter.id)),
-            letter,
-            document_file_id_match=False
-        )
+            MailboxAPI.PATH_CACHE[0].joinpath(str(letter.id) + self.SUFFIX_CHACHED),
+            letter, document_file_id_match=False)
 
         await self.facade.storage.vault.delete(
-            PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailboxAPI.PATH_INBOX[0], file=envelope.id
-            ))
-        )
+            MailboxAPI.PATH_INBOX[0].joinpath(str(envelope.id) + self.SUFFIX_ENVELOPE))
 
     async def save_read(self, message: Mail):
         """Save a message as read in the read message folder."""
         await self.facade.storage.vault.save(
-            PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_READ[0], file=message.id
-            )),
-            message
-        )
+            MailboxAPI.PATH_READ[0].joinpath(str(message.id) + self.SUFFIX_MAIL), message)
 
     async def send_mail(self, mail: Mail, subject: str, body: str, recipient: uuid.UUID=None, reply: uuid.UUID=None):
         """
@@ -506,21 +459,15 @@ class MailboxAPI(ApiFacadeExtension):
 
         """
         recipient = await self.facade.storage.vault.load_portfolio(
-            recipient if recipient else mail.owner, PGroup.VERIFIER)
-        builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
+            recipient if recipient else mail.owner, Groups.VERIFIER)
+        builder = CreateMail().perform(self.facade.data.portfolio, recipient)
         message = builder.message(subject, body, reply).done()
-        envelope = EnvelopePolicy.wrap(self.facade.data.portfolio, recipient, message)
-        await self.gather(
-            self.remove_draft(mail.id),
-            self.save_outbox(envelope),
-            self.save_sent(message)
-        )
+        envelope = WrapEnvelope().perform(self.facade.data.portfolio, recipient, message)
+        await self.gather(self.remove_draft(mail.id), self.save_outbox(envelope), self.save_sent(message))
 
     async def remove_draft(self, message_id: uuid.UUID):
         """Remove a mail from the draft folder."""
-        filename = PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-            dir=MailboxAPI.PATH_DRAFT[0], file=message_id
-        ))
+        filename =  MailboxAPI.PATH_DRAFT[0].joinpath(str(message_id) + self.SUFFIX_MAIL)
         archive = self.facade.storage.vault.archive
         is_file = await archive.isfile(filename)
         if is_file:
@@ -529,33 +476,21 @@ class MailboxAPI(ApiFacadeExtension):
     async def save_outbox(self, envelope: Envelope):
         """Save a message to outbox folder to be sent."""
         result = await self.facade.storage.vault.save(
-            PurePosixPath(DOCUMENT_PATH[DocType.COM_ENVELOPE].format(
-                dir=MailboxAPI.PATH_OUTBOX[0], file=envelope.id
-            )),
-            envelope,
-        )
+            MailboxAPI.PATH_OUTBOX[0].joinpath(str(envelope.id) + self.SUFFIX_ENVELOPE), envelope)
         if result != envelope.id:
             raise RuntimeError("{}, {}".format(result, envelope.id))
 
     async def save_sent(self, message: Mail):
         """Save a message to sent folder for archiving."""
         result = await self.facade.storage.vault.save(
-            PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_SENT[0], file=message.id
-            )),
-            message,
-        )
+            MailboxAPI.PATH_SENT[0].joinpath(str(message.id) + self.SUFFIX_MAIL), message)
 
     async def save_draft(self, draft: Mail, subject: str, body: str, reply: uuid.UUID=None):
         """Save a message to draft folder for archiving."""
-        recipient = await self.facade.storage.vault.load_portfolio(draft.owner, PGroup.VERIFIER)
-        builder = MessagePolicy.mail(self.facade.data.portfolio, recipient)
+        recipient = await self.facade.storage.vault.load_portfolio(draft.owner, Groups.VERIFIER)
+        builder = CreateMail().perform(self.facade.data.portfolio, recipient)
         new_draft = builder.message(subject, body, reply).draft()
 
         await self.facade.storage.vault.save(
-            PurePosixPath(DOCUMENT_PATH[DocType.COM_MAIL].format(
-                dir=MailboxAPI.PATH_DRAFT[0], file=new_draft.id
-            )),
-            new_draft,
-        )
+            MailboxAPI.PATH_DRAFT[0].joinpath(str(new_draft.id) + self.SUFFIX_MAIL), new_draft)
         await self.remove_draft(new_draft.id)

@@ -64,6 +64,7 @@ class ReplicationAPI(ApiFacadeExtension):
 
         preset.files[name] = (entry.id, entry.deleted, entry.modified)
         """
+        print("NAMESPACE", self.facade, preset.archive, preset)
         storage = getattr(self.facade.storage, preset.archive)
         preset._files = await Globber.syncro(
             storage.archive,

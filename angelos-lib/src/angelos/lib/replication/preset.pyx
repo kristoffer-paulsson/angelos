@@ -18,20 +18,20 @@ Replication presets. The presets defines specific replication behavior needed
 for several purposes.
 """
 import datetime
-import pathlib
+from pathlib import PurePosixPath
 import uuid
 
-from angelos.lib.api.mailbox import MailboxAPI
-from angelos.lib.storage.mail import MailStorage
-from angelos.lib.storage.vault import VaultStorage
+from angelos.facade.api.mailbox import MailboxAPI
+from angelos.facade.storage.mail import MailStorage
+from angelos.facade.storage.vault import VaultStorage
 from angelos.lib.ioc import Container
-from angelos.lib.policy.portfolio import Portfolio
+from angelos.portfolio.collection import Portfolio
 
 
 class FileSyncInfo:
     def __init__(self):
         self.fileid = uuid.UUID(int=0)
-        self.path = ""
+        self.path = PurePosixPath("")
         self.deleted = None
         self.pieces = 0
         self.size = 0
@@ -57,13 +57,8 @@ class Preset:
     T_MAIL = "mail"
 
     def __init__(
-        self,
-        archive: str,
-        preset: str = "custom",
-        modified: datetime.datetime = None,
-        path: str = "/",
-        owner: uuid.UUID = None,
-    ):
+            self, archive: str, preset: str = "custom", modified: datetime.datetime = None,
+            path: PurePosixPath = PurePosixPath("/"), owner: uuid.UUID = None):
         """Preset operation."""
         self._preset = preset
         self._modified = modified if modified else datetime.datetime(1, 1, 1)
@@ -145,13 +140,13 @@ class Preset:
     def file_processed(self, fileid: uuid.UUID):
         self.processed.add(fileid)
 
-    def to_relative(self, path: str) -> str:
+    def to_relative(self, path: PurePosixPath) -> PurePosixPath:
         """Convert absolute path to relative."""
-        return str(pathlib.PurePath(path).relative_to(self.path))
+        return PurePosixPath(path).relative_to(self.path)
 
-    def to_absolute(self, path: str) -> str:
+    def to_absolute(self, path: PurePosixPath) -> PurePosixPath:
         """Convert relative path to absolute."""
-        return str(pathlib.PurePath(self.path).joinpath(path))
+        return PurePosixPath(self.path, path)
 
     async def on_init(self, ioc: Container, portfolio: Portfolio=None):
         """Execute event before init."""
@@ -231,12 +226,12 @@ class CustomPreset(Preset):
 class MailClientPreset(Preset):
     def __init__(self, modified: datetime.datetime = None):
         Preset.__init__(
-            self, VaultStorage.ATTRIBUTE[0], Preset.T_MAIL, modified, MailboxAPI.PATH_OUTBOX[0]
-        )
+            self, VaultStorage.ATTRIBUTE[0], Preset.T_MAIL,
+            modified, MailboxAPI.PATH_OUTBOX[0])
 
     def to_absolute(self, path: str) -> str:
         """Convert relative path to absolute."""
-        return str(pathlib.PurePath(MailboxAPI.PATH_INBOX[0]).joinpath(path))
+        return str(PurePosixPath(MailboxAPI.PATH_INBOX[0], path))
 
     async def on_after_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,
@@ -247,12 +242,10 @@ class MailClientPreset(Preset):
 
 
 class MailServerPreset(Preset):
-    def __init__(
-        self, modified: datetime.datetime = None, owner: uuid.UUID = None
-    ):
+    def __init__(self, modified: datetime.datetime = None, owner: uuid.UUID = None):
         Preset.__init__(
-            self, MailStorage.ATTRIBUTE[0], Preset.T_MAIL, modified, "/", owner=owner
-        )
+            self, MailStorage.ATTRIBUTE[0], Preset.T_MAIL,
+            modified, PurePosixPath("/"), owner=owner)
 
     async def on_after_download(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,

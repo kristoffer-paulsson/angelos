@@ -18,6 +18,7 @@ import asyncio
 import datetime
 import logging
 import uuid
+from pathlib import PurePosixPath
 from typing import List, Any
 
 from angelos.archive7.archive import Archive7
@@ -137,7 +138,7 @@ class Globber:
     @staticmethod
     async def syncro(
             archive: Archive7,
-            path: str = "/",
+            path: PurePosixPath = PurePosixPath("/"),
             owner: uuid.UUID = None,
             modified: datetime.datetime = None,
             cmp_uuid: bool = False,
