@@ -109,7 +109,7 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             vault_role=vault_role
         )
 
-    async def save(self, filename: PurePosixPath, document, document_file_id_match=True):
+    async def save(self, filename: PurePosixPath, document, document_file_id_match=True) -> uuid.UUID:
         """Save a document at a certain location.
 
         Args:
@@ -145,9 +145,9 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         Returns:
 
         """
-        return await self.archive.remove(filename)
+        await self.archive.remove(filename)
 
-    async def link(self, path: PurePosixPath, link_to: PurePosixPath) -> None:
+    async def link(self, path: PurePosixPath, link_to: PurePosixPath) -> uuid.UUID:
         """Create a link to file or directory.
 
         Args:
@@ -157,9 +157,9 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
                 Path being linked to.
 
         """
-        await self.archive.link(path, link_to)
+        return await self.archive.link(path, link_to)
 
-    async def update(self, filename: PurePosixPath, document):
+    async def update(self, filename: PurePosixPath, document) -> uuid.UUID:
         """Update a document on file.
 
         Args:
@@ -191,15 +191,9 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         return datalist
 
     async def search(
-            self,
-            pattern: str = "/",
-            modified: datetime.datetime = None,
-            created: datetime.datetime = None,
-            owner: uuid.UUID = None,
-            link: bool = False,
-            limit: int = 0,
-            deleted: Optional[bool] = None,
-            fields: Callable = lambda name, entry: name
+        self, pattern: str = "/", modified: datetime.datetime = None, created: datetime.datetime = None,
+        owner: uuid.UUID = None, link: bool = False, limit: int = 0, deleted: Optional[bool] = None,
+        fields: Callable = lambda name, entry: name
     ) -> Dict[uuid.UUID, Any]:
         """Searches for a files in the storage.
 
@@ -250,14 +244,15 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
         return result
 
     async def search_docs(
-            self, issuer: uuid.UUID = None, path: PurePosixPath = PurePosixPath("/"), limit: int = 1
+        self, issuer: uuid.UUID = None,
+        path: PurePosixPath = PurePosixPath("/"), limit: int = 1
     ) -> List[bytes]:
         """Search a folder for documents by issuer and path."""
-
+        raise DeprecationWarning('Use "search" instead of "search_docs".')
         if issuer:
-            result = await Globber.owner(self.archive, issuer, path)
+            result = await Globber.owner(self.archive, issuer, str(path))
         else:
-            result = await Globber.path(self.archive, path)
+            result = await Globber.path(self.archive, str(path))
 
         result.sort(reverse=True, key=lambda e: e[2])
 

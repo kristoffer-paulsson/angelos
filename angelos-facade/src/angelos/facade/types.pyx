@@ -13,3 +13,32 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+import datetime
+from typing import NamedTuple, List, Optional
+
+
+class PersonData(NamedTuple):
+    """Person entity document data tuple."""
+
+    given_name: str
+    family_name: str
+    names: List[str]
+    sex: str
+    born: datetime.date
+
+
+class MinistryData(NamedTuple):
+    """Ministry entity document data tuple."""
+
+    ministry: str
+    vision: Optional[str]
+    founded: datetime.date
+
+
+class ChurchData(NamedTuple):
+    """Church entity document data tuple."""
+
+    city: str
+    region: Optional[str]
+    country: Optional[str]
+    founded: datetime.date

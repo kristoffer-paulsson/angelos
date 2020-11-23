@@ -14,15 +14,16 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Vault."""
+import datetime
 import uuid
 from pathlib import PurePosixPath
-from typing import List
+from typing import Optional, Callable, Dict, Any
 
-from angelos.lib.const import Const
-from angelos.lib.policy.portfolio import PortfolioPolicy
-
-from angelos.lib.helper import Glue, Globber
+from angelos.archive7.archive import Archive7, TYPE_FILE, TYPE_LINK
 from angelos.facade.facade import StorageFacadeExtension
+from angelos.lib.const import Const
+from angelos.lib.helper import Glue, Globber
+from angelos.document.utils import Helper as DocumentHelper
 
 
 class MailStorage(StorageFacadeExtension):
@@ -40,7 +41,7 @@ class MailStorage(StorageFacadeExtension):
 
     INIT_HIERARCHY = ()
 
-    async def save(self, filename: PurePosixPath, document, document_file_id_match=True):
+    async def save(self, filename: PurePosixPath, document, document_file_id_match=True) -> uuid.UUID:
         """Save a document at a certain location.
 
         Args:
@@ -60,23 +61,39 @@ class MailStorage(StorageFacadeExtension):
 
         return await self.archive.mkfile(
             filename=filename,
-            data=PortfolioPolicy.serialize(document),
+            data=DocumentHelper.serialize(document),
             id=file_id,
             owner=owner,
             created=created,
-            modified=updated,
+            modified=updated
         )
-    async def delete(self, filename: PurePosixPath):
-        """Remove a document at a certain location."""
-        return await self.archive.remove(filename)
 
-    async def update(self, filename: PurePosixPath, document):
-        """Update a document on file."""
+    async def delete(self, filename: PurePosixPath):
+        """Remove a document at a certain location.
+
+        Args:
+            filename:
+
+        Returns:
+
+        """
+        await self.archive.remove(filename)
+
+    async def update(self, filename: PurePosixPath, document) -> uuid.UUID:
+        """Update a document on file.
+
+        Args:
+            filename:
+            document:
+
+        Returns:
+
+        """
         created, updated, owner = Glue.doc_save(document)
 
         return await self.archive.save(
             filename=filename,
-            data=PortfolioPolicy.serialize(document),
+            data=DocumentHelper.serialize(document),
             modified=updated,
         )
 
@@ -89,24 +106,59 @@ class MailStorage(StorageFacadeExtension):
 
         datalist = []
         for r in result[:limit]:
-            datalist.append(self._archive.load(r[0]))
+            datalist.append(await self.archive.load(r[0]))
 
         return datalist
 
     async def search(
-        self, issuer: uuid.UUID = None, path: PurePosixPath = PurePosixPath("/"), limit: int = 1
-    ) -> List[bytes]:
-        """Search a folder for documents by issuer and path."""
+        self, pattern: str = "/", modified: datetime.datetime = None, created: datetime.datetime = None,
+        owner: uuid.UUID = None, link: bool = False, limit: int = 0, deleted: Optional[bool] = None,
+        fields: Callable = lambda name, entry: name
+    ) -> Dict[uuid.UUID, Any]:
+        """Searches for a files in the storage.
 
-        if issuer:
-            result = await Globber.owner(self.archive, issuer, path)
-        else:
-            result = await Globber.path(self.archive, path)
+        Args:
+            pattern (str):
+                Path search pattern.
+            modified (datetime.datetime):
+                Files modified since.
+            created (datetime.datetime):
+                Files created since.
+            owner (uuid.UUID):
+                Files belonging to owner.
+            link (bool):
+                Include links in result.
+            limit (int):
+                Max number of hits (0 is unlimited).
+            deleted (bool):
+                Search for deleted files.
+            fields (lambda):
+                Lambda function that compiles the result row.
 
-        result.sort(reverse=True, key=lambda e: e[2])
+        Returns (Dict[uuid.UUID, Any]):
+            Returns a dictionary with a custom resultset indexed by file ID.
 
-        datalist = []
-        for r in result[:limit]:
-            datalist.append(await self.archive.load(r[0]))
+        """
+        sq = Archive7.Query(pattern=pattern)
+        sq.type((TYPE_FILE, TYPE_LINK) if link else TYPE_FILE).deleted(deleted)
+        if modified:
+            sq.modified(modified)
+        if created:
+            sq.created(created)
+        if owner:
+            sq.owner(owner)
 
-        return datalist
+        result = dict()
+        count = 0
+        async for entry, path in self.archive.search(sq):
+            if link and entry.type == TYPE_LINK:
+                followed = self.archive._Archive7__manager._FileSystemStreamManager__follow_link(entry.id)
+                result[entry.id] = fields(path, followed)
+            else:
+                result[entry.id] = fields(path, entry)
+
+            count += 1
+            if count == limit:
+                break
+
+        return result

@@ -17,6 +17,7 @@
 
 Don't use these types with isinstance(), only in the method declaration.
 However these types can be used with Utils.is_typing() that wraps isinstance()."""
+from collections import namedtuple
 from typing import Union
 
 from angelos.document.domain import Domain, Node, Network
@@ -25,6 +26,15 @@ from angelos.document.envelope import Envelope
 from angelos.document.messages import Note, Instant, Mail, Share, Report
 from angelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
 from angelos.document.statements import Verified, Trusted, Revoked
+
+PersonData = namedtuple("PersonData", "given_name,family_name,names,sex,born")
+
+
+MinistryData = namedtuple("MinistryData", "ministry,vision,founded")
+
+
+ChurchData = namedtuple("ChurchData", "city,region,country,founded")
+
 
 DocumentT = Union[
     Person,
