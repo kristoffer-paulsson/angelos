@@ -6,11 +6,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from angelos.document.types import PersonData
+from angelos.document.types import ChurchData
 from angelos.facade.facade import Facade
+from angelos.facade.storage.routing import RoutingStorage
 from angelos.lib.const import Const
 from angelos.meta.fake import Generate
-from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
+from angelos.portfolio.portfolio.setup import SetupChurchPortfolio
 
 
 class TestRoutingStorage(TestCase):
@@ -24,10 +25,13 @@ class TestRoutingStorage(TestCase):
         self.dir = TemporaryDirectory()
         self.home = Path(self.dir.name)
         self.facade = Facade(self.home, self.secret,
-            SetupPersonPortfolio().perform(PersonData(**Generate.person_data()[0])),
-            role=Const.A_ROLE_PRIMARY, server=False
+            SetupChurchPortfolio().perform(ChurchData(**Generate.church_data()[0])),
+            role=Const.A_ROLE_PRIMARY, server=True
         )
 
     def tearDown(self) -> None:
         self.facade.close()
         self.dir.cleanup()
+
+    def test_run(self):
+        self.assertIsInstance(self.facade.storage.routing, RoutingStorage)

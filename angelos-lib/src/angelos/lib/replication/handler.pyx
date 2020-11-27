@@ -25,6 +25,7 @@ import math
 import uuid
 from typing import Any
 
+from angelos.common.utils import Util
 from asyncssh import Error
 from asyncssh.packet import (
     SSHPacketHandler,
@@ -241,9 +242,9 @@ class ReplicatorClientHandler(ReplicatorHandler):
 
             self.exit()
         except Exception as e:
-            logging.error(e, exc_info=True)
+            Util.print_exception(e)
             self.exit()
-            # logging.exception("Client replication failure")
+            logging.exception("Client replication failure")
             raise
 
     async def pull(self):

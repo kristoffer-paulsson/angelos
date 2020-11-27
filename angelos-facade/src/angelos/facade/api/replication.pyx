@@ -33,9 +33,7 @@ class ReplicationAPI(ApiFacadeExtension):
     def __init__(self, facade: Facade):
         ApiFacadeExtension.__init__(self, facade)
 
-    def create_preset(
-            self, name: str, p_type: int, user_id: uuid.UUID, **kwargs
-    ):
+    def create_preset(self, name: str, p_type: int, user_id: uuid.UUID, **kwargs):
         """
         Create a preset based on input data.
 
@@ -64,14 +62,11 @@ class ReplicationAPI(ApiFacadeExtension):
 
         preset.files[name] = (entry.id, entry.deleted, entry.modified)
         """
-        print("NAMESPACE", self.facade, preset.archive, preset)
         storage = getattr(self.facade.storage, preset.archive)
         preset._files = await Globber.syncro(
-            storage.archive,
-            preset.path,
+            storage.archive, preset.path,
             preset.owner if preset.owner.int else None,
-            preset.modified,
-            True
+            preset.modified, True
         )
 
     async def save_file(

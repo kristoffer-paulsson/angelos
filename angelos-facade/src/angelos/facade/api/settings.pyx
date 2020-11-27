@@ -18,7 +18,7 @@ import csv
 import io
 import uuid
 from configparser import ConfigParser
-from typing import Set, Tuple, Any
+from typing import Set, Tuple, Any, NoReturn
 
 from angelos.facade.facade import ApiFacadeExtension, Facade
 from angelos.common.misc import Misc
@@ -51,7 +51,7 @@ class SettingsAPI(ApiFacadeExtension):
         self.get = self.__config.get
         self.set = self.__config.set
 
-    async def load_preferences(self) -> None:
+    async def load_preferences(self) -> NoReturn:
         """
         Load preferences.ini file into a configparser.
         """

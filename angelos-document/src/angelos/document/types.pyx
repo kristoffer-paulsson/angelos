@@ -27,6 +27,7 @@ from angelos.document.messages import Note, Instant, Mail, Share, Report
 from angelos.document.profiles import PersonProfile, MinistryProfile, ChurchProfile
 from angelos.document.statements import Verified, Trusted, Revoked
 
+
 PersonData = namedtuple("PersonData", "given_name,family_name,names,sex,born")
 
 

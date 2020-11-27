@@ -56,6 +56,19 @@ SIZE_AEAD_KEY = crypto_aead_xchacha20poly1305_ietf_keybytes()
 SIZE_AEAD_A = crypto_aead_xchacha20poly1305_ietf_abytes()
 
 
+class NaClError(RuntimeError):
+    """Error due to programmatic misuse."""
+    KEY_LENGTH_ERROR = ("Invalid key due to length.", 100)
+    KEY_COMPUTATION_ERROR = ("Key computation failed", 101)
+    KEY_GENERATION_ERROR = ("Failed generate key(s)", 102)
+    DATA_LENGTH_ERROR = ("Data is to long", 103)
+
+
+class CryptoFailure(RuntimeWarning):
+    """When crypto operation fail due to circumstantial reasons."""
+    pass
+
+
 class NaCl:
     @staticmethod
     def random_bytes(unsigned int size) -> bytes:
@@ -115,7 +128,7 @@ class SecretBox(BaseKey):
         if self._sk is None:
             self._sk = self._salsa_key()
         if len(self._sk) != SIZE_SECRETBOX_KEY:
-            raise ValueError('Invalid key')
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
     def encrypt(self, message: bytes) -> bytes:
         nonce = NaCl.random_nonce()
@@ -124,7 +137,7 @@ class SecretBox(BaseKey):
         crypto = bytes(pad_len)
         fail = crypto_secretbox(crypto, pad, pad_len, nonce, self._sk)
         if fail:
-            raise ValueError("Failed to encrypt message")
+            raise CryptoFailure()
         return nonce + crypto[SIZE_SECRETBOX_BOXZERO:]
 
     def decrypt(self, crypto: bytes) -> bytes:
@@ -135,7 +148,7 @@ class SecretBox(BaseKey):
         message = bytes(pad_len)
         fail = crypto_secretbox_open(message, pad, pad_len, nonce, self._sk)
         if fail:
-            raise ValueError("Failed to decrypt message")
+            raise CryptoFailure()
         return message[SIZE_SECRETBOX_ZERO:]
 
 
@@ -147,7 +160,7 @@ class Signer(BaseKey):
 
         if self._seed:
             if len(self._seed) != SIZE_SIGN_SEED:
-                raise ValueError("Invalid seed bytes")
+                raise NaClError(*NaClError.KEY_LENGTH_ERROR)
         else:
             self._seed = NaCl.random_bytes(SIZE_SIGN_SEED)
 
@@ -156,7 +169,7 @@ class Signer(BaseKey):
 
         fail = crypto_sign_seed_keypair(self._vk, self._sk, self._seed)
         if fail:
-            raise RuntimeError("Failed to generate key-pair from seed")
+            raise NaClError(*NaClError.KEY_GENERATION_ERROR)
 
     def sign(self, message):
         cdef unsigned long long *sig_len = NULL
@@ -164,7 +177,7 @@ class Signer(BaseKey):
         signature = bytes(msg_len + SIZE_SIGN)
         fail = crypto_sign(signature, sig_len, message, msg_len, self._sk)
         if fail:
-            raise ValueError('Failed to sign message')
+            raise CryptoFailure()
 
         return signature
 
@@ -177,7 +190,7 @@ class Verifier(BaseKey):
         BaseKey.__init__(self)
 
         if len(vk) != SIZE_SIGN_PUBLICKEY:
-            raise ValueError("Invalid public key")
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
         self._vk = vk
 
@@ -191,7 +204,7 @@ class Verifier(BaseKey):
 
         fail = crypto_sign_open(message, msg_len_p, signature, sig_len, self._vk)
         if fail:
-            raise ValueError("Failed to validate message")
+            raise CryptoFailure()
         return message[:msg_len]
 
 
@@ -200,7 +213,7 @@ class PublicKey(BaseKey):
         BaseKey.__init__(self)
 
         if len(pk) != SIZE_BOX_PUBLICKEY:
-            raise ValueError("Passed in invalid public key")
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
         self._pk = pk
 
@@ -217,9 +230,9 @@ class SecretKey(BaseKey):
             crypto_box_keypair(self._pk, self._sk)
         elif len(self._sk) == SIZE_BOX_SECRETKEY:
             if crypto_scalarmult_base(self._pk, self._sk):
-                raise RuntimeError("Failed to compute scalar product")
+                raise NaClError(*NaClError.KEY_COMPUTATION_ERROR)
         else:
-            raise ValueError("Passed in invalid secret key")
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
 
 class DualSecret(BaseKey):
@@ -250,7 +263,7 @@ class CryptoBox:
             self._k = bytes(SIZE_BOX_BEFORENM)
             fail = crypto_box_beforenm(self._k, pk, sk)
             if fail:
-                raise RuntimeError("Unable to compute shared key")
+                raise NaClError(*NaClError.KEY_COMPUTATION_ERROR)
 
     def encrypt(self, message: bytes) -> bytes:
         nonce = NaCl.random_nonce()
@@ -259,7 +272,7 @@ class CryptoBox:
         crypto = bytes(pad_len)
         fail = crypto_box_afternm(crypto, pad, pad_len, nonce, self._k)
         if fail:
-            raise RuntimeError("Unable to encrypt messsage")
+            raise CryptoFailure()
 
         return nonce + crypto[SIZE_BOX_BOXZERO:]
 
@@ -271,7 +284,7 @@ class CryptoBox:
         message = bytes(pad_len)
         fail = crypto_box_open_afternm(message, pad, pad_len, nonce, self._k)
         if fail:
-            raise RuntimeError("Unable to decrypt message")
+            raise CryptoFailure()
 
         return message[SIZE_BOX_ZERO:]
 
@@ -280,11 +293,11 @@ class NetworkBox:
     def __init__(self, us: SecretKey, them: PublicKey):
         self._them = them
         if len(self._them.pk) != SIZE_KX_PUBLICKEY:
-            raise ValueError("Invalid public key bytes")
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
         self._us = us
         if len(self._us.sk) != SIZE_KX_SECRETKEY or len(self._us.pk) != SIZE_KX_PUBLICKEY:
-            raise RuntimeError("Passed in invalid secret key")
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
         self._tx = bytes(SIZE_KX_SESSIONKEY)
         self._rx = bytes(SIZE_KX_SESSIONKEY)
@@ -296,7 +309,7 @@ class NetworkBox:
 
         data_len = len(data)
         if len(data_len) > 255:
-            raise ValueError("Data can not be longer than 255 bytes.")
+            raise NaClError(*NaClError.DATA_LENGTH_ERROR)
 
         msg_len = len(message)
         crypto = bytes(msg_len + SIZE_AEAD_A)
@@ -307,7 +320,7 @@ class NetworkBox:
             data, data_len, NULL, nonce, self._tx
         )
         if fail:
-            raise RuntimeError("Unable to encrypt messsage")
+            raise CryptoFailure()
         return str(chr(data_len)).encode() + data + nonce + crypto
 
     def decrypt(self, crypto: bytes) -> Tuple[bytes, bytes]:
@@ -328,7 +341,7 @@ class NetworkBox:
         )
 
         if fail:
-            raise RuntimeError("Unable to decrypt message")
+            raise CryptoFailure()
 
         return message, data
 
@@ -338,7 +351,7 @@ class ServerBox(NetworkBox):
         NetworkBox.__init__(self, server, client)
         fail = crypto_kx_server_session_keys(self._rx, self._tx, self._us.sk, self._us.pk, self._them.pk)
         if fail:
-            raise RuntimeError("Suspicious client public key")
+            raise CryptoFailure()
 
 
 class ClientBox:
@@ -346,4 +359,4 @@ class ClientBox:
         NetworkBox.__init__(self, client, server)
         fail = crypto_kx_client_session_keys(self._rx, self._tx, self._us.sk, self._us.pk, self._them.pk)
         if fail:
-            raise RuntimeError("Suspicious server public key")
+            raise CryptoFailure()

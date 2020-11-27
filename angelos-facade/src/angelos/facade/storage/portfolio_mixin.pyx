@@ -41,6 +41,16 @@ from angelos.portfolio.statement.validate import ValidateTrustedStatement, Valid
 from angelos.portfolio.utils import Groups, Fields, Helper as PortfolioHelper
 
 
+class PortfolioError(RuntimeError):
+    """Programming error."""
+    ALREADY_EXISTS = ("Portfolio already in storage.", 100)
+    OWNER_DELETE = ("Forbidden to delete owning portfolio.", 101)
+
+
+class PortfolioNotFound(RuntimeWarning):
+    """Portfolio not found."""
+
+
 class PortfolioMixin:
     """Mixin that lets a storage deal with a portfolio repository."""
 
@@ -58,7 +68,7 @@ class PortfolioMixin:
         """Check that portfolio exists."""
         is_dir = await self.archive.isdir(path)
         if not is_dir:
-            raise Error.exception(Error.PORTFOLIO_EXISTS_NOT, {"portfolio": eid})
+            raise PortfolioNotFound()
 
     async def write_file(self, filename: PurePosixPath, doc: Document, issuer_as_owner: bool = False):
         """Write a document to the current archive."""
@@ -227,8 +237,7 @@ class PortfolioMixin:
 
         is_dir = await self.archive.isdir(dirname)
         if is_dir:
-            raise Error.exception(Error.PORTFOLIO_ALREADY_EXISTS, {
-                "portfolio": portfolio.entity.id})
+            raise PortfolioError(*PortfolioError.PORTFOLIO_ALREADY_EXISTS)
 
         await self.archive.mkdir(dirname)
 
@@ -304,7 +313,7 @@ class PortfolioMixin:
     async def delete_portfolio(self, eid: uuid.UUID) -> bool:
         """Delete an existing portfolio, except the owner."""
         if eid == self.facade.data.portfolio.entity.id:
-            raise Error.exception(Error.PORTFOLIO_ILLEGAL_DELETE, {"portfolio": eid})
+            raise PortfolioError(*PortfolioError.OWNER_DELETE)
 
         dirname = self.portfolio_path(eid)
         await self.portfolio_exists_not(dirname, eid)

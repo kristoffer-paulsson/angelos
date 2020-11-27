@@ -97,7 +97,7 @@ class DictionaryMixin:
         self._settings.set(self.SECTION[0], key, value)
 
         item.notify_all(1, {"attr": key, "value": value})
-        Loop.main().run(self._settings.save_preferences())
+        Loop.main().run(self._settings.save_preferences(), wait=False)
 
     def __delitem__(self, key: str) -> None:
         pass

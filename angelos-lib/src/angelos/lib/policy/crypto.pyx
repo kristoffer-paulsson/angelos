@@ -21,7 +21,7 @@ from angelos.document.document import UpdatedMixin
 from angelos.document.entities import Keys
 from angelos.document.envelope import Envelope, Header
 from angelos.document.types import DocumentT
-from angelos.bin.nacl import CryptoBox, Signer, Verifier, SecretKey, PublicKey
+from angelos.bin.nacl import CryptoBox, Signer, Verifier, SecretKey, PublicKey, CryptoFailure
 from angelos.lib.policy.portfolio import Portfolio, PrivatePortfolio
 from angelos.common.utils import Util
 
@@ -240,7 +240,7 @@ class Crypto:
             try:
                 verifier.verify(signature + data)
                 return True
-            except ValueError:
+            except CryptoFailure:
                 pass
 
         return False
@@ -314,7 +314,7 @@ class Crypto:
             for signature in document.signature if isinstance(document.signature, list) else [document.signature]:
                 try:
                     verifier.verify(signature + data)
-                except ValueError:
+                except CryptoFailure:
                     pass
                 else:
                     return True
@@ -405,7 +405,7 @@ class Crypto:
             try:
                 verifier.verify(header.signature + data)
                 return True
-            except ValueError:
+            except CryptoFailure:
                 pass
 
         return False

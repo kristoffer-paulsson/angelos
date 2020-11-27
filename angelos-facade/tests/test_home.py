@@ -8,6 +8,7 @@ from unittest import TestCase
 
 from angelos.document.types import PersonData
 from angelos.facade.facade import Facade
+from angelos.facade.storage.home import HomeStorage
 from angelos.lib.const import Const
 from angelos.meta.fake import Generate
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
@@ -31,6 +32,9 @@ class TestHomeStorage(TestCase):
     def tearDown(self) -> None:
         self.facade.close()
         self.dir.cleanup()
+
+    def test_run(self):
+        self.assertIsInstance(self.facade.storage.home, HomeStorage)
 
 
 

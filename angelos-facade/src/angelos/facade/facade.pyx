@@ -15,13 +15,11 @@
 #
 import asyncio
 import atexit
-import io
+import datetime
 import logging
 import math
 import time
-import traceback
 import uuid
-import datetime
 from pathlib import Path, PurePosixPath
 from typing import Tuple, Awaitable, List, Any
 
@@ -553,7 +551,7 @@ class ServerFacadeMixin(TypeFacadeMixin):
         **TypeFacadeMixin.STORAGES
     }
     APIS = {
-        "crud": ("angelos.facade.api.crud", "CrudAPI"),
+        # "crud": ("angelos.facade.api.crud", "CrudAPI"),
         **TypeFacadeMixin.APIS
     }
     DATAS = {

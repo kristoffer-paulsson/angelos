@@ -251,14 +251,16 @@ class Document(IssueMixin, BaseDocument):
             True if everything validates.
 
         """
-        valid = list()
-        classes = set(self.__class__.mro())
+        # valid = list()
+        # classes = set(self.__class__.mro())
 
-        for cls in classes:
-            if hasattr(cls, "apply_rules"):
-                valid.append(cls.apply_rules(self))
+        # for cls in classes:
+        #    if hasattr(cls, "apply_rules"):
+        #        valid.append(cls.apply_rules(self))
 
-        if not all(valid):
+        if not all([
+            func(self) for func in {
+                cls.apply_rules for cls in self.__class__.mro() if hasattr(cls, "apply_rules")}]):
             raise PolicyException()
         return True
 

@@ -32,7 +32,7 @@ class TestMailStorage(TestCase):
         self.dir = TemporaryDirectory()
         self.home = Path(self.dir.name)
         self.facade = Facade(self.home, self.secret,
-            SetupChurchPortfolio().perform(ChurchData(**Generate.church_data()[0]), server=True),
+            SetupChurchPortfolio().perform(ChurchData(**Generate.church_data()[0])),
             role=Const.A_ROLE_PRIMARY, server=True
         )
 

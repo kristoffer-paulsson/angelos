@@ -27,8 +27,9 @@ from angelos.portfolio.network.create import CreateNetwork
 from angelos.portfolio.entity.create import CreatePersonEntity, CreateMinistryEntity, CreateChurchEntity
 
 
-class BaseSetupEntity(PolicyPerformer):
-    """Initialize the entity generator"""
+class SetupEntityMixin(PolicyPerformer, PolicyMixin):
+    """Logic fo generating Entity, Keys and PrivateKeys for a new PrivatePortfolio."""
+
     def __init__(self):
         super().__init__()
         self._klass = None
@@ -45,10 +46,6 @@ class BaseSetupEntity(PolicyPerformer):
         self._hostname = None
         self._role = None
         self._server = None
-
-
-class SetupEntityMixin(PolicyMixin):
-    """Logic fo generating Entity, Keys and PrivateKeys for a new PrivatePortfolio."""
 
     def apply(self) -> bool:
         """Perform logic to create a new entity with its new portfolio."""
@@ -67,7 +64,7 @@ class SetupEntityMixin(PolicyMixin):
         return True
 
 
-class SetupPersonPortfolio(BaseSetupEntity, SetupEntityMixin):
+class SetupPersonPortfolio(SetupEntityMixin):
     """Generate new person portfolio from data."""
 
     def _setup(self):
@@ -86,7 +83,7 @@ class SetupPersonPortfolio(BaseSetupEntity, SetupEntityMixin):
         return self._portfolio
 
 
-class SetupMinistryPortfolio(BaseSetupEntity, SetupEntityMixin):
+class SetupMinistryPortfolio(SetupEntityMixin):
     """Generate new ministry portfolio from data."""
 
     def _setup(self):
@@ -105,7 +102,7 @@ class SetupMinistryPortfolio(BaseSetupEntity, SetupEntityMixin):
         return self._portfolio
 
 
-class SetupChurchPortfolio(BaseSetupEntity, SetupEntityMixin):
+class SetupChurchPortfolio(SetupEntityMixin):
     """Generate new church portfolio from data."""
 
     def _setup(self):

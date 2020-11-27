@@ -7,6 +7,7 @@ from unittest import TestCase
 
 from angelos.document.domain import Node
 from angelos.document.entities import Person, Ministry, Church
+from angelos.document.types import PersonData, MinistryData, ChurchData
 from angelos.facade.api.contact import ContactAPI
 from angelos.facade.api.crud import CrudAPI
 from angelos.facade.api.mailbox import MailboxAPI
@@ -28,7 +29,6 @@ from angelos.facade.storage.vault import VaultStorage
 from angelos.facade.task.contact_sync import ContactPortfolioSyncTask
 from angelos.facade.task.network_index import NetworkIndexerTask
 from angelos.lib.const import Const
-from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
 from angelos.meta.fake import Generate
 from angelos.meta.testing import run_async
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio, SetupMinistryPortfolio, SetupChurchPortfolio
