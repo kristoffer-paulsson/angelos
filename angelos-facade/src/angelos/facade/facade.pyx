@@ -340,13 +340,13 @@ class FacadeNamespace(FacadeFrozen):
 
     def __init__(self, facade: "Facade", config: dict, instances: dict = dict()):
         FacadeFrozen.__init__(self, facade)
-        self.__config = config
-        self.__instances = instances
+        self.__config = dict(config)
+        self.__instances = dict(instances)
 
     def __getattr__(self, name: str) -> FacadeExtension:
         if name not in self.__instances:
             if name not in self.__config:
-                raise FacadeError(*FacadeError.EXTENSION_NOT_FOUND)
+                raise FacadeError(*FacadeError.EXTENSION_NOT_FOUND, {"cls": type(self.facade), "attr": name})
             elif isinstance(self.__config[name], tuple):
                 self.__instances[name] = Util.klass(*self.__config[name])(self.facade)
             else:
@@ -558,7 +558,7 @@ class ServerFacadeMixin(TypeFacadeMixin):
         "server": ("angelos.facade.data.server", "ServerData"),
         **TypeFacadeMixin.DATAS
     }
-    TASKS = TypeFacadeMixin.TASKS
+    TASKS = {**TypeFacadeMixin.TASKS}
 
 
 class ClientFacadeMixin(TypeFacadeMixin):
@@ -573,7 +573,7 @@ class ClientFacadeMixin(TypeFacadeMixin):
         "client": ("angelos.facade.data.client", "ClientData"),
         **TypeFacadeMixin.DATAS
     }
-    TASKS = TypeFacadeMixin.TASKS
+    TASKS = {**TypeFacadeMixin.TASKS}
 
 
 class PersonClientFacade(Facade, ClientFacadeMixin, PersonFacadeMixin):

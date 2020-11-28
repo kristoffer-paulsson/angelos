@@ -41,6 +41,7 @@ class SubPackages:
         "angelos.archive7": "angelos-archive7",
         "angelos.lib": "angelos-lib",
         "angelos.server": "angelos-server",
+        "angelos.net": "angelos-net"
     }
 
     def print(self, *largs):

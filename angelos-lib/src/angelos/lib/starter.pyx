@@ -171,7 +171,8 @@ class Starter:
 
         """
         try:
-            return asyncssh.create_connection(**params)
+            conn = asyncssh.create_connection(**params)
+            return conn
         except (OSError, asyncssh.Error) as exc:
             logging.critical("SSH connection failed: %s" % str(exc), exc_info=True)
 

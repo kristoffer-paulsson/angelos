@@ -78,7 +78,7 @@ class TestFacade(TestCase):
         self.assertIsInstance(facade.data.server, ServerData)
         self.assertIsInstance(facade.data.portfolio, PortfolioData)
         self.assertIsInstance(facade.data.prefs, PreferencesData)
-        self.assertIsInstance(facade.api.crud, CrudAPI)
+        # self.assertIsInstance(facade.api.crud, CrudAPI)
         self.assertIsInstance(facade.api.settings, SettingsAPI)
         self.assertIsInstance(facade.api.mailbox, MailboxAPI)
         self.assertIsInstance(facade.api.contact, ContactAPI)
@@ -87,14 +87,25 @@ class TestFacade(TestCase):
         self.assertIsInstance(facade.task.network_index, NetworkIndexerTask)
 
     def extension_type(self, facade):
+        self.assertIs(facade.storage.facade, facade)
         for ext in facade.storage:
             self.assertIsInstance(ext, StorageFacadeExtension)
+            self.assertIs(ext.facade, facade)
+
+        self.assertIs(facade.data.facade, facade)
         for ext in facade.data:
             self.assertIsInstance(ext, DataFacadeExtension)
+            self.assertIs(ext.facade, facade)
+
+        self.assertIs(facade.api.facade, facade)
         for ext in facade.api:
             self.assertIsInstance(ext, ApiFacadeExtension)
+            self.assertIs(ext.facade, facade)
+
+        self.assertIs(facade.task.facade, facade)
         for ext in facade.task:
             self.assertIsInstance(ext, TaskFacadeExtension)
+            self.assertIs(ext.facade, facade)
 
 
 class TestPersonClientFacade(TestFacade):

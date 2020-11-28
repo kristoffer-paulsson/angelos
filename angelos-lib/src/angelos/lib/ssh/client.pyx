@@ -18,6 +18,7 @@ import asyncio
 import logging
 import uuid
 
+from angelos.common.utils import Util
 from angelos.facade.operation import ValidateTrust
 from angelos.lib.replication.endpoint import ReplicatorServer, ReplicatorClient
 from angelos.lib.replication.handler import ReplicatorServerHandler, ReplicatorClientHandler
@@ -155,7 +156,7 @@ class ServerReplicatorSession(SSHStreamSession, SSHServerSession):
         self._recv_buf[None].append(SignalReceived(signal))
         self._unblock_read(None)
 
-    @asyncio.coroutine
+    # @asyncio.coroutine
     async def __run_replicator_server(self, replicator_server, reader, writer):
         """Return a handler for an SFTP server session"""
         replicator_server.channel = self._chan
