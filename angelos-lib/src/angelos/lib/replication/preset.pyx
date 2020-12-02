@@ -31,7 +31,7 @@ from angelos.portfolio.collection import Portfolio
 class FileSyncInfo:
     def __init__(self):
         self.fileid = uuid.UUID(int=0)
-        self.path = PurePosixPath("")
+        self.path = ""  # PurePosixPath("/")
         self.deleted = None
         self.pieces = 0
         self.size = 0
@@ -116,7 +116,7 @@ class Preset:
 
         file_info = FileSyncInfo()
         file_info.fileid = fileid
-        file_info.path = meta[0]
+        file_info.path = PurePosixPath(meta[0])
         file_info.modified = meta[1]
         file_info.deleted = meta[2]
         return file_info
@@ -132,7 +132,7 @@ class Preset:
 
         file_info = FileSyncInfo()
         file_info.fileid = keys
-        file_info.path = meta[0]
+        file_info.path = PurePosixPath(meta[0])
         file_info.modified = meta[1]
         file_info.deleted = meta[2]
         return file_info
@@ -142,11 +142,15 @@ class Preset:
 
     def to_relative(self, path: PurePosixPath) -> PurePosixPath:
         """Convert absolute path to relative."""
+        print("TO_RELATIVE", path, self.path, PurePosixPath(path).relative_to(self.path))
+        # try:
+        #    return self.path.relative_to(path)
+        #except ValueError:
         return PurePosixPath(path).relative_to(self.path)
 
     def to_absolute(self, path: PurePosixPath) -> PurePosixPath:
         """Convert relative path to absolute."""
-        return PurePosixPath(self.path, path)
+        return self.path.joinpath(path)
 
     async def on_init(self, ioc: Container, portfolio: Portfolio=None):
         """Execute event before init."""
@@ -229,9 +233,9 @@ class MailClientPreset(Preset):
             self, VaultStorage.ATTRIBUTE[0], Preset.T_MAIL,
             modified, MailboxAPI.PATH_OUTBOX[0])
 
-    def to_absolute(self, path: str) -> str:
+    def to_absolute(self, path: PurePosixPath) -> PurePosixPath:
         """Convert relative path to absolute."""
-        return str(PurePosixPath(MailboxAPI.PATH_INBOX[0], path))
+        return MailboxAPI.PATH_INBOX[0].joinpath(path)
 
     async def on_after_upload(
             self, serverfile: FileSyncInfo, clientfile: FileSyncInfo,

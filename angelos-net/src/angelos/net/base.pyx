@@ -15,15 +15,20 @@
 #
 """Base classes and other functions for the network stack."""
 import asyncio
+import datetime
 import enum
 import struct
-from typing import Tuple, NamedTuple, Union
+import time
+import uuid
+from typing import Tuple, NamedTuple, Union, Any
 
 import msgpack
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
 from angelos.portfolio.collection import Portfolio
 
+# Template for custom transport.
+#  https://docs.zombofant.net/aioopenssl/devel/_modules/aioopenssl.html#STARTTLSTransport
 
 # There are 10 ranges reserved for services
 # 1. 0-127
@@ -46,6 +51,7 @@ from angelos.portfolio.collection import Portfolio
 # 1. Session handler
 # 2. Service
 # 3. Sub service
+from msgpack import ExtType
 
 UNKNOWN_TYPE = 126
 ERROR_TYPE = 127
@@ -72,19 +78,138 @@ def ri(n: int) -> int:
     return n // 128 + 1
 
 
-class ErrorPacket(NamedTuple):
-    """Return error to sending handler. (127)"""
-    type: int
-    level: int
-    process: int
-    error: int
+UINT_DATATYPE = 0x01
+UUID_DATATYPE = 0x02
+BYTES_FIX_DATATYPE = 0x03
+BYTES_VAR_DATATYPE = 0x04
+DATETIME_DATATYPE = 0x05
 
 
-class UnknownPacket(NamedTuple):
-    """Return unknown packet type to sending handler. (126)"""
-    type: int
-    level: int
-    process: int
+def default(obj: Any) -> msgpack.ExtType:
+    """Custom message pack type converter."""
+    if isinstance(obj, int):
+        return ExtType(UINT_DATATYPE, obj.to_bytes(8, "big", signed=False))
+    elif isinstance(obj, uuid.UUID):
+        return ExtType(UUID_DATATYPE, obj.bytes)
+    elif isinstance(obj, memoryview):
+        return ExtType(BYTES_FIX_DATATYPE, obj)
+    elif isinstance(obj, bytes):
+        return ExtType(BYTES_VAR_DATATYPE, obj)
+    elif isinstance(obj, datetime.datetime):
+        return ExtType(DATETIME_DATATYPE, int(
+            datetime.datetime.utcfromtimestamp(
+                obj.timestamp()).timestamp()).to_bytes(8, "big", signed=False))
+    else:
+        raise TypeError("Unsupported: {}".format(type(obj)))
+
+
+def ext_hook(code: int, data: bytes) -> Any:
+    """Custom message unpack type converter."""
+    if code == UINT_DATATYPE:
+        return int.from_bytes(data, "big", signed=False)
+    elif code == UUID_DATATYPE:
+        return uuid.UUID(bytes=data)
+    elif code == BYTES_FIX_DATATYPE:
+        return data
+    elif code == BYTES_VAR_DATATYPE:
+        return data
+    elif code == DATETIME_DATATYPE:
+        return datetime.datetime.fromtimestamp(
+            int.from_bytes(data, "big", signed=False)).replace(
+                tzinfo=datetime.timezone.utc).astimezone()
+    return ExtType(code, data)
+
+datetime.datetime.utcfromtimestamp(234234234)
+
+
+class PacketMeta(type):
+    """Meta class for packets so that they work almost like named tuples."""
+
+    def __new__(mcs, name: str, bases: tuple, namespace: dict):
+        """Scan through the fields and hide the meta data."""
+        print(name)
+        fields = list()
+
+        ns = namespace.copy()
+        for name, field in namespace.items():
+            if isinstance(field, tuple):
+                print(name)
+                fields.append((name,) + field)
+                if field[0] == BYTES_FIX_DATATYPE:
+                    _name = "_" + name
+                    ns[_name] = bytes(field[1])
+                    ns[name] = memoryview(ns[_name]).cast("B")
+                else:
+                    ns[name] = None
+
+        ns["_glorx"] = tuple(fields)
+
+        return super().__new__(mcs, name, bases, ns)
+
+
+class Packet(metaclass=PacketMeta):
+    """Network packet base class.
+
+    Example:
+
+    class MyPacket(Packet):
+        uint = (UINT_DATATYPE, 100, 200)  # <-- min and max are optional
+        uuid = (UUID_DATATYPE,)
+        fixed = (BYTES_FIX_DATATYPE, 128)  # <-- size is mandatory
+        variable = (BYTES_VAR_DATATYPE, 50, 200)  # <-- min and max are optional
+    """
+
+    def __init__(self, data: bytes = None):
+        if not data:
+            return
+
+        for index, value in enumerate(msgpack.unpackb(data, ext_hook=ext_hook, raw=False)):
+            meta = self._glorx[index]
+            attr = meta[0]
+            code = meta[1]
+
+            if code == UINT_DATATYPE:
+                if len(meta) == 4:
+                    if not (meta[2] <= value <= meta[3]):
+                        raise ValueError("Value not within {0}~{1}: was {2}".format(meta[2], meta[3], value))
+                setattr(self, attr, value)
+
+            elif code == UUID_DATATYPE:
+                setattr(self, attr, value)
+
+            elif code == BYTES_FIX_DATATYPE:
+                size = meta[2]
+                if len(value) != size:
+                    raise ValueError("Wrong size on '{0}': was {1}, expected {2}".format(attr, size, len(value)))
+                view = getattr(self, attr)
+                view[0:size] = value[0:size]
+
+            elif code == BYTES_VAR_DATATYPE:
+                if len(meta) == 4:
+                    size = len(value)
+                    if not (meta[2] <= size <= meta[3]):
+                        raise ValueError("Size not within {0}~{1}: was {2}".format(meta[2], meta[3], size))
+                setattr(self, attr, value)
+
+            elif code == DATETIME_DATATYPE:
+                setattr(self, attr, value)
+
+            else:
+                raise TypeError("Type not implemented: code {}".foramt(meta[1]))
+
+    def __bytes__(self) -> bytes:
+        return msgpack.packb(tuple([
+            getattr(self, meta[0]) for meta in self._glorx]), default=default, use_bin_type=True)
+
+
+class ErrorPacket(NamedTuple("ErrorPacket", [("type", int), ("level", int), ("process", int), ("error", int)])):
+    """"""
+    pass
+
+
+class UnknownPacket(NamedTuple("UnknownPacket", [("type", int), ("level", int), ("process", int)])):
+    """"""
+    pass
 
 
 class PacketHandler:
@@ -100,12 +225,12 @@ class PacketHandler:
         self._types = set(self.PACKETS.keys())
 
         # Enforce handling of unknown response
-        unknown = r(self.RANGE) + UNKNOWN_TYPE
+        unknown = r(self.RANGE)[0] + UNKNOWN_TYPE
         self.PACKETS[unknown] = UnknownPacket
         self.PROCESS[unknown] = "process_unknown"
 
         # Enforce handling of error response
-        error = r(self.RANGE) + ERROR_TYPE
+        error = r(self.RANGE)[0] + ERROR_TYPE
         self.PACKETS[error] = ErrorPacket
         self.PROCESS[error] = "process_error"
 
@@ -147,7 +272,6 @@ class PacketHandler:
 
 class PacketManager(asyncio.Protocol):
     """Protocol for handling packages going from and to packet handlers."""
-    HEADER = struct.Struct("!H3sB")
 
     PKT_HELLO = struct.Struct("!")  # Synchronize greeting
     PKT_FINISH = struct.Struct("!")  # Hang up on connection
@@ -197,8 +321,9 @@ class PacketManager(asyncio.Protocol):
             if len(data) <= 6:
                 raise ValueError()
 
-            pkt_type, length_data, pkt_level = self.HEADER.unpack_from(data, 0)
-            pkt_length = int.from_bytes(length_data, "big")
+            pkt_type = data[0:1].to_bytes(2, "big")
+            pkt_length = data[2:4].from_bytes(3, "big")
+            pkt_level = data[5].from_bytes(1, "big")
 
             if pkt_length != len(data):
                 raise ValueError()
@@ -214,12 +339,16 @@ class PacketManager(asyncio.Protocol):
         except (ValueError, struct.error):
             self.error(ErrorCode.MALFORMED, pkt_type, pkt_level)
         else:
-            handler.handle_packet(pkt_type, data[self.HEADER.size:])
+            handler.handle_packet(pkt_type, data[6:])
 
     def send_packet(self, pkt_type: int, pkt_level: int, data: bytes):
         """Send packet over socket."""
-        pkt_length = (self.HEADER.size + len(data)).to_bytes(3, "big")
-        self._transport.write(self.HEADER.pack(pkt_type, pkt_length, pkt_level) + data)
+        self._transport.write(
+            bytes.to_bytes(pkt_type, "big", 2) +
+            (6 + len(data)).to_bytes(3, "big") +
+            bytes.to_bytes(pkt_level, "big", 1) +
+            data
+        )
 
     def serialize(self, packet: NamedTuple) -> bytes:
         """Pack the named tuple with messagepack."""

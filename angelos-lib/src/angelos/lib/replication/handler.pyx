@@ -297,8 +297,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                     self._action = Actions.NO_ACTION
 
                 if c_fileinfo.path:
-                    c_rel_path = self.client.preset.to_relative(
-                        c_fileinfo.path)
+                    c_rel_path = self.client.preset.to_relative(c_fileinfo.path)
                 else:
                     c_rel_path = c_fileinfo.path
                 self.send_packet(
@@ -306,7 +305,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                     None,
                     String(self._action),
                     String(c_fileinfo.fileid.bytes),
-                    String(c_rel_path),
+                    String(str(c_rel_path)),
                     String(c_fileinfo.modified.isoformat()),
                     Boolean(c_fileinfo.deleted),
                 )
@@ -383,7 +382,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                     None,
                     String("push"),
                     String(c_fileinfo.fileid.bytes),
-                    String(c_rel_path),
+                    String(str(c_rel_path)),
                     String(c_fileinfo.modified.isoformat()),
                     Boolean(c_fileinfo.deleted),
                 )
@@ -551,7 +550,7 @@ class ReplicatorClientHandler(ReplicatorHandler):
                 Packets.RPL_UPLOAD,
                 None,
                 String(self._clientfile.fileid.bytes),
-                String(c_rel_path),
+                String(str(c_rel_path)),
                 UInt32(self._clientfile.size),
             )
             logging.info("RPL_UPLOAD(%s) sent" % c_rel_path)
@@ -1036,7 +1035,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
                     Packets.RPL_RESPONSE,
                     None,
                     String(s_fileinfo.fileid.bytes),
-                    String(s_rel_path),
+                    String(str(s_rel_path)),
                     String(s_fileinfo.modified.isoformat()),
                     Boolean(s_fileinfo.deleted),
                 )
@@ -1143,7 +1142,7 @@ class ReplicatorServerHandler(ReplicatorHandler):
                 Packets.RPL_RESPONSE,
                 None,
                 String(s_fileinfo.fileid.bytes),
-                String(s_fileinfo.path),
+                String(str(s_fileinfo.path)),
                 String(s_fileinfo.modified.isoformat()),
                 Boolean(s_fileinfo.deleted),
             )
