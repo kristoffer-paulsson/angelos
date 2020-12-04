@@ -27,7 +27,8 @@ from angelos.net.base import NetworkError, PacketHandler
 
 
 class AuthenticationError(RuntimeWarning):
-    pass
+    AUTH_ALREADY_DONE = ("Authentication already done.", 100)
+    AUTH_TIMEGATE_DIFF = ("Authentication time difference to large.", 101)
 
 
 class AuthenticationRequestPacket(NamedTuple):

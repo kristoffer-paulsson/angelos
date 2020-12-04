@@ -27,7 +27,7 @@ import uuid
 from abc import ABC, abstractmethod
 from concurrent.futures.thread import ThreadPoolExecutor
 from threading import Thread
-from typing import Callable, Awaitable, Any, Union, List
+from typing import Callable, Awaitable, Any, Union, List, Tuple
 from urllib.parse import urlparse
 
 import plyer
@@ -356,6 +356,18 @@ class Misc:
 
         return "{scheme}://{netloc}{path}".format(
             scheme=parts["scheme"], netloc=netloc, path=parts["path"])
+
+    @staticmethod
+    def location(url: str) -> Tuple[str, int]:
+        """domain and port from url."""
+        parts = urlparse("angelos://", url)
+        return parts.netloc.split(":")[0], parts.port
+
+    @staticmethod
+    def lookup(netloc: str) -> Tuple[ipaddress.IPv4Address, ipaddress.IPv6Address]:
+        """IP addresses from domain."""
+        return ipaddress.IPv4Address(socket.gethostbyname(netloc)), \
+               ipaddress.IPv6Address(socket.getaddrinfo(netloc, None, socket.AF_INET6)[0][4][0])
 
     @staticmethod
     async def sleep():

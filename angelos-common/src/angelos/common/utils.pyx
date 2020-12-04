@@ -116,12 +116,12 @@ class Util:
     @staticmethod
     def print_exception(exc: Exception):
         """Print exception and traceback using the python print() method."""
-        print("Critical error. ({})".format(exc))
         traceback.print_exception(type(exc), exc, exc.__traceback__)
 
     @staticmethod
     def log_exception(exc: Exception):
         """Log exception and traceback using the logging.critical() method."""
+        print("Critical error, see logs. ({})".format(type(exc)))
         logging.critical(exc, exc_info=(type(exc), exc, exc.__traceback__))
 
     # TODO: Deprecate this one.

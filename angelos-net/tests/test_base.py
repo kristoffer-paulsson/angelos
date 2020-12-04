@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import sys
@@ -9,7 +10,7 @@ from angelos.common.misc import Misc
 from angelos.meta.testing import run_async
 from angelos.meta.testing.net import FacadeContext
 from angelos.net.base import PacketHandler, PacketManager, UnknownPacket, ErrorPacket, default, ext_hook, \
-    DataType, Packet, r, UNKNOWN_PACKET
+    DataType, Packet, r, ServerManagerMixin, ClientManagerMixin
 
 
 class StubPacket(Packet, fields=("uint", "uuid", "fixed", "variable", "date"), fields_info=(
@@ -40,8 +41,7 @@ class StubHandler(PacketHandler):
         This method MUST never return an unknown or error in order
         to prevent an infinite loop over the network.
         """
-        print(packet)
-        raise NotImplementedError()
+        print(packet.tuple)
 
 
 class StubHandlerClient(StubHandler):
@@ -58,6 +58,14 @@ class StubHandlerServer(StubHandler):
     PROCESS = {
         StubHandler.PKT_STUB: "process_stub",
     }
+
+
+class StubServer(ServerManagerMixin, PacketManager):
+    """Stub protocol server."""
+
+
+class StubClient(ClientManagerMixin, PacketManager):
+    """Stub protocol client."""
 
 
 class TestExtType(TestCase):
@@ -207,3 +215,77 @@ class TestPacketHandler(TestCase):
     async def test_process_error(self):
         with self.assertRaises(NotImplementedError):
             await self.handler.process_error(ErrorPacket(0, 0, 0, 0))
+
+
+class TestPacketManager(TestCase):
+    client = None
+    server = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Setup test class with a facade and ten contacts."""
+        tracemalloc.start()
+        logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+
+    @run_async
+    async def setUp(self) -> None:
+        """Create client/server network nodes."""
+        self.client = FacadeContext.create_client()
+        self.server = FacadeContext.create_server()
+
+    def tearDown(self) -> None:
+        """Clean up test network"""
+        del self.client
+
+    def test_facade(self):
+        self.fail()
+
+    def test_portfolio(self):
+        self.fail()
+
+    def test__add_service(self):
+        self.fail()
+
+    def test_authentication_made(self):
+        self.fail()
+
+    def test_connection_made(self):
+        self.fail()
+
+    def test_data_received(self):
+        self.fail()
+
+    def test_send_packet(self):
+        self.fail()
+
+    def test_unknown(self):
+        self.fail()
+
+    def test_error(self):
+        self.fail()
+
+
+class TestRig(TestCase):
+    client = None
+    server = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Setup test class with a facade and ten contacts."""
+        tracemalloc.start()
+        logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+
+    @run_async
+    async def setUp(self) -> None:
+        """Create client/server network nodes."""
+        self.client = FacadeContext.create_client()
+        self.server = FacadeContext.create_server()
+
+    @run_async
+    async def test_run(self):
+        server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080)
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0)
+
+        client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
+        # client.send_packet(4, 1, b"Hello, world!")
