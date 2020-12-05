@@ -197,21 +197,40 @@ class StateMachine:
     """A class that can hold a single state at a time."""
 
     def __init__(self):
-        self.__state = None
+        self._state = None
+
+    @property
+    def state(self) -> str:
+        """Get state."""
+        return self._state
+
+    @property
+    def available(self) -> tuple:
+        """Expose available options."""
+        raise NotImplementedError()
+
+    def goto(self, state: str):
+        """Switch to another state."""
+        raise NotImplementedError()
 
 
 class SingleState(StateMachine):
     """A state machine that allows switching between states."""
 
-    def __init__(self, states: list):
+    def __init__(self, states: tuple):
         StateMachine.__init__(self)
-        self.__options = states
+        self._options = states
+
+    @property
+    def available(self) -> tuple:
+        """Expose available options."""
+        return self._options
 
     def goto(self, state: str):
-        """Go to another state that is available"""
-        if state not in self.__options:
+        """Go to another state that is available."""
+        if state not in self._options:
             raise RuntimeError("State {} not among options".format(state))
-        self.__state = state
+        self._state = state
 
 
 class EventState(SingleState):
@@ -219,13 +238,32 @@ class EventState(SingleState):
 
     def __init__(self, states: list):
         SingleState.__init__(self, states)
-        self.__condition = asyncio.Condition()
+        self._condition = asyncio.Condition()
 
     def goto(self, state: str):
         """Go to another state and trigger an event."""
-        SingleState.goto(self, str)
-        self.__condition.notify_all()
+        SingleState.goto(self, state)
+        self._condition.notify_all()
 
     async def wait_for(self, predicate):
         """Wait for a state to happen."""
-        await self.__condition.predicate(predicate)
+        await self._condition.predicate(predicate)
+
+
+class MultiState(StateMachine):
+    """A state machine that allows switching between predefined states."""
+
+    def __init__(self, states: dict):
+        StateMachine.__init__(self)
+        self._options = states
+
+    @property
+    def available(self) -> tuple:
+        """Expose available options."""
+        return self._options[self._state]
+
+    def goto(self, state: str):
+        """Go to another state that is available."""
+        if state not in self._options[self._state]:
+            raise RuntimeError("State {0} not among options {1}".format(state, self._options[self._state]))
+        self._state = state

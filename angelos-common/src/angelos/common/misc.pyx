@@ -466,3 +466,60 @@ class Misc:
                     )
                 )
         return items
+
+
+class StateMachine:
+    """A class that can hold a single state at a time."""
+
+    def __init__(self):
+        self._state = None
+
+    @property
+    def state(self) -> str:
+        """Get state."""
+        return self._state
+
+    @property
+    def available(self) -> tuple:
+        """Expose available options."""
+        raise NotImplementedError()
+
+    def goto(self, state: str):
+        """Switch to another state."""
+        raise NotImplementedError()
+
+
+class SingleState(StateMachine):
+    """A state machine that allows switching between states."""
+
+    def __init__(self, states: tuple):
+        StateMachine.__init__(self)
+        self._options = states
+
+    @property
+    def available(self) -> tuple:
+        """Expose available options."""
+        return self._options
+
+    def goto(self, state: str):
+        """Go to another state that is available."""
+        if state not in self._options:
+            raise RuntimeError("State {} not among options".format(state))
+        self._state = state
+
+
+class EventState(SingleState):
+    """A state machine that triggers an event at state change."""
+
+    def __init__(self, states: list):
+        SingleState.__init__(self, states)
+        self._condition = asyncio.Condition()
+
+    def goto(self, state: str):
+        """Go to another state and trigger an event."""
+        SingleState.goto(self, state)
+        self._condition.notify_all()
+
+    async def wait_for(self, predicate):
+        """Wait for a state to happen."""
+        await self._condition.predicate(predicate)

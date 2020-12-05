@@ -24,7 +24,7 @@ from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
 
 import msgpack
-from angelos.common.misc import Loop
+from angelos.common.misc import Loop, StateMachine
 from angelos.common.utils import Util
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
@@ -72,6 +72,13 @@ UNKNOWN_PACKET = 126  # Unrecognized packet
 ERROR_PACKET = 127  # Technical error
 
 
+class ConfirmCode(enum.IntEnum):
+    """Answer codes for ConfirmPackage"""
+    YES = 1  # Malformed packet
+    NO = 2  # Aborted processing of packet
+    NO_COMMENT = 3  # The server or client is busy
+
+
 class ErrorCode(enum.IntEnum):
     """Error codes"""
     MALFORMED = 1  # Malformed packet
@@ -83,6 +90,10 @@ class ErrorCode(enum.IntEnum):
 class NetworkError(RuntimeError):
     """Unrepairable network errors. """
     NO_TRANSPORT = ("Transport layer is missing.", 100)
+
+
+class GotoStateError(RuntimeWarning):
+    """When it's not possible to go to a state."""
 
 
 def r(i: int) -> Tuple[int, int]:
@@ -217,15 +228,18 @@ class Packet:
         return cls(*msgpack.unpackb(data, ext_hook=ext_hook, raw=False))
 
 
-class TellPacket(Packet, fields=("state", "value"), fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 1024))):
+class TellPacket(Packet, fields=("state", "value", "type", "session"),
+                 fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 1024), (DataType.UINT,), (DataType.UINT,))):
     """Tell the state of a thing. Client/server"""
 
 
-class ShowPacket(Packet, fields=("state",), fields_info=((DataType.UINT,),)):
+class ShowPacket(Packet, fields=("state", "type", "session"),
+                 fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
     """Get the state of a thing. Client/server"""
 
 
-class ConfirmPacket(Packet, fields=("proposal", "answer"), fields_info=((DataType.UINT,), (DataType.UINT, 0, 2))):
+class ConfirmPacket(Packet, fields=("proposal", "answer", "type", "session"),
+                    fields_info=((DataType.UINT,), (DataType.UINT, 0, 2), (DataType.UINT,), (DataType.UINT,))):
     """Answer on a sent proposal. 1=Yes, 2=No, 0=No comment."""
 
 
@@ -245,20 +259,68 @@ class RefusePacket(Packet, fields=("type", "session",), fields_info=((DataType.U
     """Refuse a packet handler session."""
 
 
-class DonePacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
-    """Indicate for initiating session packet handler that all is done."""
-
-
 class BusyPacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
     """Indicate for initiating session packet handler that it is busy asking to come back later."""
 
 
-class UnknownPacket(Packet, fields=("type", "level", "process"), fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+class DonePacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
+    """Indicate for initiating session packet handler that all is done."""
+
+
+class UnknownPacket(Packet, fields=("type", "level", "process"),
+                    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
     """Unknown packet."""
 
 
-class ErrorPacket(Packet, fields=("type", "level", "process", "error"), fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+class ErrorPacket(Packet, fields=("type", "level", "process", "error"),
+                  fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
     """Error packet."""
+
+
+class WaypointState(StateMachine):
+    """A state machine that allows switching between states according to predefined paths."""
+
+    def __init__(self, states: dict):
+        StateMachine.__init__(self)
+        self._options = states
+
+    @property
+    def available(self) -> tuple:
+        """Expose available options."""
+        return self._options[self._state]
+
+    def goto(self, state: str):
+        """Go to another state that is available."""
+        if state not in self._options[self._state]:
+            raise GotoStateError("State {0} not among options {1}".format(state, self._options[self._state]))
+        self._state = state
+
+
+class ClientStateExchangeMachine(WaypointState):
+    """Waypoints for exchanging a state over a protocol."""
+
+    def __init__(self):
+        WaypointState.__init__({
+            "ready": ("tell", "show"),
+            "show": ("confirm",),
+            "tell": ("confirm",),
+            "confirm": ("done",),
+            "done": tuple(),
+        })
+        self._state = "ready"
+
+
+class ServerStateExchangeMachine(WaypointState):
+    """Waypoints for exchanging a state over a protocol."""
+
+    def __init__(self):
+        WaypointState.__init__({
+            "ready": ("show", "tell"),
+            "show": ("tell",),
+            "tell": ("done",),
+            "done": tuple(),
+        })
+        self._state = "ready"
 
 
 class PacketHandler:
@@ -377,8 +439,9 @@ class PacketManager(asyncio.Protocol):
     PKT_FINISH = struct.Struct("!")  # Hang up on connection
 
     def __init__(self, facade: Facade):
-        self._services = dict()
-        self._range_to_service = dict()
+        self._handlers = dict()
+        self._ranges_available = set()
+        self._ranges = dict()
         self._facade = facade
         self._transport = None
         self._portfolio = None
@@ -394,14 +457,14 @@ class PacketManager(asyncio.Protocol):
         """Expose connecting portfolio."""
         return self._portfolio
 
-    def _add_service(self, service: PacketHandler):
-        if service.LEVEL not in self._services.keys():
-            self._services[service.LEVEL] = set()
-        level = self._services[service.LEVEL]
+    def _add_handler(self, service: PacketHandler):
+        if service.LEVEL not in self._handlers.keys():
+            self._handlers[service.LEVEL] = set()
+        level = self._handlers[service.LEVEL]
         level.add(service)
 
-        self._ranges.add(service.RANGE)
-        self._range_to_service[service.RANGE] = service
+        self._ranges_available.add(service.RANGE)
+        self._ranges[service.RANGE] = service
 
     def authentication_made(self, portfolio: Portfolio, node: Union[bool, Node]):
         """Indicate that authentication has taken place. Never call from outside, internal use only."""
@@ -441,11 +504,12 @@ class PacketManager(asyncio.Protocol):
         else:
             handler.handle_packet(pkt_type, data[6:])
 
-    def send_packet(self, pkt_type: int, pkt_level: int, data: bytes):
+    def send_packet(self, pkt_type: int, pkt_level: int, packet: Packet):
         """Send packet over socket."""
         if not self._transport:
             raise NetworkError(*NetworkError.NO_TRANSPORT)
 
+        data = bytes(packet)
         self._transport.write(
             bytes.to_bytes(pkt_type, "big", 2) +
             (6 + len(data)).to_bytes(3, "big") +
@@ -457,13 +521,15 @@ class PacketManager(asyncio.Protocol):
         """Unknown packet is returned to sender."""
         self.send_packet(
             r(pkt_type)[0] + UNKNOWN_PACKET, pkt_level,
-            bytes(UnknownPacket(pkt_type, pkt_level, process)))
+            UnknownPacket(pkt_type, pkt_level, process)
+        )
 
     def error(self, error: int, pkt_type: int, pkt_level, process: int = 0):
         """Error happened is returned to sender."""
         self.send_packet(
             r(pkt_type)[0] + ERROR_PACKET, pkt_level,
-            bytes(ErrorPacket(pkt_type, pkt_level, process, error)))
+            ErrorPacket(pkt_type, pkt_level, process, error)
+        )
 
 
 class ClientManagerMixin:
@@ -473,8 +539,7 @@ class ClientManagerMixin:
 
     def connection_lost(self, exc: Exception):
         """Clean up."""
-
-        print('Client: The server closed the connection', exc)
+        Util.print_exception(exc)
         self._transport.close()
 
     @classmethod
