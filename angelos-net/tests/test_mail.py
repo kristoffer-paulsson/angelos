@@ -8,19 +8,20 @@ from angelos.facade.facade import Facade
 from angelos.meta.testing import run_async
 from angelos.meta.testing.app import StubServer, StubClient
 from angelos.meta.testing.net import FacadeContext
-from angelos.net.base import ServerManagerMixin, PacketManager, ClientManagerMixin
-from angelos.net.mail import MailServer, MailClient
+from angelos.net.base import ServerProtoMixin, Protocol, \
+    ClientProtoMixin, ConnectionManager
+from angelos.net.mail import MailServer, MailClient, MailHandler
 
 
-class StubServer(ServerManagerMixin, PacketManager):
+class StubServer(ServerProtoMixin, Protocol):
     """Stub protocol server."""
 
-    def __init__(self, facade: Facade):
-        super().__init__(facade)
+    def __init__(self, facade: Facade, manager: ConnectionManager):
+        super().__init__(facade, manager)
         self._add_handler(MailServer(self))
 
 
-class StubClient(ClientManagerMixin, PacketManager):
+class StubClient(ClientProtoMixin, Protocol):
     """Stub protocol client."""
 
     def __init__(self, facade: Facade):
@@ -29,7 +30,7 @@ class StubClient(ClientManagerMixin, PacketManager):
 
     def connection_made(self, transport: asyncio.Transport):
         """Start mail replication immediately."""
-        PacketManager.connection_made(self, transport)
+        Protocol.connection_made(self, transport)
 
         self._ranges[MailClient.RANGE].start()
 
@@ -37,6 +38,7 @@ class StubClient(ClientManagerMixin, PacketManager):
 class TestMailHandler(TestCase):
     client = None
     server = None
+    manager = None
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -49,12 +51,27 @@ class TestMailHandler(TestCase):
         """Create client/server network nodes."""
         self.client = FacadeContext.create_client()
         self.server = FacadeContext.create_server()
+        self.manager = ConnectionManager()
 
     @run_async
-    async def test_run(self):
+    async def test_tell_state(self):
         server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080)
         task = asyncio.create_task(server.serve_forever())
         await asyncio.sleep(0)
 
         client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
-        # client.send_packet(4, 1, b"Hello, world!")
+        task = asyncio.create_task(client.get_handler(MailHandler.RANGE).tell_state(MailHandler.ST_ALL))
+        await asyncio.sleep(0)
+        print(await task)
+
+    @run_async
+    async def test_show_state(self):
+        server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0)
+
+        client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
+        for c in self.manager:
+            task = asyncio.create_task(c.get_handler(MailHandler.RANGE).show_state(MailHandler.ST_ALL))
+            await asyncio.sleep(0)
+            await task

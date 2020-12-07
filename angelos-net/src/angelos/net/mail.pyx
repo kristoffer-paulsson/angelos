@@ -14,10 +14,14 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Authentication handler."""
-from angelos.net.base import PacketHandler, TELL_PACKET, r, SHOW_PACKET, CONFIRM_PACKET, START_PACKET, FINISH_PACKET, \
+import asyncio
+
+from angelos.net.base import TELL_PACKET, r, SHOW_PACKET, CONFIRM_PACKET, START_PACKET, FINISH_PACKET, \
     ACCEPT_PACKET, REFUSE_PACKET, BUSY_PACKET, DONE_PACKET, TellPacket, ShowPacket, \
     ConfirmPacket, StartPacket, FinishPacket, AcceptPacket, RefusePacket, BusyPacket, DonePacket, \
-    ServerStateExchangeMachine, ClientStateExchangeMachine, ConfirmCode, GotoStateError
+    ServerStateExchangeMachine, ClientStateExchangeMachine, ConfirmCode, GotoStateError, Handler
+
+ASYNCIO_ = (asyncio)
 
 
 class MailError(RuntimeError):
@@ -25,7 +29,7 @@ class MailError(RuntimeError):
     pass
 
 
-class MailHandler(PacketHandler):
+class MailHandler(Handler):
     """Base handler for mail."""
 
     LEVEL = 1
@@ -61,10 +65,10 @@ class MailHandler(PacketHandler):
     # SESH
     ST_ALL = 0x01
 
-    def __init__(self, manager: "PacketManager", server: bool):
+    def __init__(self, manager: "Protocol", server: bool):
         super().__init__(manager)
         self._states = {
-            self.ST_ALL: "1"
+            self.ST_ALL: b"1"
         }
         self._state_machines = {
             self.ST_ALL: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
@@ -73,8 +77,8 @@ class MailHandler(PacketHandler):
     async def process_tell(self, packet: TellPacket):
         """Process a state push."""
         try:
-            machine = self._state_machines[packet.state].goto("confirm")
-            if packet.value == "?":  # At unknown state we can safely raise KeyError
+            machine = self._state_machines[packet.state].goto("tell")
+            if packet.value == b"?":  # At unknown state we can safely raise KeyError
                 raise KeyError()
             # TODO: Deal with state value
             self._states[packet.state] = packet.value
@@ -94,7 +98,7 @@ class MailHandler(PacketHandler):
             self._state_machines[packet.state].goto("show")
             state = self._states[packet.state]
         except KeyError:
-            state = "?"
+            state = b"?"
         finally:
             self._manager.send_packet(
                 self.PKT_TELL, self.LEVEL, TellPacket(
@@ -105,7 +109,8 @@ class MailHandler(PacketHandler):
         try:
             machine = self._state_machines[packet.proposal]
             machine.goto("confirm")
-            # TODO: Deal with packet.answer ...
+            machine.answer = packet.answer
+            machine.event.set()
             machine.goto("done")
         except KeyError:
             if packet.answer != ConfirmCode.NO_COMMENT:
@@ -148,13 +153,17 @@ class MailClient(MailHandler):
         """Make authentication against server."""
         print("Start mail replication")
 
-    async def tell_state(self, state: int, type: int = 0, session: int = 0):
-        """Tell state for server."""
-        self._state_machines[state].goto("tell")
-        value = self._states[state]
+    async def tell_state(self, state: int, type: int = 0, session: int = 0) -> int:
+        """Tell certain state to server and give response"""
+        machine = self._state_machines[state]
+        machine.event.clear()
+        machine.goto("tell")
         self._manager.send_packet(
             self.PKT_TELL, self.LEVEL, TellPacket(
-                state, value, type, session))
+                state, self._states[state], type, session))
+        await machine.event.wait()
+        return machine.answer
+
 
 class MailServer(MailHandler):
     """Server side mail handler."""
@@ -165,11 +174,10 @@ class MailServer(MailHandler):
         MailHandler.PKT_CONFIRM: None,
     }
 
-    def __init__(self, manager: "PacketManager"):
+    def __init__(self, manager: "Protocol"):
         super().__init__(manager, True)
 
     async def show_state(self, state: int, type: int = 0, session: int = 0):
         """Request to know state from client."""
         self._state_machines[state].goto("show")
-        self._manager.send_packet(
-            self.PKT_SHOW, self.LEVEL, ShowPacket(state, type, session))
+        self._manager.send_packet(self.PKT_SHOW, self.LEVEL, ShowPacket(state, type, session))

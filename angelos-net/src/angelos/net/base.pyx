@@ -76,7 +76,7 @@ class ConfirmCode(enum.IntEnum):
     """Answer codes for ConfirmPackage"""
     YES = 1  # Malformed packet
     NO = 2  # Aborted processing of packet
-    NO_COMMENT = 3  # The server or client is busy
+    NO_COMMENT = 0  # The server or client is busy
 
 
 class ErrorCode(enum.IntEnum):
@@ -90,6 +90,7 @@ class ErrorCode(enum.IntEnum):
 class NetworkError(RuntimeError):
     """Unrepairable network errors. """
     NO_TRANSPORT = ("Transport layer is missing.", 100)
+    ALREADY_CONNECTED = ("Already connected.", 101)
 
 
 class GotoStateError(RuntimeWarning):
@@ -292,7 +293,7 @@ class WaypointState(StateMachine):
     def goto(self, state: str):
         """Go to another state that is available."""
         if state not in self._options[self._state]:
-            raise GotoStateError("State {0} not among options {1}".format(state, self._options[self._state]))
+            raise GotoStateError("State '{0}' not among options {1}".format(state, self._options[self._state]))
         self._state = state
 
 
@@ -300,7 +301,10 @@ class ClientStateExchangeMachine(WaypointState):
     """Waypoints for exchanging a state over a protocol."""
 
     def __init__(self):
-        WaypointState.__init__({
+        # self._future = asyncio.get_event_loop().create_future()
+        self.answer = None
+        self._event = asyncio.Event()
+        WaypointState.__init__(self, {
             "ready": ("tell", "show"),
             "show": ("confirm",),
             "tell": ("confirm",),
@@ -309,12 +313,17 @@ class ClientStateExchangeMachine(WaypointState):
         })
         self._state = "ready"
 
+    @property
+    def event(self):
+        """Expose event."""
+        return self._event
+
 
 class ServerStateExchangeMachine(WaypointState):
     """Waypoints for exchanging a state over a protocol."""
 
     def __init__(self):
-        WaypointState.__init__({
+        WaypointState.__init__(self, {
             "ready": ("show", "tell"),
             "show": ("tell",),
             "tell": ("done",),
@@ -323,7 +332,7 @@ class ServerStateExchangeMachine(WaypointState):
         self._state = "ready"
 
 
-class PacketHandler:
+class Handler:
     """Base handler of protocol source of services."""
 
     LEVEL = 0
@@ -331,7 +340,7 @@ class PacketHandler:
     PACKETS = dict()
     PROCESS = dict()
 
-    def __init__(self, manager: "PacketManager"):
+    def __init__(self, manager: "Protocol"):
         self._pkt_type = None
         self._future = None
         self._silent = False
@@ -350,7 +359,7 @@ class PacketHandler:
         self.PROCESS[error] = "process_error"
 
     @property
-    def manager(self) -> "PacketManager":
+    def manager(self) -> "Protocol":
         """Expose the packet manager."""
         return self._manager
 
@@ -396,6 +405,7 @@ class PacketHandler:
         try:
             pkt_cls = self.PACKETS[pkt_type]
             proc_name = self.PROCESS[pkt_type]
+            print(pkt_type, proc_name)
 
             if proc_name in ("process_unknown", "process_error"):
                 self._silent = True  # Don't send error or unknown response packet.
@@ -413,7 +423,8 @@ class PacketHandler:
             self._manager.error(ErrorCode.MALFORMED, pkt_type, self.LEVEL)
         else:
             self._pkt_type = pkt_type
-            self._future = Loop.main().run(proc_func(packet), self._crash)
+            self._future = asyncio.ensure_future(proc_func(packet))
+            self._future.add_done_callback(self._crash)
 
     async def process_unknown(self, packet: UnknownPacket):
         """Handle an unknown packet response.
@@ -432,17 +443,18 @@ class PacketHandler:
         raise NotImplementedError()
 
 
-class PacketManager(asyncio.Protocol):
+class Protocol(asyncio.Protocol):
     """Protocol for handling packages going from and to packet handlers."""
 
     PKT_HELLO = struct.Struct("!")  # Synchronize greeting
     PKT_FINISH = struct.Struct("!")  # Hang up on connection
 
-    def __init__(self, facade: Facade):
+    def __init__(self, facade: Facade, manager: "ConnectionManager" = None):
         self._handlers = dict()
         self._ranges_available = set()
         self._ranges = dict()
         self._facade = facade
+        self._manager = manager
         self._transport = None
         self._portfolio = None
         self._node = None
@@ -457,7 +469,16 @@ class PacketManager(asyncio.Protocol):
         """Expose connecting portfolio."""
         return self._portfolio
 
-    def _add_handler(self, service: PacketHandler):
+    @property
+    def manager(self) -> "ConnectionManager":
+        """Expose the connection manager."""
+        return self._mananger
+
+    def get_handler(self, range: int) -> Handler:
+        """Get packet handler for given range if available or None."""
+        return self._ranges[range] if range in self._ranges_available else None
+
+    def _add_handler(self, service: Handler):
         if service.LEVEL not in self._handlers.keys():
             self._handlers[service.LEVEL] = set()
         level = self._handlers[service.LEVEL]
@@ -484,9 +505,9 @@ class PacketManager(asyncio.Protocol):
             if len(data) <= 6:
                 raise ValueError()
 
-            pkt_type = data[0:1].to_bytes(2, "big")
-            pkt_length = data[2:4].from_bytes(3, "big")
-            pkt_level = data[5].from_bytes(1, "big")
+            pkt_type = int.from_bytes(data[0:2], "big")
+            pkt_length = int.from_bytes(data[2:5], "big")
+            pkt_level = int(data[5])
 
             if pkt_length != len(data):
                 raise ValueError()
@@ -511,9 +532,9 @@ class PacketManager(asyncio.Protocol):
 
         data = bytes(packet)
         self._transport.write(
-            bytes.to_bytes(pkt_type, "big", 2) +
+            pkt_type.to_bytes(2, "big") +
             (6 + len(data)).to_bytes(3, "big") +
-            bytes.to_bytes(pkt_level, "big", 1) +
+            pkt_level.to_bytes(1, "big") +
             data
         )
 
@@ -532,33 +553,80 @@ class PacketManager(asyncio.Protocol):
         )
 
 
-class ClientManagerMixin:
+class ClientProtoMixin:
     """Client of packet manager."""
 
     SERVER = (False,)
 
     def connection_lost(self, exc: Exception):
         """Clean up."""
-        Util.print_exception(exc)
+        if exc:
+            Util.print_exception(exc)
         self._transport.close()
 
     @classmethod
-    async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int) -> "PacketManager":
+    async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int) -> "Protocol":
         """Connect to server."""
         _, protocol = await asyncio.get_running_loop().create_connection(
             lambda: cls(facade), str(host), port)
         return protocol
 
 
-class ServerManagerMixin:
+class ServerProtoMixin:
     """Server of packet manager."""
 
     SERVER = (True,)
 
+    def eof_received(self):
+        """End of communication."""
+        if self._manager:
+            self._manager.remove(self)
+
+    def connection_lost(self, exc: Exception):
+        """Clean up."""
+        if self._manager:
+            self._manager.remove(self)
+        Util.print_exception(exc)
+
+    def connection_made(self, transport: asyncio.Transport):
+        """Add serving protocol to local dict and set."""
+        Protocol.connection_made(self, transport)
+        if self._manager:
+            self._manager.add(self)
+
     @classmethod
     async def listen(
-            cls, facade: Facade,
-            host: Union[str, IPv4Address, IPv6Address], port: int
+            cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address],
+            port: int, manager: "ConnectionManager" = None
     ) -> asyncio.base_events.Server:
         """Start a listening server."""
-        return await asyncio.get_running_loop().create_server(lambda: cls(facade), host, port)
+        return await asyncio.get_running_loop().create_server(lambda: cls(facade, manager), host, port)
+
+
+class ConnectionManager:
+    """Keeps track at connections with server protocols."""
+
+    def __init__(self):
+        self._client_instances = dict()
+        self._clients = set()
+
+
+    def __iter__(self):
+        for client in self._clients:
+            yield self._client_instances[client]
+
+    def add(self, proto: ServerProtoMixin):
+        """Add server protocol connection."""
+        pid = id(proto)
+        if pid in self._clients:
+            raise NetworkError(*NetworkError.ALREADY_CONNECTED)
+        self._clients.add(pid)
+        self._client_instances[pid] = proto
+
+    def remove(self, proto: ServerProtoMixin):
+        """Remove server protocol connection"""
+        pid = id(proto)
+
+        if pid in self._client:
+            del self._client_instances[pid]
+            self._clients.remove(pid)
