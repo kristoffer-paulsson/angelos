@@ -24,7 +24,7 @@ from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
 
 import msgpack
-from angelos.common.misc import Loop, StateMachine
+from angelos.common.misc import StateMachine
 from angelos.common.utils import Util
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
@@ -77,6 +77,14 @@ class ConfirmCode(enum.IntEnum):
     YES = 1  # Malformed packet
     NO = 2  # Aborted processing of packet
     NO_COMMENT = 0  # The server or client is busy
+
+
+class SessionCode(enum.IntEnum):
+    """Session future return code for RefusePacket, BusyPacket, AcceptPacket"""
+    ACCEPT = 0
+    BUSY = 1
+    REFUSE = 2
+    DONE = 3
 
 
 class ErrorCode(enum.IntEnum):
@@ -301,20 +309,19 @@ class ClientStateExchangeMachine(WaypointState):
     """Waypoints for exchanging a state over a protocol."""
 
     def __init__(self):
-        # self._future = asyncio.get_event_loop().create_future()
         self.answer = None
         self._event = asyncio.Event()
         WaypointState.__init__(self, {
             "ready": ("tell", "show"),
             "show": ("confirm",),
             "tell": ("confirm",),
-            "confirm": ("done",),
-            "done": tuple(),
+            "confirm": ("accomplished",),
+            "accomplished": tuple(),
         })
         self._state = "ready"
 
     @property
-    def event(self):
+    def event(self) -> asyncio.Event:
         """Expose event."""
         return self._event
 
@@ -323,13 +330,104 @@ class ServerStateExchangeMachine(WaypointState):
     """Waypoints for exchanging a state over a protocol."""
 
     def __init__(self):
+        self._condition = asyncio.Condition()
+        self.check = lambda value: ConfirmCode.YES
+        self.value = None
         WaypointState.__init__(self, {
             "ready": ("show", "tell"),
             "show": ("tell",),
-            "tell": ("done",),
-            "done": tuple(),
+            "tell": ("accomplished",),
+            "accomplished": tuple(),
         })
         self._state = "ready"
+
+    @property
+    def condition(self) -> asyncio.Condition:
+        """Expose condition."""
+        return self._condition
+
+    def predicate(self) -> bool:
+        """Condition predicate true if confirmation is yes."""
+        return True if self.evaluate() == ConfirmCode.YES else False
+
+    def evaluate(self) -> int:
+        """Evaluate value."""
+        return self.check(self.value)
+
+
+class ClientSessionStateMachine(WaypointState):
+    """Waypoints for setting session mode over a protocol."""
+
+    def __init__(self):
+        self._future = asyncio.get_event_loop().create_future()
+        self._event = asyncio.Event()
+        WaypointState.__init__(self, {
+            "ready": ("start",),
+            "start": ("accept", "refuse", "done", "busy"),
+            "accept": ("finish", "done"),
+            "done": ("finish",),
+            "refuse": ("accomplished",),
+            "busy": ("accomplished",),
+            "finish": ("accomplished",),
+            "accomplished": tuple(),
+        })
+        self._state = "ready"
+
+    @property
+    def future(self) -> asyncio.Future:
+        return self._future
+
+    @property
+    def event(self) -> asyncio.Event:
+        """Expose event."""
+        return self._event
+
+
+class ServerSessionStateMachine(WaypointState):
+    """Waypoints for setting session mode over a protocol."""
+
+    def __init__(self):
+        WaypointState.__init__(self, {
+            "ready": ("start",),
+            "start": ("finish", "done"),
+            "done": ("finish",),
+            "finish": ("accomplished",),
+            "accomplished": tuple(),
+        })
+        self._state = "ready"
+
+
+class ProtocolSession:
+    """Session that run within a protocol handler with states."""
+
+    def __init__(self, type: int, states: dict, server: bool):
+        self._type = type
+        self._own_machine = ServerSessionStateMachine() if server else ClientSessionStateMachine()
+        self._states = states
+        self._state_machines = {
+            state: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
+            for state in self.states.keys()
+        }
+
+    @property
+    def type(self) -> int:
+        """Expose session type."""
+        return self._type
+
+    @property
+    def own(self) -> WaypointState:
+        """Expose the sessions states."""
+        return self._own_machine
+
+    @property
+    def states(self) -> dict:
+        """Expose the sessions states."""
+        return self._states
+
+    @property
+    def state_machines(self) -> dict:
+        """Expose the sessions states."""
+        return self._state_machines
 
 
 class Handler:
@@ -446,10 +544,8 @@ class Handler:
 class Protocol(asyncio.Protocol):
     """Protocol for handling packages going from and to packet handlers."""
 
-    PKT_HELLO = struct.Struct("!")  # Synchronize greeting
-    PKT_FINISH = struct.Struct("!")  # Hang up on connection
-
-    def __init__(self, facade: Facade, manager: "ConnectionManager" = None):
+    def __init__(self, facade: Facade, server: bool = False, manager: "ConnectionManager" = None):
+        self._server = server
         self._handlers = dict()
         self._ranges_available = set()
         self._ranges = dict()
@@ -473,6 +569,10 @@ class Protocol(asyncio.Protocol):
     def manager(self) -> "ConnectionManager":
         """Expose the connection manager."""
         return self._mananger
+
+    def is_server(self) -> bool:
+        """Whether is a server."""
+        return self._server
 
     def get_handler(self, range: int) -> Handler:
         """Get packet handler for given range if available or None."""
@@ -556,8 +656,6 @@ class Protocol(asyncio.Protocol):
 class ClientProtoMixin:
     """Client of packet manager."""
 
-    SERVER = (False,)
-
     def connection_lost(self, exc: Exception):
         """Clean up."""
         if exc:
@@ -574,8 +672,6 @@ class ClientProtoMixin:
 
 class ServerProtoMixin:
     """Server of packet manager."""
-
-    SERVER = (True,)
 
     def eof_received(self):
         """End of communication."""
@@ -609,7 +705,6 @@ class ConnectionManager:
     def __init__(self):
         self._client_instances = dict()
         self._clients = set()
-
 
     def __iter__(self):
         for client in self._clients:

@@ -60,9 +60,7 @@ class TestMailHandler(TestCase):
         await asyncio.sleep(0)
 
         client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
-        task = asyncio.create_task(client.get_handler(MailHandler.RANGE).tell_state(MailHandler.ST_ALL))
-        await asyncio.sleep(0)
-        print(await task)
+        print(await client.get_handler(MailHandler.RANGE).tell_state(MailHandler.ST_ALL))
 
     @run_async
     async def test_show_state(self):
@@ -72,6 +70,27 @@ class TestMailHandler(TestCase):
 
         client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
         for c in self.manager:
-            task = asyncio.create_task(c.get_handler(MailHandler.RANGE).show_state(MailHandler.ST_ALL))
-            await asyncio.sleep(0)
-            await task
+            await c.get_handler(MailHandler.RANGE).show_state(MailHandler.ST_ALL)
+            await asyncio.sleep(.1)
+
+    @run_async
+    async def test_open_session(self):
+        server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0)
+
+        client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
+        session = await client.get_handler(MailHandler.RANGE).open_session(MailHandler.SESH_ALL)
+
+        for c in self.manager:
+            print("DONE")
+            await c.get_handler(MailHandler.RANGE).session_done(MailHandler.SESH_ALL, session)
+            await asyncio.sleep(.1)
+
+        await client.get_handler(MailHandler.RANGE).get_session(session).own.event.wait()
+        await client.get_handler(MailHandler.RANGE).stop_session(session)
+
+        await asyncio.sleep(1)
+
+
+

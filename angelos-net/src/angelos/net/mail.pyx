@@ -14,14 +14,11 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Authentication handler."""
-import asyncio
-
 from angelos.net.base import TELL_PACKET, r, SHOW_PACKET, CONFIRM_PACKET, START_PACKET, FINISH_PACKET, \
     ACCEPT_PACKET, REFUSE_PACKET, BUSY_PACKET, DONE_PACKET, TellPacket, ShowPacket, \
     ConfirmPacket, StartPacket, FinishPacket, AcceptPacket, RefusePacket, BusyPacket, DonePacket, \
-    ServerStateExchangeMachine, ClientStateExchangeMachine, ConfirmCode, GotoStateError, Handler
-
-ASYNCIO_ = (asyncio)
+    ServerStateExchangeMachine, ClientStateExchangeMachine, ConfirmCode, GotoStateError, Handler, ProtocolSession, \
+    SessionCode
 
 
 class MailError(RuntimeError):
@@ -62,35 +59,54 @@ class MailHandler(Handler):
 
     PROCESS = dict()
 
-    # SESH
+    SESH_ALL = 0x01
     ST_ALL = 0x01
 
-    def __init__(self, manager: "Protocol", server: bool):
+    def __init__(self, manager: "Protocol"):
         super().__init__(manager)
+        server = manager.is_server()
         self._states = {
             self.ST_ALL: b"1"
         }
         self._state_machines = {
             self.ST_ALL: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
         }
+        self._sessions = dict()
+        self._session_types = {self.SESH_ALL: ProtocolSession}
+        self._max_sessions = 8
+        self._session_count = 0
+
+    def get_session(self, session: int) -> ProtocolSession:
+        if session in self._sessions.keys():
+            return self._sessions[session]
+        else:
+            return None
 
     async def process_tell(self, packet: TellPacket):
         """Process a state push."""
         try:
-            machine = self._state_machines[packet.state].goto("tell")
-            if packet.value == b"?":  # At unknown state we can safely raise KeyError
-                raise KeyError()
-            # TODO: Deal with state value
-            self._states[packet.state] = packet.value
-            self._manager.send_packet(
-                self.PKT_CONFIRM, self.LEVEL, ConfirmPacket(
-                    packet.state, ConfirmCode.YES, packet.type, packet.session))
+            machine = self._state_machines[packet.state]
+            machine.goto("tell")
+
+            if packet.value == b"?" or not callable(machine.check):
+                result = ConfirmCode.NO_COMMENT
+            else:
+                machine.value = packet.value
+                result = machine.evaluate()
+
+                if result == ConfirmCode.YES:
+                    self._states[packet.state] = packet.value
+
+                if machine.condition.locked():
+                    machine.condition.notify_all()
+
+            machine.goto("accomplished")
         except KeyError:
+            result = ConfirmCode.NO_COMMENT
+        finally:
             self._manager.send_packet(
                 self.PKT_CONFIRM, self.LEVEL, ConfirmPacket(
-                    packet.state, ConfirmCode.NO_COMMENT, packet.type, packet.session))
-        finally:
-            self._state_machines[packet.state].goto("done")
+                    packet.state, result, packet.type, packet.session))
 
     async def process_show(self, packet: ShowPacket):
         """Process request to show state."""
@@ -111,7 +127,7 @@ class MailHandler(Handler):
             machine.goto("confirm")
             machine.answer = packet.answer
             machine.event.set()
-            machine.goto("done")
+            machine.goto("accomplished")
         except KeyError:
             if packet.answer != ConfirmCode.NO_COMMENT:
                 raise
@@ -119,22 +135,63 @@ class MailHandler(Handler):
             raise
 
     async def process_start(self, packet: StartPacket):
-        pass
+        """Session start requested."""
+        if len(self._sessions) >= self._max_sessions:
+            self._manager.send_packet(self.PKT_BUSY, self.LEVEL, BusyPacket(packet.type, packet.session))
+        elif packet.session in self._sessions.keys() or packet.type not in self._session_types.keys():
+            self._manager.send_packet(self.PKT_REFUSE, self.LEVEL, RefusePacket(packet.type, packet.session))
+        else:
+            session = await self._create_session(packet.type, packet.session)
+            if not session:
+                self._manager.send_packet(self.PKT_REFUSE, self.LEVEL, RefusePacket(packet.type, packet.session))
+            else:
+                session.own.goto("start")
+                self._manager.send_packet(self.PKT_ACCEPT, self.LEVEL, AcceptPacket(packet.type, packet.session))
 
     async def process_finish(self, packet: FinishPacket):
-        pass
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("finish")
+        session.own.goto("accomplished")
+        del self._sessions[packet.session]
 
     async def process_accept(self, packet: AcceptPacket):
-        pass
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("accept")
+        session.own.future.set_result(SessionCode.ACCEPT)
 
     async def process_refuse(self, packet: RefusePacket):
-        pass
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("refuse")
+        session.own.goto("accomplished")
+        session.own.future.set_result(SessionCode.REFUSE)
+        del self._sessions[packet.session]
 
     async def process_busy(self, packet: BusyPacket):
-        pass
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("busy")
+        session.own.goto("accomplished")
+        session.own.future.set_result(SessionCode.BUSY)
+        del self._sessions[packet.session]
 
     async def process_done(self, packet: DonePacket):
-        pass
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.event.set()
+        session.own.goto("done")
 
 
 class MailClient(MailHandler):
@@ -144,14 +201,43 @@ class MailClient(MailHandler):
         MailHandler.PKT_TELL: None,
         MailHandler.PKT_SHOW: "process_show",
         MailHandler.PKT_CONFIRM: "process_confirm",
-    }
 
-    def __init__(self, manager: "PacketManager"):
-        super().__init__(manager, False)
+        MailHandler.PKT_START: None,
+        MailHandler.PKT_REFUSE: "process_refuse",
+        MailHandler.PKT_BUSY: "process_busy",
+        MailHandler.PKT_ACCEPT: "process_accept",
+        MailHandler.PKT_FINISH: None,
+        MailHandler.PKT_DONE: "process_done",
+    }
 
     def start(self):
         """Make authentication against server."""
         print("Start mail replication")
+
+    async def open_session(self, type: int) -> int:
+        """Open a new session of certain type."""
+        self._session_count += 1
+        session = self._session_count
+
+        sesh = ProtocolSession(type, dict(), self._manager.is_server())
+        self._sessions[session] = sesh
+
+        sesh.own.goto("start")
+        self._manager.send_packet(self.PKT_START, self.LEVEL, StartPacket(type, session))
+        await sesh.own.future
+        return self._session_count if sesh.own.future.result() == SessionCode.ACCEPT else None
+
+    async def stop_session(self, type: int, session: int):
+        """Stop a running session and clean up."""
+        sesh = self._sessions[session]
+        if sesh.type != type:
+            raise TypeError()
+
+        sesh.own.goto("finish")
+        self._manager.send_packet(self.PKT_FINISH, self.LEVEL, FinishPacket(type, session))
+
+        sesh.own.goto("accomplished")
+        del self._sessions[session]
 
     async def tell_state(self, state: int, type: int = 0, session: int = 0) -> int:
         """Tell certain state to server and give response"""
@@ -172,10 +258,29 @@ class MailServer(MailHandler):
         MailHandler.PKT_TELL: "process_tell",
         MailHandler.PKT_SHOW: None,
         MailHandler.PKT_CONFIRM: None,
+
+        MailHandler.PKT_START: "process_start",
+        MailHandler.PKT_REFUSE: None,
+        MailHandler.PKT_BUSY: None,
+        MailHandler.PKT_ACCEPT: None,
+        MailHandler.PKT_FINISH: "process_finish",
+        MailHandler.PKT_DONE: None,
     }
 
-    def __init__(self, manager: "Protocol"):
-        super().__init__(manager, True)
+    async def _create_session(self, type: int = 0, session: int = 0) -> ProtocolSession:
+        """Create a new session based on request from client"""
+        sesh = self._session_types[type](type, dict(), self._manager.is_server())
+        self._sessions[session] = sesh
+        return sesh
+
+    async def session_done(self, type: int, session: int):
+        """Tell client there is no more to do in session."""
+        sesh = self._sessions[session]
+        if sesh.type != type:
+            raise TypeError()
+
+        sesh.own.goto("done")
+        self._manager.send_packet(self.PKT_DONE, self.LEVEL, DonePacket(type, session))
 
     async def show_state(self, state: int, type: int = 0, session: int = 0):
         """Request to know state from client."""
