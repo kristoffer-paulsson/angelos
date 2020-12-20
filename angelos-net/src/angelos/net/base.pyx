@@ -19,7 +19,6 @@ import datetime
 import enum
 import struct
 import uuid
-from asyncio import CancelledError, InvalidStateError
 from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
 from contextlib import asynccontextmanager
@@ -102,6 +101,7 @@ class NetworkError(RuntimeError):
     NO_TRANSPORT = ("Transport layer is missing.", 100)
     ALREADY_CONNECTED = ("Already connected.", 101)
     SESSION_NO_SYNC = ("Failed to sync one or several states in session", 102)
+    SESSION_TYPE_INCONSISTENCY = ("Session type inconsistent.", 103)
 
 
 class GotoStateError(RuntimeWarning):
@@ -233,6 +233,12 @@ class Packet:
     def __bytes__(self) -> bytes:
         """Pack packet into bytes."""
         return msgpack.packb(self._values, default=default, use_bin_type=True)
+
+    def __repr__(self) -> str:
+        fields = list()
+        for index in range(len(self._fields)):
+            fields.append("{0}={1}".format(self._fields[index], self._values[index]))
+        return "({0}: {1})".format(self.__class__.__name__, ", ".join(fields))
 
     @classmethod
     def unpack(cls, data: bytes) -> "Packet":
@@ -468,9 +474,9 @@ class Handler:
     PROCESS = dict()
 
     def __init__(self, manager: "Protocol", states: dict, sessions: dict, max_sesh: int):
+        self._queue = asyncio.Queue()
         self._r_start = r(self.RANGE)[0]
         self._pkt_type = None
-        self._future = None
         self._silent = False
 
         self._manager = manager
@@ -496,8 +502,12 @@ class Handler:
             self.PKT_ACCEPT: None if server else "process_accept",
             self.PKT_FINISH: "process_finish" if server else None,
             self.PKT_DONE: None if server else "process_done",
+            self.PKT_UNKNOWN: "process_unknown",
+            self.PKT_ERROR: "process_error",
             **self.PROCESS
         }
+
+        self._processor = asyncio.create_task(self.packet_handler())
 
     @property
     def manager(self) -> "Protocol":
@@ -505,68 +515,49 @@ class Handler:
         return self._manager
 
     @property
-    def current(self) -> asyncio.Future:
-        """Expose current future."""
-        return self._future
+    def queue(self) -> asyncio.Queue:
+        """Expose current queue."""
+        return self._queue
 
-    def _crash(self, future: asyncio.Future) -> bool:
-        """Dealing with a crash within a packet process method."""
-        code = False
-        try:
-            future.result()
-            code = True
-        except CancelledError:
-            if not self._silent:
-                self._manager.error(ErrorCode.ABORTED, self._pkt_type + self._r_start, self.LEVEL)
-        except InvalidStateError:
-            if not self._silent:
-                self._manager.error(ErrorCode.BUSY, self._pkt_type + self._r_start, self.LEVEL)
-        except Exception as exc:
-            Util.print_exception(exc)
-            if not self._silent:
-                self._manager.error(ErrorCode.UNEXPECTED, self._pkt_type + self._r_start, self.LEVEL)
-        finally:
-            self._cleanup(code)
-            self._pkt_type = None
-            self._future = None
-            self._silent = False
+    @property
+    def processor(self) -> asyncio.Task:
+        """Expose current task."""
+        return self._processor
 
-        return code
-
-    def _cleanup(self, ok: bool):
-        """Clean up after packet processing."""
-        pass
-
-    def handle_packet(self, pkt_type: int, data: bytes):
+    async def packet_handler(self):
         """Handle received packet.
 
         If packet type class, method or processor isn't found
         An unknown packet is returned to the senders handler.
         """
-        pkt_type = pkt_type - self._r_start
-        try:
-            pkt_cls = self.PACKETS[pkt_type]
-            proc_name = self.PROCESS[pkt_type]
-            print("Server" if self._manager.is_server() else "Client", pkt_type, proc_name)
+        while True:
+            item = await self._queue.get()
+            if isinstance(item, type(None)):
+                break
+            try:
+                self._pkt_type, data = item
+                self._pkt_type = self._pkt_type - self._r_start
 
-            if proc_name in ("process_unknown", "process_error"):
-                self._silent = True  # Don't send error or unknown response packet.
+                pkt_cls = self.PACKETS[self._pkt_type]
+                proc_name = self.PROCESS[self._pkt_type]
+                print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
 
-            if self._future:  # If already processing a packet.
+                if proc_name in ("process_unknown", "process_error"):
+                    self._silent = True  # Don't send error or unknown response packet.
+
+                proc_func = getattr(self, proc_name)
+                await proc_func(pkt_cls.unpack(data))
+            except (KeyError, AttributeError):
+                self._manager.unknown(self._pkt_type + self._r_start, self.LEVEL)
+            except (ValueError, TypeError):
+                self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
+            except Exception as exc:
+                Util.print_exception(exc)
                 if not self._silent:
-                    self._manager.error(ErrorCode.BUSY, pkt_type + self._r_start, self.LEVEL)
-                return
-
-            proc_func = getattr(self, proc_name)
-            packet = pkt_cls.unpack(data)
-        except (KeyError, AttributeError):
-            self._manager.unknown(pkt_type + self._r_start, self.LEVEL)
-        except (ValueError, TypeError):
-            self._manager.error(ErrorCode.MALFORMED, pkt_type + self._r_start, self.LEVEL)
-        else:
-            self._pkt_type = pkt_type
-            self._future = asyncio.ensure_future(proc_func(packet))
-            self._future.add_done_callback(self._crash)
+                    self._manager.error(ErrorCode.UNEXPECTED, self._pkt_type + self._r_start, self.LEVEL)
+            finally:
+                self._pkt_type = None
+                self._silent = False
 
     def get_session(self, session: int) -> ProtocolSession:
         return self._sessions[session] if session in self._sessions.keys() else None
@@ -588,7 +579,6 @@ class Handler:
         answer = await self.sync(tuple(sesh.states.keys()), sesh_type, sesh_id)
         if not answer:
             raise NetworkError(*NetworkError.SESSION_NO_SYNC, {"type": sesh_type, "session": sesh_id})
-        print(sesh)
 
         try:
             yield sesh
@@ -612,7 +602,7 @@ class Handler:
         """Stop a running session and clean up."""
         sesh = self.get_session(session)
         if sesh.type != type:
-            raise TypeError()
+            raise NetworkError(*NetworkError.SESSION_TYPE_INCONSISTENCY)
 
         sesh.own.goto("finish")
         self._manager.send_packet(self.PKT_FINISH, self.LEVEL, FinishPacket(type, session))
@@ -735,7 +725,7 @@ class Handler:
         """Close an open session."""
         session = self._sessions[packet.session]
         if session.type != packet.type:
-            raise TypeError()
+            raise NetworkError(*NetworkError.SESSION_TYPE_INCONSISTENCY)
 
         session.own.goto("finish")
         session.own.goto("accomplished")
@@ -855,37 +845,43 @@ class Protocol(asyncio.Protocol):
 
     def data_received(self, data: bytes):
         """Data received."""
-        pkt_type = 0
-        pkt_level = 0
+        while data:
 
-        try:
-            if len(data) <= 6:
-                raise ValueError()
+            pkt_type = 0
+            pkt_level = 0
+            try:
+                meta = data[0:6]
+                data = data[6:]
 
-            pkt_type = int.from_bytes(data[0:2], "big")
-            pkt_length = int.from_bytes(data[2:5], "big")
-            pkt_level = int(data[5])
+                pkt_type = int.from_bytes(meta[0:2], "big")
+                pkt_length = int.from_bytes(meta[2:5], "big")
+                pkt_level = int(meta[5])
 
-            if pkt_length != len(data):
-                raise ValueError()
+                chunk = data[0:(pkt_length-6)]
+                data = data[(pkt_length-6):]
 
-            pkt_range = ri(pkt_type)
-            handler = self._ranges[pkt_range]
-        except KeyError:
-            low = r(pkt_range)[0]
-            if pkt_type == low + UNKNOWN_PACKET or pkt_type == low + ERROR_PACKET:
-                pass  # Attempted attack
+                pkt_range = ri(pkt_type)
+                handler = self._ranges[pkt_range]
+            except KeyError:
+                low = r(pkt_range)[0]
+                if pkt_type == low + UNKNOWN_PACKET or pkt_type == low + ERROR_PACKET:
+                    pass  # Attempted attack
+                else:
+                    self.unknown(pkt_type, pkt_level)
+            except (ValueError, struct.error) as exc:
+                self.error(ErrorCode.MALFORMED, pkt_type, pkt_level)
             else:
-                self.unknown(pkt_type, pkt_level)
-        except (ValueError, struct.error):
-            self.error(ErrorCode.MALFORMED, pkt_type, pkt_level)
-        else:
-            handler.handle_packet(pkt_type, data[6:])
+                if handler.queue.full():
+                    self.error(ErrorCode.BUSY, pkt_type + r(pkt_range)[0], self.LEVEL)
+                else:
+                    handler.queue.put_nowait((pkt_type, chunk))
 
     def send_packet(self, pkt_type: int, pkt_level: int, packet: Packet):
         """Send packet over socket."""
         if not self._transport:
             raise NetworkError(*NetworkError.NO_TRANSPORT)
+
+        print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
 
         data = bytes(packet)
         self._transport.write(
@@ -898,16 +894,24 @@ class Protocol(asyncio.Protocol):
     def unknown(self, pkt_type: int, pkt_level: int, process: int = 0):
         """Unknown packet is returned to sender."""
         self.send_packet(
-            r(pkt_type)[0] + UNKNOWN_PACKET, pkt_level,
+            r(ri(pkt_type))[0] + UNKNOWN_PACKET, pkt_level,
             UnknownPacket(pkt_type, pkt_level, process)
         )
 
     def error(self, error: int, pkt_type: int, pkt_level, process: int = 0):
         """Error happened is returned to sender."""
         self.send_packet(
-            r(pkt_type)[0] + ERROR_PACKET, pkt_level,
+            r(ri(pkt_type))[0] + ERROR_PACKET, pkt_level,
             ErrorPacket(pkt_type, pkt_level, process, error)
         )
+
+    def close(self):
+        if not self._transport.is_closing():
+            self._transport.close()
+            for handler in self._ranges.values():
+                handler.queue.put_nowait(None)
+                handler.queue.join()
+
 
 
 class ClientProtoMixin:
@@ -917,7 +921,7 @@ class ClientProtoMixin:
         """Clean up."""
         if exc:
             Util.print_exception(exc)
-        self._transport.close()
+        self.close()
 
     @classmethod
     async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int) -> "Protocol":
@@ -939,6 +943,7 @@ class ServerProtoMixin:
         """Clean up."""
         if self._manager:
             self._manager.remove(self)
+        self.close()
         Util.print_exception(exc)
 
     def connection_made(self, transport: asyncio.Transport):

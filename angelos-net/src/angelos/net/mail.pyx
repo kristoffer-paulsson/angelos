@@ -16,7 +16,7 @@
 """Authentication handler."""
 from angelos.net.base import Handler, ProtocolSession, Packet, DataType
 import uuid
-import binascii
+import asyncio
 
 SESH_TYPE_RECEIVE = 0x01
 SESH_TYPE_SEND = 0x02
@@ -104,10 +104,10 @@ class MailClient(MailHandler):
             raise MailError(*MailError.INIT_FAILED)
 
         async with self.context(self.SESH_RECEIVE) as sesh_receive:
-            pass
+            await asyncio.sleep(0)
 
         async with self.context(self.SESH_SEND) as sesh_send:
-            pass
+            await asyncio.sleep(0)
 
 
 class MailServer(MailHandler):

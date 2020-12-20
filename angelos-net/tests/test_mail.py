@@ -98,7 +98,7 @@ class TestMailHandler(TestCase):
 
         client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
         await client.get_handler(MailHandler.RANGE).start(uuid.uuid4())
-        await asyncio.sleep(0)
+        await asyncio.sleep(.1)
 
 
 
