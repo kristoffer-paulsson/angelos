@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import tracemalloc
+import uuid
 from unittest import TestCase
 
 from angelos.facade.facade import Facade
@@ -17,7 +18,7 @@ class StubServer(ServerProtoMixin, Protocol):
     """Stub protocol server."""
 
     def __init__(self, facade: Facade, manager: ConnectionManager):
-        super().__init__(facade, manager)
+        super().__init__(facade, True, manager)
         self._add_handler(MailServer(self))
 
 
@@ -31,8 +32,7 @@ class StubClient(ClientProtoMixin, Protocol):
     def connection_made(self, transport: asyncio.Transport):
         """Start mail replication immediately."""
         Protocol.connection_made(self, transport)
-
-        self._ranges[MailClient.RANGE].start()
+        # self._ranges[MailClient.RANGE].start()
 
 
 class TestMailHandler(TestCase):
@@ -82,15 +82,23 @@ class TestMailHandler(TestCase):
         client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
         session = await client.get_handler(MailHandler.RANGE).open_session(MailHandler.SESH_ALL)
 
-        for c in self.manager:
-            print("DONE")
-            await c.get_handler(MailHandler.RANGE).session_done(MailHandler.SESH_ALL, session)
-            await asyncio.sleep(.1)
+        tuple(self.manager)[0].get_handler(MailHandler.RANGE).session_done(MailHandler.SESH_ALL, session)
+        await asyncio.sleep(0)
 
         await client.get_handler(MailHandler.RANGE).get_session(session).own.event.wait()
-        await client.get_handler(MailHandler.RANGE).stop_session(session)
+        await client.get_handler(MailHandler.RANGE).stop_session(MailHandler.SESH_ALL, session)
 
         await asyncio.sleep(1)
+
+    @run_async
+    async def test_start(self):
+        server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0)
+
+        client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
+        await client.get_handler(MailHandler.RANGE).start(uuid.uuid4())
+        await asyncio.sleep(0)
 
 
 

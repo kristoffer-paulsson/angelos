@@ -22,6 +22,7 @@ import uuid
 from asyncio import CancelledError, InvalidStateError
 from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
+from contextlib import asynccontextmanager
 
 import msgpack
 from angelos.common.misc import StateMachine
@@ -68,6 +69,7 @@ ACCEPT_PACKET = 122  # Acceptance toward session or request
 REFUSE_PACKET = 123  # Refusal of session or request
 BUSY_PACKET = 124  # To busy for session or request
 DONE_PACKET = 125  # Nothing more to do in session or request
+
 UNKNOWN_PACKET = 126  # Unrecognized packet
 ERROR_PACKET = 127  # Technical error
 
@@ -99,6 +101,7 @@ class NetworkError(RuntimeError):
     """Unrepairable network errors. """
     NO_TRANSPORT = ("Transport layer is missing.", 100)
     ALREADY_CONNECTED = ("Already connected.", 101)
+    SESSION_NO_SYNC = ("Failed to sync one or several states in session", 102)
 
 
 class GotoStateError(RuntimeWarning):
@@ -260,19 +263,19 @@ class FinishPacket(Packet, fields=("type", "session"), fields_info=((DataType.UI
     """Finalize a packet handler session."""
 
 
-class AcceptPacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
+class AcceptPacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
     """Accept a packet handler session."""
 
 
-class RefusePacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
+class RefusePacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
     """Refuse a packet handler session."""
 
 
-class BusyPacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
+class BusyPacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
     """Indicate for initiating session packet handler that it is busy asking to come back later."""
 
 
-class DonePacket(Packet, fields=("type", "session",), fields_info=((DataType.UINT,), (DataType.UINT,))):
+class DonePacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
     """Indicate for initiating session packet handler that all is done."""
 
 
@@ -435,10 +438,37 @@ class Handler:
 
     LEVEL = 0
     RANGE = 0
-    PACKETS = dict()
+
+    PKT_TELL = TELL_PACKET  # Tell the state of things
+    PKT_SHOW = SHOW_PACKET  # Demand to know the state if things
+    PKT_CONFIRM = CONFIRM_PACKET  # Accept or deny a state change or proposal
+    PKT_START = START_PACKET  # Initiate a session
+    PKT_FINISH = FINISH_PACKET  # Finalize a started session
+    PKT_ACCEPT = ACCEPT_PACKET  # Acceptance toward session or request
+    PKT_REFUSE = REFUSE_PACKET  # Refusal of session or request
+    PKT_BUSY = BUSY_PACKET  # To busy for session or request
+    PKT_DONE = DONE_PACKET  # Nothing more to do in session or request
+    PKT_UNKNOWN = UNKNOWN_PACKET
+    PKT_ERROR = ERROR_PACKET
+
+    PACKETS = {
+        PKT_TELL: TellPacket,
+        PKT_SHOW: ShowPacket,
+        PKT_CONFIRM: ConfirmPacket,
+        PKT_START: StartPacket,
+        PKT_FINISH: FinishPacket,
+        PKT_ACCEPT: AcceptPacket,
+        PKT_REFUSE: RefusePacket,
+        PKT_BUSY: BusyPacket,
+        PKT_DONE: DonePacket,
+        PKT_UNKNOWN: UnknownPacket,
+        PKT_ERROR: ErrorPacket
+    }
+
     PROCESS = dict()
 
-    def __init__(self, manager: "Protocol"):
+    def __init__(self, manager: "Protocol", states: dict, sessions: dict, max_sesh: int):
+        self._r_start = r(self.RANGE)[0]
         self._pkt_type = None
         self._future = None
         self._silent = False
@@ -446,15 +476,28 @@ class Handler:
         self._manager = manager
         self._types = set(self.PACKETS.keys())
 
-        # Enforce handling of unknown response
-        unknown = r(self.RANGE)[0] + UNKNOWN_PACKET
-        self.PACKETS[unknown] = UnknownPacket
-        self.PROCESS[unknown] = "process_unknown"
+        server = manager.is_server()
+        self._states = states  # {self.ST_ALL: b"1"}
+        self._state_machines = {
+            state: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
+            for state in self._states.keys()}
+        self._sessions = dict()
+        self._session_types = sessions  # {self.SESH_ALL: ProtocolSession}
+        self._max_sessions = max_sesh
+        self._session_count = 0
 
-        # Enforce handling of error response
-        error = r(self.RANGE)[0] + ERROR_PACKET
-        self.PACKETS[error] = ErrorPacket
-        self.PROCESS[error] = "process_error"
+        self.PROCESS = {
+            self.PKT_TELL: "process_tell" if server else None,
+            self.PKT_SHOW: None if server else "process_show",
+            self.PKT_CONFIRM: None if server else "process_confirm",
+            self.PKT_START: "process_start" if server else None,
+            self.PKT_REFUSE: None if server else "process_refuse",
+            self.PKT_BUSY: None if server else "process_busy",
+            self.PKT_ACCEPT: None if server else "process_accept",
+            self.PKT_FINISH: "process_finish" if server else None,
+            self.PKT_DONE: None if server else "process_done",
+            **self.PROCESS
+        }
 
     @property
     def manager(self) -> "Protocol":
@@ -474,14 +517,14 @@ class Handler:
             code = True
         except CancelledError:
             if not self._silent:
-                self._manager.error(ErrorCode.ABORTED, self._pkt_type, self.LEVEL)
+                self._manager.error(ErrorCode.ABORTED, self._pkt_type + self._r_start, self.LEVEL)
         except InvalidStateError:
             if not self._silent:
-                self._manager.error(ErrorCode.BUSY, self._pkt_type, self.LEVEL)
+                self._manager.error(ErrorCode.BUSY, self._pkt_type + self._r_start, self.LEVEL)
         except Exception as exc:
             Util.print_exception(exc)
             if not self._silent:
-                self._manager.error(ErrorCode.UNEXPECTED, self._pkt_type, self.LEVEL)
+                self._manager.error(ErrorCode.UNEXPECTED, self._pkt_type + self._r_start, self.LEVEL)
         finally:
             self._cleanup(code)
             self._pkt_type = None
@@ -500,29 +543,243 @@ class Handler:
         If packet type class, method or processor isn't found
         An unknown packet is returned to the senders handler.
         """
+        pkt_type = pkt_type - self._r_start
         try:
             pkt_cls = self.PACKETS[pkt_type]
             proc_name = self.PROCESS[pkt_type]
-            print(pkt_type, proc_name)
+            print("Server" if self._manager.is_server() else "Client", pkt_type, proc_name)
 
             if proc_name in ("process_unknown", "process_error"):
                 self._silent = True  # Don't send error or unknown response packet.
 
             if self._future:  # If already processing a packet.
                 if not self._silent:
-                    self._manager.error(ErrorCode.BUSY, pkt_type, self.LEVEL)
+                    self._manager.error(ErrorCode.BUSY, pkt_type + self._r_start, self.LEVEL)
                 return
 
             proc_func = getattr(self, proc_name)
             packet = pkt_cls.unpack(data)
         except (KeyError, AttributeError):
-            self._manager.unknown(pkt_type, self.LEVEL)
+            self._manager.unknown(pkt_type + self._r_start, self.LEVEL)
         except (ValueError, TypeError):
-            self._manager.error(ErrorCode.MALFORMED, pkt_type, self.LEVEL)
+            self._manager.error(ErrorCode.MALFORMED, pkt_type + self._r_start, self.LEVEL)
         else:
             self._pkt_type = pkt_type
             self._future = asyncio.ensure_future(proc_func(packet))
             self._future.add_done_callback(self._crash)
+
+    def get_session(self, session: int) -> ProtocolSession:
+        return self._sessions[session] if session in self._sessions.keys() else None
+
+    async def sync(self, states: tuple, type: int = 0, session: int = 0) -> bool:
+        """Run several state synchronizations in a batch."""
+        yes = True
+        for state in states:
+            ans = await self._tell_state(state, type, session)
+            yes = yes if ans == ConfirmCode.YES else False
+        return yes
+
+    @asynccontextmanager
+    async def context(self, sesh_type: int, **kwargs):
+        """Run a protocol session as a context manager with state sync."""
+        sesh_id = await self._open_session(sesh_type, **kwargs)
+        sesh = self.get_session(sesh_id)
+
+        answer = await self.sync(tuple(sesh.states.keys()), sesh_type, sesh_id)
+        if not answer:
+            raise NetworkError(*NetworkError.SESSION_NO_SYNC, {"type": sesh_type, "session": sesh_id})
+        print(sesh)
+
+        try:
+            yield sesh
+        finally:
+            await self._stop_session(sesh_type, sesh_id)
+
+    async def _open_session(self, type: int, **kwargs) -> int:
+        """Open a new session of certain type."""
+        self._session_count += 1
+        session = self._session_count
+
+        sesh = self._session_types[type](self._manager.is_server(), **kwargs)
+        self._sessions[session] = sesh
+
+        sesh.own.goto("start")
+        self._manager.send_packet(self.PKT_START, self.LEVEL, StartPacket(type, session))
+        await sesh.own.future
+        return self._session_count if sesh.own.future.result() == SessionCode.ACCEPT else None
+
+    async def _stop_session(self, type: int, session: int):
+        """Stop a running session and clean up."""
+        sesh = self.get_session(session)
+        if sesh.type != type:
+            raise TypeError()
+
+        sesh.own.goto("finish")
+        self._manager.send_packet(self.PKT_FINISH, self.LEVEL, FinishPacket(type, session))
+
+        sesh.own.goto("accomplished")
+        del self._sessions[session]
+
+    async def _tell_state(self, state: int, type: int = 0, session: int = 0) -> int:
+        """Tell certain state to server and give response"""
+        if session:
+            sesh = self.get_session(session)
+            machine = sesh.state_machines[state]
+            value = sesh.states[state]
+        else:
+            machine = self._state_machines[state]
+            value = self._states[state]
+
+        machine.event.clear()
+        machine.goto("tell")
+        self._manager.send_packet(self.PKT_TELL, self.LEVEL, TellPacket(state, value, type, session))
+        await machine.event.wait()
+        return machine.answer
+
+    def _create_session(self, type: int = 0, session: int = 0) -> ProtocolSession:
+        """Create a new session based on request from client"""
+        sesh = self._session_types[type](self._manager.is_server())
+        self._sessions[session] = sesh
+        return sesh
+
+    def session_done(self, type: int, session: int):
+        """Tell client there is no more to do in session."""
+        sesh = self.get_session(session)
+        if sesh.type != type:
+            raise TypeError()
+
+        sesh.own.goto("done")
+        self._manager.send_packet(self.PKT_DONE, self.LEVEL, DonePacket(type, session))
+
+    async def show_state(self, state: int, type: int = 0, session: int = 0):
+        """Request to know state from client."""
+        machine = self.get_session(session).state_machines[state] if session else self._state_machines[state]
+        machine.goto("show")
+        self._manager.send_packet(self.PKT_SHOW, self.LEVEL, ShowPacket(state, type, session))
+
+    async def process_tell(self, packet: TellPacket):
+        """Process a state push."""
+        try:
+            machine = self.get_session(packet.session).state_machines[packet.state] \
+                if packet.session else self._state_machines[packet.state]
+            machine.goto("tell")
+
+            if packet.value == b"?" or not callable(machine.check):
+                result = ConfirmCode.NO_COMMENT
+            else:
+                machine.value = packet.value
+                result = machine.evaluate()
+
+                if result == ConfirmCode.YES:
+                    self._states[packet.state] = packet.value
+
+                if machine.condition.locked():
+                    machine.condition.notify_all()
+
+            machine.goto("accomplished")
+        except KeyError:
+            result = ConfirmCode.NO_COMMENT
+        finally:
+            self._manager.send_packet(
+                self.PKT_CONFIRM + self._r_start, self.LEVEL, ConfirmPacket(
+                    packet.state, result, packet.type, packet.session))
+
+    async def process_show(self, packet: ShowPacket):
+        """Process request to show state."""
+        try:
+            machine = self.get_session(packet.session).state_machines[packet.state] \
+                if packet.session else self._state_machines[packet.state]
+            machine.goto("show")
+            state = self._states[packet.state]
+        except KeyError:
+            state = b"?"
+        finally:
+            self._manager.send_packet(
+                self.PKT_TELL + self._r_start, self.LEVEL, TellPacket(
+                    packet.state, state, packet.type, packet.session))
+
+    async def process_confirm(self, packet: ConfirmPacket):
+        """Process a confirmation of state received and acceptance."""
+        try:
+            machine = self.get_session(packet.session).state_machines[packet.proposal] \
+                if packet.session else self._state_machines[packet.proposal]
+            machine.goto("confirm")
+            machine.answer = packet.answer
+            machine.event.set()
+            machine.goto("accomplished")
+        except KeyError:
+            if packet.answer != ConfirmCode.NO_COMMENT:
+                raise
+        except GotoStateError:
+            raise
+
+    async def process_start(self, packet: StartPacket):
+        """Session start requested."""
+        if len(self._sessions) >= self._max_sessions:
+            self._manager.send_packet(
+                self.PKT_BUSY + self._r_start, self.LEVEL, BusyPacket(packet.type, packet.session))
+        elif packet.session in self._sessions.keys() or packet.type not in self._session_types.keys():
+            self._manager.send_packet(
+                self.PKT_REFUSE + self._r_start, self.LEVEL, RefusePacket(packet.type, packet.session))
+        else:
+            session = self._create_session(packet.type, packet.session)
+            if not session:
+                self._manager.send_packet(
+                    self.PKT_REFUSE + self._r_start, self.LEVEL, RefusePacket(packet.type, packet.session))
+            else:
+                session.own.goto("start")
+                self._manager.send_packet(
+                    self.PKT_ACCEPT + self._r_start, self.LEVEL, AcceptPacket(packet.type, packet.session))
+
+    async def process_finish(self, packet: FinishPacket):
+        """Close an open session."""
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("finish")
+        session.own.goto("accomplished")
+        del self._sessions[packet.session]
+
+    async def process_accept(self, packet: AcceptPacket):
+        """Accept response to start session."""
+        session = self.get_session(packet.session)
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("accept")
+        session.own.future.set_result(SessionCode.ACCEPT)
+
+    async def process_refuse(self, packet: RefusePacket):
+        """Refuse response to start session."""
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("refuse")
+        session.own.goto("accomplished")
+        session.own.future.set_result(SessionCode.REFUSE)
+        del self._sessions[packet.session]
+
+    async def process_busy(self, packet: BusyPacket):
+        """Busy response to start session."""
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.goto("busy")
+        session.own.goto("accomplished")
+        session.own.future.set_result(SessionCode.BUSY)
+        del self._sessions[packet.session]
+
+    async def process_done(self, packet: DonePacket):
+        """Indication there is nothing more to do in session."""
+        session = self._sessions[packet.session]
+        if session.type != packet.type:
+            raise TypeError()
+
+        session.own.event.set()
+        session.own.goto("done")
 
     async def process_unknown(self, packet: UnknownPacket):
         """Handle an unknown packet response.
@@ -700,7 +957,7 @@ class ServerProtoMixin:
 
 
 class ConnectionManager:
-    """Keeps track at connections with server protocols."""
+    """Keeps track of connections with server protocols."""
 
     def __init__(self):
         self._client_instances = dict()
