@@ -180,6 +180,16 @@ class BaseStream:  # (Iterable, Reversible):
         return self._identity
 
     @property
+    def count(self):
+        """Expose block count."""
+        return self._count
+
+    @property
+    def len(self):
+        """Expose stream byte length."""
+        return self._count
+
+    @property
     def manager(self):
         """Expose stream manager."""
         return self._manager

@@ -15,6 +15,7 @@
 #
 """Vault."""
 import datetime
+import functools
 import uuid
 from pathlib import PurePosixPath
 from typing import Optional, Callable, Dict, Any
@@ -40,6 +41,10 @@ class MailStorage(StorageFacadeExtension):
     USEFLAG = (Const.A_USE_MAIL,)
 
     INIT_HIERARCHY = ()
+
+    async def receive_iter(self, owner: uuid.UUID):
+        """Iterator that iterates over files belonging to an owner."""
+        return functools.partial(self.archive.search, query=Archive7.Query().type(TYPE_FILE).owner(owner))
 
     async def save(self, filename: PurePosixPath, document, document_file_id_match=True) -> uuid.UUID:
         """Save a document at a certain location.

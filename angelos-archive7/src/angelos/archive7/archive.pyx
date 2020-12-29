@@ -24,7 +24,7 @@ import uuid
 from pathlib import Path, PurePosixPath
 from typing import Union
 
-from angelos.archive7.fs import Delete, InvalidPath, EntryRecord
+from angelos.archive7.fs import Delete, InvalidPath, EntryRecord, FileObject
 from angelos.archive7.fs import FileSystemStreamManager, TYPE_DIR, TYPE_LINK, TYPE_FILE, \
     HierarchyTraverser
 from angelos.common.misc import SharedResourceMixin
@@ -468,13 +468,16 @@ class Archive7(SharedResourceMixin):
     async def load(self, *args, **kwargs):
         return await self._run(functools.partial(self.__load, *args, **kwargs))
 
-    def __load(self, filename: PurePosixPath) -> bytes:
+    def __load(self, filename: PurePosixPath, fd: bool = False) -> Union[bytes, FileObject]:
         """Load data from a file."""
         try:
-            vfd = self.__manager.open(self.__manager.resolve_path(filename, True), "rb")
-            data = vfd.read()
-            vfd.close()
-            return data
+            if fd:
+                return self.__manager.open(self.__manager.resolve_path(filename, True), "rb")
+            else:
+                vfd = self.__manager.open(self.__manager.resolve_path(filename, True), "rb")
+                data = vfd.read()
+                vfd.close()
+                return data
         except InvalidPath:
             raise Archive7Error(*Archive7Error.AR7_NOT_FOUND, {"path": filename})
 
