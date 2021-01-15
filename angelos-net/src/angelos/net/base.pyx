@@ -17,7 +17,6 @@
 import asyncio
 import datetime
 import enum
-import struct
 import uuid
 from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
@@ -106,6 +105,7 @@ class NetworkError(RuntimeError):
     ALREADY_CONNECTED = ("Already connected.", 101)
     SESSION_NO_SYNC = ("Failed to sync one or several states in session", 102)
     SESSION_TYPE_INCONSISTENCY = ("Session type inconsistent.", 103)
+    ATTEMPTED_ATTACK = ("Attempted attack with error/unknown packets.", 104 )
 
 
 class GotoStateError(RuntimeWarning):
@@ -590,7 +590,8 @@ class Handler:
             except (KeyError, AttributeError) as exc:
                 Util.print_exception(exc)
                 self._manager.unknown(self._pkt_type + self._r_start, self.LEVEL)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as exc:
+                Util.print_exception(exc)
                 self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
             except Exception as exc:
                 Util.print_exception(exc)
@@ -651,11 +652,11 @@ class Handler:
                 states = sesh.states
                 event = sesh.event
             else:
-                states = self.states
+                states = self._states
                 event = self._enquiry
 
             self._manager.send_packet(
-                self.PKT_ENQUIRY + self._r_start, self.LEVEL, ResponsePacket(
+                self.PKT_ENQUIRY + self._r_start, self.LEVEL, EnquiryPacket(
                     state, sesh.type if sesh else 0, sesh.id if sesh else 0))
 
             await event.wait()
@@ -678,7 +679,9 @@ class Handler:
         machine.goto("tell")
         self._manager.send_packet(self.PKT_TELL, self.LEVEL, TellPacket(
             state, value, sesh.type if sesh else 0, sesh.id if sesh else 0))
+
         await machine.event.wait()
+        machine.event.clear()
         return machine.answer
 
     async def _create_session(self, type: int = 0, session: int = 0) -> ProtocolSession:
@@ -697,7 +700,7 @@ class Handler:
         """Call to make preparations for a session."""
         pass
 
-    async def show_state(self, state: int, sesh: ProtocolSession = None):
+    async def _show_state(self, state: int, sesh: ProtocolSession = None):
         """Request to know state from client."""
         machine = sesh.state_machines[state] if sesh else self._state_machines[state]
         machine.goto("show")
@@ -737,10 +740,10 @@ class Handler:
                 result = machine.evaluate()
 
                 if result == ConfirmCode.YES:
-                    if packet.session:
-                        self.get_session(packet.session).states[packet.state] = packet.value
-                    else:
-                        self._states[packet.state] = packet.value
+                    # if packet.session:
+                    #    self.get_session(packet.session).states[packet.state] = packet.value
+                    # else:
+                    self._states[packet.state] = packet.value
 
                 if machine.condition.locked():
                     machine.condition.notify_all()
@@ -769,6 +772,7 @@ class Handler:
 
     async def process_confirm(self, packet: ConfirmPacket):
         """Process a confirmation of state received and acceptance."""
+        print("CONFIRM", packet)
         try:
             machine = self.get_session(packet.session).state_machines[packet.proposal] \
                 if packet.session else self._state_machines[packet.proposal]
@@ -943,13 +947,14 @@ class Protocol(asyncio.Protocol):
 
                 pkt_range = ri(pkt_type)
                 handler = self._ranges[pkt_range]
-            except KeyError:
+            except KeyError as exc:
                 low = r(pkt_range)[0]
                 if pkt_type == low + UNKNOWN_PACKET or pkt_type == low + ERROR_PACKET:
-                    pass  # Attempted attack
+                    Util.print_exception(exc)  # Attempted attack
+                    raise NetworkError(*NetworkError.ATTEMPTED_ATTACK)
                 else:
                     self.unknown(pkt_type, pkt_level)
-            except (ValueError, struct.error) as exc:
+            except ValueError:
                 self.error(ErrorCode.MALFORMED, pkt_type, pkt_level)
             else:
                 if handler.queue.full():
