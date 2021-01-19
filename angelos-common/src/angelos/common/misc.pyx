@@ -281,6 +281,23 @@ class LazyAttribute:
         return self.__value
 
 
+class SyncCallable:
+    """Network callable to get around cython callables."""
+
+    def __init__(self, callback: Callable):
+        self._cb = callback
+
+    def __call__(self, value: bytes) -> int:
+        return self._cb(value)
+
+
+class AsyncCallable(SyncCallable):
+    """Async network callable."""
+
+    async def __call__(self, value: bytes) -> int:
+        return await self._cb(value)
+
+
 class Misc:
     """Namespace for miscellanious functions and methods."""
 

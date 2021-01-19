@@ -14,16 +14,17 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Authentication handler."""
+import asyncio
 import time
 import uuid
 
 from angelos.bin.nacl import NaCl, Signer, Verifier, CryptoFailure
+from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.common.utils import Util
 from angelos.facade.storage.portfolio_mixin import PortfolioNotFound
 from angelos.lib.policy.crypto import Crypto
+from angelos.net.base import NetworkError, Handler, ConfirmCode, ConnectionClosed
 from angelos.portfolio.utils import Groups
-
-from angelos.net.base import NetworkError, Handler, ConfirmCode
 
 
 class LoginTypeCode:
@@ -81,7 +82,7 @@ class AuthenticationClient(AuthenticationHandler):
     def __init__(self, manager: "Protocol"):
         AuthenticationHandler.__init__(self, manager)
 
-    async def _login(self, node: bool = False):
+    async def _login(self, node: bool = False) -> bool:
         await self._tell_state(self.ST_VERSION)
         await self._tell_state(self.ST_LOGIN)
         if node:
@@ -101,9 +102,13 @@ class AuthenticationClient(AuthenticationHandler):
             self._manager.facade.data.portfolio.privkeys.seed).signature(
             self._states[self.ST_SERVER_SPECIMEN])
 
-        await self._tell_state(self.ST_SERVER_SIGNATURE)
-        await self._question_state(self.ST_CLIENT_SIGNATURE)
+        approved = await self._tell_state(self.ST_SERVER_SIGNATURE)
 
+        # Authentication at server failed
+        if not approved == ConfirmCode.YES:
+            return False
+
+        await self._question_state(self.ST_CLIENT_SIGNATURE)
 
         try:
             identity = uuid.UUID(bytes=self._states[self.ST_SERVER_ID])
@@ -120,19 +125,22 @@ class AuthenticationClient(AuthenticationHandler):
 
             Verifier(keys.verify).verify(self._states[self.ST_CLIENT_SPECIMEN] + self._states[self.ST_CLIENT_SIGNATURE])
             self._manager.authentication_made(portfolio, node)
+            return True
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure) as exc:
             Util.print_exception(exc)
+            self._manager.close()
+            return False
 
-    async def auth_user(self):
+    async def auth_user(self) -> bool:
         """Authenticate a user against a network."""
         self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_USER
-        await self._login()
+        return await self._login()
 
-    async def auth_node(self):
+    async def auth_node(self) -> bool:
         """Authenticate a node within a network."""
         self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_NODE
 
-    async def auth_net(self):
+    async def auth_net(self) -> bool:
         """Authenticate a network against another network."""
         self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_NET
 
@@ -142,17 +150,13 @@ class AuthenticationServer(AuthenticationHandler):
     def __init__(self, manager: "Protocol"):
         AuthenticationHandler.__init__(self, manager)
 
-        self._state_machines[self.ST_SERVER_ID].check = self._check_no
-        self._state_machines[self.ST_SERVER_PUBLIC].check = self._check_no
-        self._state_machines[self.ST_SERVER_SPECIMEN].check = self._check_no
-        self._state_machines[self.ST_SERVER_TIME].check = self._check_no
-        self._state_machines[self.ST_SERVER_SIGNATURE].check = self._check_signature
+        self._state_machines[self.ST_SERVER_ID].check = SyncCallable(lambda value: ConfirmCode.NO)
+        self._state_machines[self.ST_SERVER_PUBLIC].check = SyncCallable(lambda value: ConfirmCode.NO)
+        self._state_machines[self.ST_SERVER_SPECIMEN].check = SyncCallable(lambda value: ConfirmCode.NO)
+        self._state_machines[self.ST_SERVER_TIME].check = SyncCallable(lambda value: ConfirmCode.NO)
+        self._state_machines[self.ST_SERVER_SIGNATURE].check = AsyncCallable(self._check_signature)
 
-    def _check_no(self, value: bytes) -> int:
-        """Make state unchangeable."""
-        return ConfirmCode.NO
-
-    def _check_signature(self, value: bytes) -> int:
+    async def _check_signature(self, value: bytes) -> int:
         """Authenticate signature."""
         self._states[self.ST_CLIENT_SIGNATURE] = Signer(
             self._manager.facade.data.portfolio.privkeys.seed).signature(
@@ -163,7 +167,7 @@ class AuthenticationServer(AuthenticationHandler):
             if abs(int.from_bytes(self._states[self.ST_CLIENT_TIME], "big") - time.time()) > 240:
                 raise NetworkError(*NetworkError.AUTH_TIMEGATE_DIFF)
 
-            portfolio = self.manager.facade.storage.vault.load_portfolio(identity, Groups.CLIENT_AUTH)
+            portfolio = await self.manager.facade.storage.vault.load_portfolio(identity, Groups.CLIENT_AUTH)
 
             if self._manager.facade.data.portfolio.entity.id == identity:  # Check node privileges
                 keys = [keys for keys in self._manager.facade.data.portfolio.keys if
@@ -176,7 +180,9 @@ class AuthenticationServer(AuthenticationHandler):
 
             Verifier(keys.verify).verify(value + self._states[self.ST_SERVER_SIGNATURE])
             self._manager.authentication_made(portfolio, node)
-        except (ValueError, IndexError, PortfolioNotFound, CryptoFailure, NetworkError):
+        except (ValueError, IndexError, PortfolioNotFound, CryptoFailure, NetworkError) as exc:
+            Util.print_exception(exc)
+            asyncio.get_event_loop().call_soon(self._manager.close)
             return ConfirmCode.NO
         else:
             return ConfirmCode.YES

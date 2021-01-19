@@ -18,12 +18,12 @@ import asyncio
 import datetime
 import enum
 import uuid
+from contextlib import asynccontextmanager
 from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
-from contextlib import asynccontextmanager
 
 import msgpack
-from angelos.common.misc import StateMachine
+from angelos.common.misc import StateMachine, SyncCallable, AsyncCallable, Loop
 from angelos.common.utils import Util
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
@@ -105,7 +105,8 @@ class NetworkError(RuntimeError):
     ALREADY_CONNECTED = ("Already connected.", 101)
     SESSION_NO_SYNC = ("Failed to sync one or several states in session", 102)
     SESSION_TYPE_INCONSISTENCY = ("Session type inconsistent.", 103)
-    ATTEMPTED_ATTACK = ("Attempted attack with error/unknown packets.", 104 )
+    ATTEMPTED_ATTACK = ("Attempted attack with error/unknown packets.", 104)
+    FALSE_CHECK_METHOD = ("Check method must be a NetCallable", 105)
 
 
 class GotoStateError(RuntimeWarning):
@@ -114,6 +115,10 @@ class GotoStateError(RuntimeWarning):
 
 class NotAuthenticated(RuntimeWarning):
     """When there is not authenticated portfolio."""
+
+
+class ConnectionClosed(RuntimeWarning):
+    """When connection unexpectedly closed."""
 
 
 def r(i: int) -> Tuple[int, int]:
@@ -358,7 +363,7 @@ class ServerStateExchangeMachine(WaypointState):
 
     def __init__(self):
         self._condition = asyncio.Condition()
-        self.check = lambda value: ConfirmCode.YES
+        self.check = SyncCallable(lambda value: ConfirmCode.YES)
         self.value = None
         WaypointState.__init__(self, {
             "ready": ("show", "tell"),
@@ -373,13 +378,19 @@ class ServerStateExchangeMachine(WaypointState):
         """Expose condition."""
         return self._condition
 
-    def predicate(self) -> bool:
+    async def predicate(self) -> bool:
         """Condition predicate true if confirmation is yes."""
-        return True if self.evaluate() == ConfirmCode.YES else False
+        check = await self.evaluate()
+        return True if check == ConfirmCode.YES else False
 
-    def evaluate(self) -> int:
+    async def evaluate(self) -> int:
         """Evaluate value."""
-        return self.check(self.value)
+        if isinstance(self.check, AsyncCallable):
+            return await self.check(self.value)
+        elif isinstance(self.check, SyncCallable):
+            return self.check(self.value)
+        else:
+            raise NetworkError(*NetworkError.FALSE_CHECK_METHOD)
 
 
 class ClientSessionStateMachine(WaypointState):
@@ -628,6 +639,9 @@ class Handler:
 
     async def _open_session(self, type: int, **kwargs) -> ProtocolSession:
         """Open a new session of certain type."""
+        if self._transport.is_closing():
+            raise NetworkError(*NetworkError.IS_CLOSED)
+
         self._session_count += 1
         sesh = self._session_types[type](self._manager.is_server(), self._session_count, **kwargs)
         self._sessions[sesh.id] = sesh
@@ -737,7 +751,7 @@ class Handler:
                 result = ConfirmCode.NO_COMMENT
             else:
                 machine.value = packet.value
-                result = machine.evaluate()
+                result = await machine.evaluate()
 
                 if result == ConfirmCode.YES:
                     # if packet.session:
@@ -772,7 +786,6 @@ class Handler:
 
     async def process_confirm(self, packet: ConfirmPacket):
         """Process a confirmation of state received and acceptance."""
-        print("CONFIRM", packet)
         try:
             machine = self.get_session(packet.session).state_machines[packet.proposal] \
                 if packet.session else self._state_machines[packet.proposal]
@@ -928,6 +941,11 @@ class Protocol(asyncio.Protocol):
         """Connection is made."""
         self._transport = transport
 
+    def check(self):
+        """Raise exception if connection is closed."""
+        if self._transport.is_closing():
+            raise ConnectionClosed()
+
     def data_received(self, data: bytes):
         """Data received."""
         while data:
@@ -967,6 +985,8 @@ class Protocol(asyncio.Protocol):
         if not self._transport:
             raise NetworkError(*NetworkError.NO_TRANSPORT)
 
+        self.check()
+
         print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
 
         data = bytes(packet)
@@ -996,7 +1016,6 @@ class Protocol(asyncio.Protocol):
             self._transport.close()
             for handler in self._ranges.values():
                 handler.queue.put_nowait(None)
-                handler.queue.join()
 
 
 class ClientProtoMixin:
