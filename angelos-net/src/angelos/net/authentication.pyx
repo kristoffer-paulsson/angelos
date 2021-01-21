@@ -83,6 +83,7 @@ class AuthenticationClient(AuthenticationHandler):
         AuthenticationHandler.__init__(self, manager)
 
     async def _login(self, node: bool = False) -> bool:
+        """Login operation against server."""
         await self._tell_state(self.ST_VERSION)
         await self._tell_state(self.ST_LOGIN)
         if node:
@@ -123,7 +124,7 @@ class AuthenticationClient(AuthenticationHandler):
                 keys = [keys for keys in portfolio.keys if keys.verify == self._states[self.ST_SERVER_PUBLIC]][0]
                 node = False
 
-            Verifier(keys.verify).verify(self._states[self.ST_CLIENT_SPECIMEN] + self._states[self.ST_CLIENT_SIGNATURE])
+            Verifier(keys.verify).verify(self._states[self.ST_CLIENT_SIGNATURE] + self._states[self.ST_CLIENT_SPECIMEN])
             self._manager.authentication_made(portfolio, node)
             return True
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure) as exc:
@@ -136,13 +137,20 @@ class AuthenticationClient(AuthenticationHandler):
         self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_USER
         return await self._login()
 
+    # TODO: Implement node authentication
     async def auth_node(self) -> bool:
         """Authenticate a node within a network."""
         self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_NODE
 
+    # TODO: Implement network authentication
     async def auth_net(self) -> bool:
         """Authenticate a network against another network."""
         self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_NET
+
+    # TODO: Implement administrator authentication
+    async def auth_admin(self) -> bool:
+        """Authenticate an administrator against server."""
+        self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_ADMIN
 
 
 class AuthenticationServer(AuthenticationHandler):
@@ -178,7 +186,7 @@ class AuthenticationServer(AuthenticationHandler):
                 keys = [keys for keys in portfolio.keys if keys.verify == self._states[self.ST_CLIENT_PUBLIC]][0]
                 node = False
 
-            Verifier(keys.verify).verify(value + self._states[self.ST_SERVER_SIGNATURE])
+            Verifier(keys.verify).verify(value + self._states[self.ST_SERVER_SPECIMEN])
             self._manager.authentication_made(portfolio, node)
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure, NetworkError) as exc:
             Util.print_exception(exc)

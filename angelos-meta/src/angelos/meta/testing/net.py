@@ -27,6 +27,47 @@ from angelos.meta.fake import Generate
 from angelos.meta.testing import run_async
 from angelos.portfolio.collection import PrivatePortfolio
 from angelos.portfolio.portfolio.setup import SetupChurchPortfolio, SetupPersonPortfolio
+from angelos.portfolio.utils import Groups
+
+
+async def cross_authenticate(server: Facade, client: Facade) -> bool:
+    # Client --> Server
+    # Export the public client portfolio
+    client_data = await client.storage.vault.load_portfolio(
+        client.data.portfolio.entity.id, Groups.SHARE_MAX_USER)
+
+    # Add client portfolio to server
+    await server.storage.vault.accept_portfolio(client_data)
+
+    # Load server data from server vault
+    server_data = await server.storage.vault.load_portfolio(
+        server.data.portfolio.entity.id, Groups.SHARE_MAX_COMMUNITY)
+
+    # Add server portfolio to client
+    await client.storage.vault.accept_portfolio(server_data)
+
+    # Server -" Client
+    # Trust the client portfolio
+    # trust = StatementPolicy.trusted(server.data.portfolio, client.data.portfolio)
+
+    # Saving server trust for client to server
+    # await server.storage.vault.statements_portfolio(set([trust]))
+
+    # Client <-- -" Server
+    # Load client data from server vault
+    # client_data = await server.storage.vault.load_portfolio(client.data.portfolio.entity.id, Groups.SHARE_MAX_USER)
+
+    # Saving server trust for client to client
+    # await client.storage.vault.statements_portfolio(client_data.owner.trusted)
+
+    # Client -" Server
+    # Trust the server portfolio
+    # trust = StatementPolicy.trusted(client.data.portfolio, server.data.portfolio)
+
+    # Saving client trust for server to client
+    # await client.storage.vault.statements_portfolio(set([trust]))
+
+    return True
 
 
 class FacadeContext:

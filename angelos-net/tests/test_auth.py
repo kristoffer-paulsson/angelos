@@ -6,8 +6,8 @@ from unittest import TestCase
 
 from angelos.facade.facade import Facade
 from angelos.meta.testing import run_async
-from angelos.meta.testing.net import FacadeContext
-from angelos.net.auth import AuthenticationServer, AuthenticationClient, AuthenticationHandler
+from angelos.meta.testing.net import FacadeContext, cross_authenticate
+from angelos.net.authentication import AuthenticationServer, AuthenticationClient, AuthenticationHandler
 from angelos.net.base import ConnectionManager, ServerProtoMixin, Protocol, ClientProtoMixin
 
 
@@ -54,10 +54,12 @@ class TestAuthenticationServer(TestCase):
 
     @run_async
     async def test_auth_user(self):
+        await cross_authenticate(self.server.facade, self.client1.facade)
+
         server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
         task = asyncio.create_task(server.serve_forever())
         await asyncio.sleep(0)
 
         client = await StubClient.connect(self.client1.facade, "127.0.0.1", 8080)
-        await client.get_handler(AuthenticationHandler.RANGE).auth_user()
+        self.assertTrue(await client.get_handler(AuthenticationHandler.RANGE).auth_user())
         await asyncio.sleep(.1)
