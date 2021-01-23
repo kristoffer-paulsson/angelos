@@ -15,41 +15,30 @@
 #
 """Network client and server classes to connect and listen."""
 import asyncio
-from ipaddress import IPv4Address, IPv6Address
-from typing import Union
 
 from angelos.facade.facade import Facade
-from angelos.net.base import PacketManager
+from angelos.net.authentication import AuthenticationServer, AuthenticationClient
+from angelos.net.base import Protocol, ClientProtoMixin, ServerProtoMixin, ConnectionManager
+from angelos.net.broker import ServiceBrokerClient, ServiceBrokerServer
 
 
-class Client(PacketManager):
+class Client(Protocol, ClientProtoMixin):
     """Client of packet manager."""
 
-    SERVER = (False,)
-
-    def connection_lost(self, exc: Exception):
-        """Clean up."""
-
-        print('Client: The server closed the connection', exc)
-        self._transport.close()
-
-    @classmethod
-    async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int) -> "Client":
-        """Connect to server."""
-        _, protocol = await asyncio.get_running_loop().create_connection(
-            lambda: cls(facade), str(host), port)
-        return protocol
+    def __init__(self, facade: Facade):
+        super().__init__(facade)
+        self._add_handler(ServiceBrokerClient(self))
+        self._add_handler(AuthenticationClient(self))
 
 
-class Server(PacketManager):
+class Server(Protocol, ServerProtoMixin):
     """Server of packet manager."""
 
-    SERVER = (True,)
+    def __init__(self, facade: Facade, manager: ConnectionManager):
+        super().__init__(facade, True, manager)
+        self._add_handler(ServiceBrokerServer(self))
+        self._add_handler(AuthenticationServer(self))
 
-    @classmethod
-    async def listen(
-            cls, facade: Facade,
-            host: Union[str, IPv4Address, IPv6Address], port: int
-    ) -> asyncio.base_events.Server:
-        """Start a listening server."""
-        return await asyncio.get_running_loop().create_server(lambda: cls(facade), host, port)
+    def connection_made(self, transport: asyncio.Transport):
+        """Add more handlers according to authentication."""
+        ServerProtoMixin.connection_made(self, transport)

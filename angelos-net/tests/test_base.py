@@ -11,49 +11,156 @@ from angelos.net.base import ConnectionManager, ServerProtoMixin, Protocol, Clie
 
 
 
-#### Testing handler state transfer ####
+#### Stub handler one-1 ####
 
+class StubHandler1(Handler):
+    """Stub handler 1"""
 
-class StubStateHandler(Handler):
     LEVEL = 1
     RANGE = 1
 
-    ST_STUB = 0x01
-    ST_ANOTHER = 0x02
+    ST_VERSION = 0x01
 
     def __init__(self, manager: "Protocol"):
         Handler.__init__(self, manager, {
-            self.ST_STUB: b"test",
-            self.ST_ANOTHER: b"next",
-        }, dict(), 8)
+            self.ST_VERSION: b"stub1-0.1",
+        }, dict(), 0)
 
 
-class StubStateClient(StubStateHandler):
-    async def test_tell(self) -> int:
-        await self._tell_state(self.ST_STUB)
-        return await self._tell_state(self.ST_ANOTHER)
+class StubHandlerClient1(StubHandler1):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler1.__init__(self, manager)
+
+    async def test(self):
+        return await self._tell_state(self.ST_VERSION)
 
 
-class StubStateServer(StubStateHandler):
+class StubHandlerServer1(StubHandler1):
 
-    async def test_show(self):
-        await self._show_state(self.ST_STUB)
+    def __init__(self, manager: "Protocol"):
+        StubHandler1.__init__(self, manager)
 
 
-class StubServer(ServerProtoMixin, Protocol):
-    """Stub protocol server."""
+#### Stub handler two-2 ####
+
+class StubHandler2(Handler):
+    """Stub handler 2"""
+
+    LEVEL = 2
+    RANGE = 2
+
+    ST_VERSION = 0x01
+
+    def __init__(self, manager: "Protocol"):
+        Handler.__init__(self, manager, {
+            self.ST_VERSION: b"stub2-0.1",
+        }, dict(), 0)
+
+
+class StubHandlerClient2(StubHandler2):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler2.__init__(self, manager)
+
+    async def test(self):
+        return await self._tell_state(self.ST_VERSION)
+
+
+class StubHandlerServer2(StubHandler2):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler2.__init__(self, manager)
+
+
+#### Stub handler three-3 ####
+
+class StubHandler3(Handler):
+    """Stub handler 3"""
+
+    LEVEL = 3
+    RANGE = 3
+
+    ST_VERSION = 0x01
+
+    def __init__(self, manager: "Protocol"):
+        Handler.__init__(self, manager, {
+            self.ST_VERSION: b"stub3-0.1",
+        }, dict(), 0)
+
+
+class StubHandlerClient3(StubHandler3):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler3.__init__(self, manager)
+
+    async def test(self):
+        return await self._tell_state(self.ST_VERSION)
+
+
+class StubHandlerServer3(StubHandler3):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler3.__init__(self, manager)
+
+
+#### Stub handler four-4 ####
+
+class StubHandler4(Handler):
+    """Stub handler 4"""
+
+    LEVEL = 4
+    RANGE = 4
+
+    ST_VERSION = 0x01
+
+    def __init__(self, manager: "Protocol"):
+        Handler.__init__(self, manager, {
+            self.ST_VERSION: b"stub4-0.1",
+        }, dict(), 0)
+
+
+class StubHandlerClient4(StubHandler4):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler4.__init__(self, manager)
+
+    async def test(self):
+        return await self._tell_state(self.ST_VERSION)
+
+
+class StubHandlerServer4(StubHandler4):
+
+    def __init__(self, manager: "Protocol"):
+        StubHandler4.__init__(self, manager)
+
+
+#### Client and Server ####
+
+class StubServer(Protocol, ServerProtoMixin):
+    """Server of packet manager."""
 
     def __init__(self, facade: Facade, manager: ConnectionManager):
         super().__init__(facade, True, manager)
-        self._add_handler(StubStateServer(self))
+        self._add_handler(StubHandlerServer1(self))
+        self._add_handler(StubHandlerServer2(self))
+        self._add_handler(StubHandlerServer3(self))
+        self._add_handler(StubHandlerServer4(self))
+
+    def connection_made(self, transport: asyncio.Transport):
+        """Add more handlers according to authentication."""
+        ServerProtoMixin.connection_made(self, transport)
 
 
-class StubClient(ClientProtoMixin, Protocol):
-    """Stub protocol client."""
+class StubClient(Protocol, ClientProtoMixin):
+    """Client of packet manager."""
 
     def __init__(self, facade: Facade):
         super().__init__(facade)
-        self._add_handler(StubStateClient(self))
+        self._add_handler(StubHandlerClient1(self))
+        self._add_handler(StubHandlerClient2(self))
+        self._add_handler(StubHandlerClient3(self))
+        self._add_handler(StubHandlerClient4(self))
 
     def connection_made(self, transport: asyncio.Transport):
         """Start mail replication immediately."""
@@ -86,5 +193,8 @@ class TestHandler(TestCase):
         await asyncio.sleep(0)
 
         client = await StubClient.connect(self.client.facade, "127.0.0.1", 8080)
-        await client.get_handler(StubStateHandler.RANGE).test_tell()
+        await client.get_handler(StubHandler1.RANGE).test()
+        await client.get_handler(StubHandler2.RANGE).test()
+        await client.get_handler(StubHandler3.RANGE).test()
+        await client.get_handler(StubHandler4.RANGE).test()
         await asyncio.sleep(.1)

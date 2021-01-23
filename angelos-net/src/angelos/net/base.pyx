@@ -23,7 +23,7 @@ from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
 
 import msgpack
-from angelos.common.misc import StateMachine, SyncCallable, AsyncCallable, Loop
+from angelos.common.misc import StateMachine, SyncCallable, AsyncCallable
 from angelos.common.utils import Util
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
@@ -333,7 +333,8 @@ class WaypointState(StateMachine):
     def goto(self, state: str):
         """Go to another state that is available."""
         if state not in self._options[self._state]:
-            raise GotoStateError("State '{0}' not among options {1}".format(state, self._options[self._state]))
+            raise GotoStateError("State '{0}' not among options {1} in '{2}'".format(
+                state, self._options[self._state], self._state))
         self._state = state
 
 
@@ -361,9 +362,9 @@ class ClientStateExchangeMachine(WaypointState):
 class ServerStateExchangeMachine(WaypointState):
     """Waypoints for exchanging a state over a protocol."""
 
-    def __init__(self):
+    def __init__(self, check: SyncCallable = SyncCallable(lambda value: ConfirmCode.YES)):
         self._condition = asyncio.Condition()
-        self.check = SyncCallable(lambda value: ConfirmCode.YES)
+        self.check = check
         self.value = None
         WaypointState.__init__(self, {
             "ready": ("show", "tell"),
@@ -533,9 +534,7 @@ class Handler:
 
         server = manager.is_server()
         self._states = states  # {self.ST_ALL: b"1"}
-        self._state_machines = {
-            state: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
-            for state in self._states.keys()}
+        self._state_machines = self._machines(server)
         self._sessions = dict()
         self._session_types = sessions  # {self.SESH_ALL: ProtocolSession}
         self._max_sessions = max_sesh
@@ -560,6 +559,10 @@ class Handler:
 
         self._processor = asyncio.create_task(self.packet_handler())
 
+    def _machines(self, server: bool):
+        return {state: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
+            for state in self._states.keys()}
+
     @property
     def manager(self) -> "Protocol":
         """Expose the packet manager."""
@@ -574,6 +577,10 @@ class Handler:
     def processor(self) -> asyncio.Task:
         """Expose current task."""
         return self._processor
+
+    def _package(self, pkt_type: int, packet: Packet):
+        """Simplifying packet sending."""
+        self._manager.send_packet(pkt_type + self._r_start, self.LEVEL, packet)
 
     async def packet_handler(self):
         """Handle received packet.
@@ -639,22 +646,19 @@ class Handler:
 
     async def _open_session(self, type: int, **kwargs) -> ProtocolSession:
         """Open a new session of certain type."""
-        if self._transport.is_closing():
-            raise NetworkError(*NetworkError.IS_CLOSED)
-
         self._session_count += 1
         sesh = self._session_types[type](self._manager.is_server(), self._session_count, **kwargs)
         self._sessions[sesh.id] = sesh
 
         sesh.own.goto("start")
-        self._manager.send_packet(self.PKT_START, self.LEVEL, StartPacket(type, sesh.id))
+        self._package(self.PKT_START, StartPacket(type, sesh.id))
         await sesh.own.future
         return sesh if sesh.own.future.result() == SessionCode.ACCEPT else None
 
     async def _stop_session(self, sesh: ProtocolSession):
         """Stop a running session and clean up."""
         sesh.own.goto("finish")
-        self._manager.send_packet(self.PKT_FINISH, self.LEVEL, FinishPacket(sesh.type, sesh.id))
+        self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
 
         sesh.own.goto("accomplished")
         del self._sessions[sesh.id]
@@ -669,9 +673,7 @@ class Handler:
                 states = self._states
                 event = self._enquiry
 
-            self._manager.send_packet(
-                self.PKT_ENQUIRY + self._r_start, self.LEVEL, EnquiryPacket(
-                    state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
 
             await event.wait()
             response = self._response
@@ -691,8 +693,7 @@ class Handler:
 
         machine.event.clear()
         machine.goto("tell")
-        self._manager.send_packet(self.PKT_TELL, self.LEVEL, TellPacket(
-            state, value, sesh.type if sesh else 0, sesh.id if sesh else 0))
+        self._package(self.PKT_TELL, TellPacket(state, value, sesh.type if sesh else 0, sesh.id if sesh else 0))
 
         await machine.event.wait()
         machine.event.clear()
@@ -708,7 +709,7 @@ class Handler:
     def session_done(self, sesh: ProtocolSession):
         """Tell client there is no more to do in session."""
         sesh.own.goto("accomplished")
-        self._manager.send_packet(self.PKT_DONE, self.LEVEL, DonePacket(sesh.type, sesh.id))
+        self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
 
     async def session_prepare(self, sesh: ProtocolSession):
         """Call to make preparations for a session."""
@@ -718,16 +719,14 @@ class Handler:
         """Request to know state from client."""
         machine = sesh.state_machines[state] if sesh else self._state_machines[state]
         machine.goto("show")
-        self._manager.send_packet(self.PKT_SHOW, self.LEVEL, ShowPacket(state, sesh.type, sesh.id))
+        self._package(self.PKT_SHOW, ShowPacket(state, sesh.type, sesh.id))
 
     async def process_enquiry(self, packet: EnquiryPacket):
         """Process an enquiry."""
         value = self.get_session(packet.session).states[packet.state] \
             if packet.session else self._states[packet.state]
 
-        self._manager.send_packet(
-            self.PKT_RESPONSE + self._r_start, self.LEVEL, ResponsePacket(
-                packet.state, value, packet.type, packet.session))
+        self._package(self.PKT_RESPONSE, ResponsePacket(packet.state, value, packet.type, packet.session))
 
     async def process_response(self, packet: ResponsePacket):
         """Process response of enquiry"""
@@ -766,9 +765,7 @@ class Handler:
         except KeyError:
             result = ConfirmCode.NO_COMMENT
         finally:
-            self._manager.send_packet(
-                self.PKT_CONFIRM + self._r_start, self.LEVEL, ConfirmPacket(
-                    packet.state, result, packet.type, packet.session))
+            self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
 
     async def process_show(self, packet: ShowPacket):
         """Process request to show state."""
@@ -780,9 +777,7 @@ class Handler:
         except KeyError:
             state = b"?"
         finally:
-            self._manager.send_packet(
-                self.PKT_TELL + self._r_start, self.LEVEL, TellPacket(
-                    packet.state, state, packet.type, packet.session))
+            self._package(self.PKT_TELL, TellPacket(packet.state, state, packet.type, packet.session))
 
     async def process_confirm(self, packet: ConfirmPacket):
         """Process a confirmation of state received and acceptance."""
@@ -802,20 +797,16 @@ class Handler:
     async def process_start(self, packet: StartPacket):
         """Session start requested."""
         if len(self._sessions) >= self._max_sessions:
-            self._manager.send_packet(
-                self.PKT_BUSY + self._r_start, self.LEVEL, BusyPacket(packet.type, packet.session))
+            self._package(self.PKT_BUSY, BusyPacket(packet.type, packet.session))
         elif packet.session in self._sessions.keys() or packet.type not in self._session_types.keys():
-            self._manager.send_packet(
-                self.PKT_REFUSE + self._r_start, self.LEVEL, RefusePacket(packet.type, packet.session))
+            self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
         else:
             sesh = await self._create_session(packet.type, packet.session)
             if not sesh:
-                self._manager.send_packet(
-                    self.PKT_REFUSE + self._r_start, self.LEVEL, RefusePacket(packet.type, packet.session))
+                self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
             else:
                 sesh.own.goto("start")
-                self._manager.send_packet(
-                    self.PKT_ACCEPT + self._r_start, self.LEVEL, AcceptPacket(packet.type, packet.session))
+                self._package(self.PKT_ACCEPT, AcceptPacket(packet.type, packet.session))
 
     async def process_finish(self, packet: FinishPacket):
         """Close an open session."""
@@ -838,7 +829,7 @@ class Handler:
 
     async def process_refuse(self, packet: RefusePacket):
         """Refuse response to start session."""
-        sesh = self.get_session[packet.session]
+        sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
             raise TypeError()
 
@@ -849,7 +840,7 @@ class Handler:
 
     async def process_busy(self, packet: BusyPacket):
         """Busy response to start session."""
-        sesh = self.get_session[packet.session]
+        sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
             raise TypeError()
 
@@ -1030,8 +1021,7 @@ class ClientProtoMixin:
     @classmethod
     async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int) -> "Protocol":
         """Connect to server."""
-        _, protocol = await asyncio.get_running_loop().create_connection(
-            lambda: cls(facade), str(host), port)
+        _, protocol = await asyncio.get_running_loop().create_connection(lambda: cls(facade), str(host), port)
         return protocol
 
 

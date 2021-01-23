@@ -2,19 +2,21 @@ import asyncio
 import logging
 import sys
 import tracemalloc
-import uuid
 from pathlib import PurePosixPath
+from typing import Union
 from unittest import TestCase
 
+from angelos.document.domain import Node
 from angelos.document.messages import Mail
 from angelos.document.utils import Definitions, Helper
 from angelos.facade.facade import Facade
 from angelos.meta.fake import Generate
 from angelos.meta.testing import run_async
 from angelos.meta.testing.app import StubServer, StubClient
-from angelos.meta.testing.net import FacadeContext
-from angelos.net.base import ServerProtoMixin, Protocol, \
-    ClientProtoMixin, ConnectionManager
+from angelos.meta.testing.net import FacadeContext, cross_authenticate
+from angelos.net.authentication import AuthenticationServer, AuthenticationClient, AuthenticationHandler
+from angelos.net.base import ServerProtoMixin, Protocol, ClientProtoMixin, ConnectionManager
+from angelos.net.broker import ServiceBrokerServer, ServiceBrokerClient, ServiceBrokerHandler
 from angelos.net.mail import MailServer, MailClient, MailHandler
 from angelos.portfolio.collection import Portfolio, PrivatePortfolio
 from angelos.portfolio.envelope.wrap import WrapEnvelope
@@ -31,25 +33,36 @@ async def inject_mail(server: Facade, sender: PrivatePortfolio, recipient: Portf
     return message
 
 
-class StubServer(ServerProtoMixin, Protocol):
-    """Stub protocol server."""
+class StubServer(Protocol, ServerProtoMixin):
+    """Server of packet manager."""
 
     def __init__(self, facade: Facade, manager: ConnectionManager):
         super().__init__(facade, True, manager)
+        self._add_handler(ServiceBrokerServer(self))
+        self._add_handler(AuthenticationServer(self))
+
+    def connection_made(self, transport: asyncio.Transport):
+        """Add more handlers according to authentication."""
+        ServerProtoMixin.connection_made(self, transport)
+
+    def authentication_made(self, portfolio: Portfolio, node: Union[bool, Node]):
+        """Indicate that authentication has taken place. Never call from outside, internal use only."""
+        Protocol.authentication_made(self, portfolio, node)
         self._add_handler(MailServer(self))
 
 
-class StubClient(ClientProtoMixin, Protocol):
-    """Stub protocol client."""
+class StubClient(Protocol, ClientProtoMixin):
+    """Client of packet manager."""
 
     def __init__(self, facade: Facade):
         super().__init__(facade)
+        self._add_handler(ServiceBrokerClient(self))
+        self._add_handler(AuthenticationClient(self))
         self._add_handler(MailClient(self))
 
     def connection_made(self, transport: asyncio.Transport):
         """Start mail replication immediately."""
         Protocol.connection_made(self, transport)
-        # self._ranges[MailClient.RANGE].start()
 
 
 class TestMailHandler(TestCase):
@@ -74,6 +87,7 @@ class TestMailHandler(TestCase):
 
     @run_async
     async def test_start(self):
+        await cross_authenticate(self.server.facade, self.client1.facade)
         for _ in range(10):
             await inject_mail(
                 self.server.facade, self.client1.facade.data.portfolio, self.client2.facade.data.portfolio)
@@ -83,6 +97,8 @@ class TestMailHandler(TestCase):
         await asyncio.sleep(0)
 
         client = await StubClient.connect(self.client1.facade, "127.0.0.1", 8080)
+        self.assertTrue(await client.get_handler(AuthenticationHandler.RANGE).auth_user())
+        self.assertTrue(await client.get_handler(ServiceBrokerHandler.RANGE).request(MailHandler.RANGE))
         await client.get_handler(MailHandler.RANGE).start()
         await asyncio.sleep(.1)
 

@@ -61,7 +61,7 @@ class AuthenticationHandler(Handler):
         specimen = NaCl.random_bytes(64)
         server = manager.is_server()
         Handler.__init__(self, manager, {
-            self.ST_VERSION: b"auth-0.1",
+            self.ST_VERSION: b"authentication-0.1",
             self.ST_LOGIN: b"",
             self.ST_SERVER_ID: portfolio.entity.id.bytes if server else uuid.UUID(int=0).bytes,
             self.ST_SERVER_PUBLIC: keys.verify if server else b"",

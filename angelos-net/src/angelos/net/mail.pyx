@@ -180,7 +180,7 @@ class MailHandler(Handler):
     """Base handler for mail."""
 
     LEVEL = 2
-    RANGE = 2
+    RANGE = 3
 
     SESH_RECEIVE = SESH_TYPE_RECEIVE
     SESH_SEND = SESH_TYPE_SEND
@@ -229,14 +229,14 @@ class MailHandler(Handler):
         entry, path = await self._glob_iterator()
 
         if not entry:
-            self._manager.send_packet(self.PKT_DONE + self._r_start, self.LEVEL, DonePacket(sesh.type, sesh.id))
+            self._package(self.PKT_DONE + self._r_start, self.LEVEL, DonePacket(sesh.type, sesh.id))
         else:
             if self._fd:
                 raise MailError(*MailError.FD_ALREADY_OPEN)
 
             self._fd = self._manager.facade.storage.mail.archive.load(path, True)
-            self._manager.send_packet(
-                self.PKT_DISPATCH + self._r_start, self.LEVEL, DispatchNotePacket(
+            self._package(
+                self.PKT_DISPATCH, DispatchNotePacket(
                     path, self._fd.stream.count, self._fd.stream.len,
                     entry.created, entry.modified, sesh.type, sesh.id
                 )
@@ -260,8 +260,8 @@ class MailHandler(Handler):
             raise MailError(*MailError.STREAM_UNSYNCED)
 
         block = self._fd.stream.block
-        self._manager.send_packet(
-            self.PKT_BLOCK + self._r_start, self.LEVEL, BlockPacket(block.digest, block.data, sesh.type, sesh.id))
+        self._package(
+            self.PKT_BLOCK, BlockPacket(block.digest, block.data, sesh.type, sesh.id))
 
         if block.index == -1:
             self._fd.close()
@@ -317,7 +317,7 @@ class MailClient(MailHandler):
         machine = sesh.collection
         while True:
             machine.goto("collect")
-            self._manager.send_packet(self.PKT_START, self.LEVEL, CollectPacket(sesh.type, sesh.id))
+            self._package(self.PKT_COLLECT, CollectPacket(sesh.type, sesh.id))
             await machine.event.wait()
             if machine.note:
                 yield machine.note
@@ -332,7 +332,7 @@ class MailClient(MailHandler):
         machine = sesh.collection
         for block in range(sesh.states[ST_BLOCK_CNT]):
             machine.goto("pull")
-            self._manager.send_packet(self.PKT_START, self.LEVEL, PullPacket(block, sesh.type, sesh.id))
+            self._package(self.PKT_PULL, PullPacket(block, sesh.type, sesh.id))
             await machine.event.wait()
             if machine.block:
                 yield machine.block
