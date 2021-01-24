@@ -1,89 +1,35 @@
 # Angelos / Logo
 
-<img align="left" height="256" src="https://github.com/kristoffer-paulsson/angelos/blob/master/art/angelos.png"/>
+<img height="256" src="https://angelos-project.com/images/angelos.png"/>
 
 Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."
 
-Λόγῳ is a safe messenger client. Logo means "Reason, matter, statement, remark, saying, Word."
+Λόγῳ is a safe messenger client. Logo means "Word with an intent."
 
-## Purpose
+## Online presence
 
-In many places in the world, Christians lack the freedom to practice their faith and express their beliefs. In some parts of the world, Christians risk their lives to meet in their homes. In other countries, they are being limited in what they are allowed to believe, or are discriminated against for not yielding to a repressive regime. This kind of laws is about to come through in western countries that supposedly have religious freedom.
+Visit us at [angelos-project.com](https://angelos-project.com)
 
-The believers have their computers monitored, their phones are being eavesdropped. Their neighbors might report what they think is going on to the authorities, just for practicing their faith. As of today, social media can not be trusted to guarantee your freedom to practice your faith. The media corporations are surrendering to the regimes, where their users live or are biased themselves.
-
-Today there is a need for a platform that is neutral, decentralized and secure, so that PoF (Persons of Faith) don't have to worry about being spied upon, being monitored, harassed or directly persecuted. What we want to do is to provide a software platform made up of a Client mobile and desktop app, and Server software to handle safe communication.
-
-## Solution
-
-The solution is that Christians and the congregations they are part of in each city should be enabled to communicate securely. For that, we need a software platform that is neutral, decentralized and secure.
-
-* Neutral - By making the platform NOT hierarchical, but rather peer-to-peer we can guarantee that no-one can take total control over the system, it is a system based on trust and credibility.
-* Decentralized - The platform will be engineered in such a way, that there is no central authority, but instead many decentralized networks that can be interconnected. That means that no rouge entity can shut down the whole system, also corrupt networks can be disconnected.
-* Secure - All communication between client and servers, and networks are encrypted. All storage and databases on the filesystems are encrypted so that no rouge entity can spy on the users. Also, each user has a unique encryption key to sign and encrypt all communication. This guarantees that all communication is private and that the senders are verified.
-
-With such a social platform, people of faith should be able to communicate with each other. Being able to plan where to celebrate their common faith without interruption. And being enabled to help and support each other in tough environments.
-
-## Goal
-
-First, we need to understand what this is. The platform is called Angelos, and the app is called Logo. This is the software platform that will be free and available as open source.
-
-The goal of this project is to design and develop a server and app communications platform. This social media platform is targeted towards smartphones, tablets, desktop computers and the server software to be installable on Linux and Windows servers.
+Talk to us on our [discord server](https://discord.gg/TPx65rT)
 
 ## Technology
 
-The platform is mainly being developed in Python 3.7~ and relies heavily on the SSH protocol and cryptography from (NaCl) libsodium. Application development is mainly done in KivyMD. The communication system builds heavily on Peer-2-peer replication.
+Mainly compiled Python for safety reasons.
+All information is encrypted on harddrive as well on the network using libsodium (NaCL).
+Python 3.7 is the preferred version.
+User interface follows [Material Design](https://material.io).
 
-## How to use
-
-Assume that some believers living in a city somewhere with or without persecution, want to be able to communicate and organize securely. They decide to download the Angelos server and install it on a server hotel connected to the internet. They also download the app and installs it on their smartphones and computers. They sign-in to the local Angelos server and verify each other's credibility, which is their social trust to each other in that local network. More people join the Christian network, they download the app and connect to the current server. When they verify with already trusted persons, the services on the platform becomes available for them. All app-to-server communication is encrypted, all data saved on the apps is encrypted, also the servers. After some time one of the believers realize that Christians in the neighbor city also runs an Angelos city network, they decide to interconnect their networks, now Christians in both cities can communicate securely with each other. After some time there is a nationwide use of the Angelos system interconnected between cities. If persecution is starting, anyone can report that to other interconnected city churches. There is no risk that information can be stolen by rogue entities.
-
-## Discord server
-Talk to us on our [discord server](https://discord.gg/TPx65rT)!
-
-## Setup development environment
+## Development
 Download source tree from Github.
-> git clone git://github.com/kristoffer-paulsson/angelos.git
-> cd angelos
+> &gt; git clone git://github.com/kristoffer-paulsson/angelos.git
+> 
+> &gt; cd angelos
+> 
+> &gt; virtualenv -p /usr/bin/python3.7 venv
+> 
+> &gt; source venv/bin/activate
+> 
+> &gt; pip install -r requirements.txt
+> 
+> &gt; python setup.py develop
 
-Setup a virtual environment with Python 3.
-> virtualenv -p /usr/bin/python3.7 venv
-
-Linux: */usr/bin/python3.x*
-
-macOS: */Library/Frameworks/Python.framework/Versions/3.x/bin/python3.x*
-
-Install required packages.
-> pip install -r requirements.txt
-
-Build one of the targets. (angelos/logo/ar7)
-> make &lt;target&gt;
-
-Run the compiled target.
-> &lt;target&gt;
-
-## external access
-
-On Debian you must open the ports that will be used by angelos. If you already have a SSH daemon installed it has to be reconfigured to not run on port 22. As sudo user do this.
-
-> iptables -A INPUT -p tcp --dport 22 --jump ACCEPT
->
-> iptables -A INPUT -p tcp --dport 3 --jump ACCEPT
->
-> iptables -A INPUT -p tcp --dport 4 --jump ACCEPT
->
-> iptables -A INPUT -p tcp --dport 5 --jump ACCEPT
->
-> iptables-save
-
-Then angelos must be started with the option to listen to any
-
-> angelos -l any
-
-angelos --root-dir=$(pwd)/dev_env --run-dir=$(pwd)/dev_env --state-dir=$(pwd)/dev_env --logs-dir=$(pwd)/dev_env --conf-dir=$(pwd)/dev_env
-
->cp angelos.service /etc/systemd/system/angelos.service
->systemctl daemon-reload
->systemctl enable angelos.service
->systemctl restart angelos.service
->systemctl status angelos.service
