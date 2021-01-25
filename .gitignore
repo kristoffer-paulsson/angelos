@@ -16,3 +16,5 @@ tarball/
 /angelos-bin/usr/
 /vagrant/
 /vagrant2/
+/docs/api/*
+!/docs/api/.gitkeep

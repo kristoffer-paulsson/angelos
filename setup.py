@@ -25,6 +25,7 @@ from setuptools import setup, Command, Extension
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 from Cython.Build import cythonize
+from sphinx.setup_command import BuildDoc
 
 
 class SubPackages:
@@ -288,7 +289,8 @@ config = {
     "cmdclass": {
         "develop": CustomDevelop,
         "install": CustomInstall,
-        "venv": CustomEnvironment
+        "venv": CustomEnvironment,
+        "build_sphinx": BuildDoc,
     },
     "classifiers": [
         "Development Status :: 2 - Pre-Alpha",

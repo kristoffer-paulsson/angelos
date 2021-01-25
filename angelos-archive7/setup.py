@@ -18,6 +18,8 @@ from Cython.Build import cythonize
 from angelos.meta.setup import LibraryScanner
 from setuptools import setup, find_namespace_packages
 
+from sphinx.setup_command import BuildDoc
+
 NAME = "angelos.archive"
 VERSION = "1.0.0b1"
 RELEASE = ""
@@ -47,6 +49,9 @@ config = {
           "Topic :: System :: Archiving",
           "Topic :: Utilities"
     ],
+    "cmdclass": {
+        "build_sphinx": BuildDoc,
+    },
     "install_requires": ["contextvars;python_version<'3.7'"],
     "package_dir": {"": "src"},
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),

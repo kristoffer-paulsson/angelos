@@ -23,6 +23,9 @@ default:
 install:
 	python setup.py venv --prefix=$(DESTDIR)
 
+docs:
+	python setup.py build_sphinx
+
 check:
 	echo ""
 
@@ -35,6 +38,5 @@ clean:
 	find ./angelos-*/src -name \*.so -type f -delete
 	find ./angelos-*/src -name \*.dylib -type f -delete
 	find ./angelos-*/src -name \*.pyd -type f -delete
-	rm -fr ./docs/html/
-	rm -fr ./docs/doctrees/
+	rm -fr ./docs/api/*
 

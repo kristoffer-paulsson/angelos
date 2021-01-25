@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #
 # Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
@@ -12,4 +13,7 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-"""PSI package documentation"""
+from angelos.meta.docs.generator import DocGenerator
+
+if __name__ == "__main__":
+    print(DocGenerator("angelos").run())

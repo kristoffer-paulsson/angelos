@@ -13,3 +13,4 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+"""The Archive7 is a format for encrypted random access file archives."""
