@@ -81,6 +81,7 @@ class AuthenticationClient(AuthenticationHandler):
 
     def __init__(self, manager: "Protocol"):
         AuthenticationHandler.__init__(self, manager)
+        print("CLIENT ID", uuid.UUID(bytes=self._states[self.ST_CLIENT_ID]))
 
     async def _login(self, node: bool = False) -> bool:
         """Login operation against server."""
@@ -157,6 +158,7 @@ class AuthenticationServer(AuthenticationHandler):
 
     def __init__(self, manager: "Protocol"):
         AuthenticationHandler.__init__(self, manager)
+        print("SERVER ID", uuid.UUID(bytes=self._states[self.ST_SERVER_ID]))
 
         self._state_machines[self.ST_SERVER_ID].check = SyncCallable(lambda value: ConfirmCode.NO)
         self._state_machines[self.ST_SERVER_PUBLIC].check = SyncCallable(lambda value: ConfirmCode.NO)

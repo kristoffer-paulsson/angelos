@@ -19,6 +19,7 @@ import hashlib
 import uuid
 from pathlib import PurePosixPath
 
+from angelos.document.utils import Helper, Definitions
 from angelos.net.base import Handler, ProtocolSession, Packet, DataType, WaypointState, DonePacket
 from angelos.portfolio.collection import Portfolio
 
@@ -40,7 +41,7 @@ BLOCK_PACKET = 0x04
 
 class BlockError(RuntimeWarning):
     """Block data digest mismatch."""
-pass
+    pass
 
 
 class MailError(RuntimeError):
@@ -59,7 +60,7 @@ class ClientCollectStateMachine(WaypointState):
         self._event = asyncio.Event()
         WaypointState.__init__(self, {
             "ready": ("collect",),
-            "collect": ("note",),
+            "collect": ("note", "accomplished"),  # accomplished added for done.
             "note": ("collect", "accomplished"),
             "accomplished": tuple(),
         })
@@ -94,6 +95,9 @@ class ReceiveSession(ProtocolSession):
         """Exposing the internal collection state."""
         return self._collection
 
+    def cleanup(self):
+        self._collection.event.set()
+
 
 class CollectPacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
     """Request to collect a mail from server."""
@@ -101,7 +105,7 @@ class CollectPacket(Packet, fields=("type", "session"), fields_info=((DataType.U
 
 class DispatchNotePacket(
     Packet, fields=("file", "count", "length", "created", "modified", "type", "session"),
-    fields_info=((DataType.BYTES_FIX, 16), (DataType.UINT,), (DataType.UINT,), (DataType.DATETIME,),
+    fields_info=((DataType.UUID,), (DataType.UINT,), (DataType.UINT,), (DataType.DATETIME,),
                  (DataType.DATETIME,), (DataType.UINT,), (DataType.UINT,))):
     """Response to mail collect request."""
 
@@ -225,26 +229,28 @@ class MailHandler(Handler):
 
     async def process_collect(self, packet: CollectPacket):
         """Process mail collection request."""
-        sesh = self.get_session(packet.id)
-        entry, path = await self._glob_iterator()
+        try:
+            sesh = self.get_session(packet.session)
+            entry, path = await self._glob_iterator.__anext__()
 
-        if not entry:
-            self._package(self.PKT_DONE + self._r_start, self.LEVEL, DonePacket(sesh.type, sesh.id))
-        else:
             if self._fd:
                 raise MailError(*MailError.FD_ALREADY_OPEN)
 
-            self._fd = self._manager.facade.storage.mail.archive.load(path, True)
+            self._fd = await self._manager.facade.storage.mail.archive.load(path, True)
+            print("PATH", path, entry.id)
             self._package(
                 self.PKT_DISPATCH, DispatchNotePacket(
-                    path, self._fd.stream.count, self._fd.stream.len,
+                    entry.id, self._fd.stream.count, self._fd.stream.len,
                     entry.created, entry.modified, sesh.type, sesh.id
                 )
             )
+        except StopAsyncIteration:
+            self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
+            print(sesh.collection)
 
     async def process_dispatch_note(self, packet: DispatchNotePacket):
         """Process request to show state."""
-        sesh = self.get_session(packet.id)
+        sesh = self.get_session(packet.session)
         machine = sesh.collection
         machine.goto("note")
         machine.note = packet
@@ -292,25 +298,32 @@ class MailClient(MailHandler):
             raise MailError(*MailError.INIT_FAILED)
 
         async with self.context(self.SESH_RECEIVE) as sesh_receive:
+            print("SESH_RECEIVE enter", sesh_receive)
             async for note in self.collect_iter(sesh_receive):
-                path = self._manager.facade.api.mailbox.PATH_INBOX[0].joinpath(PurePosixPath(note.path).name)
+                print("COLLECT enter", note.file)
+                path = self._manager.facade.api.mailbox.PATH_INBOX[0].joinpath(
+                    str(note.file) + Helper.extension(Definitions.COM_ENVELOPE))
                 try:
                     await self._manager.facade.storage.vault.archive.mkfile(
                         path, b"", created=note.created, modified=note.modified, owner=user)
                     fd = self._manager.facade.storage.vault.archive.load(path, True)
 
                     async with self.context(self.SESH_DOWNLOAD, file=note.file, count=note.count) as sesh_download:
+                        print("SESH_DOWNLOAD enter")
                         async for block in self.pull_iter(sesh_download):
                             if hashlib.sha1(self.data).digest() != block.digest:
                                 raise BlockError()
                             fd.stream.push(block.data)
                         fd.stream.truncate(note.length)
+                        print("SESH_DOWNLOAD leave")
                     fd.close()
                 except BlockError:
                     await self._manager.facade.storage.vault.archive.remove(path)
+                print("COLLECT leave", note.file)
+            print("SESH_RECEIVE leave")
 
-        async with self.context(self.SESH_SEND) as sesh_send:
-            pass
+        # async with self.context(self.SESH_SEND) as sesh_send:
+        #    pass
 
     async def collect_iter(self, sesh: ReceiveSession):
         """Iterator for collecting mails from server."""
@@ -353,5 +366,5 @@ class MailServer(MailHandler):
     async def session_prepare(self, sesh: ProtocolSession):
         """Call to make preparations for a session."""
         if sesh.type == self.SESH_RECEIVE:
-            self._glob_iterator = await self._manager.facade.storage.mail.receive_iter(
-                self._manager.portfolio.entity.id)
+            print(self._manager.portfolio.entity.id)
+            self._glob_iterator = self._manager.facade.storage.mail.receive_iter(self._manager.portfolio.entity.id)

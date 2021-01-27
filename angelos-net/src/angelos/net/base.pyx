@@ -480,6 +480,10 @@ class ProtocolSession:
         """Expose the sessions states."""
         return self._state_machines
 
+    def cleanup(self):
+        """Clean up the session, called by process_done."""
+        pass
+
 
 class Handler:
     """Base handler of protocol source of services."""
@@ -636,6 +640,7 @@ class Handler:
         """Run a protocol session as a context manager with state sync."""
         sesh = await self._open_session(sesh_type, **kwargs)
         answer = await self.sync(tuple(sesh.states.keys()), sesh)
+
         if not answer:
             raise NetworkError(*NetworkError.SESSION_NO_SYNC, {"type": sesh.type, "session": sesh.id})
 
@@ -851,12 +856,13 @@ class Handler:
 
     async def process_done(self, packet: DonePacket):
         """Indication there is nothing more to do in session."""
-        sesh = self.get_session[packet.session]
+        sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
             raise TypeError()
 
         sesh.own.event.set()
         sesh.own.goto("done")
+        sesh.cleanup()
 
     async def process_unknown(self, packet: UnknownPacket):
         """Handle an unknown packet response.

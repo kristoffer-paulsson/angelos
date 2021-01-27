@@ -6,7 +6,9 @@
 Welcome to The Angelos Project's documentation!
 ===============================================
 
-Hello world
+The project's homepage_ is here.
+
+.. _homepage: https://angelos-project.com
 
 .. toctree::
    :hidden:

@@ -95,17 +95,17 @@ class Generate:
         return churches
 
     @classmethod
-    def lipsum(cls) -> bytes:
+    def lipsum(cls, upper: int = 10) -> bytes:
         """Random lipsum data generator."""
         return (
-            "\n".join(random.choices(LIPSUM_LINES, k=random.randrange(1, 10)))
+            "\n".join(random.choices(LIPSUM_LINES, k=random.randrange(1, upper)))
         ).encode("utf-8")
 
     @classmethod
-    def lipsum_sentence(cls) -> str:
+    def lipsum_sentence(cls, upper: int = 10) -> str:
         """Random sentence"""
         return (
-            " ".join(random.choices(LIPSUM_WORDS, k=random.randrange(3, 10)))
+            " ".join(random.choices(LIPSUM_WORDS, k=random.randrange(3, upper)))
         ).capitalize()
 
     @classmethod

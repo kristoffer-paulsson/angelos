@@ -26,8 +26,9 @@ from angelos.portfolio.message.create import CreateMail
 async def inject_mail(server: Facade, sender: PrivatePortfolio, recipient: Portfolio) -> Mail:
     """Generate one mail to recipient using a facade saving the mail to the outbox."""
     message = CreateMail().perform(sender, recipient).message(
-        Generate.lipsum_sentence(), Generate.lipsum().decode()).done()
+        Generate.lipsum_sentence(), Generate.lipsum(100).decode()).done()
     envelope = WrapEnvelope().perform(sender, recipient, message)
+    print(envelope.owner, recipient.entity.id, len(message.body), message.export_yaml())
     await server.storage.mail.save(
         PurePosixPath("/" + str(envelope.id) + Helper.extension(Definitions.COM_ENVELOPE)), envelope)
     return message
@@ -87,8 +88,8 @@ class TestMailHandler(TestCase):
 
     @run_async
     async def test_start(self):
-        await cross_authenticate(self.server.facade, self.client1.facade)
-        for _ in range(10):
+        await cross_authenticate(self.server.facade, self.client2.facade)
+        for _ in range(3):
             await inject_mail(
                 self.server.facade, self.client1.facade.data.portfolio, self.client2.facade.data.portfolio)
 
@@ -96,7 +97,7 @@ class TestMailHandler(TestCase):
         task = asyncio.create_task(server.serve_forever())
         await asyncio.sleep(0)
 
-        client = await StubClient.connect(self.client1.facade, "127.0.0.1", 8080)
+        client = await StubClient.connect(self.client2.facade, "127.0.0.1", 8080)
         self.assertTrue(await client.get_handler(AuthenticationHandler.RANGE).auth_user())
         self.assertTrue(await client.get_handler(ServiceBrokerHandler.RANGE).request(MailHandler.RANGE))
         await client.get_handler(MailHandler.RANGE).start()
