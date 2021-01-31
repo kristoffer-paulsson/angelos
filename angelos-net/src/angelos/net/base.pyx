@@ -261,27 +261,27 @@ class Packet:
 
 class EnquiryPacket(Packet, fields=("state", "type", "session"),
                  fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
-    """Enquire the state of a thing. Client/server"""
+    """Enquire the fact of a state. From client to server."""
 
 
 class ResponsePacket(Packet, fields=("state", "value", "type", "session"),
                  fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 1024), (DataType.UINT,), (DataType.UINT,))):
-    """Respond to enquiry. Client/server"""
+    """Respond fact of state enquiry. From server to client."""
 
 
 class TellPacket(Packet, fields=("state", "value", "type", "session"),
                  fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 1024), (DataType.UINT,), (DataType.UINT,))):
-    """Tell the state of a thing. Client/server"""
+    """Tell the server to set the value of a state. From client to server."""
 
 
 class ShowPacket(Packet, fields=("state", "type", "session"),
                  fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
-    """Get the state of a thing. Client/server"""
+    """Request to see the value of a state. From server to client"""
 
 
 class ConfirmPacket(Packet, fields=("proposal", "answer", "type", "session"),
                     fields_info=((DataType.UINT,), (DataType.UINT, 0, 2), (DataType.UINT,), (DataType.UINT,))):
-    """Answer on a sent proposal. 1=Yes, 2=No, 0=No comment."""
+    """Answer on a sent proposal. 1=Yes, 2=No, 0=No comment. From server to client."""
 
 
 class StartPacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
@@ -668,7 +668,7 @@ class Handler:
         sesh.own.goto("accomplished")
         del self._sessions[sesh.id]
 
-    async def _question_state(self, state: int, sesh: ProtocolSession = None) -> bytes:
+    async def _poll_state(self, state: int, sesh: ProtocolSession = None) -> bytes:
         """Question a state on the server."""
         async with self._enquiry_lock:
             if sesh:

@@ -144,7 +144,7 @@ class ServerPullStateMachine(WaypointState):
 
 
 class DownloadSession(ProtocolSession):
-    def __init__(self, server: bool, session: int, file: uuid.UUID, count: int = 0):
+    def __init__(self, server: bool, session: int, file: uuid.UUID = uuid.UUID(int=0), count: int = 0):
         ProtocolSession.__init__(self, SESH_TYPE_DOWNLOAD, session, {
             ST_FILE_ID: file.bytes,
             ST_BLOCK_CNT: hex(count)[2:].encode()

@@ -90,10 +90,10 @@ class AuthenticationClient(AuthenticationHandler):
         if node:
             await self._tell_state(self.ST_CLIENT_NODE)
 
-        await self._question_state(self.ST_SERVER_ID)
-        await self._question_state(self.ST_SERVER_PUBLIC)
-        await self._question_state(self.ST_SERVER_SPECIMEN)
-        await self._question_state(self.ST_SERVER_TIME)
+        await self._poll_state(self.ST_SERVER_ID)
+        await self._poll_state(self.ST_SERVER_PUBLIC)
+        await self._poll_state(self.ST_SERVER_SPECIMEN)
+        await self._poll_state(self.ST_SERVER_TIME)
 
         await self._tell_state(self.ST_CLIENT_ID)
         await self._tell_state(self.ST_CLIENT_PUBLIC)
@@ -110,7 +110,7 @@ class AuthenticationClient(AuthenticationHandler):
         if not approved == ConfirmCode.YES:
             return False
 
-        await self._question_state(self.ST_CLIENT_SIGNATURE)
+        await self._poll_state(self.ST_CLIENT_SIGNATURE)
 
         try:
             identity = uuid.UUID(bytes=self._states[self.ST_SERVER_ID])
