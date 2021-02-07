@@ -8,8 +8,9 @@ from angelos.common.misc import SyncCallable
 from angelos.facade.facade import Facade
 from angelos.meta.testing import run_async
 from angelos.meta.testing.net import FacadeContext
-from angelos.net.base import Protocol, ClientProtoMixin, ServerProtoMixin, ConnectionManager, ConfirmCode
-from angelos.net.primitives import Handler, StateMixin, StateMode, NetworkState
+from angelos.net.base import Protocol, ClientProtoMixin, ServerProtoMixin, ConnectionManager, ConfirmCode, \
+    GotoStateError
+from angelos.net.primitives import Handler, StateMixin, StateMode, NetworkState, ReuseStateError
 
 
 class StateHandler(Handler, StateMixin):
@@ -41,9 +42,20 @@ class ClientStateStub(StateHandler):
 
     def __init__(self, manager: "Protocol"):
         StateHandler.__init__(self, manager)
+        default = SyncCallable(lambda value: ConfirmCode.YES)
+        self._states[self.ST_FACT].upgrade(default)
 
-    async def do_mediate(self):
-        return await self._call_mediate(self.ST_VERSION, [b"stub-0.3", b"stub-0.2", b"stub-0.1"])
+    async def do_mediate(self, handler: int = StateHandler.ST_VERSION):
+        return await self._call_mediate(handler, [b"stub-0.3", b"stub-0.2", b"stub-0.1"])
+
+    async def do_tell(self, handler: int = StateHandler.ST_ONCE):
+        return await self._call_tell(handler)
+
+    async def do_tell_r(self, handler: int = StateHandler.ST_VERSION):
+        return await self._call_tell(handler)
+
+    async def do_query(self, handler: int = StateHandler.ST_FACT):
+        return await self._call_query(handler)
 
 
 class ServerStateStub(StateHandler):
@@ -54,14 +66,13 @@ class ServerStateStub(StateHandler):
         default = SyncCallable(lambda value: ConfirmCode.YES)
         self._states[self.ST_ONCE].upgrade(default)
         self._states[self.ST_REPRISE].upgrade(default)
-        self._states[self.ST_FACT].upgrade(default)
 
     def _mediate_version(self, value: bytes) -> int:
         """Test version compatibility."""
         return ConfirmCode.YES if value == self._states[self.ST_VERSION].value else ConfirmCode.NO
 
-    async def do_show(self):
-        return await self._call_show(self.ST_ONCE)
+    async def do_show(self, handler: int = StateHandler.ST_ONCE):
+        return await self._call_show(handler)
 
 
 class ClientStub(Protocol, ClientProtoMixin):
@@ -85,6 +96,9 @@ class ServerStub(Protocol, ServerProtoMixin):
 
 
 class StateMixinTest(TestCase):
+    """Testing of network state exchange."""
+    # TODO: Make tests for misuse cases.
+
     server = None
     client = None
     manager = None
@@ -107,31 +121,191 @@ class StateMixinTest(TestCase):
         del self.server
         del self.client
 
+    async def environment(self, handler: int, side: bool = True) -> Handler:
+        """Setup an environment with client and server.
+
+        Args:
+            handler (int):
+                Settle on which handler by range.
+            side (bool):
+                Get from client (True) or server (False)
+
+        Returns (Handler):
+            Protocol handler class instance to test on.
+        """
+        server = await ServerStub.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
+        task = asyncio.create_task(server.serve_forever())
+        await asyncio.sleep(0)
+
+        client = await ClientStub.connect(self.client.facade, "127.0.0.1", 8080)
+        if side:
+            return client.get_handler(handler)
+        else:
+            await asyncio.sleep(0)
+            conn = list(self.manager)
+            return conn[0].get_handler(handler)
+
     @run_async
     async def test__call_mediate(self):
         """Test that StateMixin._call_mediate behaves as expected."""
-        server = await ServerStub.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
-        task = asyncio.create_task(server.serve_forever())
-        await asyncio.sleep(0)
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(b"stub-0.1", await handler.do_mediate())
 
-        client = await ClientStub.connect(self.client.facade, "127.0.0.1", 8080)
-        self.assertEqual(b"stub-0.1", await client.get_handler(StateHandler.RANGE).do_mediate())
-        await asyncio.sleep(.1)
+    @run_async
+    async def test__call_mediate_1(self):
+        """Test that StateMixin._call_mediate on ONCE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(b"stub-0.3", await handler.do_mediate(StateHandler.ST_ONCE))
+
+    @run_async
+    async def test__call_mediate_2(self):
+        """Test that StateMixin._call_mediate on REPRISE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(b"stub-0.3", await handler.do_mediate(StateHandler.ST_REPRISE))
+
+    @run_async
+    async def test__call_mediate_3(self):
+        """Test that StateMixin._call_mediate on FACT."""
+        with self.assertRaises(ReuseStateError):
+            handler = await self.environment(StateHandler.RANGE)
+            await handler.do_mediate(StateHandler.ST_FACT)
+
+    @run_async
+    async def test__call_mediate_4(self):
+        """Test that StateMixin._call_mediate behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE)
+        # self.assertEqual(b"stub-0.1", await handler.do_mediate())
+
+    @run_async
+    async def test__call_mediate_5(self):
+        """Test that StateMixin._call_mediate behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE)
+        # self.assertEqual(b"stub-0.1", await handler.do_mediate())
 
     @run_async
     async def test__call_show(self):
-        """Test that StateMixin._call_ahow behaves as expected."""
-        server = await ServerStub.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
-        task = asyncio.create_task(server.serve_forever())
-        await asyncio.sleep(0)
-
-        client = await ClientStub.connect(self.client.facade, "127.0.0.1", 8080)
-        await asyncio.sleep(.1)
-
-        conn = list(self.manager)
-        handler = conn[0].get_handler(StateHandler.RANGE)
-        self.assertEqual(handler.get_state(handler.ST_ONCE).value, b"xx1")
+        """Test that StateMixin._call_show behaves as expected."""
+        handler = await self.environment(StateHandler.RANGE, False)
         self.assertEqual(await handler.do_show(), b"xx5")
-        # await asyncio.sleep(.1)
-        # machine = handler.get_state(handler.ST_ONCE)
-        # print(machine.value, machine.frozen, machine.mode, machine.state)
+
+    @run_async
+    async def test__call_show_1(self):
+        """Test that StateMixin._call_show behaves on MEDIATE."""
+        with self.assertRaises(ReuseStateError):
+            handler = await self.environment(StateHandler.RANGE, False)
+            await handler.do_show(StateHandler.ST_VERSION)
+
+    @run_async
+    async def test__call_show_2(self):
+        """Test that StateMixin._call_show behaves on REPRISE."""
+        with self.assertRaises(ReuseStateError):
+            handler = await self.environment(StateHandler.RANGE, False)
+            await handler.do_show(StateHandler.ST_REPRISE)
+
+    @run_async
+    async def test__call_show_3(self):
+        """Test that StateMixin._call_show behaves on FACT."""
+        with self.assertRaises(ReuseStateError):
+            handler = await self.environment(StateHandler.RANGE, False)
+            await handler.do_show(StateHandler.ST_FACT)
+
+    @run_async
+    async def test__call_show_4(self):
+        """Test that StateMixin._call_show behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE, False)
+        # self.assertEqual(await handler.do_show(), b"xx5")
+
+    @run_async
+    async def test__call_show_5(self):
+        """Test that StateMixin._call_show behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE, False)
+        # self.assertEqual(await handler.do_show(), b"xx5")
+
+    @run_async
+    async def test__call_tell(self):
+        """Test that StateMixin._call_tell behaves as expected."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_tell(), b"xx5")
+
+    @run_async
+    async def test__call_tell_1(self):
+        """Test that StateMixin._call_tell behaves on MEDIATE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_tell(StateHandler.ST_VERSION), b"stub-0.1")
+
+    @run_async
+    async def test__call_tell_2(self):
+        """Test that StateMixin._call_tell behaves on REPRISE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_tell(StateHandler.ST_REPRISE), b"xx6")
+
+    @run_async
+    async def test__call_tell_3(self):
+        """Test that StateMixin._call_tell behaves on FACT."""
+        with self.assertRaises(ReuseStateError):
+            handler = await self.environment(StateHandler.RANGE)
+            await handler.do_tell(StateHandler.ST_FACT)
+
+    @run_async
+    async def test__call_tell_4(self):
+        """Test that StateMixin._call_tell behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE)
+        # self.assertEqual(await handler.do_tell(), b"xx5")
+
+    @run_async
+    async def test__call_tell_5(self):
+        """Test that StateMixin._call_tell behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE)
+        # self.assertEqual(await handler.do_tell(), b"xx5")
+
+    @run_async
+    async def test__call_query(self):
+        """Test that StateMixin._call_query behaves as expected."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_query(), (1, b"xx3"))
+
+    @run_async
+    async def test__call_query_1(self):
+        """Test that StateMixin._call_query behaves on MEDIATE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_query(StateHandler.ST_VERSION), (None, b"stub-0.1"))
+
+    @run_async
+    async def test__call_query_2(self):
+        """Test that StateMixin._call_query behaves on ONCE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_query(StateHandler.ST_ONCE), (None, b"xx1"))
+
+    @run_async
+    async def test__call_query_3(self):
+        """Test that StateMixin._call_query behaves on REPRISE."""
+        handler = await self.environment(StateHandler.RANGE)
+        self.assertEqual(await handler.do_query(StateHandler.ST_REPRISE), (None, b"xx2"))
+
+    @run_async
+    async def test__call_query_4(self):
+        """Test that StateMixin._call_query behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE)
+        # self.assertEqual(await handler.do_query(), b"xx3")
+
+    @run_async
+    async def test__call_query_5(self):
+        """Test that StateMixin._call_query behaves as expected."""
+        pass
+        # FIXME: Write
+        # handler = await self.environment(StateHandler.RANGE)
+        # self.assertEqual(await handler.do_query(), b"xx3")

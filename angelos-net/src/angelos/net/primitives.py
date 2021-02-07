@@ -75,6 +75,11 @@ class Handler:
         """Expose current task."""
         return self._processor
 
+    @property
+    def states(self) -> dict:
+        """Expose local states."""
+        return self._states
+
     def _package(self, pkt_type: int, packet: Packet):
         """Simplifying packet sending."""
         self._manager.send_packet(pkt_type + self._r_start, self.LEVEL, packet)
@@ -198,7 +203,7 @@ class NetworkState(WaypointState):
         self._mode = mode
         self._value = value
         self._checker = check
-        self._frozen = True if self._mode == StateMode.FACT else False  # Frozen if FACT.
+        self._frozen = True if self._mode == StateMode.FACT and server else False  # Frozen if FACT and server-side.
 
     @property
     def mode(self) -> int:
@@ -395,15 +400,14 @@ class StateMixin:
         A protocol primitive.
         """
         machine = sesh.states[state] if sesh else self._states[state]
-        if not self._is_tellable(machine):
-            raise ReuseStateError()
-        machine.goto("tell")
-        self._package(self.PKT_TELL, TellPacket(state, machine.value, sesh.type if sesh else 0, sesh.id if sesh else 0))
-        answer = await machine.future
-        self._furbish(machine, answer)
-        return answer
+        with machine.us():
+            machine.goto("tell")
+            self._package(self.PKT_TELL, TellPacket(
+                state, machine.value, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            answer = await machine.wait()
+        return machine.value if answer == ConfirmCode.YES else None
 
-    async def _call_query(self, state: int, sesh: ProtocolSession = None) -> bytes:
+    async def _call_query(self, state: int, sesh: ProtocolSession = None) -> tuple:
         """
         Query a fact of state.
 
@@ -411,12 +415,9 @@ class StateMixin:
         A protocol primitive.
         """
         machine = sesh.states[state] if sesh else self._states[state]
-        if machine.mode != StateMode.FACT:
-            raise ReuseStateError()
-        self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
-        response = await machine.future
-        self._furbish(machine)
-        return response
+        with machine.us():
+            self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            return await machine.wait()
 
     async def process_show(self, packet: ShowPacket):
         """
@@ -428,13 +429,17 @@ class StateMixin:
         try:
             machine = self.get_session(packet.session).states[packet.state] \
                 if packet.session else self._states[packet.state]
+
+            if machine.mode in (StateMode.MEDIATE, StateMode.REPRISE, StateMode.FACT):
+                raise ReuseStateError("Forbidden use of state.")
+
             machine.them()
             machine.goto("show")
             value = machine.value
         except KeyError:
             value = b"?"
-        finally:
-            self._package(self.PKT_TELL, TellPacket(packet.state, value, packet.type, packet.session))
+
+        self._package(self.PKT_TELL, TellPacket(packet.state, value, packet.type, packet.session))
 
     async def process_tell(self, packet: TellPacket):
         """
@@ -456,7 +461,7 @@ class StateMixin:
             with machine.them() if who is not False else contextlib.nullcontext():
                 machine.goto("tell")
 
-                if packet.value == b"?" or not machine.check:
+                if packet.value == b"?":  # or not machine.check:
                     result = ConfirmCode.NO_COMMENT
                 else:
                     result = await machine.eval(packet.value)
@@ -467,8 +472,8 @@ class StateMixin:
                 machine.reuse()
         except KeyError:
             result = ConfirmCode.NO_COMMENT
-        finally:
-            self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
+
+        self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
 
     async def process_confirm(self, packet: ConfirmPacket):
         """
@@ -521,23 +526,10 @@ class StateMixin:
         """
         machine = self.get_session(packet.session).states[packet.state] \
             if packet.session else self._states[packet.state]
-        machine.update(packet.value)
-        machine.future.set_result(packet.value)
 
-    def _is_tellable(self, machine: NetworkState) -> bool:
-        """Discern if state can be told."""
-        return machine.mode in self._TELLABLE and not machine.frozen
-
-    def _furbish(self, machine: NetworkState, result: int):
-        """Furbish a state."""
-        if machine.mode == StateMode.ONCE:
-            machine.freeze()
-        elif machine.mode == StateMode.REPRISE:
-            machine.reuse()
-        elif machine.mode == StateMode.MEDIATE:
-            if result == ConfirmCode.YES:
-                machine.freeze()
-            elif result in (ConfirmCode.NO, ConfirmCode.NO_COMMENT):
-                machine.reuse()
-        elif machine.mode == StateMode.FACT:
-            machine.reuse()
+        if machine.other() != False:  # Them or no-one
+            machine.other(reset=True)  # Reset other
+        elif machine.mode == StateMode.FACT:  # Us
+            await machine.set_result((await machine.eval(packet.value), packet.value))
+        else:
+            await machine.set_result((None, packet.value))
