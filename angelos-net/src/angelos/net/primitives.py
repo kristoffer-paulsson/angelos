@@ -24,7 +24,8 @@ from angelos.common.utils import Util
 from angelos.net.base import UNKNOWN_PACKET, ERROR_PACKET, UnknownPacket, ErrorPacket, r, Packet, ErrorCode, \
     WaypointState, ProtocolSession, ConfirmCode, NetworkError, \
     GotoStateError, ENQUIRY_PACKET, RESPONSE_PACKET, TELL_PACKET, SHOW_PACKET, CONFIRM_PACKET, EnquiryPacket, \
-    ResponsePacket, TellPacket, ShowPacket, ConfirmPacket
+    ResponsePacket, TellPacket, ShowPacket, ConfirmPacket, START_PACKET, FINISH_PACKET, ACCEPT_PACKET, REFUSE_PACKET, \
+    BUSY_PACKET, DONE_PACKET, StartPacket, FinishPacket, AcceptPacket, RefusePacket, BusyPacket, DonePacket, SessionCode
 
 
 class Handler:
@@ -143,10 +144,6 @@ class Handler:
 #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 
 
-class NetworkSession:
-    pass
-
-
 class StateMode(enum.IntEnum):
     """
     A state can operate in several modes:
@@ -175,6 +172,7 @@ class FrozenStateError(RuntimeWarning):
 
 
 class NetworkState(WaypointState):
+    """Network state in a network protocol, for sharing and carrying out state primitive operations."""
 
     def __init__(self, server: bool, mode: int, value: bytes = None, check: SyncCallable = None):
 
@@ -313,8 +311,6 @@ class NetworkState(WaypointState):
 
 class StateMixin:
     """State mixin for a network protocol handler, adding state exchange as a primitive."""
-
-    _TELLABLE = (StateMode.ONCE, StateMode.REPRISE, StateMode.MEDIATE)
 
     PKT_ENQUIRY = ENQUIRY_PACKET  # Ask for the state of things
     PKT_RESPONSE = RESPONSE_PACKET  # Respond to enquiry
@@ -533,3 +529,238 @@ class StateMixin:
             await machine.set_result((await machine.eval(packet.value), packet.value))
         else:
             await machine.set_result((None, packet.value))
+
+
+#### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+#### #### #### #### #### #### # Network session # #### #### #### #### #### ####
+#### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+
+
+class NetworkSession(WaypointState):
+    """Session that run within a protocol handler with states."""
+
+    def __init__(self, type: int, id: int, states: dict, server: bool):
+        WaypointState.__init__(self, {
+            "ready": ("start",),
+            "start": ("finish", "done"),
+            "done": ("finish",),
+            "finish": ("accomplished",),
+            "accomplished": tuple(),
+        } if server else {
+            "ready": ("start",),
+            "start": ("accept", "refuse", "done", "busy"),
+            "accept": ("finish", "done"),
+            "done": ("finish",),
+            "refuse": ("accomplished",),
+            "busy": ("accomplished",),
+            "finish": ("accomplished",),
+            "accomplished": tuple(),
+        })
+        self._state = "ready"
+
+        self._type = type
+        self._id = id
+        self._states = dict()
+        for key in states:
+            self._states[key] = NetworkState(server, *states[key])
+
+    @property
+    def type(self) -> int:
+        """Expose session type."""
+        return self._type
+
+    @property
+    def id(self) -> int:
+        """Expose session id."""
+        return self._id
+
+    @property
+    def states(self) -> dict:
+        """Expose the sessions states."""
+        return self._states
+
+
+class SessionMixin:
+    """Session mixin for a network protocol handler, adding session synchronization as a primitive."""
+
+    PKT_START = START_PACKET  # Initiate a session
+    PKT_FINISH = FINISH_PACKET  # Finalize a started session
+    PKT_ACCEPT = ACCEPT_PACKET  # Acceptance toward session or request
+    PKT_REFUSE = REFUSE_PACKET  # Refusal of session or request
+    PKT_BUSY = BUSY_PACKET  # To busy for session or request
+    PKT_DONE = DONE_PACKET  # Nothing more to do in session or request
+
+    SESSIONS = dict()
+    MAX_SESH = 8
+
+    def __init__(self, sessions: dict):
+        """Dict[int: Tuple[int, bytes, SyncCallable]]"""
+        server = self._manager.is_server()
+        self.PACKETS = {
+            self.PKT_START: StartPacket,
+            self.PKT_FINISH: FinishPacket,
+            self.PKT_ACCEPT: AcceptPacket,
+            self.PKT_REFUSE: RefusePacket,
+            self.PKT_BUSY: BusyPacket,
+            self.PKT_DONE: DonePacket,
+            **self.PACKETS
+        }
+        self.PROCESS = {
+            self.PKT_START: "process_start" if server else None,
+            self.PKT_REFUSE: None if server else "process_refuse",
+            self.PKT_BUSY: None if server else "process_busy",
+            self.PKT_ACCEPT: None if server else "process_accept",
+            self.PKT_FINISH: "process_finish" if server else None,
+            self.PKT_DONE: None if server else "process_done",
+            **self.PROCESS
+        }
+        self._sessions = dict()
+        self._sesh_cnt = 0
+
+    async def _sesh_sync(self, states: tuple, sesh: ProtocolSession = None) -> bool:
+        """
+        Run several state synchronizations in a batch.
+
+        Called from the client.
+        Part of a protocol primitive.
+        """
+        yes = True
+        for state in states:
+            ans = await self._tell_state(state, sesh)
+            yes = yes if ans == ConfirmCode.YES else False
+        return yes
+
+    async def _sesh_open(self, type: int, **kwargs) -> NetworkSession:
+        """
+        Open a new session of certain type.
+
+        Called from the client.
+        Part of a protocol primitive.
+        """
+        self._sesh_cnt += 1
+        sesh = self.SESSIONS[type](self._manager.is_server(), self._sesh_cnt, **kwargs)
+        self._sessions[sesh.id] = sesh
+
+        sesh.own.goto("start")
+        self._package(self.PKT_START, StartPacket(type, sesh.id))
+        await sesh.own.future
+        return sesh if sesh.own.future.result() == SessionCode.ACCEPT else None
+
+    async def _sesh_close(self, sesh: NetworkSession):
+        """
+        Stop a running session and clean up.
+
+        Called from the client.
+        Part of a protocol primitive.
+        """
+        sesh.own.goto("finish")
+        self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
+
+        sesh.own.goto("accomplished")
+        del self._sessions[sesh.id]
+
+    async def _sesh_create(self, type: int = 0, session: int = 0) -> NetworkSession:
+        """
+        Create a new session based on request from client.
+
+        Called from the server.
+        Part of a protocol primitive.
+        """
+        sesh = self._session_types[type](self._manager.is_server(), session)
+        self._sessions[session] = sesh
+        await self.session_prepare(sesh)
+        return sesh
+
+    def _sesh_done(self, sesh: NetworkSession):
+        """
+        Tell client there is no more to do in session.
+
+        Called from the server.
+        Part of a protocol primitive.
+        """
+        sesh.own.goto("accomplished")
+        self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
+
+    @contextlib.asynccontextmanager
+    async def _sesh_context(self, sesh_type: int, **kwargs):
+        """
+        Run a protocol session as a context manager with state synchronization.
+
+        Called from the client.
+        A protocol primitive.
+        """
+        sesh = await self._open_session(sesh_type, **kwargs)
+        answer = await self.sync(tuple(sesh.states.keys()), sesh)
+
+        if not answer:
+            raise NetworkError(*NetworkError.SESSION_NO_SYNC, {"type": sesh.type, "session": sesh.id})
+
+        try:
+            yield sesh
+        finally:
+            await self._stop_session(sesh)
+
+    async def process_start(self, packet: StartPacket):
+        """Session start requested."""
+        if len(self._sessions) >= self._max_sessions:
+            self._package(self.PKT_BUSY, BusyPacket(packet.type, packet.session))
+        elif packet.session in self._sessions.keys() or packet.type not in self._session_types.keys():
+            self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
+        else:
+            sesh = await self._create_session(packet.type, packet.session)
+            if not sesh:
+                self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
+            else:
+                sesh.own.goto("start")
+                self._package(self.PKT_ACCEPT, AcceptPacket(packet.type, packet.session))
+
+    async def process_finish(self, packet: FinishPacket):
+        """Close an open session."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise NetworkError(*NetworkError.SESSION_TYPE_INCONSISTENCY)
+
+        sesh.own.goto("finish")
+        sesh.own.goto("accomplished")
+        del self._sessions[packet.session]
+
+    async def process_accept(self, packet: AcceptPacket):
+        """Accept response to start session."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise TypeError()
+
+        sesh.own.goto("accept")
+        sesh.own.future.set_result(SessionCode.ACCEPT)
+
+    async def process_refuse(self, packet: RefusePacket):
+        """Refuse response to start session."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise TypeError()
+
+        sesh.own.goto("refuse")
+        sesh.own.goto("accomplished")
+        sesh.own.future.set_result(SessionCode.REFUSE)
+        del self._sessions[packet.session]
+
+    async def process_busy(self, packet: BusyPacket):
+        """Busy response to start session."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise TypeError()
+
+        sesh.own.goto("busy")
+        sesh.own.goto("accomplished")
+        sesh.own.future.set_result(SessionCode.BUSY)
+        del self._sessions[packet.session]
+
+    async def process_done(self, packet: DonePacket):
+        """Indication there is nothing more to do in session."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise TypeError()
+
+        sesh.own.event.set()
+        sesh.own.goto("done")
+        sesh.cleanup()

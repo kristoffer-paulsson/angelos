@@ -8,21 +8,45 @@ from angelos.common.misc import SyncCallable
 from angelos.facade.facade import Facade
 from angelos.meta.testing import run_async
 from angelos.meta.testing.net import FacadeContext
-from angelos.net.base import Protocol, ClientProtoMixin, ServerProtoMixin, ConnectionManager, ConfirmCode, \
-    GotoStateError
-from angelos.net.primitives import Handler, StateMixin, StateMode, NetworkState, ReuseStateError
+from angelos.net.base import Protocol, ClientProtoMixin, ServerProtoMixin, ConnectionManager, ConfirmCode
+from angelos.net.primitives import Handler, StateMixin, StateMode, NetworkState, ReuseStateError, GrabStateError, \
+    SessionMixin, NetworkSession
 
 
-class StateHandler(Handler, StateMixin):
+SESH_TYPE_STUB = 0x01
+
+
+class StubSession(NetworkSession):
+    """Test stub session with states."""
+
+    ST_MEDIATE = 0x01
+    ST_ONCE = 0x02
+    ST_REPRISE = 0x03
+    ST_FACT = 0x04
+
+    def __init__(self, server: bool, session: int):
+        NetworkSession.__init__(self, SESH_TYPE_STUB, session, {
+            self.ST_MEDIATE: (StateMode.MEDIATE, "10.0"),
+            self.ST_ONCE: (StateMode.ONCE, "xf11"),
+            self.ST_REPRISE: (StateMode.REPRISE, "xf12"),
+            self.ST_FACT: (StateMode.FACT, "xf13")
+        }, server)
+
+
+class StateHandler(Handler, StateMixin, SessionMixin):
     """Test handler for primitives."""
 
     LEVEL = 10
     RANGE = 500
 
+    MAX_SESH = 4
+
     ST_VERSION = 0x01
     ST_ONCE = 0x02
     ST_REPRISE = 0x03
     ST_FACT = 0x04
+
+    SESH_STUB = SESH_TYPE_STUB
 
     def __init__(self, manager: "Protocol"):
         server = manager.is_server()
@@ -32,6 +56,9 @@ class StateHandler(Handler, StateMixin):
             self.ST_ONCE: (StateMode.ONCE, b"xx1" if server else b"xx5"),
             self.ST_REPRISE: (StateMode.REPRISE, b"xx2" if server else b"xx6"),
             self.ST_FACT: (StateMode.FACT, b"xx3" if server else b"xx7"),
+        })
+        SessionMixin.__init__(self, {
+            self.SESH_STUB, StubSession
         })
 
     def get_state(self, state: int) -> NetworkState:
@@ -102,6 +129,8 @@ class StateMixinTest(TestCase):
     server = None
     client = None
     manager = None
+    server_handler = None
+    client_handler = None
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -118,8 +147,10 @@ class StateMixinTest(TestCase):
 
     def tearDown(self) -> None:
         """Clean up test network"""
-        del self.server
-        del self.client
+        self.server_handler = None
+        self.client_handler = None
+        self.server = None
+        self.client = None
 
     async def environment(self, handler: int, side: bool = True) -> Handler:
         """Setup an environment with client and server.
@@ -138,174 +169,168 @@ class StateMixinTest(TestCase):
         await asyncio.sleep(0)
 
         client = await ClientStub.connect(self.client.facade, "127.0.0.1", 8080)
-        if side:
-            return client.get_handler(handler)
-        else:
-            await asyncio.sleep(0)
-            conn = list(self.manager)
-            return conn[0].get_handler(handler)
+        await asyncio.sleep(0)
+
+        self.client_handler = client.get_handler(handler)
+        self.server_handler = list(self.manager)[0].get_handler(handler)
 
     @run_async
     async def test__call_mediate(self):
         """Test that StateMixin._call_mediate behaves as expected."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(b"stub-0.1", await handler.do_mediate())
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(b"stub-0.1", await self.client_handler.do_mediate())
 
     @run_async
     async def test__call_mediate_1(self):
         """Test that StateMixin._call_mediate on ONCE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(b"stub-0.3", await handler.do_mediate(StateHandler.ST_ONCE))
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(b"stub-0.3", await self.client_handler.do_mediate(StateHandler.ST_ONCE))
 
     @run_async
     async def test__call_mediate_2(self):
         """Test that StateMixin._call_mediate on REPRISE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(b"stub-0.3", await handler.do_mediate(StateHandler.ST_REPRISE))
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(b"stub-0.3", await self.client_handler.do_mediate(StateHandler.ST_REPRISE))
 
     @run_async
     async def test__call_mediate_3(self):
         """Test that StateMixin._call_mediate on FACT."""
         with self.assertRaises(ReuseStateError):
-            handler = await self.environment(StateHandler.RANGE)
-            await handler.do_mediate(StateHandler.ST_FACT)
+            await self.environment(StateHandler.RANGE)
+            await self.client_handler.do_mediate(StateHandler.ST_FACT)
 
     @run_async
     async def test__call_mediate_4(self):
-        """Test that StateMixin._call_mediate behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE)
-        # self.assertEqual(b"stub-0.1", await handler.do_mediate())
+        """Test that StateMixin._call_mediate behaves on MEDIATE where the server grabs its own state as 'us'."""
+        await self.environment(StateHandler.RANGE)
+        self.server_handler.get_state(StateHandler.ST_VERSION).us()
+        self.assertEqual(b"stub-0.1", await self.client_handler.do_mediate())
 
     @run_async
     async def test__call_mediate_5(self):
-        """Test that StateMixin._call_mediate behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE)
-        # self.assertEqual(b"stub-0.1", await handler.do_mediate())
+        """Test that StateMixin._call_mediate behaves on MEDIATE where the server grabs its own state as 'them'."""
+        with self.assertRaises(GrabStateError):
+            await self.environment(StateHandler.RANGE)
+            self.server_handler.get_state(StateHandler.ST_VERSION).them()
+            self.assertEqual(b"stub-0.1", await self.client_handler.do_mediate())
 
     @run_async
     async def test__call_show(self):
         """Test that StateMixin._call_show behaves as expected."""
-        handler = await self.environment(StateHandler.RANGE, False)
-        self.assertEqual(await handler.do_show(), b"xx5")
+        await self.environment(StateHandler.RANGE, False)
+        self.assertEqual(await self.server_handler.do_show(), b"xx5")
 
     @run_async
     async def test__call_show_1(self):
         """Test that StateMixin._call_show behaves on MEDIATE."""
         with self.assertRaises(ReuseStateError):
-            handler = await self.environment(StateHandler.RANGE, False)
-            await handler.do_show(StateHandler.ST_VERSION)
+            await self.environment(StateHandler.RANGE, False)
+            await self.server_handler.do_show(StateHandler.ST_VERSION)
 
     @run_async
     async def test__call_show_2(self):
         """Test that StateMixin._call_show behaves on REPRISE."""
         with self.assertRaises(ReuseStateError):
-            handler = await self.environment(StateHandler.RANGE, False)
-            await handler.do_show(StateHandler.ST_REPRISE)
+            await self.environment(StateHandler.RANGE, False)
+            await self.server_handler.do_show(StateHandler.ST_REPRISE)
 
     @run_async
     async def test__call_show_3(self):
         """Test that StateMixin._call_show behaves on FACT."""
         with self.assertRaises(ReuseStateError):
-            handler = await self.environment(StateHandler.RANGE, False)
-            await handler.do_show(StateHandler.ST_FACT)
+            await self.environment(StateHandler.RANGE, False)
+            await self.server_handler.do_show(StateHandler.ST_FACT)
 
     @run_async
     async def test__call_show_4(self):
-        """Test that StateMixin._call_show behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE, False)
-        # self.assertEqual(await handler.do_show(), b"xx5")
+        """Test that StateMixin._call_show behaves on ONCE where the client grabs its own state as 'us'."""
+        with self.assertRaises(GrabStateError):
+            await self.environment(StateHandler.RANGE, False)
+            self.client_handler.get_state(StateHandler.ST_ONCE).us()
+            self.assertEqual(await self.server_handler.do_show(), b"xx5")
 
     @run_async
     async def test__call_show_5(self):
-        """Test that StateMixin._call_show behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE, False)
-        # self.assertEqual(await handler.do_show(), b"xx5")
+        """Test that StateMixin._call_show behaves on ONCE where the client grabs its own state as 'them'."""
+        with self.assertRaises(GrabStateError):
+            await self.environment(StateHandler.RANGE, False)
+            self.client_handler.get_state(StateHandler.ST_ONCE).them()
+            self.assertEqual(await self.server_handler.do_show(), b"xx5")
 
     @run_async
     async def test__call_tell(self):
         """Test that StateMixin._call_tell behaves as expected."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_tell(), b"xx5")
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_tell(), b"xx5")
 
     @run_async
     async def test__call_tell_1(self):
         """Test that StateMixin._call_tell behaves on MEDIATE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_tell(StateHandler.ST_VERSION), b"stub-0.1")
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_tell(StateHandler.ST_VERSION), b"stub-0.1")
 
     @run_async
     async def test__call_tell_2(self):
         """Test that StateMixin._call_tell behaves on REPRISE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_tell(StateHandler.ST_REPRISE), b"xx6")
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_tell(StateHandler.ST_REPRISE), b"xx6")
 
     @run_async
     async def test__call_tell_3(self):
         """Test that StateMixin._call_tell behaves on FACT."""
         with self.assertRaises(ReuseStateError):
-            handler = await self.environment(StateHandler.RANGE)
-            await handler.do_tell(StateHandler.ST_FACT)
+            await self.environment(StateHandler.RANGE)
+            await self.client_handler.do_tell(StateHandler.ST_FACT)
 
     @run_async
     async def test__call_tell_4(self):
-        """Test that StateMixin._call_tell behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE)
-        # self.assertEqual(await handler.do_tell(), b"xx5")
+        """Test that StateMixin._call_tell behaves on ONCE where the client grabs its own state as 'us'."""
+        await self.environment(StateHandler.RANGE)
+        self.server_handler.get_state(StateHandler.ST_ONCE).us()
+        self.assertEqual(await self.client_handler.do_tell(), b"xx5")
 
     @run_async
     async def test__call_tell_5(self):
-        """Test that StateMixin._call_tell behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE)
-        # self.assertEqual(await handler.do_tell(), b"xx5")
+        """Test that StateMixin._call_tell behaves on ONCE where the client grabs its own state as 'them'."""
+        with self.assertRaises(GrabStateError):
+            await self.environment(StateHandler.RANGE)
+            self.server_handler.get_state(StateHandler.ST_ONCE).them()
+            self.assertEqual(await self.client_handler.do_tell(), b"xx5")
 
     @run_async
     async def test__call_query(self):
         """Test that StateMixin._call_query behaves as expected."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_query(), (1, b"xx3"))
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_query(), (1, b"xx3"))
 
     @run_async
     async def test__call_query_1(self):
         """Test that StateMixin._call_query behaves on MEDIATE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_query(StateHandler.ST_VERSION), (None, b"stub-0.1"))
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_query(StateHandler.ST_VERSION), (None, b"stub-0.1"))
 
     @run_async
     async def test__call_query_2(self):
         """Test that StateMixin._call_query behaves on ONCE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_query(StateHandler.ST_ONCE), (None, b"xx1"))
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_query(StateHandler.ST_ONCE), (None, b"xx1"))
 
     @run_async
     async def test__call_query_3(self):
         """Test that StateMixin._call_query behaves on REPRISE."""
-        handler = await self.environment(StateHandler.RANGE)
-        self.assertEqual(await handler.do_query(StateHandler.ST_REPRISE), (None, b"xx2"))
+        await self.environment(StateHandler.RANGE)
+        self.assertEqual(await self.client_handler.do_query(StateHandler.ST_REPRISE), (None, b"xx2"))
 
     @run_async
     async def test__call_query_4(self):
-        """Test that StateMixin._call_query behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE)
-        # self.assertEqual(await handler.do_query(), b"xx3")
+        """Test that StateMixin._call_query behaves on FACT where the client grabs its own state as 'us'."""
+        await self.environment(StateHandler.RANGE)
+        self.server_handler.get_state(StateHandler.ST_FACT).us()
+        self.assertEqual(await self.client_handler.do_query(), (1, b"xx3"))
 
     @run_async
     async def test__call_query_5(self):
-        """Test that StateMixin._call_query behaves as expected."""
-        pass
-        # FIXME: Write
-        # handler = await self.environment(StateHandler.RANGE)
-        # self.assertEqual(await handler.do_query(), b"xx3")
+        """Test that StateMixin._call_query behaves on FACT where the client grabs its own state as 'them'."""
+        await self.environment(StateHandler.RANGE)
+        self.server_handler.get_state(StateHandler.ST_FACT).them()
+        self.assertEqual(await self.client_handler.do_query(), (1, b"xx3"))
