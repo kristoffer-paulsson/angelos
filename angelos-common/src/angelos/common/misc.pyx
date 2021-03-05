@@ -287,19 +287,19 @@ class SyncCallable:
     def __init__(self, callback: Callable):
         self._cb = callback
 
-    def __call__(self, value: bytes) -> int:
-        return self._cb(value)
+    def __call__(self, *args, **kwargs) -> Any:
+        return self._cb(*args, **kwargs)
 
 
 class AsyncCallable(SyncCallable):
     """Async network callable."""
 
-    async def __call__(self, value: bytes) -> int:
-        return await self._cb(value)
+    async def __call__(self, *args, **kwargs) -> Any:
+        return await self._cb(*args, **kwargs)
 
 
 class Misc:
-    """Namespace for miscellanious functions and methods."""
+    """Namespace for miscellaneous functions and methods."""
 
     REGEX = r"""(?:(?P<username>[\w\-\.]+)(?::(?P<password>[\w\-\.]+))?@)?(?P<hostname>[\w\-\.]+)(?::(?P<port>\d+))?"""
 
