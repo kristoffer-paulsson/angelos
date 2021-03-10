@@ -945,9 +945,6 @@ class IterateMixin:
     PKT_PULL_CHUNK = PULL_CHUNK_PACKET
     PKT_SENT_CHUNK = SENT_CHUNK_PACKET
 
-    SESSIONS = dict()
-    MAX_SESH = 8
-
     def __init__(self):
         """Dict[int: Tuple[int, bytes, SyncCallable]]"""
         server = self._manager.is_server()

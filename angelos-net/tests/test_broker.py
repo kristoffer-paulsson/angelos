@@ -8,7 +8,7 @@ from angelos.facade.facade import Facade
 from angelos.meta.testing import run_async
 from angelos.meta.testing.app import StubServer, StubClient
 from angelos.meta.testing.net import FacadeContext
-from angelos.net.base import ServerProtoMixin, Protocol, ClientProtoMixin, ConnectionManager, Handler
+from angelos.net.base import ServerProtoMixin, Protocol, ClientProtoMixin, ConnectionManager, Handler, StateMode
 from angelos.net.broker import ServiceBrokerServer, ServiceBrokerClient, ServiceBrokerHandler
 
 
@@ -21,8 +21,8 @@ class StubHandler(Handler):
 
     def __init__(self, manager: "Protocol"):
         Handler.__init__(self, manager, {
-            self.ST_VERSION: b"stub-0.1",
-        }, dict(), 0)
+            self.ST_VERSION: (StateMode.MEDIATE, b"stub-0.1"),
+        }, dict())
 
 
 class StubHandlerClient(StubHandler):
@@ -93,7 +93,7 @@ class TestMailHandler(TestCase):
         client = await StubClient.connect(self.client1.facade, "127.0.0.1", 8080)
         self.assertTrue(await client.get_handler(ServiceBrokerHandler.RANGE).request(StubHandler.RANGE))
         await asyncio.sleep(0)
-        self.assertTrue(await client.get_handler(ServiceBrokerHandler.RANGE).request(StubHandler.RANGE))
+        self.assertFalse(await client.get_handler(ServiceBrokerHandler.RANGE).request(StubHandler.RANGE-2))
         # await client.get_handler(MailHandler.RANGE).start()
         await asyncio.sleep(.1)
 

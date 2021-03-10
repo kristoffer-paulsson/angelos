@@ -15,10 +15,10 @@
 #
 """Base classes and other functions for the network stack."""
 import asyncio
+import contextlib
 import datetime
 import enum
 import uuid
-from contextlib import asynccontextmanager
 from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
 
@@ -57,6 +57,15 @@ from angelos.portfolio.collection import Portfolio
 # 2. Communicating states
 # 3. Begin and end sessions
 
+
+PUSH_ITEM_PACKET = 106
+RECEIVED_ITEM_PACKET = 107
+PUSH_CHUNK_PACKET = 108
+RECEIVED_CHUNK_PACKET = 109
+PULL_ITEM_PACKET = 110
+SENT_ITEM_PACKET = 111
+PULL_CHUNK_PACKET = 112
+SENT_CHUNK_PACKET = 113
 
 ENQUIRY_PACKET = 115  # Ask for information
 RESPONSE_PACKET = 116  # Response to enquery
@@ -106,7 +115,7 @@ class NetworkError(RuntimeError):
     SESSION_NO_SYNC = ("Failed to sync one or several states in session", 102)
     SESSION_TYPE_INCONSISTENCY = ("Session type inconsistent.", 103)
     ATTEMPTED_ATTACK = ("Attempted attack with error/unknown packets.", 104)
-    FALSE_CHECK_METHOD = ("Check method must be a NetCallable", 105)
+    FALSE_CHECK_METHOD = ("State checker not set or of wrong type.", 105)
 
 
 class GotoStateError(RuntimeWarning):
@@ -119,6 +128,10 @@ class NotAuthenticated(RuntimeWarning):
 
 class ConnectionClosed(RuntimeWarning):
     """When connection unexpectedly closed."""
+
+
+class ProtocolNegotiationError(RuntimeWarning):
+    """Failed negotiating protcol version."""
 
 
 def r(i: int) -> Tuple[int, int]:
@@ -308,6 +321,54 @@ class DonePacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT
     """Indicate for initiating session packet handler that all is done."""
 
 
+class PushItemPacket(
+    Packet, fields=("count", "item", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UUID,), (DataType.UINT,), (DataType.UINT,))):
+    """Item pushed from client to server."""
+
+
+class ItemReceivedPacket(
+    Packet, fields=("count", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+    """Response to sent item from server."""
+
+
+class PushChunkPacket(
+    Packet, fields=("count", "chunk", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 8192), (DataType.UINT,), (DataType.UINT,))):
+    """Chunk pushed from client to server."""
+
+
+class ChunkReceivedPacket(
+    Packet, fields=("count", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+    """Response to sent chunk from server."""
+
+
+class PullItemPacket(
+    Packet, fields=("count", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+    """Pull item from client to server."""
+
+
+class ItemSentPacket(
+    Packet, fields=("count", "item", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UUID,), (DataType.UINT,), (DataType.UINT,))):
+    """Response to request item from server."""
+
+
+class PullChunkPacket(
+    Packet, fields=("count", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+    """Pull chunk from client to server."""
+
+
+class ChunkSentPacket(
+    Packet, fields=("count", "chunk", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 8192), (DataType.UINT,), (DataType.UINT,))):
+    """Response to request chunk from server."""
+
+
 class UnknownPacket(Packet, fields=("type", "level", "process"),
                     fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
     """Unknown packet."""
@@ -338,13 +399,45 @@ class WaypointState(StateMachine):
         self._state = state
 
 
-class ClientStateExchangeMachine(WaypointState):
-    """Waypoints for exchanging a state over a protocol."""
+class StateMode(enum.IntEnum):
+    """
+    A state can operate in several modes:
 
-    def __init__(self):
-        self.answer = None
-        self._event = asyncio.Event()
+    * ONCE: Allows to tell and show one time.
+    * REPRISE: Allows tell multiple times.
+    * MEDIATE: Allows tell until a yes confirmation.
+    * FACT: Entry state that can't be showed or told.
+    """
+    ONCE = 0
+    REPRISE = 1
+    MEDIATE = 2
+    FACT = 3
+
+
+class GrabStateError(RuntimeError):
+    """A state primitive or processor is wrongfully seized or unoccupied."""
+
+
+class ReuseStateError(RuntimeError):
+    """A state was not tellable."""
+
+
+class FrozenStateError(RuntimeWarning):
+    """Attempted change of frozen state."""
+
+
+class NetworkState(WaypointState):
+    """Network state in a network protocol, for sharing and carrying out state primitive operations."""
+
+    def __init__(self, server: bool, mode: int, value: bytes = None, check: SyncCallable = None):
+
+        # Related to the state machine
         WaypointState.__init__(self, {
+            "ready": ("show", "tell"),
+            "show": ("tell",),
+            "tell": ("accomplished",),
+            "accomplished": tuple(),
+        } if server else {
             "ready": ("tell", "show"),
             "show": ("confirm",),
             "tell": ("confirm",),
@@ -353,54 +446,157 @@ class ClientStateExchangeMachine(WaypointState):
         })
         self._state = "ready"
 
-    @property
-    def event(self) -> asyncio.Event:
-        """Expose event."""
-        return self._event
-
-
-class ServerStateExchangeMachine(WaypointState):
-    """Waypoints for exchanging a state over a protocol."""
-
-    def __init__(self, check: SyncCallable = SyncCallable(lambda value: ConfirmCode.YES)):
+        # Locking mechanism
+        self._loop = asyncio.get_event_loop()
         self._condition = asyncio.Condition()
-        self.check = check
-        self.value = None
-        WaypointState.__init__(self, {
-            "ready": ("show", "tell"),
-            "show": ("tell",),
-            "tell": ("accomplished",),
-            "accomplished": tuple(),
-        })
-        self._state = "ready"
+        self._result = None
+        self._other = None
+
+        # Mode, value and evaluation
+        self._mode = mode
+        self._value = value
+        self._checker = check
+        self._frozen = True if self._mode == StateMode.FACT and server else False  # Frozen if FACT and server-side.
 
     @property
-    def condition(self) -> asyncio.Condition:
-        """Expose condition."""
-        return self._condition
+    def mode(self) -> int:
+        """State mode."""
+        return self._mode
 
-    async def predicate(self) -> bool:
-        """Condition predicate true if confirmation is yes."""
-        check = await self.evaluate()
-        return True if check == ConfirmCode.YES else False
+    @property
+    def value(self) -> bytes:
+        """State value."""
+        return self._value
 
-    async def evaluate(self) -> int:
-        """Evaluate value."""
-        if isinstance(self.check, AsyncCallable):
-            return await self.check(self.value)
-        elif isinstance(self.check, SyncCallable):
-            return self.check(self.value)
+    @property
+    def check(self) -> bool:
+        """Evaluation checker set."""
+        return bool(self._checker)
+
+    @property
+    def frozen(self) -> bool:
+        """Frozen machine."""
+        return self._frozen
+
+    def __enter__(self):
+        """Grab state."""
+        if self._other is None:
+            raise GrabStateError("State not properly grabbed.")
+        return None
+
+    def __exit__(self, exc_type, exc, tb):
+        """Release state."""
+        self.other(reset=True)
+
+    def us(self) -> "NetworkState":
+        """Grab user predicate as us, other = False."""
+        if self._other is not None:
+            raise GrabStateError("State already grabbed.")
+        self._other = False
+        return self
+
+    def them(self) -> "NetworkState":
+        """Grab user predicate as them, other = True."""
+        if self._other is not None:
+            raise GrabStateError("State already grabbed.")
+        self._other = True
+        return self
+
+    async def set_result(self, value: Any):
+        """Set result and return to waiter."""
+        self._result = value
+        async with self._condition:
+            self._condition.notify()
+
+    async def wait(self) -> Any:
+        """Wait for result from processor."""
+        self._result = None
+        async with self._condition:
+            await self._condition.wait()
+        return self._result
+
+    def other(self, reset: bool = False) -> bool:
+        """Used by the other side."""
+        if reset:
+            if self._other is None:
+                raise GrabStateError("Attempt to release non-grabbed state.")
+            self._other = None
+        else:
+            return self._other
+
+    def freeze(self):
+        """Freeze state"""
+        self._frozen = True
+
+    def update(self, value: bytes):
+        """Update value field."""
+        self._value = value
+
+    def upgrade(self, check: SyncCallable):
+        """Upgrade checker."""
+        self._checker = check
+
+    def reuse(self):
+        """Reuse state if possible."""
+        if not self._frozen:
+            self._state = "ready"
+
+    async def eval(self, value: bytes) -> int:
+        """Check value and set if yes."""
+        if self._frozen:  # Never evaluate or assign if frozen.
+            raise ReuseStateError("Attempted reuse of frozen state.")
+
+        if isinstance(self._checker, AsyncCallable):
+            answer = await self._checker(value)
+        elif isinstance(self._checker, SyncCallable):
+            answer = self._checker(value)
+        elif self._checker is None:
+            answer = ConfirmCode.YES
         else:
             raise NetworkError(*NetworkError.FALSE_CHECK_METHOD)
 
+        if answer == ConfirmCode.YES:  # Assign if YES
+            self._value = value
+            if self._mode == StateMode.MEDIATE:  # Freeze if MEDIATE
+                self._frozen = True
 
-class ClientSessionStateMachine(WaypointState):
-    """Waypoints for setting session mode over a protocol."""
+        if self._mode == StateMode.ONCE:  # Always freeze if ONCE
+            self._frozen = True
 
-    def __init__(self):
-        self._future = asyncio.get_event_loop().create_future()
-        self._event = asyncio.Event()
+        return answer
+
+    async def trigger(self, state: "NetworkState", sesh: "NetworkSession" = None) -> int:
+        """Trigger the checker only when FACT and on server."""
+        if not (self._frozen and StateMode.FACT):
+            raise ReuseStateError("Attempted reuse of frozen state.")
+
+        if isinstance(self._checker, AsyncCallable):
+            answer = await self._checker(state, sesh)
+        elif isinstance(self._checker, SyncCallable):
+            answer = self._checker(state, sesh)
+        elif self._checker is None:
+            answer = ConfirmCode.YES
+        else:
+            raise NetworkError(*NetworkError.FALSE_CHECK_METHOD)
+
+        return answer
+
+
+class SessionInconsistencyWarning(RuntimeWarning):
+    """Sessions of same ID is of different type."""
+
+
+class NetworkSession(WaypointState):
+    """Session that run within a protocol handler with states."""
+
+    def __init__(self, server: bool, type: int, id: int, states: dict):
         WaypointState.__init__(self, {
+            "ready": ("start",),
+            "start": ("finish", "done"),
+            "done": ("finish",),
+            "finish": ("accomplished",),
+            "accomplished": tuple(),
+        } if server else {
             "ready": ("start",),
             "start": ("accept", "refuse", "done", "busy"),
             "accept": ("finish", "done"),
@@ -412,77 +608,124 @@ class ClientSessionStateMachine(WaypointState):
         })
         self._state = "ready"
 
-    @property
-    def future(self) -> asyncio.Future:
-        return self._future
-
-    @property
-    def event(self) -> asyncio.Event:
-        """Expose event."""
-        return self._event
-
-
-class ServerSessionStateMachine(WaypointState):
-    """Waypoints for setting session mode over a protocol."""
-
-    def __init__(self):
-        WaypointState.__init__(self, {
-            "ready": ("start",),
-            "start": ("finish", "done"),
-            "done": ("finish",),
-            "finish": ("accomplished",),
-            "accomplished": tuple(),
-        })
-        self._state = "ready"
-
-
-class ProtocolSession:
-    """Session that run within a protocol handler with states."""
-
-    def __init__(self, type: int, id: int, states: dict, server: bool):
         self._type = type
         self._id = id
-        self._event = asyncio.Event()
-        self._own_machine = ServerSessionStateMachine() if server else ClientSessionStateMachine()
-        self._states = states
-        self._state_machines = {
-            state: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
-            for state in self.states.keys()
-        }
+        self._states = dict()
+        for key in states:
+            self._states[key] = NetworkState(server, *states[key])
 
-    @property
-    def event(self) -> asyncio.Event:
-        """Expose enquiry event for session."""
-        return self._event
+        self._event = asyncio.Event()
+        self._event.clear()
+        self._result = None
 
     @property
     def type(self) -> int:
-        """Expose session type."""
+        """Session type."""
         return self._type
 
     @property
     def id(self) -> int:
-        """Expose session id."""
+        """Session id."""
         return self._id
-
-    @property
-    def own(self) -> WaypointState:
-        """Expose the sessions states."""
-        return self._own_machine
 
     @property
     def states(self) -> dict:
         """Expose the sessions states."""
         return self._states
 
-    @property
-    def state_machines(self) -> dict:
-        """Expose the sessions states."""
-        return self._state_machines
+    async def set_result(self, value: Any):
+        """Set result and return to waiter."""
+        self._result = value
+        self._event.set()
 
-    def cleanup(self):
-        """Clean up the session, called by process_done."""
-        pass
+    async def wait(self) -> Any:
+        """Wait for result from processor."""
+        self._result = None
+        await self._event.wait()
+        return self._result
+
+
+class IteratorInconsistencyWarning(RuntimeWarning):
+    """Iterator session out of order."""
+
+
+class NetworkIterator(NetworkSession):
+
+    ST_COUNT = 0x01
+
+    def __init__(self, server: bool, type: int, id: int, states: dict):
+        NetworkSession.__init__(self, server, type, id, states)
+
+        self._iter = asyncio.Condition()
+        self._data = None
+        self._cnt = 0
+
+    @property
+    def iter(self) -> asyncio.Condition:
+        """Iterator condition."""
+        return self._iter
+
+    @property
+    def count(self) -> int:
+        """Show count."""
+        return self._cnt
+
+    def increase(self):
+        """Increase count by one."""
+        self._cnt += 1
+
+    async def iter_result(self, data: Any):
+        """Set iterator item/chunk and return to waiter."""
+        self._data = data
+        async with self._iter:
+            self._iter.notify()
+
+    async def iter_wait(self) -> Any:
+        """Wait for iterator item/chunk from processor."""
+        self._data = None
+        async with self._iter:
+            await self._iter.wait()
+        return self._data
+
+
+class PullIterator(NetworkIterator):
+    def __init__(self, server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
+        NetworkIterator.__init__(self, server, type, id, {
+            **states,
+            self.ST_COUNT: (StateMode.FACT, count.to_bytes(4, byteorder="big", signed=False) if count else b"?", check)
+        })
+
+
+class PushIterator(NetworkIterator):
+    def __init__(self, server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
+        NetworkIterator.__init__(self, server, type, id, {
+            **states,
+            self.ST_COUNT: (StateMode.ONCE, count.to_bytes(4, byteorder="big", signed=False) if count else b"?", check)
+        })
+
+
+class PullItemIterator(PullIterator):
+
+    async def pull_item(self):
+        raise NotImplementedError()
+
+
+class PushItemIterator(PushIterator):
+
+    async def push_item(self, packet: PushItemPacket):
+        raise NotImplementedError()
+
+
+class PullChunkIterator(PullIterator):
+
+    async def pull_chunk(self):
+        raise NotImplementedError()
+
+
+class PushChunkIterator(PushIterator):
+
+    async def push_chunk(self):
+        raise NotImplementedError()
 
 
 class Handler:
@@ -502,48 +745,56 @@ class Handler:
     PKT_REFUSE = REFUSE_PACKET  # Refusal of session or request
     PKT_BUSY = BUSY_PACKET  # To busy for session or request
     PKT_DONE = DONE_PACKET  # Nothing more to do in session or request
+    PKT_PUSH_ITEM = PUSH_ITEM_PACKET  # Push item to server.
+    PKT_RCVD_ITEM = RECEIVED_ITEM_PACKET
+    PKT_PUSH_CHUNK = PUSH_CHUNK_PACKET  # Push item to server.
+    PKT_RCVD_CHUNK = RECEIVED_CHUNK_PACKET
+    PKT_PULL_ITEM = PULL_ITEM_PACKET
+    PKT_SENT_ITEM = SENT_ITEM_PACKET
+    PKT_PULL_CHUNK = PULL_CHUNK_PACKET
+    PKT_SENT_CHUNK = SENT_CHUNK_PACKET
     PKT_UNKNOWN = UNKNOWN_PACKET
     PKT_ERROR = ERROR_PACKET
 
-    PACKETS = {
-        PKT_ENQUIRY: EnquiryPacket,
-        PKT_RESPONSE: ResponsePacket,
-        PKT_TELL: TellPacket,
-        PKT_SHOW: ShowPacket,
-        PKT_CONFIRM: ConfirmPacket,
-        PKT_START: StartPacket,
-        PKT_FINISH: FinishPacket,
-        PKT_ACCEPT: AcceptPacket,
-        PKT_REFUSE: RefusePacket,
-        PKT_BUSY: BusyPacket,
-        PKT_DONE: DonePacket,
-        PKT_UNKNOWN: UnknownPacket,
-        PKT_ERROR: ErrorPacket
-    }
+    SESSIONS = dict()
+    MAX_SESH = 8
 
+    PACKETS = dict()
     PROCESS = dict()
 
-    def __init__(self, manager: "Protocol", states: dict, sessions: dict, max_sesh: int):
+    def __init__(self, manager: "Protocol", states: dict, sessions: dict):
         self._queue = asyncio.Queue()
         self._r_start = r(self.RANGE)[0]
         self._pkt_type = None
         self._silent = False
 
         self._manager = manager
-        self._types = set(self.PACKETS.keys())
+        server = self._manager.is_server()
 
-        self._enquiry = asyncio.Event()
-        self._enquiry_lock = asyncio.Lock()
-        self._response = None
-
-        server = manager.is_server()
-        self._states = states  # {self.ST_ALL: b"1"}
-        self._state_machines = self._machines(server)
-        self._sessions = dict()
-        self._session_types = sessions  # {self.SESH_ALL: ProtocolSession}
-        self._max_sessions = max_sesh
-        self._session_count = 0
-
+        self.PACKETS = {
+            self.PKT_ENQUIRY: EnquiryPacket,
+            self.PKT_RESPONSE: ResponsePacket,
+            self.PKT_TELL: TellPacket,
+            self.PKT_SHOW: ShowPacket,
+            self.PKT_CONFIRM: ConfirmPacket,
+            self.PKT_START: StartPacket,
+            self.PKT_FINISH: FinishPacket,
+            self.PKT_ACCEPT: AcceptPacket,
+            self.PKT_REFUSE: RefusePacket,
+            self.PKT_BUSY: BusyPacket,
+            self.PKT_DONE: DonePacket,
+            self.PKT_PUSH_ITEM: PushItemPacket,
+            self.PKT_RCVD_ITEM: ItemReceivedPacket,
+            self.PKT_PUSH_CHUNK: PushChunkPacket,
+            self.PKT_RCVD_CHUNK: ChunkReceivedPacket,
+            self.PKT_PULL_ITEM: PullItemPacket,
+            self.PKT_SENT_ITEM: ItemSentPacket,
+            self.PKT_PULL_CHUNK: PullChunkPacket,
+            self.PKT_SENT_CHUNK: ChunkSentPacket,
+            self.PKT_UNKNOWN: UnknownPacket,
+            self.PKT_ERROR: ErrorPacket,
+            **self.PACKETS
+        }
         self.PROCESS = {
             self.PKT_ENQUIRY: "process_enquiry" if server else None,
             self.PKT_RESPONSE: None if server else "process_response",
@@ -556,6 +807,14 @@ class Handler:
             self.PKT_ACCEPT: None if server else "process_accept",
             self.PKT_FINISH: "process_finish" if server else None,
             self.PKT_DONE: None if server else "process_done",
+            self.PKT_PUSH_ITEM: "process_pushitem" if server else None,
+            self.PKT_RCVD_ITEM: None if server else "process_rcvditem",
+            self.PKT_PUSH_CHUNK: "process_pushchunk" if server else None,
+            self.PKT_RCVD_CHUNK: None if server else "process_rcvdchunk",
+            self.PKT_PULL_ITEM: "process_pullitem" if server else None,
+            self.PKT_SENT_ITEM: None if server else "process_sentitem",
+            self.PKT_PULL_CHUNK: "process_pullchunk" if server else None,
+            self.PKT_SENT_CHUNK: None if server else "process_sentchunk",
             self.PKT_UNKNOWN: "process_unknown",
             self.PKT_ERROR: "process_error",
             **self.PROCESS
@@ -563,9 +822,14 @@ class Handler:
 
         self._processor = asyncio.create_task(self.packet_handler())
 
-    def _machines(self, server: bool):
-        return {state: ServerStateExchangeMachine() if server else ClientStateExchangeMachine()
-            for state in self._states.keys()}
+        self._states = dict()
+        for key in states:
+            self._states[key] = NetworkState(server, *states[key])
+
+        self._sessions = dict()
+        self._sesh_cnt = 0
+        for key, value in sessions.items():
+            self.SESSIONS[key] = value
 
     @property
     def manager(self) -> "Protocol":
@@ -581,6 +845,11 @@ class Handler:
     def processor(self) -> asyncio.Task:
         """Expose current task."""
         return self._processor
+
+    @property
+    def states(self) -> dict:
+        """Expose local states."""
+        return self._states
 
     def _package(self, pkt_type: int, packet: Packet):
         """Simplifying packet sending."""
@@ -623,246 +892,492 @@ class Handler:
                 self._pkt_type = None
                 self._silent = False
 
-    def get_session(self, session: int) -> ProtocolSession:
+    def get_session(self, session: int) -> NetworkSession:
         """Load a given session."""
         return self._sessions[session] if session in self._sessions.keys() else None
 
-    async def sync(self, states: tuple, sesh: ProtocolSession = None) -> bool:
-        """Run several state synchronizations in a batch."""
-        yes = True
-        for state in states:
-            ans = await self._tell_state(state, sesh)
-            yes = yes if ans == ConfirmCode.YES else False
-        return yes
+    async def _call_mediate(self, state: int, values: list, sesh: "NetworkSession" = None) -> bytes:
+        """
+        Negotiate value of state using with multiple tell.
 
-    @asynccontextmanager
-    async def context(self, sesh_type: int, **kwargs):
-        """Run a protocol session as a context manager with state sync."""
-        sesh = await self._open_session(sesh_type, **kwargs)
-        answer = await self.sync(tuple(sesh.states.keys()), sesh)
+        Called from client.
+        A protocol primitive.
 
-        if not answer:
-            raise NetworkError(*NetworkError.SESSION_NO_SYNC, {"type": sesh.type, "session": sesh.id})
+        List[bytes]
+        """
+        machine = sesh.states[state] if sesh else self._states[state]
+        with machine.us():
+            for value in values:
+                machine.update(value)
+                machine.goto("tell")
+                self._package(self.PKT_TELL, TellPacket(
+                    state, machine.value, sesh.type if sesh else 0, sesh.id if sesh else 0))
+                answer = await machine.wait()
+                if answer == ConfirmCode.YES:
+                    machine.freeze()
+                    break
+
+        return machine.value if answer == ConfirmCode.YES else None
+
+    async def _call_show(self, state: int, sesh: "NetworkSession" = None):
+        """
+        Request to show the value of a state.
+
+        Called from the server.
+        A protocol primitive.
+        """
+        machine = sesh.states[state] if sesh else self._states[state]
+        with machine.us():
+            machine.goto("show")
+            self._package(self.PKT_SHOW, ShowPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            answer = await machine.wait()
+        return machine.value if answer == ConfirmCode.YES else None
+
+    async def _call_tell(self, state: int, sesh: "NetworkSession" = None) -> bytes:
+        """
+        Tell value to evaluate in state.
+
+        Called from the client.
+        A protocol primitive.
+        """
+        machine = sesh.states[state] if sesh else self._states[state]
+        with machine.us():
+            machine.goto("tell")
+            self._package(self.PKT_TELL, TellPacket(
+                state, machine.value, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            answer = await machine.wait()
+        return machine.value if answer == ConfirmCode.YES else None
+
+    async def _call_query(self, state: int, sesh: "NetworkSession" = None) -> tuple:
+        """
+        Query a fact of state.
+
+        Called from the client.
+        A protocol primitive.
+        """
+        machine = sesh.states[state] if sesh else self._states[state]
+        with machine.us():
+            self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            return await machine.wait()
+
+    async def _sesh_open(self, type: int, **kwargs) -> NetworkSession:
+        """
+        Open a new session of certain type.
+
+        Called from the client.
+        Part of a protocol primitive.
+        """
+        self._sesh_cnt += 1
+        sesh = self.SESSIONS[type](self._manager.is_server(), self._sesh_cnt, **kwargs)
+        if sesh.type != type:
+            raise TypeError("Session built in type: {0} not same as requested: {1}.".format(sesh.type, type))
+        self._sessions[sesh.id] = sesh
+
+        sesh.goto("start")
+        self._package(self.PKT_START, StartPacket(type, sesh.id))
+        result = await sesh.wait()
+        return sesh if result == SessionCode.ACCEPT else None
+
+    async def _sesh_close(self, sesh: NetworkSession):
+        """
+        Stop a running session and clean up.
+
+        Called from the client.
+        Part of a protocol primitive.
+        """
+        sesh.goto("finish")
+        self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
+
+        sesh.goto("accomplished")
+        del self._sessions[sesh.id]
+
+    async def _sesh_create(self, type: int = 0, session: int = 0) -> NetworkSession:
+        """
+        Create a new session based on request from client.
+
+        Called from the server.
+        Part of a protocol primitive.
+        """
+        sesh = self.SESSIONS[type](self._manager.is_server(), session)
+        if sesh.type != type:
+            raise TypeError("Session built in type: {0} not same as requested: {1}.".format(sesh.type, type))
+        self._sessions[session] = sesh
+        # await self.session_prepare(sesh)
+        return sesh
+
+    def _sesh_done(self, sesh: NetworkSession):
+        """
+        Tell client there is no more to do in session.
+
+        Called from the server.
+        Part of a protocol primitive.
+        """
+        sesh.goto("accomplished")
+        self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
+
+    @contextlib.asynccontextmanager
+    async def _sesh_context(self, sesh_type: int, **kwargs):
+        """
+        Run a protocol session as a context manager with state synchronization.
+
+        Called from the client.
+        A protocol primitive.
+        """
+        sesh = await self._sesh_open(sesh_type, **kwargs)
 
         try:
             yield sesh
         finally:
-            await self._stop_session(sesh)
+            await self._sesh_close(sesh)
 
-    async def _open_session(self, type: int, **kwargs) -> ProtocolSession:
-        """Open a new session of certain type."""
-        self._session_count += 1
-        sesh = self._session_types[type](self._manager.is_server(), self._session_count, **kwargs)
-        self._sessions[sesh.id] = sesh
+    async def _push_item(self, sesh: NetworkIterator, item: uuid.UUID):
+        """
+        Send an array of items in a for-loop. Sends from client to server.
 
-        sesh.own.goto("start")
-        self._package(self.PKT_START, StartPacket(type, sesh.id))
-        await sesh.own.future
-        return sesh if sesh.own.future.result() == SessionCode.ACCEPT else None
+        Called from the client.
+        A protocol primitive.
+        """
+        sesh.increase()
+        self._package(self.PKT_PUSH_ITEM, PushItemPacket(sesh.count, item, sesh.type, sesh.id))
+        return await sesh.iter_wait()
 
-    async def _stop_session(self, sesh: ProtocolSession):
-        """Stop a running session and clean up."""
-        sesh.own.goto("finish")
-        self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
+    async def _push_chunk(self, sesh: NetworkIterator, chunk: bytes):
+        """
+        Send an stream of chunks in a for-loop. Sends from client to server.
 
-        sesh.own.goto("accomplished")
-        del self._sessions[sesh.id]
+        Called from the client.
+        A protocol primitive.
+        """
+        sesh.increase()
+        self._package(self.PKT_PUSH_CHUNK, PushChunkPacket(sesh.count, chunk, sesh.type, sesh.id))
+        return await sesh.iter_wait()
 
-    async def _poll_state(self, state: int, sesh: ProtocolSession = None) -> bytes:
-        """Question a state on the server."""
-        async with self._enquiry_lock:
-            if sesh:
-                states = sesh.states
-                event = sesh.event
-            else:
-                states = self._states
-                event = self._enquiry
+    async def _iter_pull_item(self, sesh: NetworkIterator, count: int = 0):
+        """
+        Run an iterator over an array of items. Brings from server to client.
 
-            self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+        Called from the client.
+        A protocol primitive.
+        """
+        while True:
+            sesh.increase()
+            self._package(self.PKT_PULL_ITEM, PullItemPacket(sesh.count, sesh.type, sesh.id))
+            yield (await sesh.iter_wait()).item
+            if 0 < count == sesh.count:
+                break
 
-            await event.wait()
-            response = self._response
-            self._response = None
-            event.clear()
+    async def _iter_pull_chunk(self, sesh: NetworkIterator, count: int = 0):
+        """
+        Run an iterator over an array of chunks. Brings from server to client.
 
-            return response
-
-    async def _tell_state(self, state: int, sesh: ProtocolSession = None) -> int:
-        """Tell certain state to server and give response"""
-        if sesh:
-            machine = sesh.state_machines[state]
-            value = sesh.states[state]
-        else:
-            machine = self._state_machines[state]
-            value = self._states[state]
-
-        machine.event.clear()
-        machine.goto("tell")
-        self._package(self.PKT_TELL, TellPacket(state, value, sesh.type if sesh else 0, sesh.id if sesh else 0))
-
-        await machine.event.wait()
-        machine.event.clear()
-        return machine.answer
-
-    async def _create_session(self, type: int = 0, session: int = 0) -> ProtocolSession:
-        """Create a new session based on request from client"""
-        sesh = self._session_types[type](self._manager.is_server(), session)
-        self._sessions[session] = sesh
-        await self.session_prepare(sesh)
-        return sesh
-
-    def session_done(self, sesh: ProtocolSession):
-        """Tell client there is no more to do in session."""
-        sesh.own.goto("accomplished")
-        self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
-
-    async def session_prepare(self, sesh: ProtocolSession):
-        """Call to make preparations for a session."""
-        pass
-
-    async def _show_state(self, state: int, sesh: ProtocolSession = None):
-        """Request to know state from client."""
-        machine = sesh.state_machines[state] if sesh else self._state_machines[state]
-        machine.goto("show")
-        self._package(self.PKT_SHOW, ShowPacket(state, sesh.type, sesh.id))
-
-    async def process_enquiry(self, packet: EnquiryPacket):
-        """Process an enquiry."""
-        value = self.get_session(packet.session).states[packet.state] \
-            if packet.session else self._states[packet.state]
-
-        self._package(self.PKT_RESPONSE, ResponsePacket(packet.state, value, packet.type, packet.session))
-
-    async def process_response(self, packet: ResponsePacket):
-        """Process response of enquiry"""
-        self._response = packet.value
-        if packet.session:
-            sesh = self.get_session(packet.session)
-            sesh.states[packet.state] = packet.value
-            sesh.event.set()
-        else:
-            self._states[packet.state] = packet.value
-            self._enquiry.set()
-
-    async def process_tell(self, packet: TellPacket):
-        """Process a state push."""
-        try:
-            machine = self.get_session(packet.session).state_machines[packet.state] \
-                if packet.session else self._state_machines[packet.state]
-            machine.goto("tell")
-
-            if packet.value == b"?" or not callable(machine.check):
-                result = ConfirmCode.NO_COMMENT
-            else:
-                machine.value = packet.value
-                result = await machine.evaluate()
-
-                if result == ConfirmCode.YES:
-                    # if packet.session:
-                    #    self.get_session(packet.session).states[packet.state] = packet.value
-                    # else:
-                    self._states[packet.state] = packet.value
-
-                if machine.condition.locked():
-                    machine.condition.notify_all()
-
-            machine.goto("accomplished")
-        except KeyError:
-            result = ConfirmCode.NO_COMMENT
-        finally:
-            self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
+        Called from the client.
+        A protocol primitive.
+        """
+        while True:
+            sesh.increase()
+            self._package(self.PKT_PULL_CHUNK, PullChunkPacket(sesh.count, sesh.type, sesh.id))
+            yield (await sesh.iter_wait()).item
+            if 0 < count == sesh.count:
+                break
 
     async def process_show(self, packet: ShowPacket):
-        """Process request to show state."""
+        """
+        Process request to see a value of a state.
+
+        Processed on the client.
+        A primitive processor of (show).
+        """
         try:
-            machine = self.get_session(packet.session).state_machines[packet.state] \
-                if packet.session else self._state_machines[packet.state]
+            machine = self.get_session(packet.session).states[packet.state] \
+                if packet.session else self._states[packet.state]
+
+            if machine.mode in (StateMode.MEDIATE, StateMode.REPRISE, StateMode.FACT):
+                raise ReuseStateError("Forbidden use of state.")
+
+            machine.them()
             machine.goto("show")
-            state = self._states[packet.state]
+            value = machine.value
         except KeyError:
-            state = b"?"
-        finally:
-            self._package(self.PKT_TELL, TellPacket(packet.state, state, packet.type, packet.session))
+            value = b"?"
+
+        self._package(self.PKT_TELL, TellPacket(packet.state, value, packet.type, packet.session))
+
+    async def process_tell(self, packet: TellPacket):
+        """
+        Process a call to set a value for a state.
+
+        Processed on the server.
+        A primitive processor of (show/tell).
+        """
+        try:
+            machine = self.get_session(packet.session).states[packet.state] \
+                if packet.session else self._states[packet.state]
+
+            who = machine.other()
+            # If True or None use with statement.
+            # Possible primitives MEDIATE and TELL if True.
+            # Only possible primitive should be SHOW if False.
+            # None will trigger predicate for termination.
+            # Types may be ONCE, REPRISE or MEDIATE.
+            with machine.them() if who is not False else contextlib.nullcontext():
+                machine.goto("tell")
+
+                if packet.value == b"?":  # or not machine.check:
+                    result = ConfirmCode.NO_COMMENT
+                else:
+                    result = await machine.eval(packet.value)
+                    if not who:
+                        await machine.set_result(result)
+
+                machine.goto("accomplished")
+                machine.reuse()
+        except KeyError:
+            result = ConfirmCode.NO_COMMENT
+
+        self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
 
     async def process_confirm(self, packet: ConfirmPacket):
-        """Process a confirmation of state received and acceptance."""
+        """
+        Process an answer for acceptance of a value for a state.
+
+        Processed on the client.
+        A primitive processor of (show/tell).
+        """
         try:
-            machine = self.get_session(packet.session).state_machines[packet.proposal] \
-                if packet.session else self._state_machines[packet.proposal]
+            machine = self.get_session(packet.session).states[packet.proposal] \
+                if packet.session else self._states[packet.proposal]
+
             machine.goto("confirm")
-            machine.answer = packet.answer
-            machine.event.set()
+            if machine.other():  # Them
+                machine.other(reset=True)  # Reset other
+            else:  # Us or no-one
+                await machine.set_result(packet.answer)
             machine.goto("accomplished")
+
+            if machine.mode == StateMode.ONCE or (
+                    machine.mode == StateMode.MEDIATE and packet.answer == ConfirmCode.YES):
+                machine.freeze()
+
+            machine.reuse()
+
         except KeyError:
             if packet.answer != ConfirmCode.NO_COMMENT:
                 raise
         except GotoStateError:
             raise
 
+    async def process_enquiry(self, packet: EnquiryPacket):
+        """
+        Process an enquiry for a fact of a state.
+
+        Processed on the server.
+        A primitive processor of (query).
+        """
+        sesh = self.get_session(packet.session) if packet.session else None
+        machine = sesh.states[packet.state] if packet.session else self._states[packet.state]
+
+        if machine.check:
+            await machine.trigger(machine, sesh)
+
+        self._package(self.PKT_RESPONSE, ResponsePacket(packet.state, machine.value, packet.type, packet.session))
+
+    async def process_response(self, packet: ResponsePacket):
+        """
+        Process a response of a fact enquiry.
+
+        Processed on the client.
+        A primitive processor of (query).
+        """
+        machine = self.get_session(packet.session).states[packet.state] \
+            if packet.session else self._states[packet.state]
+
+        if machine.other() != False:  # Them or no-one
+            machine.other(reset=True)  # Reset other
+        elif machine.mode == StateMode.FACT:  # Us
+            await machine.set_result((await machine.eval(packet.value), packet.value))
+        else:
+            await machine.set_result((None, packet.value))
+
     async def process_start(self, packet: StartPacket):
         """Session start requested."""
-        if len(self._sessions) >= self._max_sessions:
+        if len(self._sessions) >= self.MAX_SESH:
             self._package(self.PKT_BUSY, BusyPacket(packet.type, packet.session))
-        elif packet.session in self._sessions.keys() or packet.type not in self._session_types.keys():
+        elif packet.session in self._sessions.keys() or packet.type not in self.SESSIONS.keys():
             self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
         else:
-            sesh = await self._create_session(packet.type, packet.session)
+            sesh = await self._sesh_create(packet.type, packet.session)
             if not sesh:
                 self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
             else:
-                sesh.own.goto("start")
+                sesh.goto("start")
                 self._package(self.PKT_ACCEPT, AcceptPacket(packet.type, packet.session))
 
     async def process_finish(self, packet: FinishPacket):
         """Close an open session."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
-            raise NetworkError(*NetworkError.SESSION_TYPE_INCONSISTENCY)
+            raise SessionInconsistencyWarning("Session type inconsistency.")
 
-        sesh.own.goto("finish")
-        sesh.own.goto("accomplished")
+        sesh.goto("finish")
+        sesh.goto("accomplished")
         del self._sessions[packet.session]
 
     async def process_accept(self, packet: AcceptPacket):
         """Accept response to start session."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
-            raise TypeError()
+            raise SessionInconsistencyWarning("Session type inconsistency.")
 
-        sesh.own.goto("accept")
-        sesh.own.future.set_result(SessionCode.ACCEPT)
+        sesh.goto("accept")
+        await sesh.set_result(SessionCode.ACCEPT)
 
     async def process_refuse(self, packet: RefusePacket):
         """Refuse response to start session."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
-            raise TypeError()
+            raise SessionInconsistencyWarning("Session type inconsistency.")
 
-        sesh.own.goto("refuse")
-        sesh.own.goto("accomplished")
-        sesh.own.future.set_result(SessionCode.REFUSE)
+        sesh.goto("refuse")
+        sesh.goto("accomplished")
+        sesh.future.set_result(SessionCode.REFUSE)
         del self._sessions[packet.session]
 
     async def process_busy(self, packet: BusyPacket):
         """Busy response to start session."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
-            raise TypeError()
+            raise SessionInconsistencyWarning("Session type inconsistency.")
 
-        sesh.own.goto("busy")
-        sesh.own.goto("accomplished")
-        sesh.own.future.set_result(SessionCode.BUSY)
+        sesh.goto("busy")
+        sesh.goto("accomplished")
+        sesh.future.set_result(SessionCode.BUSY)
         del self._sessions[packet.session]
 
     async def process_done(self, packet: DonePacket):
         """Indication there is nothing more to do in session."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
-            raise TypeError()
+            raise SessionInconsistencyWarning("Session type inconsistency.")
 
-        sesh.own.event.set()
-        sesh.own.goto("done")
+        sesh.event.set()
+        sesh.goto("done")
         sesh.cleanup()
+
+    async def process_pushitem(self, packet: PushItemPacket):
+        """Handle pushed item from client."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        sesh.increase()
+        max_iter = sesh.states[NetworkIterator.ST_COUNT].value
+        if max_iter != b"?":
+            if sesh.count > int.from_bytes(max_iter, "big", signed=False):
+                raise IteratorInconsistencyWarning("More items pushed than max.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed item in wrong order.")
+
+        await sesh.push_item(packet)
+        self._package(self.PKT_RCVD_ITEM, ItemReceivedPacket(sesh.count, sesh.type, sesh.id))
+
+    async def process_rcvditem(self, packet: ItemReceivedPacket):
+        """Handle received item confirmation from server."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Received item confirmation wrong order.")
+
+        await sesh.iter_result(packet)
+
+    async def process_pushchunk(self, packet: PushChunkPacket):
+        """Handle pushed chunk from client."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        sesh.increase()
+        max_iter = sesh.states[NetworkIterator.ST_COUNT].value
+        if max_iter != b"?":
+            if sesh.count > int.from_bytes(max_iter, "big", signed=False):
+                raise IteratorInconsistencyWarning("More chunks pushed than max.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
+
+        await sesh.push_chunk(packet)
+        self._package(self.PKT_RCVD_CHUNK, ChunkReceivedPacket(sesh.count, sesh.type, sesh.id))
+
+    async def process_rcvdchunk(self, packet: ChunkReceivedPacket):
+        """Handle received chunk confirmation from server."""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Received chunk confirmation wrong order.")
+
+        await sesh.iter_result(packet)
+
+    async def process_pullitem(self, packet: PullItemPacket):
+        """Handle item pull request from client"""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        sesh.increase()
+        max_iter = sesh.states[NetworkIterator.ST_COUNT].value
+        if max_iter != b"?":
+            if sesh.count > int.from_bytes(max_iter, "big", signed=False):
+                raise IteratorInconsistencyWarning("More item pushed than max.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed item in wrong order.")
+
+        item = await sesh.pull_item()
+        self._package(self.PKT_SENT_ITEM, ItemSentPacket(sesh.count, item, sesh.type, sesh.id))
+
+    async def process_sentitem(self, packet: ItemSentPacket):
+        """Handle sent item from server"""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
+
+        await sesh.iter_result(packet)
+
+    async def process_pullchunk(self, packet: PullChunkPacket):
+        """Handle chunk pull request from client"""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        sesh.increase()
+        max_iter = sesh.states[NetworkIterator.ST_COUNT].value
+        if max_iter != b"?":
+            if sesh.count > int.from_bytes(max_iter, "big", signed=False):
+                raise IteratorInconsistencyWarning("More chunks pushed than max.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
+
+        item = await sesh.pull_chunk()
+        self._package(self.PKT_SENT_ITEM, ChunkSentPacket(sesh.count, item, sesh.type, sesh.id))
+
+    async def process_sentchunk(self, packet: ChunkSentPacket):
+        """Handle sent chunk from server"""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
+
+        await sesh.iter_result(packet)
 
     async def process_unknown(self, packet: UnknownPacket):
         """Handle an unknown packet response.

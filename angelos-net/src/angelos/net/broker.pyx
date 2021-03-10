@@ -14,10 +14,11 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Service broker handler."""
-import asyncio
 
-from angelos.common.misc import AsyncCallable
-from angelos.net.base import Handler, ConfirmCode, ClientStateExchangeMachine, ServerStateExchangeMachine
+from angelos.common.misc import SyncCallable
+from angelos.net.base import Handler, ConfirmCode, StateMode, ProtocolNegotiationError
+
+BROKER_VERSION = b"broker-0.1"
 
 
 class ServiceBoundariesError(RuntimeWarning):
@@ -32,11 +33,11 @@ class ServiceBrokerHandler(Handler):
     ST_VERSION = 0x01
     ST_SERVICE = 0x02
 
-    def __init__(self, manager: "Protocol"):
+    def __init__(self, manager: "Protocol", version: SyncCallable = None, check: SyncCallable = None):
         Handler.__init__(self, manager, {
-            self.ST_VERSION: b"broker-0.1",
-            self.ST_SERVICE: b"",
-        }, dict(), 0)
+            self.ST_VERSION: (StateMode.MEDIATE, BROKER_VERSION, version),
+            self.ST_SERVICE: (StateMode.REPRISE, b"", check),
+        }, dict())
 
 
 class ServiceBrokerClient(ServiceBrokerHandler):
@@ -49,28 +50,30 @@ class ServiceBrokerClient(ServiceBrokerHandler):
         if not 1 <= service <= 512:
             raise ServiceBoundariesError()
 
-        self._states[self.ST_SERVICE] = service.to_bytes(2, "big", signed=False)
-        result = await self._tell_state(self.ST_SERVICE) == ConfirmCode.YES
-        asyncio.get_running_loop().call_soon(self._reset_state)  # Reset soon
-        return result
+        if not self._states[self.ST_VERSION].frozen:
+            version = await self._call_mediate(self.ST_VERSION, [BROKER_VERSION])
+            if version is None:
+                raise ProtocolNegotiationError()
 
-    def _reset_state(self):
-        ClientStateExchangeMachine.__init__(self._state_machines[self.ST_SERVICE])
+        self._states[self.ST_SERVICE].update(service.to_bytes(2, "big", signed=False))
+        return await self._call_tell(self.ST_SERVICE) is not None
 
 
 class ServiceBrokerServer(ServiceBrokerHandler):
 
     def __init__(self, manager: "Protocol"):
-        ServiceBrokerHandler.__init__(self, manager)
-        self.__acb = AsyncCallable(self._check_service)
-        self._state_machines[self.ST_SERVICE].check = self.__acb
+        ServiceBrokerHandler.__init__(
+            self, manager,
+            SyncCallable(self._negotiate_version),
+            SyncCallable(self._check_service)
+        )
 
-    async def _check_service(self, value: bytes) -> int:
+    def _negotiate_version(self, value: bytes) -> int:
+        """Negotiate protocol version."""
+        return ConfirmCode.YES if value == BROKER_VERSION else ConfirmCode.NO
+
+    def _check_service(self, value: bytes) -> int:
         """Check handler availability based on range."""
         range = int.from_bytes(value[:2], "big", signed=False)
         result = ConfirmCode.YES if self._manager.get_handler(range) else ConfirmCode.NO_COMMENT
-        asyncio.get_running_loop().call_soon(self._reset_state)  # Reset soon
         return result
-
-    def _reset_state(self):
-        ServerStateExchangeMachine.__init__(self._state_machines[self.ST_SERVICE], self.__acb)

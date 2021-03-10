@@ -19,12 +19,15 @@ import time
 import uuid
 
 from angelos.bin.nacl import NaCl, Signer, Verifier, CryptoFailure
-from angelos.common.misc import SyncCallable, AsyncCallable
+from angelos.common.misc import AsyncCallable, SyncCallable
 from angelos.common.utils import Util
 from angelos.facade.storage.portfolio_mixin import PortfolioNotFound
 from angelos.lib.policy.crypto import Crypto
-from angelos.net.base import NetworkError, Handler, ConfirmCode, ConnectionClosed
+from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkState, \
+    NetworkSession
 from angelos.portfolio.utils import Groups
+
+AUTHENTICATION_VERSION = b"authentication-0.1"
 
 
 class LoginTypeCode:
@@ -61,71 +64,74 @@ class AuthenticationHandler(Handler):
         specimen = NaCl.random_bytes(64)
         server = manager.is_server()
         Handler.__init__(self, manager, {
-            self.ST_VERSION: b"authentication-0.1",
-            self.ST_LOGIN: b"",
-            self.ST_SERVER_ID: portfolio.entity.id.bytes if server else uuid.UUID(int=0).bytes,
-            self.ST_SERVER_PUBLIC: keys.verify if server else b"",
-            self.ST_SERVER_SPECIMEN: specimen if server else b"",
-            self.ST_SERVER_SIGNATURE: b"",
-            self.ST_SERVER_TIME: int(time.time()).to_bytes(8, "big") if server else b"",
-            self.ST_CLIENT_ID: uuid.UUID(int=0).bytes if server else portfolio.entity.id.bytes,
-            self.ST_CLIENT_NODE: b"",
-            self.ST_CLIENT_PUBLIC: b"" if server else keys.verify,
-            self.ST_CLIENT_SPECIMEN: b"" if server else specimen,
-            self.ST_CLIENT_SIGNATURE: b"",
-            self.ST_CLIENT_TIME: b"" if server else int(time.time()).to_bytes(8, "big"),
-        }, dict(), 8)
+            self.ST_VERSION: (StateMode.MEDIATE, AUTHENTICATION_VERSION),
+            self.ST_LOGIN: (StateMode.ONCE, b""),
+            self.ST_SERVER_ID: (StateMode.FACT, portfolio.entity.id.bytes if server else uuid.UUID(int=0).bytes),
+            self.ST_SERVER_PUBLIC: (StateMode.FACT, keys.verify if server else b""),
+            self.ST_SERVER_SPECIMEN: (StateMode.FACT, specimen if server else b""),
+            self.ST_SERVER_SIGNATURE: (StateMode.ONCE, b""),
+            self.ST_SERVER_TIME: (StateMode.FACT, int(time.time()).to_bytes(8, "big") if server else b""),
+            self.ST_CLIENT_ID: (StateMode.ONCE, uuid.UUID(int=0).bytes if server else portfolio.entity.id.bytes),
+            self.ST_CLIENT_NODE: (StateMode.ONCE, b""),
+            self.ST_CLIENT_PUBLIC: (StateMode.ONCE, b"" if server else keys.verify),
+            self.ST_CLIENT_SPECIMEN: (StateMode.ONCE, b"" if server else specimen),
+            self.ST_CLIENT_SIGNATURE: (StateMode.FACT, b""),
+            self.ST_CLIENT_TIME: (StateMode.ONCE, b"" if server else int(time.time()).to_bytes(8, "big")),
+        }, dict())
 
 
 class AuthenticationClient(AuthenticationHandler):
 
     def __init__(self, manager: "Protocol"):
         AuthenticationHandler.__init__(self, manager)
-        print("CLIENT ID", uuid.UUID(bytes=self._states[self.ST_CLIENT_ID]))
 
     async def _login(self, node: bool = False) -> bool:
         """Login operation against server."""
-        await self._tell_state(self.ST_VERSION)
-        await self._tell_state(self.ST_LOGIN)
+        version = await self._call_mediate(self.ST_VERSION, [AUTHENTICATION_VERSION])
+        if version is None:
+            raise ProtocolNegotiationError()
+
+        await self._call_tell(self.ST_LOGIN)
         if node:
-            await self._tell_state(self.ST_CLIENT_NODE)
+            await self._call_tell(self.ST_CLIENT_NODE)
 
-        await self._poll_state(self.ST_SERVER_ID)
-        await self._poll_state(self.ST_SERVER_PUBLIC)
-        await self._poll_state(self.ST_SERVER_SPECIMEN)
-        await self._poll_state(self.ST_SERVER_TIME)
+        await self._call_query(self.ST_SERVER_ID)
+        await self._call_query(self.ST_SERVER_PUBLIC)
+        await self._call_query(self.ST_SERVER_SPECIMEN)
+        await self._call_query(self.ST_SERVER_TIME)
 
-        await self._tell_state(self.ST_CLIENT_ID)
-        await self._tell_state(self.ST_CLIENT_PUBLIC)
-        await self._tell_state(self.ST_CLIENT_SPECIMEN)
-        await self._tell_state(self.ST_CLIENT_TIME)
+        await self._call_tell(self.ST_CLIENT_ID)
+        await self._call_tell(self.ST_CLIENT_PUBLIC)
+        await self._call_tell(self.ST_CLIENT_SPECIMEN)
+        await self._call_tell(self.ST_CLIENT_TIME)
 
-        self._states[self.ST_SERVER_SIGNATURE] = Signer(
-            self._manager.facade.data.portfolio.privkeys.seed).signature(
-            self._states[self.ST_SERVER_SPECIMEN])
+        self._states[self.ST_SERVER_SIGNATURE].update(
+            Signer(self._manager.facade.data.portfolio.privkeys.seed).signature(
+                self._states[self.ST_SERVER_SPECIMEN].value))
 
-        approved = await self._tell_state(self.ST_SERVER_SIGNATURE)
+        approved = await self._call_tell(self.ST_SERVER_SIGNATURE)
 
         # Authentication at server failed
-        if not approved == ConfirmCode.YES:
+        if approved is None:
             return False
 
-        await self._poll_state(self.ST_CLIENT_SIGNATURE)
+        await self._call_query(self.ST_CLIENT_SIGNATURE)
 
         try:
-            identity = uuid.UUID(bytes=self._states[self.ST_SERVER_ID])
+            identity = uuid.UUID(bytes=self._states[self.ST_SERVER_ID].value)
             portfolio = await self.manager.facade.storage.vault.load_portfolio(identity, Groups.CLIENT_AUTH)
 
             if self._manager.facade.data.portfolio.entity.id == identity:  # Check node privileges
                 keys = [keys for keys in self._manager.facade.data.portfolio.keys if
-                        keys.verify == self._states[self.ST_SERVER_PUBLIC]][0]
+                        keys.verify == self._states[self.ST_SERVER_PUBLIC].value][0]
                 node = [node for node in self._manager.facade.data.portfolio.node if
-                        node.id == uuid.UUID(bytes=self._states[self.ST_SERVER_NODE])][0]
+                        node.id == uuid.UUID(bytes=self._states[self.ST_SERVER_NODE].value)][0]
             else:  # Check normal logon
-                keys = [keys for keys in portfolio.keys if keys.verify == self._states[self.ST_SERVER_PUBLIC]][0]
+                keys = [keys for keys in portfolio.keys if keys.verify == self._states[self.ST_SERVER_PUBLIC].value][0]
                 node = False
 
-            Verifier(keys.verify).verify(self._states[self.ST_CLIENT_SIGNATURE] + self._states[self.ST_CLIENT_SPECIMEN])
+            Verifier(keys.verify).verify(
+                self._states[self.ST_CLIENT_SIGNATURE].value + self._states[self.ST_CLIENT_SPECIMEN].value)
             self._manager.authentication_made(portfolio, node)
             return True
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure) as exc:
@@ -135,60 +141,64 @@ class AuthenticationClient(AuthenticationHandler):
 
     async def auth_user(self) -> bool:
         """Authenticate a user against a network."""
-        self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_USER
+        self._states[self.ST_LOGIN].update(LoginTypeCode.LOGIN_USER)
         return await self._login()
 
     # TODO: Implement node authentication
     async def auth_node(self) -> bool:
         """Authenticate a node within a network."""
-        self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_NODE
+        self._states[self.ST_LOGIN].update(LoginTypeCode.LOGIN_NODE)
 
     # TODO: Implement network authentication
     async def auth_net(self) -> bool:
         """Authenticate a network against another network."""
-        self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_NET
+        self._states[self.ST_LOGIN].update(LoginTypeCode.LOGIN_NET)
 
     # TODO: Implement administrator authentication
     async def auth_admin(self) -> bool:
         """Authenticate an administrator against server."""
-        self._states[self.ST_LOGIN] = LoginTypeCode.LOGIN_ADMIN
+        self._states[self.ST_LOGIN].update(LoginTypeCode.LOGIN_ADMIN)
 
 
 class AuthenticationServer(AuthenticationHandler):
 
     def __init__(self, manager: "Protocol"):
         AuthenticationHandler.__init__(self, manager)
-        print("SERVER ID", uuid.UUID(bytes=self._states[self.ST_SERVER_ID]))
+        self._states[self.ST_VERSION].upgrade(SyncCallable(self._check_version))
+        self._states[self.ST_LOGIN].upgrade(SyncCallable(self._check_login))
+        self._states[self.ST_SERVER_SIGNATURE].upgrade(AsyncCallable(self._check_signature))
 
-        self._state_machines[self.ST_SERVER_ID].check = SyncCallable(lambda value: ConfirmCode.NO)
-        self._state_machines[self.ST_SERVER_PUBLIC].check = SyncCallable(lambda value: ConfirmCode.NO)
-        self._state_machines[self.ST_SERVER_SPECIMEN].check = SyncCallable(lambda value: ConfirmCode.NO)
-        self._state_machines[self.ST_SERVER_TIME].check = SyncCallable(lambda value: ConfirmCode.NO)
-        self._state_machines[self.ST_SERVER_SIGNATURE].check = AsyncCallable(self._check_signature)
+    def _check_version(self, value: bytes) -> int:
+        """Negotiate protocol version."""
+        return ConfirmCode.YES if value == AUTHENTICATION_VERSION else ConfirmCode.NO
+
+    def _check_login(self, value: bytes) -> int:
+        """Check login type availability."""
+        return ConfirmCode.YES if value == LoginTypeCode.LOGIN_USER else ConfirmCode.NO
 
     async def _check_signature(self, value: bytes) -> int:
         """Authenticate signature."""
-        self._states[self.ST_CLIENT_SIGNATURE] = Signer(
-            self._manager.facade.data.portfolio.privkeys.seed).signature(
-            self._states[self.ST_CLIENT_SPECIMEN])
+        self._states[self.ST_CLIENT_SIGNATURE].update(
+            Signer(self._manager.facade.data.portfolio.privkeys.seed).signature(
+                self._states[self.ST_CLIENT_SPECIMEN].value))
 
         try:
-            identity = uuid.UUID(bytes=self._states[self.ST_CLIENT_ID])
-            if abs(int.from_bytes(self._states[self.ST_CLIENT_TIME], "big") - time.time()) > 240:
+            identity = uuid.UUID(bytes=self._states[self.ST_CLIENT_ID].value)
+            if abs(int.from_bytes(self._states[self.ST_CLIENT_TIME].value, "big") - time.time()) > 240:
                 raise NetworkError(*NetworkError.AUTH_TIMEGATE_DIFF)
 
             portfolio = await self.manager.facade.storage.vault.load_portfolio(identity, Groups.CLIENT_AUTH)
 
             if self._manager.facade.data.portfolio.entity.id == identity:  # Check node privileges
                 keys = [keys for keys in self._manager.facade.data.portfolio.keys if
-                        keys.verify == self._states[self.ST_CLIENT_PUBLIC]][0]
+                        keys.verify == self._states[self.ST_CLIENT_PUBLIC].value][0]
                 node = [node for node in self._manager.facade.data.portfolio.node if
-                        node.id == uuid.UUID(bytes=self._states[self.ST_CLIENT_NODE])][0]
+                        node.id == uuid.UUID(bytes=self._states[self.ST_CLIENT_NODE].value)][0]
             else:  # Check normal logon
-                keys = [keys for keys in portfolio.keys if keys.verify == self._states[self.ST_CLIENT_PUBLIC]][0]
+                keys = [keys for keys in portfolio.keys if keys.verify == self._states[self.ST_CLIENT_PUBLIC].value][0]
                 node = False
 
-            Verifier(keys.verify).verify(value + self._states[self.ST_SERVER_SPECIMEN])
+            Verifier(keys.verify).verify(value + self._states[self.ST_SERVER_SPECIMEN].value)
             self._manager.authentication_made(portfolio, node)
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure, NetworkError) as exc:
             Util.print_exception(exc)

@@ -24,7 +24,7 @@ class StubHandler1(Handler):
     def __init__(self, manager: "Protocol"):
         Handler.__init__(self, manager, {
             self.ST_VERSION: b"stub1-0.1",
-        }, dict(), 0)
+        }, dict())
 
 
 class StubHandlerClient1(StubHandler1):
@@ -55,7 +55,7 @@ class StubHandler2(Handler):
     def __init__(self, manager: "Protocol"):
         Handler.__init__(self, manager, {
             self.ST_VERSION: b"stub2-0.1",
-        }, dict(), 0)
+        }, dict())
 
 
 class StubHandlerClient2(StubHandler2):
@@ -86,7 +86,7 @@ class StubHandler3(Handler):
     def __init__(self, manager: "Protocol"):
         Handler.__init__(self, manager, {
             self.ST_VERSION: b"stub3-0.1",
-        }, dict(), 0)
+        }, dict())
 
 
 class StubHandlerClient3(StubHandler3):
@@ -117,7 +117,7 @@ class StubHandler4(Handler):
     def __init__(self, manager: "Protocol"):
         Handler.__init__(self, manager, {
             self.ST_VERSION: b"stub4-0.1",
-        }, dict(), 0)
+        }, dict())
 
 
 class StubHandlerClient4(StubHandler4):
