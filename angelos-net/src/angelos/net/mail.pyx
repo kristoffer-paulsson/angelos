@@ -14,34 +14,24 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Mail handler."""
-import asyncio
+import datetime
 import hashlib
+import os
+import typing
 import uuid
-from pathlib import PurePosixPath
 
+from angelos.archive7.fs import FileObject
+from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.document.utils import Helper, Definitions
-from angelos.net.base import Handler, ProtocolSession, Packet, DataType, WaypointState, DonePacket
-from angelos.portfolio.collection import Portfolio
+from angelos.net.base import Handler, NetworkIterator, PullItemIterator, PullChunkIterator, \
+    PushItemIterator, PushChunkIterator, StateMode, NetworkState, ConfirmCode
+
+MAIL_VERSION = b"mail-0.1"
 
 SESH_TYPE_RECEIVE = 0x01
-SESH_TYPE_SEND = 0x02
-SESH_TYPE_DOWNLOAD = 0x03
+SESH_TYPE_DOWNLOAD = 0x02
+SESH_TYPE_SEND = 0x03
 SESH_TYPE_UPLOAD = 0x04
-
-ST_FILE_ID = 0x01
-ST_BLOCK_CNT = 0x02
-
-ST_COLLECTOR = 0x01
-
-COLLECT_PACKET = 0x01
-DISPATCH_NOTE_PACKET = 0x02
-PULL_PACKET = 0x03
-BLOCK_PACKET = 0x04
-
-
-class BlockError(RuntimeWarning):
-    """Block data digest mismatch."""
-    pass
 
 
 class MailError(RuntimeError):
@@ -52,132 +42,84 @@ class MailError(RuntimeError):
     NOT_AUTHENTICATED = ("The client is not authenticated", 103)
 
 
-class ClientCollectStateMachine(WaypointState):
-    """Mail collection state client-side."""
-
-    def __init__(self):
-        self.note = None
-        self._event = asyncio.Event()
-        WaypointState.__init__(self, {
-            "ready": ("collect",),
-            "collect": ("note", "accomplished"),  # accomplished added for done.
-            "note": ("collect", "accomplished"),
-            "accomplished": tuple(),
-        })
-        self._state = "ready"
-
-    @property
-    def event(self) -> asyncio.Event:
-        """Expose event."""
-        return self._event
+class ChunkError(RuntimeWarning):
+    """Block data digest mismatch."""
+    pass
 
 
-class ServerCollectStateMachine(WaypointState):
-    """Mail collection state server-side."""
+class ReceiveIterator(PullItemIterator):
+    """Test stub iterator item push with states."""
 
-    def __init__(self):
-        WaypointState.__init__(self, {
-            "ready": ("collect",),
-            "collect": ("note",),
-            "note": ("collect", "accomplished"),
-            "accomplished": tuple(),
-        })
-        self._state = "ready"
+    def __init__(self, server: bool, session: int, check: SyncCallable = None):
+        PullItemIterator.__init__(self, server, SESH_TYPE_RECEIVE, session, {
+        }, 0, check)
+        self._external = None
+        self._handler = None
 
+    async def pull_item(self) -> uuid.UUID:
+        item = await self._external.__anext__()
+        self._handler.set_entry(item)
+        return item[0].id
 
-class ReceiveSession(ProtocolSession):
-    def __init__(self, server: bool, session: int):
-        ProtocolSession.__init__(self, SESH_TYPE_RECEIVE, session, dict(), server)
-        self._collection = ServerCollectStateMachine() if server else ClientCollectStateMachine()
-
-    @property
-    def collection(self) -> WaypointState:
-        """Exposing the internal collection state."""
-        return self._collection
-
-    def cleanup(self):
-        self._collection.event.set()
+    def external(self, handler: "MailHandler", iterator: typing.Iterator):
+        """Set handler and iterator."""
+        self._handler = handler
+        self._external = iterator
 
 
-class CollectPacket(Packet, fields=("type", "session"), fields_info=((DataType.UINT,), (DataType.UINT,))):
-    """Request to collect a mail from server."""
+class DownloadIterator(PullChunkIterator):
+    """Test stub iterator item push with states."""
+
+    ST_CREATED = 0x02
+    ST_MODIFIED = 0x03
+    ST_OWNER = 0x04
+    ST_NAME = 0x05
+    ST_LENGTH = 0x06
+    ST_ID = 0x07
+
+    def __init__(self, server: bool, session: int, check: SyncCallable = None):
+        PullChunkIterator.__init__(self, server, SESH_TYPE_DOWNLOAD, session, {
+            self.ST_CREATED: (StateMode.FACT, b""),
+            self.ST_MODIFIED: (StateMode.FACT, b""),
+            self.ST_OWNER: (StateMode.FACT, b""),
+            self.ST_NAME: (StateMode.FACT, b""),
+            self.ST_LENGTH: (StateMode.FACT, b""),
+            self.ST_ID: (StateMode.ONCE, b"")
+        }, 0, check)
+        self._fd = None
+        self._handler = None
+        self._stream = None
+
+    async def pull_chunk(self) -> typing.Tuple[bytes, bytes]:
+        block = self._stream.block
+        if block.next == -1:
+            self._fd.close()
+            await self._handler.del_entry()
+        else:
+            self._stream.next()
+        return block.data, block.digest
+
+    def external(self, handler: "MailHandler", fd: FileObject):
+        """Set handler and iterator."""
+        self._handler = handler
+        self._fd = fd
+        self._stream = fd.stream
 
 
-class DispatchNotePacket(
-    Packet, fields=("file", "count", "length", "created", "modified", "type", "session"),
-    fields_info=((DataType.UUID,), (DataType.UINT,), (DataType.UINT,), (DataType.DATETIME,),
-                 (DataType.DATETIME,), (DataType.UINT,), (DataType.UINT,))):
-    """Response to mail collect request."""
+class SendIterator(PushItemIterator):
+    """Test stub iterator item push with states."""
+
+    def __init__(self, server: bool, session: int, count: int = 0):
+        PushItemIterator.__init__(self, server, SESH_TYPE_SEND, session, {
+        }, count, SyncCallable(self.count_state))
 
 
-class ClientPullStateMachine(WaypointState):
-    """Mail collection state client-side."""
+class UploadIterator(PushChunkIterator):
+    """Test stub iterator item push with states."""
 
-    def __init__(self):
-        self.block = None
-        self._event = asyncio.Event()
-        WaypointState.__init__(self, {
-            "ready": ("pull",),
-            "pull": ("block",),
-            "block": ("pull", "accomplished"),
-            "accomplished": tuple(),
-        })
-        self._state = "ready"
-
-    @property
-    def event(self) -> asyncio.Event:
-        """Expose event."""
-        return self._event
-
-
-class ServerPullStateMachine(WaypointState):
-    """Mail collection state server-side."""
-
-    def __init__(self):
-        WaypointState.__init__(self, {
-            "ready": ("pull",),
-            "pull": ("block",),
-            "block": ("pull", "accomplished"),
-            "accomplished": tuple(),
-        })
-        self._state = "ready"
-
-
-class DownloadSession(ProtocolSession):
-    def __init__(self, server: bool, session: int, file: uuid.UUID = uuid.UUID(int=0), count: int = 0):
-        ProtocolSession.__init__(self, SESH_TYPE_DOWNLOAD, session, {
-            ST_FILE_ID: file.bytes,
-            ST_BLOCK_CNT: hex(count)[2:].encode()
-        }, server)
-        self._pull = ServerPullStateMachine() if server else ClientPullStateMachine()
-
-    @property
-    def pull(self) -> WaypointState:
-        """Exposing the internal collection state."""
-        return self._pull
-
-
-class PullPacket(Packet, fields=("block", "type", "session"),
-                 fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
-    """Request to collect a block from server."""
-
-
-class BlockPacket(Packet, fields=("digest", "data", "type", "session"), fields_info=(
-        (DataType.BYTES_FIX, 20), (DataType.BYTES_FIX, 4008), (DataType.UINT,), (DataType.UINT,))):
-    """Response to mail collect request."""
-
-
-class SendSession(ProtocolSession):
-    def __init__(self, server: bool, session: int):
-        ProtocolSession.__init__(self, SESH_TYPE_SEND, session, dict(), server)
-
-
-class UploadSession(ProtocolSession):
-    def __init__(self, server: bool, session: int, file: uuid.UUID = uuid.UUID(int=0), count: int = 0):
-        ProtocolSession.__init__(self, SESH_TYPE_UPLOAD, session, {
-            ST_FILE_ID: file.bytes,
-            ST_BLOCK_CNT: hex(count)[2:].encode()
-        }, server)
+    def __init__(self, server: bool, session: int, count: int = 0):
+        PushChunkIterator.__init__(self, server, SESH_TYPE_UPLOAD, session, {
+        }, count, SyncCallable(self.server_trigger if server else self.count_state))
 
 
 class MailHandler(Handler):
@@ -187,99 +129,23 @@ class MailHandler(Handler):
     RANGE = 3
 
     SESH_RECEIVE = SESH_TYPE_RECEIVE
-    SESH_SEND = SESH_TYPE_SEND
     SESH_DOWNLOAD = SESH_TYPE_DOWNLOAD
+    SESH_SEND = SESH_TYPE_SEND
     SESH_UPLOAD = SESH_TYPE_UPLOAD
 
     ST_VERSION = 0x01
 
-    PKT_COLLECT = COLLECT_PACKET
-    PKT_DISPATCH = DISPATCH_NOTE_PACKET
-    PKT_PULL = PULL_PACKET
-    PKT_BLOCK = BLOCK_PACKET
-
-    PACKETS = {
-        PKT_COLLECT: CollectPacket,
-        PKT_DISPATCH: DispatchNotePacket,
-        PKT_PULL: PullPacket,
-        PKT_BLOCK: BlockPacket,
-        **Handler.PACKETS
-    }
-
-    def __init__(self, manager: "Protocol"):
-        Handler.__init__(self, manager, {
-            self.ST_VERSION: b"mail-0.1",
-        }, {
-            self.SESH_SEND: SendSession,
-            self.SESH_RECEIVE: ReceiveSession,
-            self.SESH_UPLOAD: UploadSession,
-            self.SESH_DOWNLOAD: DownloadSession
-        }, 8)
-        self._glob_iterator = None  # Vault / mail file glob iterator
-        self._fd = None
-
-        server = self._manager.is_server()
-        self.PROCESS = {
-            self.PKT_COLLECT: "process_collect" if server else None,
-            self.PKT_DISPATCH: None if server else "process_dispatch_note",
-            self.PKT_PULL: "process_pull" if server else None,
-            self.PKT_BLOCK: None if server else "process_block",
-            **self.PROCESS
-        }
-
-    async def process_collect(self, packet: CollectPacket):
-        """Process mail collection request."""
-        try:
-            sesh = self.get_session(packet.session)
-            entry, path = await self._glob_iterator.__anext__()
-
-            if self._fd:
-                raise MailError(*MailError.FD_ALREADY_OPEN)
-
-            self._fd = await self._manager.facade.storage.mail.archive.load(path, True)
-            print("PATH", path, entry.id)
-            self._package(
-                self.PKT_DISPATCH, DispatchNotePacket(
-                    entry.id, self._fd.stream.count, self._fd.stream.len,
-                    entry.created, entry.modified, sesh.type, sesh.id
-                )
-            )
-        except StopAsyncIteration:
-            self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
-            print(sesh.collection)
-
-    async def process_dispatch_note(self, packet: DispatchNotePacket):
-        """Process request to show state."""
-        sesh = self.get_session(packet.session)
-        machine = sesh.collection
-        machine.goto("note")
-        machine.note = packet
-        machine.event.set()
-
-    async def process_pull(self, packet: PullPacket):
-        """Process request to show state."""
-        sesh = self.get_session(packet.id)
-        if packet.block != 0:
-            self._fd.stream.next()
-
-        if packet.block != self._fd.stream.block.index:
-            raise MailError(*MailError.STREAM_UNSYNCED)
-
-        block = self._fd.stream.block
-        self._package(
-            self.PKT_BLOCK, BlockPacket(block.digest, block.data, sesh.type, sesh.id))
-
-        if block.index == -1:
-            self._fd.close()
-            self._fd = None
-
-    async def process_block(self, packet: BlockPacket):
-        """Process request to show state."""
-        sesh = self.get_session(packet.id)
-        machine = sesh.pull
-        machine.goto("block")
-        machine.block = packet
-        machine.event.set()
+    def __init__(self, manager: "Protocol", receive: SyncCallable = None, download: SyncCallable = None):
+        server = manager.is_server()
+        Handler.__init__(self, manager, states={
+            self.ST_VERSION: (StateMode.MEDIATE, MAIL_VERSION),
+        },
+        sessions={
+            self.SESH_RECEIVE: (ReceiveIterator, {"check": receive} if server else dict()),
+            self.SESH_DOWNLOAD: (DownloadIterator, {"check": download} if server else dict()),
+            self.SESH_SEND: (SendIterator, {} if server else dict()),
+            self.SESH_UPLOAD: (UploadIterator, {} if server else dict()),
+        }, max_sesh=5)
 
 
 class MailClient(MailHandler):
@@ -287,84 +153,112 @@ class MailClient(MailHandler):
 
     def __init__(self, manager: "Protocol"):
         MailHandler.__init__(self, manager)
-        print("Client", self.PACKETS, self.PROCESS)
 
-    async def start(self) -> bool:
-        """Make authentication against server."""
+    async def exchange(self):
+        """Send and receive messages."""
         user = self._manager.facade.data.portfolio.entity.id
 
-        init = await self.sync(tuple(self._states.keys()))
-        if not init:
-            raise MailError(*MailError.INIT_FAILED)
+        await self._receive_mails()
+        # await self._send_mails()
 
-        async with self.context(self.SESH_RECEIVE) as sesh_receive:
-            print("SESH_RECEIVE enter", sesh_receive)
-            async for note in self.collect_iter(sesh_receive):
-                print("COLLECT enter", note.file)
-                path = self._manager.facade.api.mailbox.PATH_INBOX[0].joinpath(
-                    str(note.file) + Helper.extension(Definitions.COM_ENVELOPE))
-                try:
-                    await self._manager.facade.storage.vault.archive.mkfile(
-                        path, b"", created=note.created, modified=note.modified, owner=user)
-                    fd = self._manager.facade.storage.vault.archive.load(path, True)
+    async def _receive_mails(self):
+        """Iterate over received mails."""
+        async with self._sesh_context(self.SESH_RECEIVE) as sesh:
+            answer, data = await self._call_query(NetworkIterator.ST_COUNT, sesh)
+            count = int.from_bytes(data, "big", signed=False)
+            async for item in self._iter_pull_item(sesh, count):
+                await self._download(item)
 
-                    async with self.context(self.SESH_DOWNLOAD, file=note.file, count=note.count) as sesh_download:
-                        print("SESH_DOWNLOAD enter")
-                        async for block in self.pull_iter(sesh_download):
-                            if hashlib.sha1(self.data).digest() != block.digest:
-                                raise BlockError()
-                            fd.stream.push(block.data)
-                        fd.stream.truncate(note.length)
-                        print("SESH_DOWNLOAD leave")
-                    fd.close()
-                except BlockError:
-                    await self._manager.facade.storage.vault.archive.remove(path)
-                print("COLLECT leave", note.file)
-            print("SESH_RECEIVE leave")
+    async def _download(self, item: uuid.UUID):
+        """Download received mail."""
+        async with self._sesh_context(self.SESH_DOWNLOAD) as sesh:
+            sesh.states[DownloadIterator.ST_ID].update(item.bytes)
+            await self._call_tell(DownloadIterator.ST_ID, sesh)
 
-        # async with self.context(self.SESH_SEND) as sesh_send:
-        #    pass
+            count = int.from_bytes((await self._call_query(NetworkIterator.ST_COUNT, sesh))[1], "big", signed=False)
+            created = datetime.datetime.fromisoformat(
+                (await self._call_query(DownloadIterator.ST_CREATED, sesh))[1].decode())
+            modified = datetime.datetime.fromisoformat(
+                (await self._call_query(DownloadIterator.ST_MODIFIED, sesh))[1].decode())
+            owner = uuid.UUID(bytes=(await self._call_query(DownloadIterator.ST_OWNER, sesh))[1])
+            name = (await self._call_query(DownloadIterator.ST_NAME, sesh))[1]
+            length = int.from_bytes((await self._call_query(DownloadIterator.ST_LENGTH, sesh))[1], "big", signed=False)
 
-    async def collect_iter(self, sesh: ReceiveSession):
-        """Iterator for collecting mails from server."""
-        machine = sesh.collection
-        while True:
-            machine.goto("collect")
-            self._package(self.PKT_COLLECT, CollectPacket(sesh.type, sesh.id))
-            await machine.event.wait()
-            if machine.note:
-                yield machine.note
-                machine.note = None
-            else:
-                break
-            machine.event.clear()
-        machine.goto("accomplished")
+            path = self._manager.facade.api.mailbox.PATH_INBOX[0].joinpath(
+                str(name) + Helper.extension(Definitions.COM_ENVELOPE))
 
-    async def pull_iter(self, sesh: DownloadSession):
-        """Iterator for pulling file stream blocks from server."""
-        machine = sesh.collection
-        for block in range(sesh.states[ST_BLOCK_CNT]):
-            machine.goto("pull")
-            self._package(self.PKT_PULL, PullPacket(block, sesh.type, sesh.id))
-            await machine.event.wait()
-            if machine.block:
-                yield machine.block
-                machine.block = None
-            else:
-                break
-            machine.event.clear()
-        machine.goto("accomplished")
+            try:
+                await self._manager.facade.storage.vault.archive.mkfile(
+                    path, b"", created=created, modified=modified, owner=owner, id=item)
+                fd = await self._manager.facade.storage.vault.archive.load(path, True, False)
+                async for chunk, digest in self._iter_pull_chunk(sesh, count):
+                    if hashlib.sha1(chunk).digest() != digest:
+                        raise ChunkError()
+                    fd.write(chunk)
+                fd.truncate(length)
+                fd.close()
+            except ChunkError:
+                await self._manager.facade.storage.vault.archive.remove(path)
+
+    async def _send_mails(self):
+        """Iterate over sent mails."""
+        items = list()
+        async with self._sesh_context(self.SESH_SEND) as sesh:
+            answer, data = await self._call_query(NetworkIterator.ST_COUNT, sesh)
+            count = int.from_bytes(data, "big", signed=False)
+            async for item in self._iter_pull_item(sesh, count):
+                items.append(item)
+        return items
+
+    async def _upload(self):
+        """Upload sent mail."""
+        async with self._sesh_context(self.SESH_UPLOAD, count=5) as sesh:
+            await self._call_tell(NetworkIterator.ST_COUNT, sesh)
+            for chunk in [os.urandom(4096) for _ in range(5)]:
+                await self._push_chunk(sesh, chunk)
 
 
 class MailServer(MailHandler):
     """Server side mail handler."""
 
     def __init__(self, manager: "Protocol"):
-        MailHandler.__init__(self, manager)
-        print("Server", self.PACKETS, self.PROCESS)
+        MailHandler.__init__(
+            self, manager,
+            receive=AsyncCallable(self._receive_items),
+            download=AsyncCallable(self._download_chunks)
+        )
+        self._item = None
 
-    async def session_prepare(self, sesh: ProtocolSession):
-        """Call to make preparations for a session."""
-        if sesh.type == self.SESH_RECEIVE:
-            print(self._manager.portfolio.entity.id)
-            self._glob_iterator = self._manager.facade.storage.mail.receive_iter(self._manager.portfolio.entity.id)
+    async def _receive_items(self, state: NetworkState, sesh: ReceiveIterator) -> int:
+        """Prepare ReceiveIterator with an iterator."""
+        sesh.external(self, self._manager.facade.storage.mail.receive_iter(self._manager.portfolio.entity.id))
+        state.update(b"?")
+        return ConfirmCode.YES
+
+    def set_entry(self, item: tuple):
+        if self._item:
+            raise TypeError("Current item already set.")
+        self._item = item
+
+    async def _download_chunks(self, state: NetworkState, sesh: ReceiveIterator) -> int:
+        """Prepare DownloadIterator with file information and chunk count."""
+        if not self._item:
+            raise TypeError("No current item set.")
+
+        if sesh.states[DownloadIterator.ST_ID].value != self._item[0].id.bytes:
+            raise TypeError("Current item out of sync with session.")
+
+        fd = await self._manager.facade.storage.mail.archive.load(self._item[1], True)
+        sesh.external(self, fd)
+
+        state.update(fd.stream.count.to_bytes(8, "big", signed=False))
+        sesh.states[DownloadIterator.ST_CREATED].update(self._item[0].created.isoformat().encode())
+        sesh.states[DownloadIterator.ST_MODIFIED].update(self._item[0].modified.isoformat().encode())
+        sesh.states[DownloadIterator.ST_OWNER].update(self._item[0].owner.bytes)
+        sesh.states[DownloadIterator.ST_NAME].update(self._item[0].name)
+        sesh.states[DownloadIterator.ST_LENGTH].update(self._item[0].length.to_bytes(8, "big", signed=False))
+
+    async def del_entry(self):
+        await self._manager.facade.storage.mail.archive.remove(self._item[1])
+        self._item = None
+

@@ -66,6 +66,7 @@ PULL_ITEM_PACKET = 110
 SENT_ITEM_PACKET = 111
 PULL_CHUNK_PACKET = 112
 SENT_CHUNK_PACKET = 113
+STOP_ITER_PACKET = 114
 
 ENQUIRY_PACKET = 115  # Ask for information
 RESPONSE_PACKET = 116  # Response to enquery
@@ -334,8 +335,9 @@ class ItemReceivedPacket(
 
 
 class PushChunkPacket(
-    Packet, fields=("count", "chunk", "type", "session"),
-    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 8192), (DataType.UINT,), (DataType.UINT,))):
+    Packet, fields=("count", "chunk", "digest", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 8192), (DataType.BYTES_VAR, 0, 64),
+                 (DataType.UINT,), (DataType.UINT,))):
     """Chunk pushed from client to server."""
 
 
@@ -364,9 +366,16 @@ class PullChunkPacket(
 
 
 class ChunkSentPacket(
-    Packet, fields=("count", "chunk", "type", "session"),
-    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 8192), (DataType.UINT,), (DataType.UINT,))):
+    Packet, fields=("count", "chunk", "digest", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 8192), (DataType.BYTES_VAR, 0, 64),
+                 (DataType.UINT,), (DataType.UINT,))):
     """Response to request chunk from server."""
+
+
+class StopIterationPacket(
+    Packet, fields=("count", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+    """Response that iteration stopped in any direction."""
 
 
 class UnknownPacket(Packet, fields=("type", "level", "process"),
@@ -753,16 +762,11 @@ class Handler:
     PKT_SENT_ITEM = SENT_ITEM_PACKET
     PKT_PULL_CHUNK = PULL_CHUNK_PACKET
     PKT_SENT_CHUNK = SENT_CHUNK_PACKET
+    PKT_STOP_ITER = STOP_ITER_PACKET
     PKT_UNKNOWN = UNKNOWN_PACKET
     PKT_ERROR = ERROR_PACKET
 
-    SESSIONS = dict()
-    MAX_SESH = 8
-
-    PACKETS = dict()
-    PROCESS = dict()
-
-    def __init__(self, manager: "Protocol", states: dict, sessions: dict):
+    def __init__(self, manager: "Protocol", states: dict = dict(), sessions: dict = dict(), max_sesh: int = 0):
         self._queue = asyncio.Queue()
         self._r_start = r(self.RANGE)[0]
         self._pkt_type = None
@@ -771,7 +775,7 @@ class Handler:
         self._manager = manager
         server = self._manager.is_server()
 
-        self.PACKETS = {
+        self._pkgs = {
             self.PKT_ENQUIRY: EnquiryPacket,
             self.PKT_RESPONSE: ResponsePacket,
             self.PKT_TELL: TellPacket,
@@ -791,11 +795,11 @@ class Handler:
             self.PKT_SENT_ITEM: ItemSentPacket,
             self.PKT_PULL_CHUNK: PullChunkPacket,
             self.PKT_SENT_CHUNK: ChunkSentPacket,
+            self.PKT_STOP_ITER: StopIterationPacket,
             self.PKT_UNKNOWN: UnknownPacket,
             self.PKT_ERROR: ErrorPacket,
-            **self.PACKETS
         }
-        self.PROCESS = {
+        self._procs = {
             self.PKT_ENQUIRY: "process_enquiry" if server else None,
             self.PKT_RESPONSE: None if server else "process_response",
             self.PKT_TELL: "process_tell" if server else None,
@@ -815,9 +819,9 @@ class Handler:
             self.PKT_SENT_ITEM: None if server else "process_sentitem",
             self.PKT_PULL_CHUNK: "process_pullchunk" if server else None,
             self.PKT_SENT_CHUNK: None if server else "process_sentchunk",
+            self.PKT_STOP_ITER: "process_stopiter",
             self.PKT_UNKNOWN: "process_unknown",
             self.PKT_ERROR: "process_error",
-            **self.PROCESS
         }
 
         self._processor = asyncio.create_task(self.packet_handler())
@@ -826,10 +830,12 @@ class Handler:
         for key in states:
             self._states[key] = NetworkState(server, *states[key])
 
-        self._sessions = dict()
+        self._seshs = dict()
         self._sesh_cnt = 0
+        self._sesh_max = max_sesh
+        self._sessions = dict()
         for key, value in sessions.items():
-            self.SESSIONS[key] = value
+            self._sessions[key] = value
 
     @property
     def manager(self) -> "Protocol":
@@ -869,8 +875,8 @@ class Handler:
                 self._pkt_type, data = item
                 self._pkt_type = self._pkt_type - self._r_start
 
-                pkt_cls = self.PACKETS[self._pkt_type]
-                proc_name = self.PROCESS[self._pkt_type]
+                pkt_cls = self._pkgs[self._pkt_type]
+                proc_name = self._procs[self._pkt_type]
                 print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
 
                 if proc_name in ("process_unknown", "process_error"):
@@ -894,7 +900,7 @@ class Handler:
 
     def get_session(self, session: int) -> NetworkSession:
         """Load a given session."""
-        return self._sessions[session] if session in self._sessions.keys() else None
+        return self._seshs[session] if session in self._seshs.keys() else None
 
     async def _call_mediate(self, state: int, values: list, sesh: "NetworkSession" = None) -> bytes:
         """
@@ -968,10 +974,13 @@ class Handler:
         Part of a protocol primitive.
         """
         self._sesh_cnt += 1
-        sesh = self.SESSIONS[type](self._manager.is_server(), self._sesh_cnt, **kwargs)
+
+        sesh_data = self._sessions[type]
+        sesh = sesh_data[0](self._manager.is_server(), self._sesh_cnt, **sesh_data[1], **kwargs)
+
         if sesh.type != type:
             raise TypeError("Session built in type: {0} not same as requested: {1}.".format(sesh.type, type))
-        self._sessions[sesh.id] = sesh
+        self._seshs[sesh.id] = sesh
 
         sesh.goto("start")
         self._package(self.PKT_START, StartPacket(type, sesh.id))
@@ -989,7 +998,7 @@ class Handler:
         self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
 
         sesh.goto("accomplished")
-        del self._sessions[sesh.id]
+        del self._seshs[sesh.id]
 
     async def _sesh_create(self, type: int = 0, session: int = 0) -> NetworkSession:
         """
@@ -998,10 +1007,12 @@ class Handler:
         Called from the server.
         Part of a protocol primitive.
         """
-        sesh = self.SESSIONS[type](self._manager.is_server(), session)
+        sesh_data = self._sessions[type]
+        sesh = sesh_data[0](self._manager.is_server(), session, **sesh_data[1])
+
         if sesh.type != type:
             raise TypeError("Session built in type: {0} not same as requested: {1}.".format(sesh.type, type))
-        self._sessions[session] = sesh
+        self._seshs[session] = sesh
         # await self.session_prepare(sesh)
         return sesh
 
@@ -1062,7 +1073,10 @@ class Handler:
         while True:
             sesh.increase()
             self._package(self.PKT_PULL_ITEM, PullItemPacket(sesh.count, sesh.type, sesh.id))
-            yield (await sesh.iter_wait()).item
+            packet = await sesh.iter_wait()
+            if packet is None:
+                break
+            yield packet.item
             if 0 < count == sesh.count:
                 break
 
@@ -1076,7 +1090,10 @@ class Handler:
         while True:
             sesh.increase()
             self._package(self.PKT_PULL_CHUNK, PullChunkPacket(sesh.count, sesh.type, sesh.id))
-            yield (await sesh.iter_wait()).item
+            packet = await sesh.iter_wait()
+            if packet is None:
+                break
+            yield packet.chunk, packet.digest
             if 0 < count == sesh.count:
                 break
 
@@ -1200,9 +1217,9 @@ class Handler:
 
     async def process_start(self, packet: StartPacket):
         """Session start requested."""
-        if len(self._sessions) >= self.MAX_SESH:
+        if len(self._seshs) >= self._sesh_max:
             self._package(self.PKT_BUSY, BusyPacket(packet.type, packet.session))
-        elif packet.session in self._sessions.keys() or packet.type not in self.SESSIONS.keys():
+        elif packet.session in self._seshs.keys() or packet.type not in self._sessions.keys():
             self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
         else:
             sesh = await self._sesh_create(packet.type, packet.session)
@@ -1220,7 +1237,7 @@ class Handler:
 
         sesh.goto("finish")
         sesh.goto("accomplished")
-        del self._sessions[packet.session]
+        del self._seshs[packet.session]
 
     async def process_accept(self, packet: AcceptPacket):
         """Accept response to start session."""
@@ -1240,7 +1257,7 @@ class Handler:
         sesh.goto("refuse")
         sesh.goto("accomplished")
         sesh.future.set_result(SessionCode.REFUSE)
-        del self._sessions[packet.session]
+        del self._seshs[packet.session]
 
     async def process_busy(self, packet: BusyPacket):
         """Busy response to start session."""
@@ -1251,7 +1268,7 @@ class Handler:
         sesh.goto("busy")
         sesh.goto("accomplished")
         sesh.future.set_result(SessionCode.BUSY)
-        del self._sessions[packet.session]
+        del self._seshs[packet.session]
 
     async def process_done(self, packet: DonePacket):
         """Indication there is nothing more to do in session."""
@@ -1336,8 +1353,12 @@ class Handler:
         if sesh.count != packet.count:
             raise IteratorInconsistencyWarning("Pushed item in wrong order.")
 
-        item = await sesh.pull_item()
-        self._package(self.PKT_SENT_ITEM, ItemSentPacket(sesh.count, item, sesh.type, sesh.id))
+        try:
+            item = await sesh.pull_item()
+        except StopAsyncIteration:
+            self._package(self.PKT_STOP_ITER, StopIterationPacket(sesh.count, sesh.type, sesh.id))
+        else:
+            self._package(self.PKT_SENT_ITEM, ItemSentPacket(sesh.count, item, sesh.type, sesh.id))
 
     async def process_sentitem(self, packet: ItemSentPacket):
         """Handle sent item from server"""
@@ -1365,8 +1386,8 @@ class Handler:
         if sesh.count != packet.count:
             raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
 
-        item = await sesh.pull_chunk()
-        self._package(self.PKT_SENT_ITEM, ChunkSentPacket(sesh.count, item, sesh.type, sesh.id))
+        chunk, digest = await sesh.pull_chunk()
+        self._package(self.PKT_SENT_CHUNK, ChunkSentPacket(sesh.count, chunk, digest, sesh.type, sesh.id))
 
     async def process_sentchunk(self, packet: ChunkSentPacket):
         """Handle sent chunk from server"""
@@ -1378,6 +1399,17 @@ class Handler:
             raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
 
         await sesh.iter_result(packet)
+
+    async def process_stopiter(self, packet: StopIterationPacket):
+        """Handle stop iteration from server/client"""
+        sesh = self.get_session(packet.session)
+        if sesh.type != packet.type:
+            raise SessionInconsistencyWarning("Session type inconsistency.")
+
+        if sesh.count != packet.count:
+            raise IteratorInconsistencyWarning("Pushed chunk or item in wrong order.")
+
+        await sesh.iter_result(None)
 
     async def process_unknown(self, packet: UnknownPacket):
         """Handle an unknown packet response.

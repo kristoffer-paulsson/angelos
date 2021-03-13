@@ -26,18 +26,17 @@ class ServiceBoundariesError(RuntimeWarning):
 
 
 class ServiceBrokerHandler(Handler):
-
     LEVEL = 1
     RANGE = 2
 
     ST_VERSION = 0x01
     ST_SERVICE = 0x02
 
-    def __init__(self, manager: "Protocol", version: SyncCallable = None, check: SyncCallable = None):
-        Handler.__init__(self, manager, {
-            self.ST_VERSION: (StateMode.MEDIATE, BROKER_VERSION, version),
-            self.ST_SERVICE: (StateMode.REPRISE, b"", check),
-        }, dict())
+    def __init__(self, manager: "Protocol"):
+        Handler.__init__(self, manager, states={
+            self.ST_VERSION: (StateMode.MEDIATE, BROKER_VERSION),
+            self.ST_SERVICE: (StateMode.REPRISE, b""),
+        })
 
 
 class ServiceBrokerClient(ServiceBrokerHandler):
@@ -62,11 +61,9 @@ class ServiceBrokerClient(ServiceBrokerHandler):
 class ServiceBrokerServer(ServiceBrokerHandler):
 
     def __init__(self, manager: "Protocol"):
-        ServiceBrokerHandler.__init__(
-            self, manager,
-            SyncCallable(self._negotiate_version),
-            SyncCallable(self._check_service)
-        )
+        ServiceBrokerHandler.__init__(self, manager)
+        self._states[self.ST_VERSION].upgrade(SyncCallable(self._negotiate_version))
+        self._states[self.ST_SERVICE].upgrade(SyncCallable(self._check_service))
 
     def _negotiate_version(self, value: bytes) -> int:
         """Negotiate protocol version."""

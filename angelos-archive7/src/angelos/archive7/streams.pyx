@@ -188,6 +188,7 @@ class BaseStream:  # (Iterable, Reversible):
     def len(self):
         """Expose stream byte length."""
         return self._count
+        # FIXME: Should be "self._length"
 
     @property
     def manager(self):

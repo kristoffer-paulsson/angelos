@@ -23,8 +23,7 @@ from angelos.common.misc import AsyncCallable, SyncCallable
 from angelos.common.utils import Util
 from angelos.facade.storage.portfolio_mixin import PortfolioNotFound
 from angelos.lib.policy.crypto import Crypto
-from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkState, \
-    NetworkSession
+from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError
 from angelos.portfolio.utils import Groups
 
 AUTHENTICATION_VERSION = b"authentication-0.1"
@@ -63,7 +62,7 @@ class AuthenticationHandler(Handler):
         keys = Crypto.latest_keys(portfolio.keys)
         specimen = NaCl.random_bytes(64)
         server = manager.is_server()
-        Handler.__init__(self, manager, {
+        Handler.__init__(self, manager, states={
             self.ST_VERSION: (StateMode.MEDIATE, AUTHENTICATION_VERSION),
             self.ST_LOGIN: (StateMode.ONCE, b""),
             self.ST_SERVER_ID: (StateMode.FACT, portfolio.entity.id.bytes if server else uuid.UUID(int=0).bytes),
@@ -77,7 +76,7 @@ class AuthenticationHandler(Handler):
             self.ST_CLIENT_SPECIMEN: (StateMode.ONCE, b"" if server else specimen),
             self.ST_CLIENT_SIGNATURE: (StateMode.FACT, b""),
             self.ST_CLIENT_TIME: (StateMode.ONCE, b"" if server else int(time.time()).to_bytes(8, "big")),
-        }, dict())
+        })
 
 
 class AuthenticationClient(AuthenticationHandler):

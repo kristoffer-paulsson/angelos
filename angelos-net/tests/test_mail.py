@@ -100,7 +100,7 @@ class TestMailHandler(TestCase):
         client = await StubClient.connect(self.client2.facade, "127.0.0.1", 8080)
         self.assertTrue(await client.get_handler(AuthenticationHandler.RANGE).auth_user())
         self.assertTrue(await client.get_handler(ServiceBrokerHandler.RANGE).request(MailHandler.RANGE))
-        await client.get_handler(MailHandler.RANGE).start()
+        await client.get_handler(MailHandler.RANGE).exchange()
         await asyncio.sleep(.1)
 
 

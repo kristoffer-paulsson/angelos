@@ -468,11 +468,11 @@ class Archive7(SharedResourceMixin):
     async def load(self, *args, **kwargs):
         return await self._run(functools.partial(self.__load, *args, **kwargs))
 
-    def __load(self, filename: PurePosixPath, fd: bool = False) -> Union[bytes, FileObject]:
+    def __load(self, filename: PurePosixPath, fd: bool = False, readonly: bool = True) -> Union[bytes, FileObject]:
         """Load data from a file."""
         try:
             if fd:
-                return self.__manager.open(self.__manager.resolve_path(filename, True), "rb")
+                return self.__manager.open(self.__manager.resolve_path(filename, True), "rb" if readonly else "wb")
             else:
                 vfd = self.__manager.open(self.__manager.resolve_path(filename, True), "rb")
                 data = vfd.read()
