@@ -28,9 +28,18 @@ async def inject_mail(server: Facade, sender: PrivatePortfolio, recipient: Portf
     message = CreateMail().perform(sender, recipient).message(
         Generate.lipsum_sentence(), Generate.lipsum(100).decode()).done()
     envelope = WrapEnvelope().perform(sender, recipient, message)
-    print(envelope.owner, recipient.entity.id, len(message.body), message.export_yaml())
     await server.storage.mail.save(
         PurePosixPath("/" + str(envelope.id) + Helper.extension(Definitions.COM_ENVELOPE)), envelope)
+    return message
+
+
+async def prepare_mail(client: Facade, recipient: Portfolio) -> Mail:
+    """Generate one mail to recipient using a facade saving the mail to the outbox."""
+    message = CreateMail().perform(client.data.portfolio, recipient).message(
+        Generate.lipsum_sentence(), Generate.lipsum(100).decode()).done()
+    envelope = WrapEnvelope().perform(client.data.portfolio, recipient, message)
+    await client.storage.vault.save(
+        PurePosixPath("/messages/outbox/" + str(envelope.id) + Helper.extension(Definitions.COM_ENVELOPE)), envelope)
     return message
 
 
@@ -92,6 +101,8 @@ class TestMailHandler(TestCase):
         for _ in range(3):
             await inject_mail(
                 self.server.facade, self.client1.facade.data.portfolio, self.client2.facade.data.portfolio)
+            await prepare_mail(
+                self.client2.facade, self.client1.facade.data.portfolio)
 
         server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
         task = asyncio.create_task(server.serve_forever())

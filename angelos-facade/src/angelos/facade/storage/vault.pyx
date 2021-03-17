@@ -109,6 +109,11 @@ class VaultStorage(StorageFacadeExtension, PortfolioMixin):
             vault_role=vault_role
         )
 
+    async def outbox_iter(self):
+        """Iterator that iterates over files found in the outbox."""
+        async for entry, path in self.archive.search(query=Archive7.Query("/messages/outbox/*").type(TYPE_FILE)):
+            yield entry, path
+
     async def save(self, filename: PurePosixPath, document, document_file_id_match=True) -> uuid.UUID:
         """Save a document at a certain location.
 

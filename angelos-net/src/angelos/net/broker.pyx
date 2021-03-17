@@ -16,7 +16,7 @@
 """Service broker handler."""
 
 from angelos.common.misc import SyncCallable
-from angelos.net.base import Handler, ConfirmCode, StateMode, ProtocolNegotiationError
+from angelos.net.base import Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkSession
 
 BROKER_VERSION = b"broker-0.1"
 
@@ -65,11 +65,11 @@ class ServiceBrokerServer(ServiceBrokerHandler):
         self._states[self.ST_VERSION].upgrade(SyncCallable(self._negotiate_version))
         self._states[self.ST_SERVICE].upgrade(SyncCallable(self._check_service))
 
-    def _negotiate_version(self, value: bytes) -> int:
+    def _negotiate_version(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Negotiate protocol version."""
         return ConfirmCode.YES if value == BROKER_VERSION else ConfirmCode.NO
 
-    def _check_service(self, value: bytes) -> int:
+    def _check_service(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Check handler availability based on range."""
         range = int.from_bytes(value[:2], "big", signed=False)
         result = ConfirmCode.YES if self._manager.get_handler(range) else ConfirmCode.NO_COMMENT

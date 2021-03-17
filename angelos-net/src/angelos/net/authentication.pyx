@@ -23,7 +23,7 @@ from angelos.common.misc import AsyncCallable, SyncCallable
 from angelos.common.utils import Util
 from angelos.facade.storage.portfolio_mixin import PortfolioNotFound
 from angelos.lib.policy.crypto import Crypto
-from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError
+from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkSession
 from angelos.portfolio.utils import Groups
 
 AUTHENTICATION_VERSION = b"authentication-0.1"
@@ -167,15 +167,15 @@ class AuthenticationServer(AuthenticationHandler):
         self._states[self.ST_LOGIN].upgrade(SyncCallable(self._check_login))
         self._states[self.ST_SERVER_SIGNATURE].upgrade(AsyncCallable(self._check_signature))
 
-    def _check_version(self, value: bytes) -> int:
+    def _check_version(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Negotiate protocol version."""
         return ConfirmCode.YES if value == AUTHENTICATION_VERSION else ConfirmCode.NO
 
-    def _check_login(self, value: bytes) -> int:
+    def _check_login(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Check login type availability."""
         return ConfirmCode.YES if value == LoginTypeCode.LOGIN_USER else ConfirmCode.NO
 
-    async def _check_signature(self, value: bytes) -> int:
+    async def _check_signature(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Authenticate signature."""
         self._states[self.ST_CLIENT_SIGNATURE].update(
             Signer(self._manager.facade.data.portfolio.privkeys.seed).signature(

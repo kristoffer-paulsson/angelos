@@ -550,15 +550,15 @@ class NetworkState(WaypointState):
         if not self._frozen:
             self._state = "ready"
 
-    async def eval(self, value: bytes) -> int:
+    async def eval(self, value: bytes, sesh: "NetworkSession" = None) -> int:
         """Check value and set if yes."""
         if self._frozen:  # Never evaluate or assign if frozen.
             raise ReuseStateError("Attempted reuse of frozen state.")
 
         if isinstance(self._checker, AsyncCallable):
-            answer = await self._checker(value)
+            answer = await self._checker(value, sesh)
         elif isinstance(self._checker, SyncCallable):
-            answer = self._checker(value)
+            answer = self._checker(value, sesh)
         elif self._checker is None:
             answer = ConfirmCode.YES
         else:
@@ -598,7 +598,7 @@ class SessionInconsistencyWarning(RuntimeWarning):
 class NetworkSession(WaypointState):
     """Session that run within a protocol handler with states."""
 
-    def __init__(self, server: bool, type: int, id: int, states: dict):
+    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict):
         WaypointState.__init__(self, {
             "ready": ("start",),
             "start": ("finish", "done"),
@@ -615,6 +615,7 @@ class NetworkSession(WaypointState):
             "finish": ("accomplished",),
             "accomplished": tuple(),
         })
+        self._handler = handler
         self._state = "ready"
 
         self._type = type
@@ -662,8 +663,8 @@ class NetworkIterator(NetworkSession):
 
     ST_COUNT = 0x01
 
-    def __init__(self, server: bool, type: int, id: int, states: dict):
-        NetworkSession.__init__(self, server, type, id, states)
+    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict):
+        NetworkSession.__init__(self, handler, server, type, id, states)
 
         self._iter = asyncio.Condition()
         self._data = None
@@ -698,18 +699,18 @@ class NetworkIterator(NetworkSession):
 
 
 class PullIterator(NetworkIterator):
-    def __init__(self, server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
-        NetworkIterator.__init__(self, server, type, id, {
+    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
+        NetworkIterator.__init__(self, handler, server, type, id, {
             **states,
-            self.ST_COUNT: (StateMode.FACT, count.to_bytes(4, byteorder="big", signed=False) if count else b"?", check)
+            self.ST_COUNT: (StateMode.FACT, count.to_bytes(4, byteorder="big", signed=False) if count else b"!", check)
         })
 
 
 class PushIterator(NetworkIterator):
-    def __init__(self, server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
-        NetworkIterator.__init__(self, server, type, id, {
+    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
+        NetworkIterator.__init__(self, handler, server, type, id, {
             **states,
-            self.ST_COUNT: (StateMode.ONCE, count.to_bytes(4, byteorder="big", signed=False) if count else b"?", check)
+            self.ST_COUNT: (StateMode.ONCE, count.to_bytes(4, byteorder="big", signed=False) if count else b"!", check)
         })
 
 
@@ -877,7 +878,7 @@ class Handler:
 
                 pkt_cls = self._pkgs[self._pkt_type]
                 proc_name = self._procs[self._pkt_type]
-                print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
+                # print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
 
                 if proc_name in ("process_unknown", "process_error"):
                     self._silent = True  # Don't send error or unknown response packet.
@@ -976,7 +977,7 @@ class Handler:
         self._sesh_cnt += 1
 
         sesh_data = self._sessions[type]
-        sesh = sesh_data[0](self._manager.is_server(), self._sesh_cnt, **sesh_data[1], **kwargs)
+        sesh = sesh_data[0](self, self._manager.is_server(), self._sesh_cnt, **sesh_data[1], **kwargs)
 
         if sesh.type != type:
             raise TypeError("Session built in type: {0} not same as requested: {1}.".format(sesh.type, type))
@@ -1008,12 +1009,11 @@ class Handler:
         Part of a protocol primitive.
         """
         sesh_data = self._sessions[type]
-        sesh = sesh_data[0](self._manager.is_server(), session, **sesh_data[1])
+        sesh = sesh_data[0](self, self._manager.is_server(), session, **sesh_data[1])
 
         if sesh.type != type:
             raise TypeError("Session built in type: {0} not same as requested: {1}.".format(sesh.type, type))
         self._seshs[session] = sesh
-        # await self.session_prepare(sesh)
         return sesh
 
     def _sesh_done(self, sesh: NetworkSession):
@@ -1052,7 +1052,8 @@ class Handler:
         self._package(self.PKT_PUSH_ITEM, PushItemPacket(sesh.count, item, sesh.type, sesh.id))
         return await sesh.iter_wait()
 
-    async def _push_chunk(self, sesh: NetworkIterator, chunk: bytes):
+    async def _push_chunk(
+            self, sesh: NetworkIterator, chunk: Union[bytes, bytearray], digest: Union[bytes, bytearray]):
         """
         Send an stream of chunks in a for-loop. Sends from client to server.
 
@@ -1060,7 +1061,7 @@ class Handler:
         A protocol primitive.
         """
         sesh.increase()
-        self._package(self.PKT_PUSH_CHUNK, PushChunkPacket(sesh.count, chunk, sesh.type, sesh.id))
+        self._package(self.PKT_PUSH_CHUNK, PushChunkPacket(sesh.count, chunk, digest, sesh.type, sesh.id))
         return await sesh.iter_wait()
 
     async def _iter_pull_item(self, sesh: NetworkIterator, count: int = 0):
@@ -1127,8 +1128,12 @@ class Handler:
         A primitive processor of (show/tell).
         """
         try:
-            machine = self.get_session(packet.session).states[packet.state] \
-                if packet.session else self._states[packet.state]
+            if packet.session:
+                sesh = self.get_session(packet.session)
+                machine = sesh.states[packet.state]
+            else:
+                sesh = None
+                machine = self._states[packet.state]
 
             who = machine.other()
             # If True or None use with statement.
@@ -1142,7 +1147,7 @@ class Handler:
                 if packet.value == b"?":  # or not machine.check:
                     result = ConfirmCode.NO_COMMENT
                 else:
-                    result = await machine.eval(packet.value)
+                    result = await machine.eval(packet.value, sesh)
                     if not who:
                         await machine.set_result(result)
 
@@ -1205,13 +1210,17 @@ class Handler:
         Processed on the client.
         A primitive processor of (query).
         """
-        machine = self.get_session(packet.session).states[packet.state] \
-            if packet.session else self._states[packet.state]
+        if packet.session:
+            sesh = self.get_session(packet.session)
+            machine = sesh.states[packet.state]
+        else:
+            sesh = None
+            machine = self._states[packet.state]
 
         if machine.other() != False:  # Them or no-one
             machine.other(reset=True)  # Reset other
         elif machine.mode == StateMode.FACT:  # Us
-            await machine.set_result((await machine.eval(packet.value), packet.value))
+            await machine.set_result((await machine.eval(packet.value, sesh), packet.value))
         else:
             await machine.set_result((None, packet.value))
 
@@ -1288,14 +1297,14 @@ class Handler:
 
         sesh.increase()
         max_iter = sesh.states[NetworkIterator.ST_COUNT].value
-        if max_iter != b"?":
+        if max_iter != b"!":
             if sesh.count > int.from_bytes(max_iter, "big", signed=False):
                 raise IteratorInconsistencyWarning("More items pushed than max.")
 
         if sesh.count != packet.count:
             raise IteratorInconsistencyWarning("Pushed item in wrong order.")
 
-        await sesh.push_item(packet)
+        await sesh.push_item(packet.item)
         self._package(self.PKT_RCVD_ITEM, ItemReceivedPacket(sesh.count, sesh.type, sesh.id))
 
     async def process_rcvditem(self, packet: ItemReceivedPacket):
@@ -1317,14 +1326,14 @@ class Handler:
 
         sesh.increase()
         max_iter = sesh.states[NetworkIterator.ST_COUNT].value
-        if max_iter != b"?":
+        if max_iter != b"!":
             if sesh.count > int.from_bytes(max_iter, "big", signed=False):
                 raise IteratorInconsistencyWarning("More chunks pushed than max.")
 
         if sesh.count != packet.count:
             raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
 
-        await sesh.push_chunk(packet)
+        await sesh.push_chunk(packet.chunk, packet.digest)
         self._package(self.PKT_RCVD_CHUNK, ChunkReceivedPacket(sesh.count, sesh.type, sesh.id))
 
     async def process_rcvdchunk(self, packet: ChunkReceivedPacket):
@@ -1346,7 +1355,7 @@ class Handler:
 
         sesh.increase()
         max_iter = sesh.states[NetworkIterator.ST_COUNT].value
-        if max_iter != b"?":
+        if max_iter != b"!":
             if sesh.count > int.from_bytes(max_iter, "big", signed=False):
                 raise IteratorInconsistencyWarning("More item pushed than max.")
 
@@ -1379,7 +1388,7 @@ class Handler:
 
         sesh.increase()
         max_iter = sesh.states[NetworkIterator.ST_COUNT].value
-        if max_iter != b"?":
+        if max_iter != b"!":
             if sesh.count > int.from_bytes(max_iter, "big", signed=False):
                 raise IteratorInconsistencyWarning("More chunks pushed than max.")
 
@@ -1531,7 +1540,7 @@ class Protocol(asyncio.Protocol):
 
         self.check()
 
-        print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
+        # print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
 
         data = bytes(packet)
         self._transport.write(

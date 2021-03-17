@@ -16,11 +16,11 @@
 """Mail handler."""
 import datetime
 import hashlib
-import os
 import typing
 import uuid
+from pathlib import PurePosixPath
 
-from angelos.archive7.fs import FileObject
+from angelos.archive7.fs import FileObject, EntryRecord
 from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.document.utils import Helper, Definitions
 from angelos.net.base import Handler, NetworkIterator, PullItemIterator, PullChunkIterator, \
@@ -50,21 +50,19 @@ class ChunkError(RuntimeWarning):
 class ReceiveIterator(PullItemIterator):
     """Test stub iterator item push with states."""
 
-    def __init__(self, server: bool, session: int, check: SyncCallable = None):
-        PullItemIterator.__init__(self, server, SESH_TYPE_RECEIVE, session, {
+    def __init__(self, handler: "Handler", server: bool, session: int, check: SyncCallable = None):
+        PullItemIterator.__init__(self, handler, server, SESH_TYPE_RECEIVE, session, {
         }, 0, check)
-        self._external = None
-        self._handler = None
+        self._iterator = None
 
     async def pull_item(self) -> uuid.UUID:
-        item = await self._external.__anext__()
+        item = await self._iterator.__anext__()
         self._handler.set_entry(item)
         return item[0].id
 
-    def external(self, handler: "MailHandler", iterator: typing.Iterator):
+    def iterator_of_source(self, iterator: typing.Iterator):
         """Set handler and iterator."""
-        self._handler = handler
-        self._external = iterator
+        self._iterator = iterator
 
 
 class DownloadIterator(PullChunkIterator):
@@ -77,8 +75,8 @@ class DownloadIterator(PullChunkIterator):
     ST_LENGTH = 0x06
     ST_ID = 0x07
 
-    def __init__(self, server: bool, session: int, check: SyncCallable = None):
-        PullChunkIterator.__init__(self, server, SESH_TYPE_DOWNLOAD, session, {
+    def __init__(self, handler: "Handler", server: bool, session: int, check: SyncCallable = None):
+        PullChunkIterator.__init__(self, handler, server, SESH_TYPE_DOWNLOAD, session, {
             self.ST_CREATED: (StateMode.FACT, b""),
             self.ST_MODIFIED: (StateMode.FACT, b""),
             self.ST_OWNER: (StateMode.FACT, b""),
@@ -87,21 +85,19 @@ class DownloadIterator(PullChunkIterator):
             self.ST_ID: (StateMode.ONCE, b"")
         }, 0, check)
         self._fd = None
-        self._handler = None
         self._stream = None
 
     async def pull_chunk(self) -> typing.Tuple[bytes, bytes]:
         block = self._stream.block
         if block.next == -1:
             self._fd.close()
-            await self._handler.del_entry()
+            await self._handler.del_entry(True)
         else:
             self._stream.next()
         return block.data, block.digest
 
-    def external(self, handler: "MailHandler", fd: FileObject):
+    def source(self, fd: FileObject):
         """Set handler and iterator."""
-        self._handler = handler
         self._fd = fd
         self._stream = fd.stream
 
@@ -109,17 +105,50 @@ class DownloadIterator(PullChunkIterator):
 class SendIterator(PushItemIterator):
     """Test stub iterator item push with states."""
 
-    def __init__(self, server: bool, session: int, count: int = 0):
-        PushItemIterator.__init__(self, server, SESH_TYPE_SEND, session, {
-        }, count, SyncCallable(self.count_state))
+    def __init__(self, handler: "Handler", server: bool, session: int, check: SyncCallable = None):
+        PushItemIterator.__init__(self, handler, server, SESH_TYPE_SEND, session, {
+        }, 0, check)
+
+    async def push_item(self, item: uuid.UUID):
+        self._handler.set_entry((item,))
 
 
 class UploadIterator(PushChunkIterator):
     """Test stub iterator item push with states."""
 
-    def __init__(self, server: bool, session: int, count: int = 0):
-        PushChunkIterator.__init__(self, server, SESH_TYPE_UPLOAD, session, {
-        }, count, SyncCallable(self.server_trigger if server else self.count_state))
+    ST_CREATED = 0x02
+    ST_MODIFIED = 0x03
+    ST_OWNER = 0x04
+    ST_NAME = 0x05
+    ST_LENGTH = 0x06
+    ST_ID = 0x07
+
+    def __init__(self, handler: "Handler", server: bool, session: int, check: SyncCallable = None):
+        PushChunkIterator.__init__(self, handler, server, SESH_TYPE_UPLOAD, session, {
+            self.ST_CREATED: (StateMode.ONCE, b""),
+            self.ST_MODIFIED: (StateMode.ONCE, b""),
+            self.ST_OWNER: (StateMode.ONCE, b""),
+            self.ST_NAME: (StateMode.ONCE, b""),
+            self.ST_LENGTH: (StateMode.ONCE, b""),
+            self.ST_ID: (StateMode.ONCE, b"")
+        }, 0, check)
+        self._fd = None
+
+    async def push_chunk(self, chunk: bytes, digest: bytes):
+        if hashlib.sha1(chunk).digest() != digest:
+            raise ChunkError()
+
+        self._fd.write(chunk)
+
+        count = int.from_bytes(self._states[UploadIterator.ST_COUNT].value, "big", signed=False)
+        if self._cnt == count:
+            self._fd.truncate(int.from_bytes(self._states[UploadIterator.ST_LENGTH].value, "big", signed=False))
+            self._fd.close()
+            await self._handler.del_entry()
+
+    def source(self, fd: FileObject):
+        """Set handler and iterator."""
+        self._fd = fd
 
 
 class MailHandler(Handler):
@@ -135,16 +164,17 @@ class MailHandler(Handler):
 
     ST_VERSION = 0x01
 
-    def __init__(self, manager: "Protocol", receive: SyncCallable = None, download: SyncCallable = None):
+    def __init__(self, manager: "Protocol"):
         server = manager.is_server()
-        Handler.__init__(self, manager, states={
+        Handler.__init__(self, manager,
+        states={
             self.ST_VERSION: (StateMode.MEDIATE, MAIL_VERSION),
         },
         sessions={
-            self.SESH_RECEIVE: (ReceiveIterator, {"check": receive} if server else dict()),
-            self.SESH_DOWNLOAD: (DownloadIterator, {"check": download} if server else dict()),
-            self.SESH_SEND: (SendIterator, {} if server else dict()),
-            self.SESH_UPLOAD: (UploadIterator, {} if server else dict()),
+            self.SESH_RECEIVE: (ReceiveIterator, dict()),
+            self.SESH_DOWNLOAD: (DownloadIterator, dict()),
+            self.SESH_SEND: (SendIterator, dict()),
+            self.SESH_UPLOAD: (UploadIterator, dict()),
         }, max_sesh=5)
 
 
@@ -159,7 +189,7 @@ class MailClient(MailHandler):
         user = self._manager.facade.data.portfolio.entity.id
 
         await self._receive_mails()
-        # await self._send_mails()
+        await self._send_mails()
 
     async def _receive_mails(self):
         """Iterate over received mails."""
@@ -204,35 +234,63 @@ class MailClient(MailHandler):
         """Iterate over sent mails."""
         items = list()
         async with self._sesh_context(self.SESH_SEND) as sesh:
-            answer, data = await self._call_query(NetworkIterator.ST_COUNT, sesh)
-            count = int.from_bytes(data, "big", signed=False)
-            async for item in self._iter_pull_item(sesh, count):
-                items.append(item)
-        return items
-
-    async def _upload(self):
-        """Upload sent mail."""
-        async with self._sesh_context(self.SESH_UPLOAD, count=5) as sesh:
             await self._call_tell(NetworkIterator.ST_COUNT, sesh)
-            for chunk in [os.urandom(4096) for _ in range(5)]:
-                await self._push_chunk(sesh, chunk)
+            async for entry, path in self._manager.facade.storage.vault.outbox_iter():
+                await self._push_item(sesh, entry.id)
+                await self._upload(entry, path)
+
+    async def _block_iter(self, fd: FileObject):
+        """Iterate over block in a file descriptor stream."""
+        stream = fd.stream
+
+        while True:
+            block = stream.block
+            yield block.data, block.digest
+            if block.next == -1:
+                fd.close()
+                break
+            else:
+                stream.next()
+
+    async def _upload(self, entry: EntryRecord, path: PurePosixPath):
+        """Upload sent mail."""
+        async with self._sesh_context(self.SESH_UPLOAD) as sesh:
+            sesh.states[UploadIterator.ST_CREATED].update(entry.created.isoformat().encode())
+            await self._call_tell(UploadIterator.ST_CREATED, sesh)
+            sesh.states[UploadIterator.ST_MODIFIED].update(entry.modified.isoformat().encode())
+            await self._call_tell(UploadIterator.ST_MODIFIED, sesh)
+            sesh.states[UploadIterator.ST_OWNER].update(entry.owner.bytes)
+            await self._call_tell(UploadIterator.ST_OWNER, sesh)
+            sesh.states[UploadIterator.ST_NAME].update(entry.name)
+            await self._call_tell(UploadIterator.ST_NAME, sesh)
+            sesh.states[UploadIterator.ST_LENGTH].update(entry.length.to_bytes(8, "big", signed=False))
+            await self._call_tell(UploadIterator.ST_LENGTH, sesh)
+
+            fd = await self._manager.facade.storage.vault.archive.load(path, True)
+            sesh.states[UploadIterator.ST_COUNT].update(fd.stream.count.to_bytes(8, "big", signed=False))
+
+            await self._call_tell(UploadIterator.ST_COUNT, sesh)
+            async for chunk, digest in self._block_iter(fd):
+                await self._push_chunk(sesh, chunk, digest)
+
+            await self._manager.facade.storage.vault.archive.remove(path)
 
 
 class MailServer(MailHandler):
     """Server side mail handler."""
 
     def __init__(self, manager: "Protocol"):
-        MailHandler.__init__(
-            self, manager,
-            receive=AsyncCallable(self._receive_items),
-            download=AsyncCallable(self._download_chunks)
-        )
+        MailHandler.__init__(self, manager)
+        self._sessions[self.SESH_RECEIVE][1]["check"] = AsyncCallable(self._receive_items)
+        self._sessions[self.SESH_DOWNLOAD][1]["check"] = AsyncCallable(self._download_chunks)
+        self._sessions[self.SESH_SEND][1]["check"] = AsyncCallable(self._send_items)
+        self._sessions[self.SESH_UPLOAD][1]["check"] = AsyncCallable(self._upload_chunks)
         self._item = None
 
     async def _receive_items(self, state: NetworkState, sesh: ReceiveIterator) -> int:
         """Prepare ReceiveIterator with an iterator."""
-        sesh.external(self, self._manager.facade.storage.mail.receive_iter(self._manager.portfolio.entity.id))
-        state.update(b"?")
+        sesh.iterator_of_source(self._manager.facade.storage.mail.receive_iter(self._manager.portfolio.entity.id))
+        state.update(b"!")
         return ConfirmCode.YES
 
     def set_entry(self, item: tuple):
@@ -240,7 +298,7 @@ class MailServer(MailHandler):
             raise TypeError("Current item already set.")
         self._item = item
 
-    async def _download_chunks(self, state: NetworkState, sesh: ReceiveIterator) -> int:
+    async def _download_chunks(self, state: NetworkState, sesh: DownloadIterator) -> int:
         """Prepare DownloadIterator with file information and chunk count."""
         if not self._item:
             raise TypeError("No current item set.")
@@ -249,7 +307,7 @@ class MailServer(MailHandler):
             raise TypeError("Current item out of sync with session.")
 
         fd = await self._manager.facade.storage.mail.archive.load(self._item[1], True)
-        sesh.external(self, fd)
+        sesh.source(fd)
 
         state.update(fd.stream.count.to_bytes(8, "big", signed=False))
         sesh.states[DownloadIterator.ST_CREATED].update(self._item[0].created.isoformat().encode())
@@ -258,7 +316,33 @@ class MailServer(MailHandler):
         sesh.states[DownloadIterator.ST_NAME].update(self._item[0].name)
         sesh.states[DownloadIterator.ST_LENGTH].update(self._item[0].length.to_bytes(8, "big", signed=False))
 
-    async def del_entry(self):
-        await self._manager.facade.storage.mail.archive.remove(self._item[1])
+        return ConfirmCode.YES
+
+    async def del_entry(self, delete: bool = False):
+        if delete:
+            await self._manager.facade.storage.mail.archive.remove(self._item[1])
         self._item = None
+
+    async def _send_items(self, value: bytes, sesh: SendIterator) -> int:
+        """Prepare SendIterator with an iterator."""
+        return ConfirmCode.YES if value == b"!" else ConfirmCode.NO
+
+    async def _upload_chunks(self, state: NetworkState, sesh: UploadIterator) -> int:
+        """Prepare UploadIterator with file information and chunk count."""
+        if not self._item:
+            raise TypeError("No current item set.")
+
+        created = datetime.datetime.fromisoformat(
+            sesh.states[UploadIterator.ST_CREATED].value.decode())
+        modified = datetime.datetime.fromisoformat(
+            sesh.states[UploadIterator.ST_MODIFIED].value.decode())
+        owner = uuid.UUID(bytes=sesh.states[UploadIterator.ST_OWNER].value)
+        name = sesh.states[UploadIterator.ST_NAME].value
+        path = PurePosixPath("/" + str(self._item[0]) + Helper.extension(Definitions.COM_ENVELOPE))
+
+        await self._manager.facade.storage.vault.archive.mkfile(
+            path, b"", created=created, modified=modified, owner=owner, id=self._item[0])
+        sesh.source(await self._manager.facade.storage.vault.archive.load(path, True, False))
+
+        return ConfirmCode.YES
 
