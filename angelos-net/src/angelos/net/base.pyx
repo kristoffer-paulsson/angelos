@@ -18,6 +18,7 @@ import asyncio
 import contextlib
 import datetime
 import enum
+import random
 import uuid
 from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
@@ -27,6 +28,7 @@ from angelos.common.misc import StateMachine, SyncCallable, AsyncCallable
 from angelos.common.utils import Util
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
+from angelos.net.noise import NoiseTransportProtocol
 from angelos.portfolio.collection import Portfolio
 
 # 1. Packet type, 2 bytes
@@ -57,33 +59,36 @@ from angelos.portfolio.collection import Portfolio
 # 2. Communicating states
 # 3. Begin and end sessions
 
+EMPTY_PAYLOAD = b"0101010101010101010101010101010101010101010101010101010101010101"
 
-PUSH_ITEM_PACKET = 106
-RECEIVED_ITEM_PACKET = 107
-PUSH_CHUNK_PACKET = 108
-RECEIVED_CHUNK_PACKET = 109
-PULL_ITEM_PACKET = 110
-SENT_ITEM_PACKET = 111
-PULL_CHUNK_PACKET = 112
-SENT_CHUNK_PACKET = 113
-STOP_ITER_PACKET = 114
 
-ENQUIRY_PACKET = 115  # Ask for information
-RESPONSE_PACKET = 116  # Response to enquery
+PUSH_ITEM_PACKET = 105
+RECEIVED_ITEM_PACKET = 106
+PUSH_CHUNK_PACKET = 107
+RECEIVED_CHUNK_PACKET = 108
+PULL_ITEM_PACKET = 109
+SENT_ITEM_PACKET = 110
+PULL_CHUNK_PACKET = 111
+SENT_CHUNK_PACKET = 112
+STOP_ITER_PACKET = 113
 
-TELL_PACKET = 117  # Tell the state of things
-SHOW_PACKET = 118  # Demand to know the state if things
-CONFIRM_PACKET = 119  # Accept or deny a state change or proposal
+ENQUIRY_PACKET = 114  # Ask for information
+RESPONSE_PACKET = 115  # Response to enquery
 
-START_PACKET = 120  # Initiate a session
-FINISH_PACKET = 121  # Finalize a started session
-ACCEPT_PACKET = 122  # Acceptance toward session or request
-REFUSE_PACKET = 123  # Refusal of session or request
-BUSY_PACKET = 124  # To busy for session or request
-DONE_PACKET = 125  # Nothing more to do in session or request
+TELL_PACKET = 116  # Tell the state of things
+SHOW_PACKET = 117  # Demand to know the state if things
+CONFIRM_PACKET = 118  # Accept or deny a state change or proposal
 
-UNKNOWN_PACKET = 126  # Unrecognized packet
-ERROR_PACKET = 127  # Technical error
+START_PACKET = 119  # Initiate a session
+FINISH_PACKET = 120  # Finalize a started session
+ACCEPT_PACKET = 121  # Acceptance toward session or request
+REFUSE_PACKET = 122  # Refusal of session or request
+BUSY_PACKET = 123  # To busy for session or request
+DONE_PACKET = 124  # Nothing more to do in session or request
+
+UNKNOWN_PACKET = 125  # Unrecognized packet
+ERROR_PACKET = 126  # Technical error
+NULL_PACKET = 127  # Technical error
 
 
 class ConfirmCode(enum.IntEnum):
@@ -386,6 +391,12 @@ class UnknownPacket(Packet, fields=("type", "level", "process"),
 class ErrorPacket(Packet, fields=("type", "level", "process", "error"),
                   fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
     """Error packet."""
+
+
+class NullPacket(
+    Packet, fields=("even", "dummy", "type", "session"),
+    fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 64), (DataType.UINT,), (DataType.UINT,))):
+    """Null packet, used to even out asynchronous communication to synchronous."""
 
 
 class WaypointState(StateMachine):
@@ -766,6 +777,7 @@ class Handler:
     PKT_STOP_ITER = STOP_ITER_PACKET
     PKT_UNKNOWN = UNKNOWN_PACKET
     PKT_ERROR = ERROR_PACKET
+    PKT_NULL = NULL_PACKET
 
     def __init__(self, manager: "Protocol", states: dict = dict(), sessions: dict = dict(), max_sesh: int = 0):
         self._queue = asyncio.Queue()
@@ -799,6 +811,7 @@ class Handler:
             self.PKT_STOP_ITER: StopIterationPacket,
             self.PKT_UNKNOWN: UnknownPacket,
             self.PKT_ERROR: ErrorPacket,
+            self.PKT_NULL: NullPacket,
         }
         self._procs = {
             self.PKT_ENQUIRY: "process_enquiry" if server else None,
@@ -823,6 +836,7 @@ class Handler:
             self.PKT_STOP_ITER: "process_stopiter",
             self.PKT_UNKNOWN: "process_unknown",
             self.PKT_ERROR: "process_error",
+            self.PKT_NULL: "process_null" # if server else None,
         }
 
         self._processor = asyncio.create_task(self.packet_handler())
@@ -858,9 +872,9 @@ class Handler:
         """Expose local states."""
         return self._states
 
-    def _package(self, pkt_type: int, packet: Packet):
+    async def _package(self, pkt_type: int, packet: Packet):
         """Simplifying packet sending."""
-        self._manager.send_packet(pkt_type + self._r_start, self.LEVEL, packet)
+        await self._manager.send_packet(pkt_type + self._r_start, self.LEVEL, packet)
 
     async def packet_handler(self):
         """Handle received packet.
@@ -917,7 +931,7 @@ class Handler:
             for value in values:
                 machine.update(value)
                 machine.goto("tell")
-                self._package(self.PKT_TELL, TellPacket(
+                await self._package(self.PKT_TELL, TellPacket(
                     state, machine.value, sesh.type if sesh else 0, sesh.id if sesh else 0))
                 answer = await machine.wait()
                 if answer == ConfirmCode.YES:
@@ -936,8 +950,10 @@ class Handler:
         machine = sesh.states[state] if sesh else self._states[state]
         with machine.us():
             machine.goto("show")
-            self._package(self.PKT_SHOW, ShowPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            await self._package(self.PKT_SHOW, ShowPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
             answer = await machine.wait()
+            await self._package(self.PKT_NULL, NullPacket(
+                True, EMPTY_PAYLOAD[:random.randrange(1, 64)], sesh.type, sesh.session))
         return machine.value if answer == ConfirmCode.YES else None
 
     async def _call_tell(self, state: int, sesh: "NetworkSession" = None) -> bytes:
@@ -950,7 +966,7 @@ class Handler:
         machine = sesh.states[state] if sesh else self._states[state]
         with machine.us():
             machine.goto("tell")
-            self._package(self.PKT_TELL, TellPacket(
+            await self._package(self.PKT_TELL, TellPacket(
                 state, machine.value, sesh.type if sesh else 0, sesh.id if sesh else 0))
             answer = await machine.wait()
         return machine.value if answer == ConfirmCode.YES else None
@@ -964,7 +980,7 @@ class Handler:
         """
         machine = sesh.states[state] if sesh else self._states[state]
         with machine.us():
-            self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            await self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
             return await machine.wait()
 
     async def _sesh_open(self, type: int, **kwargs) -> NetworkSession:
@@ -984,7 +1000,7 @@ class Handler:
         self._seshs[sesh.id] = sesh
 
         sesh.goto("start")
-        self._package(self.PKT_START, StartPacket(type, sesh.id))
+        await self._package(self.PKT_START, StartPacket(type, sesh.id))
         result = await sesh.wait()
         return sesh if result == SessionCode.ACCEPT else None
 
@@ -996,7 +1012,7 @@ class Handler:
         Part of a protocol primitive.
         """
         sesh.goto("finish")
-        self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
+        await self._package(self.PKT_FINISH, FinishPacket(sesh.type, sesh.id))
 
         sesh.goto("accomplished")
         del self._seshs[sesh.id]
@@ -1016,7 +1032,7 @@ class Handler:
         self._seshs[session] = sesh
         return sesh
 
-    def _sesh_done(self, sesh: NetworkSession):
+    async def _sesh_done(self, sesh: NetworkSession):
         """
         Tell client there is no more to do in session.
 
@@ -1024,7 +1040,7 @@ class Handler:
         Part of a protocol primitive.
         """
         sesh.goto("accomplished")
-        self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
+        await self._package(self.PKT_DONE, DonePacket(sesh.type, sesh.id))
 
     @contextlib.asynccontextmanager
     async def _sesh_context(self, sesh_type: int, **kwargs):
@@ -1049,7 +1065,7 @@ class Handler:
         A protocol primitive.
         """
         sesh.increase()
-        self._package(self.PKT_PUSH_ITEM, PushItemPacket(sesh.count, item, sesh.type, sesh.id))
+        await self._package(self.PKT_PUSH_ITEM, PushItemPacket(sesh.count, item, sesh.type, sesh.id))
         return await sesh.iter_wait()
 
     async def _push_chunk(
@@ -1061,7 +1077,7 @@ class Handler:
         A protocol primitive.
         """
         sesh.increase()
-        self._package(self.PKT_PUSH_CHUNK, PushChunkPacket(sesh.count, chunk, digest, sesh.type, sesh.id))
+        await self._package(self.PKT_PUSH_CHUNK, PushChunkPacket(sesh.count, chunk, digest, sesh.type, sesh.id))
         return await sesh.iter_wait()
 
     async def _iter_pull_item(self, sesh: NetworkIterator, count: int = 0):
@@ -1073,7 +1089,7 @@ class Handler:
         """
         while True:
             sesh.increase()
-            self._package(self.PKT_PULL_ITEM, PullItemPacket(sesh.count, sesh.type, sesh.id))
+            await self._package(self.PKT_PULL_ITEM, PullItemPacket(sesh.count, sesh.type, sesh.id))
             packet = await sesh.iter_wait()
             if packet is None:
                 break
@@ -1090,7 +1106,7 @@ class Handler:
         """
         while True:
             sesh.increase()
-            self._package(self.PKT_PULL_CHUNK, PullChunkPacket(sesh.count, sesh.type, sesh.id))
+            await self._package(self.PKT_PULL_CHUNK, PullChunkPacket(sesh.count, sesh.type, sesh.id))
             packet = await sesh.iter_wait()
             if packet is None:
                 break
@@ -1118,7 +1134,7 @@ class Handler:
         except KeyError:
             value = b"?"
 
-        self._package(self.PKT_TELL, TellPacket(packet.state, value, packet.type, packet.session))
+        await self._package(self.PKT_TELL, TellPacket(packet.state, value, packet.type, packet.session))
 
     async def process_tell(self, packet: TellPacket):
         """
@@ -1156,7 +1172,7 @@ class Handler:
         except KeyError:
             result = ConfirmCode.NO_COMMENT
 
-        self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
+        await self._package(self.PKT_CONFIRM, ConfirmPacket(packet.state, result, packet.type, packet.session))
 
     async def process_confirm(self, packet: ConfirmPacket):
         """
@@ -1201,7 +1217,7 @@ class Handler:
         if machine.check:
             await machine.trigger(machine, sesh)
 
-        self._package(self.PKT_RESPONSE, ResponsePacket(packet.state, machine.value, packet.type, packet.session))
+        await self._package(self.PKT_RESPONSE, ResponsePacket(packet.state, machine.value, packet.type, packet.session))
 
     async def process_response(self, packet: ResponsePacket):
         """
@@ -1227,16 +1243,16 @@ class Handler:
     async def process_start(self, packet: StartPacket):
         """Session start requested."""
         if len(self._seshs) >= self._sesh_max:
-            self._package(self.PKT_BUSY, BusyPacket(packet.type, packet.session))
+            await self._package(self.PKT_BUSY, BusyPacket(packet.type, packet.session))
         elif packet.session in self._seshs.keys() or packet.type not in self._sessions.keys():
-            self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
+            await self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
         else:
             sesh = await self._sesh_create(packet.type, packet.session)
             if not sesh:
-                self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
+                await self._package(self.PKT_REFUSE, RefusePacket(packet.type, packet.session))
             else:
                 sesh.goto("start")
-                self._package(self.PKT_ACCEPT, AcceptPacket(packet.type, packet.session))
+                await self._package(self.PKT_ACCEPT, AcceptPacket(packet.type, packet.session))
 
     async def process_finish(self, packet: FinishPacket):
         """Close an open session."""
@@ -1246,6 +1262,8 @@ class Handler:
 
         sesh.goto("finish")
         sesh.goto("accomplished")
+        await self._package(self.PKT_NULL, NullPacket(
+            True, EMPTY_PAYLOAD[:random.randrange(1, 64)], packet.type, packet.session))
         del self._seshs[packet.session]
 
     async def process_accept(self, packet: AcceptPacket):
@@ -1305,7 +1323,7 @@ class Handler:
             raise IteratorInconsistencyWarning("Pushed item in wrong order.")
 
         await sesh.push_item(packet.item)
-        self._package(self.PKT_RCVD_ITEM, ItemReceivedPacket(sesh.count, sesh.type, sesh.id))
+        await self._package(self.PKT_RCVD_ITEM, ItemReceivedPacket(sesh.count, sesh.type, sesh.id))
 
     async def process_rcvditem(self, packet: ItemReceivedPacket):
         """Handle received item confirmation from server."""
@@ -1334,7 +1352,7 @@ class Handler:
             raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
 
         await sesh.push_chunk(packet.chunk, packet.digest)
-        self._package(self.PKT_RCVD_CHUNK, ChunkReceivedPacket(sesh.count, sesh.type, sesh.id))
+        await self._package(self.PKT_RCVD_CHUNK, ChunkReceivedPacket(sesh.count, sesh.type, sesh.id))
 
     async def process_rcvdchunk(self, packet: ChunkReceivedPacket):
         """Handle received chunk confirmation from server."""
@@ -1348,7 +1366,7 @@ class Handler:
         await sesh.iter_result(packet)
 
     async def process_pullitem(self, packet: PullItemPacket):
-        """Handle item pull request from client"""
+        """Handle item pull request from client."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
             raise SessionInconsistencyWarning("Session type inconsistency.")
@@ -1365,12 +1383,12 @@ class Handler:
         try:
             item = await sesh.pull_item()
         except StopAsyncIteration:
-            self._package(self.PKT_STOP_ITER, StopIterationPacket(sesh.count, sesh.type, sesh.id))
+            await self._package(self.PKT_STOP_ITER, StopIterationPacket(sesh.count, sesh.type, sesh.id))
         else:
-            self._package(self.PKT_SENT_ITEM, ItemSentPacket(sesh.count, item, sesh.type, sesh.id))
+            await self._package(self.PKT_SENT_ITEM, ItemSentPacket(sesh.count, item, sesh.type, sesh.id))
 
     async def process_sentitem(self, packet: ItemSentPacket):
-        """Handle sent item from server"""
+        """Handle sent item from server."""
         sesh = self.get_session(packet.session)
         if sesh.type != packet.type:
             raise SessionInconsistencyWarning("Session type inconsistency.")
@@ -1396,7 +1414,7 @@ class Handler:
             raise IteratorInconsistencyWarning("Pushed chunk in wrong order.")
 
         chunk, digest = await sesh.pull_chunk()
-        self._package(self.PKT_SENT_CHUNK, ChunkSentPacket(sesh.count, chunk, digest, sesh.type, sesh.id))
+        await self._package(self.PKT_SENT_CHUNK, ChunkSentPacket(sesh.count, chunk, digest, sesh.type, sesh.id))
 
     async def process_sentchunk(self, packet: ChunkSentPacket):
         """Handle sent chunk from server"""
@@ -1436,6 +1454,13 @@ class Handler:
         """
         raise NotImplementedError()
 
+    async def process_null(self, packet: NullPacket):
+        """Handle a null packet. Null packets are used for fillers to make all communication synchronous."""
+        if not packet.even:
+            await self._package(self.PKT_NULL, NullPacket(
+                True, EMPTY_PAYLOAD[:random.randrange(1, 64)], packet.type, packet.session))
+
+
 
 class Protocol(asyncio.Protocol):
     """Protocol for handling packages going from and to packet handlers."""
@@ -1450,6 +1475,8 @@ class Protocol(asyncio.Protocol):
         self._transport = None
         self._portfolio = None
         self._node = None
+
+        self._trans_fut = asyncio.get_event_loop().create_future()
 
     @property
     def facade(self) -> Facade:
@@ -1467,6 +1494,10 @@ class Protocol(asyncio.Protocol):
     def manager(self) -> "ConnectionManager":
         """Expose the connection manager."""
         return self._mananger
+
+    async def ready(self):
+        """Wait for the underlying transport to be ready."""
+        await self._trans_fut
 
     def is_server(self) -> bool:
         """Whether is a server."""
@@ -1493,6 +1524,7 @@ class Protocol(asyncio.Protocol):
     def connection_made(self, transport: asyncio.Transport):
         """Connection is made."""
         self._transport = transport
+        self._trans_fut.set_result(True)
 
     def check(self):
         """Raise exception if connection is closed."""
@@ -1533,12 +1565,13 @@ class Protocol(asyncio.Protocol):
                 else:
                     handler.queue.put_nowait((pkt_type, chunk))
 
-    def send_packet(self, pkt_type: int, pkt_level: int, packet: Packet):
+    async def send_packet(self, pkt_type: int, pkt_level: int, packet: Packet):
         """Send packet over socket."""
         if not self._transport:
             raise NetworkError(*NetworkError.NO_TRANSPORT)
 
         self.check()
+        await self._transport.wait()
 
         # print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
 
@@ -1550,16 +1583,23 @@ class Protocol(asyncio.Protocol):
             data
         )
 
+    def _send_packet_async(self, pkt_type: int, pkt_level: int, packet: Packet):
+        def done(fut):
+            fut.result()
+
+        task = asyncio.create_task(pkt_type, pkt_level, packet)
+        task.add_done_callback(done)
+
     def unknown(self, pkt_type: int, pkt_level: int, process: int = 0):
         """Unknown packet is returned to sender."""
-        self.send_packet(
+        self._send_packet_async(
             r(ri(pkt_type))[0] + UNKNOWN_PACKET, pkt_level,
             UnknownPacket(pkt_type, pkt_level, process)
         )
 
     def error(self, error: int, pkt_type: int, pkt_level, process: int = 0):
         """Error happened is returned to sender."""
-        self.send_packet(
+        self._send_packet_async(
             r(ri(pkt_type))[0] + ERROR_PACKET, pkt_level,
             ErrorPacket(pkt_type, pkt_level, process, error)
         )
@@ -1581,10 +1621,10 @@ class ClientProtoMixin:
         self.close()
 
     @classmethod
-    async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int) -> "Protocol":
+    async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int, key: bytes = None) -> "Protocol":
         """Connect to server."""
-        _, protocol = await asyncio.get_running_loop().create_connection(lambda: cls(facade), str(host), port)
-        return protocol
+        _, protocol = await asyncio.get_running_loop().create_connection(lambda: NoiseTransportProtocol(cls(facade), server=False, key=key), str(host), port)
+        return protocol.get_protocol()
 
 
 class ServerProtoMixin:
@@ -1611,10 +1651,10 @@ class ServerProtoMixin:
     @classmethod
     async def listen(
             cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address],
-            port: int, manager: "ConnectionManager" = None
+            port: int, manager: "ConnectionManager" = None, key: bytes = None
     ) -> asyncio.base_events.Server:
         """Start a listening server."""
-        return await asyncio.get_running_loop().create_server(lambda: cls(facade, manager), host, port)
+        return await asyncio.get_running_loop().create_server(lambda: NoiseTransportProtocol(cls(facade, manager), server=True, key=key), host, port)
 
 
 class ConnectionManager:

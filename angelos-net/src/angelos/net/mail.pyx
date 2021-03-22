@@ -186,6 +186,8 @@ class MailClient(MailHandler):
 
     async def exchange(self):
         """Send and receive messages."""
+        await self._manager.ready()
+
         user = self._manager.facade.data.portfolio.entity.id
 
         await self._receive_mails()

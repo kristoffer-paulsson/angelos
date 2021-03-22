@@ -25,6 +25,10 @@ from angelos.server.parser import Parser
 
 # TODO: Make all of angelos use pathlib instead of os.path
 
+# TODO: Implement windows version:
+#   https://gist.github.com/guillaumevincent/d8d94a0a44a7ec13def7f96bfb713d3f
+#   https://github.com/meatballs/AnvilUplinkWindows
+
 
 class PidFile:
     """Representation of a pid-file in /tmp."""

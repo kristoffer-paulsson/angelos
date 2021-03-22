@@ -86,6 +86,8 @@ class AuthenticationClient(AuthenticationHandler):
 
     async def _login(self, node: bool = False) -> bool:
         """Login operation against server."""
+        await self._manager.ready()
+
         version = await self._call_mediate(self.ST_VERSION, [AUTHENTICATION_VERSION])
         if version is None:
             raise ProtocolNegotiationError()

@@ -46,6 +46,7 @@ class ServiceBrokerClient(ServiceBrokerHandler):
 
     async def request(self, service: int) -> bool:
         """Request a network service by range."""
+        await self._manager.ready()
         if not 1 <= service <= 512:
             raise ServiceBoundariesError()
 

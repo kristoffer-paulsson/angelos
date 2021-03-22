@@ -2,5 +2,6 @@ cython
 ../angelos-meta
 
 msgpack
+noiseprotocol
 
 -e .
