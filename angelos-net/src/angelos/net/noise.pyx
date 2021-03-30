@@ -13,14 +13,290 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-"""Implementation of several but not all protocols within the Noise Protocol Framework."""
+"""Implementation of intermediary transport and the standard noise protocol for Angelos."""
 import asyncio
-import itertools
 import os
 from asyncio.protocols import Protocol
 from asyncio.transports import Transport
-from typing import Any, Union
-from noise.connection import NoiseConnection, Keypair
+from typing import Any, Union, Callable
+
+from angelos.bin.nacl import PublicKey, SecretKey, Backend_25519_ChaChaPoly_BLAKE2b
+
+# TODO: Certify that this implementation of Noise_XX_25519_ChaChaPoly_BLAKE2b
+#  can is interoperable with other implementations.
+
+
+class HandshakeError(RuntimeWarning):
+    """The handshake failed."""
+    pass
+
+
+class NonceDepleted(RuntimeWarning):
+    """The nonce is depleted and connection must be terminated."""
+
+
+class CipherState:
+    """State of the cipher algorithm."""
+
+    def __init__(self):
+        self.k = None
+        self.n = None
+
+
+class SymmetricState:
+    """The symmetric state of the protocol."""
+
+    def __init__(self):
+        self.h = None
+        self.ck = None
+        self.cipher_state = None
+
+
+class HandshakeState:
+    """The handshake state."""
+
+    def __init__(self):
+        self.symmetric_state = None
+        self.s = None
+        self.e = None
+        self.rs = None
+        self.re = None
+
+
+class NoiseProtocol(Backend_25519_ChaChaPoly_BLAKE2b):
+    """Static implementation of Noise Protocol Noise_XX_25519_ChaChaPoly_BLAKE2b."""
+
+    MAX_MESSAGE_LEN = 2 ** 16 - 1
+    MAX_NONCE = 2 ** 64 - 1
+
+    __slots__ = (
+        "_name", "_initiator", "_handshake_hash", "_handshake_state", "_symmetric_state", "_cipher_state_handshake",
+        "_cipher_state_encrypt", "_cipher_state_decrypt", "_static_key"
+    )
+
+    def __init__(self, initiator: bool, static_key: SecretKey):
+        Backend_25519_ChaChaPoly_BLAKE2b.__init__(self, 64, 64)
+        self._name = b"Noise_XX_25519_ChaChaPoly_BLAKE2b"
+        self._initiator = initiator
+        self._handshake_hash = None
+        self._handshake_state = None
+        self._symmetric_state = None
+        self._cipher_state_handshake = None
+        self._cipher_state_encrypt = None
+        self._cipher_state_decrypt = None
+        self._static_key = static_key
+
+    @property
+    def protocol(self) -> bytes:
+        return self._name
+
+    @property
+    def handshake_hash(self) -> bytes:
+        return self._handshake_hash
+
+    def _initialize_key(self, cs: CipherState, key):
+        """Reset a cipher state with a new key."""
+        cs.k = key
+        cs.n = 0
+
+    def _encrypt_with_ad(self, cs: CipherState, ad: bytes, plaintext: bytes) -> bytes:
+        """Encrypt a message with additional data."""
+        if cs.n == self.MAX_NONCE:
+            raise NonceDepleted()
+
+        if cs.k is None:
+            return plaintext
+
+        ciphertext = self._encrypt(cs.k, cs.n.to_bytes(8, "little"), plaintext, ad)
+        cs.n += 1
+        return ciphertext
+
+    def _decrypt_with_ad(self, cs: CipherState, ad: bytes, ciphertext: bytes) -> bytes:
+        """Decrypt cipher using additional data."""
+        if cs.n == self.MAX_NONCE:
+            raise NonceDepleted()
+
+        if cs.k is None:
+            return ciphertext
+
+        plaintext = self._decrypt(cs.k, cs.n.to_bytes(8, "little"), ciphertext, ad)
+        cs.n += 1
+        return plaintext
+
+    def _mix_key(self, ss: SymmetricState, input_key_material: bytes):
+        """Mix key with data"""
+        ss.ck, temp_k = self._hkdf2(ss.ck, input_key_material)
+        if self.hashlen == 64:
+            temp_k = temp_k[:32]
+
+        self._initialize_key(ss.cipher_state, temp_k)
+
+    def _mix_hash(self, ss: SymmetricState, data: bytes):
+        """Mix hash with data."""
+        ss.h = self._hash(ss.h + data)
+
+    def _encrypt_and_hash(self, ss: SymmetricState, plaintext: bytes) -> bytes:
+        """Encrypt a message, then mix the hash with the cipher."""
+        ciphertext = self._encrypt_with_ad(ss.cipher_state, ss.h, plaintext)
+        self._mix_hash(ss, ciphertext)
+        return ciphertext
+
+    def _decrypt_and_hash(self, ss: SymmetricState, ciphertext: bytes) -> bytes:
+        """Decrypt a message, then hash with the cipher"""
+        plaintext = self._decrypt_with_ad(ss.cipher_state, ss.h, ciphertext)
+        self._mix_hash(ss, ciphertext)
+        return plaintext
+
+    async def _initiator_xx(self, writer: Callable, reader: Callable):
+        """Shake hand as initiator according to XX."""
+
+        # Step 1
+        # WRITE True e
+        buffer = bytearray()
+        self._handshake_state.e = self._generate() if self._handshake_state.e is None else self._handshake_state.e
+        buffer += self._handshake_state.e.pk
+        self._mix_hash(self._handshake_state.symmetric_state, self._handshake_state.e.pk)
+        buffer += self._encrypt_and_hash(self._handshake_state.symmetric_state, b"")
+        writer(buffer)
+
+        # Step 2
+        message = await reader()
+        # READ True e
+        self._handshake_state.re = PublicKey(bytes(message[:self.dhlen]))
+        message = message[self.dhlen:]
+        self._mix_hash(self._handshake_state.symmetric_state, self._handshake_state.re.pk)
+        # READ True ee
+        self._mix_key(self._handshake_state.symmetric_state,
+                      self._dh(self._handshake_state.e.sk, self._handshake_state.re.pk))
+        # READ True s
+        if self._cipher_state_handshake.k is not None:
+            temp = bytes(message[:self.dhlen + 16])
+            message = message[self.dhlen + 16:]
+        else:
+            temp = bytes(message[:self.dhlen])
+            message = message[self.dhlen:]
+        self._handshake_state.rs = PublicKey(self._decrypt_and_hash(self._handshake_state.symmetric_state, temp))
+        # READ True es
+        self._mix_key(self._handshake_state.symmetric_state,
+                      self._dh(self._handshake_state.e.sk, self._handshake_state.rs.pk))
+        if self._decrypt_and_hash(self._handshake_state.symmetric_state, bytes(message)) != b"":
+            raise HandshakeError()
+
+        # Step 3
+        # WRITE True s
+        buffer = bytearray()
+        buffer += self._encrypt_and_hash(self._handshake_state.symmetric_state, self._handshake_state.s.pk)
+        # WRITE True se
+        self._mix_key(self._handshake_state.symmetric_state,
+                      self._dh(self._handshake_state.s.sk, self._handshake_state.re.pk))
+        buffer += self._encrypt_and_hash(self._handshake_state.symmetric_state, b"")
+        writer(buffer)
+
+    async def _responder_xx(self, writer: Callable, reader: Callable):
+        """Shake hand as responder according to XX."""
+        message = await reader()
+        # READ False e
+        self._handshake_state.re = PublicKey(bytes(message[:self.dhlen]))
+        message = message[self.dhlen:]
+        self._mix_hash(self._handshake_state.symmetric_state, self._handshake_state.re.pk)
+        if self._decrypt_and_hash(self._handshake_state.symmetric_state, bytes(message)) != b"":
+            raise HandshakeError()
+
+        buffer = bytearray()
+        # WRITE False e
+        self._handshake_state.e = self._generate() if self._handshake_state.e is None else self._handshake_state.e
+        buffer += self._handshake_state.e.pk
+        self._mix_hash(self._handshake_state.symmetric_state, self._handshake_state.e.pk)
+        # WRITE False ee
+        self._mix_key(self._handshake_state.symmetric_state,
+                      self._dh(self._handshake_state.e.sk, self._handshake_state.re.pk))
+        # WRITE False s
+        buffer += self._encrypt_and_hash(self._handshake_state.symmetric_state, self._handshake_state.s.pk)
+        # WRITE False es
+        self._mix_key(self._handshake_state.symmetric_state,
+                      self._dh(self._handshake_state.s.sk, self._handshake_state.re.pk))
+        buffer += self._encrypt_and_hash(self._handshake_state.symmetric_state, b"")
+        writer(buffer)
+
+        message = await reader()
+        buffer = bytearray()
+        # result = self._read_message(self._handshake_state, message, buffer)
+        # READ False s
+        if self._cipher_state_handshake.k is not None:
+            temp = bytes(message[:self.dhlen + 16])
+            message = message[self.dhlen + 16:]
+        else:
+            temp = bytes(message[:self.dhlen])
+            message = message[self.dhlen:]
+        self._handshake_state.rs = PublicKey(self._decrypt_and_hash(self._handshake_state.symmetric_state, temp))
+        # READ False se
+        self._mix_key(self._handshake_state.symmetric_state,
+                      self._dh(self._handshake_state.e.sk, self._handshake_state.rs.pk))
+        if self._decrypt_and_hash(self._handshake_state.symmetric_state, bytes(message)) != b"":
+            raise HandshakeError()
+
+    async def start_handshake(self, writer: Callable, reader: Callable):
+        """Do noise protocol handshake."""
+        ss = SymmetricState()
+        if len(self._name) <= self.hashlen:
+            ss.h = self._name.ljust(self.hashlen, b"\0")
+        else:
+            ss.h = self._hash(self._name)
+
+        ss.ck = ss.h
+
+        ss.cipher_state = CipherState()
+        self._initialize_key(ss.cipher_state, None)
+        self._cipher_state_handshake = ss.cipher_state
+
+        hs = HandshakeState()
+        hs.symmetric_state = ss
+        self._mix_hash(hs.symmetric_state, b"")  # Empty prologue
+
+        hs.s = self._static_key
+
+        self._handshake_state = hs
+        self._symmetric_state = self._handshake_state.symmetric_state
+
+        if self._initiator:
+            await self._initiator_xx(writer, reader)
+        else:
+            await self._responder_xx(writer, reader)
+
+        temp_k1, temp_k2 = self._hkdf2(self._handshake_state.symmetric_state.ck, b"")
+
+        if self.hashlen == 64:
+            temp_k1 = temp_k1[:32]
+            temp_k2 = temp_k2[:32]
+
+        c1, c2 = CipherState(), CipherState()
+        self._initialize_key(c1, temp_k1)
+        self._initialize_key(c2, temp_k2)
+        if self._initiator:
+            self._cipher_state_encrypt = c1
+            self._cipher_state_decrypt = c2
+        else:
+            self._cipher_state_encrypt = c2
+            self._cipher_state_decrypt = c1
+
+        self._handshake_hash = self._symmetric_state.h
+
+        self._handshake_state = None
+        self._symmetric_state = None
+        self._cipher_state_handshake = None
+
+    def encrypt(self, data: bytes) -> bytes:
+        """Encrypt data into a cipher before writing."""
+        if len(data) > self.MAX_MESSAGE_LEN:
+            raise ValueError("Data must be less or equal to {}.".format(self.MAX_MESSAGE_LEN))
+        return self._encrypt_with_ad(self._cipher_state_encrypt, None, data)
+
+    def decrypt(self, data: bytes) -> bytes:
+        """Decrypt a cipher into data before reading."""
+        if len(data) > self.MAX_MESSAGE_LEN:
+            raise ValueError("Data must be less or equal to {}".format(self.MAX_MESSAGE_LEN))
+        return self._decrypt_with_ad(self._cipher_state_decrypt, None, data)
+
 
 # And he made in Jerusalem engines, invented by cunning men, to be on
 # the towers and upon the bulwarks, to shoot arrows and great stones
@@ -209,10 +485,10 @@ class IntermediateTransportProtocol(Transport, Protocol):
         self._protocol.resume_writing()
 
     def data_received(self, data: Union[bytes, bytearray, memoryview]) -> None:
-        """Reades data to the protocol generally with flow interruption depending on mode.
+        """Reads data to the protocol generally with flow interruption depending on mode.
         DIVERT will interrupt and cancel flow to overlying protocol.
         PASSTHROUGH will first transform flow and then pass on to overlying protocol.
-        EAVESDROP will first transform flow, then pass to overlying protocoll and lastly interrupt flow."""
+        EAVESDROP will first transform flow, then pass to overlying protocol and lastly interrupt flow."""
         if self._mode is not self.DIVERT:
             data = self._on_received(data)
             self._protocol.data_received(data)
@@ -230,38 +506,16 @@ class NoiseTransportProtocol(IntermediateTransportProtocol):
 
     def __init__(self, protocol: Protocol, server: bool = False, key: bytes = None):
         IntermediateTransportProtocol.__init__(self, protocol)
-        self._noise = NoiseConnection.from_name(b"Noise_XX_25519_ChaChaPoly_BLAKE2b")
+        self._noise = NoiseProtocol(not server, SecretKey(os.urandom(32)))
         self._event = asyncio.Event()
         self._event.set()
-        if server:
-            self._noise.set_as_responder()
-        else:
-            self._noise.set_as_initiator()
-        self._noise.set_keypair_from_private_bytes(Keypair.STATIC, key if key else os.urandom(32))
         self._server = server
 
     async def _on_connection(self) -> None:
         """Perform noise protocol handshake before telling application protocol connection_made()."""
-        side = "Server" if self._server else "Client"
         self._set_mode(IntermediateTransportProtocol.DIVERT)
-        # print("{0} HANDSHAKE Start".format(side))
-        self._noise.start_handshake()
-
-        cycle = ["receive", "send"]
-        for action in itertools.cycle(cycle if self._server else reversed(cycle)):
-            if self._noise.handshake_finished:
-                break
-            elif action == "send":
-                send = self._noise.write_message()
-                # print("{0} {1} {2} {3}".format(side, action.upper(), len(send), send))
-                self._transport.write(send)
-            elif action == "receive":
-                receive = await self._reader()
-                # print("{0} {1} {2} {3}".format(side, action.upper(), len(receive), receive))
-                self._noise.read_message(receive)
-
+        await self._noise.start_handshake(self._transport.write, self._reader)
         self._set_mode(IntermediateTransportProtocol.PASSTHROUGH)
-        # print("{0} HANDSHAKE Over".format(side))
 
     def _on_write(self, data: Union[bytes, bytearray, memoryview]) -> Union[bytes, bytearray, memoryview]:
         """Encrypt outgoing data with Noise."""

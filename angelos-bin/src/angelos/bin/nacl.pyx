@@ -16,6 +16,7 @@
 """Cython implementation of a libsodium wrapper."""
 from typing import Union, Tuple
 
+from libc.stdlib cimport malloc, free
 from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_box_boxzerobytes, crypto_box_open_afternm, crypto_secretbox, crypto_secretbox_open, \
     crypto_secretbox_noncebytes, crypto_secretbox_keybytes, crypto_secretbox_zerobytes, \
@@ -26,8 +27,15 @@ from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_kx_secretkeybytes, crypto_kx_sessionkeybytes, crypto_kx_client_session_keys, \
     crypto_kx_server_session_keys, crypto_aead_xchacha20poly1305_ietf_npubbytes, \
     crypto_aead_xchacha20poly1305_ietf_keybytes, crypto_aead_xchacha20poly1305_ietf_abytes, \
-    crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt
+    crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt, \
+    crypto_generichash_keybytes, crypto_generichash_keygen, crypto_generichash, crypto_generichash_bytes, \
+    crypto_generichash_bytes_min, crypto_generichash_bytes_max, sodium_base64_VARIANT_URLSAFE, \
+    sodium_bin2base64, sodium_base642bin, sodium_base64_encoded_len, randombytes_buf, crypto_scalarmult, \
+    crypto_scalarmult_scalarbytes, crypto_scalarmult_bytes, sodium_init, crypto_aead_chacha20poly1305_encrypt, \
+    crypto_aead_chacha20poly1305_decrypt, crypto_aead_chacha20poly1305_keybytes, \
+    crypto_aead_chacha20poly1305_npubbytes, crypto_aead_chacha20poly1305_abytes
 
+sodium_init()
 
 SIZE_BOX_NONCE = crypto_box_noncebytes()
 
@@ -55,6 +63,20 @@ SIZE_AEAD_NPUB = crypto_aead_xchacha20poly1305_ietf_npubbytes()
 SIZE_AEAD_KEY = crypto_aead_xchacha20poly1305_ietf_keybytes()
 SIZE_AEAD_A = crypto_aead_xchacha20poly1305_ietf_abytes()
 
+SIZE_HASH_KEY = crypto_generichash_keybytes()
+SIZE_HASH_BYTES = crypto_generichash_bytes()
+SIZE_HASH_BYTES_MIN = crypto_generichash_bytes_min()
+SIZE_HASH_BYTES_MAX = crypto_generichash_bytes_max()
+
+SIZE_SCALARMULT_SCALARBYTES = crypto_scalarmult_scalarbytes()
+SIZE_SCALARMULT_BYTES = crypto_scalarmult_bytes()
+
+SIZE_AEAD_CCP_NONCE = crypto_aead_chacha20poly1305_npubbytes()
+SIZE_AEAD_CCP_KEY = crypto_aead_chacha20poly1305_keybytes()
+SIZE_AEAD_CCP_BYTES = crypto_aead_chacha20poly1305_abytes()
+
+BASE64_VARIANT_URLSAFE = sodium_base64_VARIANT_URLSAFE
+
 
 class NaClError(RuntimeError):
     """Error due to programmatic misuse."""
@@ -62,11 +84,16 @@ class NaClError(RuntimeError):
     KEY_COMPUTATION_ERROR = ("Key computation failed", 101)
     KEY_GENERATION_ERROR = ("Failed generate key(s)", 102)
     DATA_LENGTH_ERROR = ("Data is to long", 103)
+    HASH_LENGTH_BOUNDARIES = ("Hash length outside boundaries", 104)
+    NONCE_LENGTH_ERROR = ("Invalid nonce due to length", 105)
 
 
 class CryptoFailure(RuntimeWarning):
     """When crypto operation fail due to circumstantial reasons."""
     pass
+
+class HashFailure(RuntimeWarning):
+    """When hash operation fail due to circumstantial reasons."""
 
 
 class NaCl:
@@ -213,7 +240,7 @@ class PublicKey(BaseKey):
         BaseKey.__init__(self)
 
         if len(pk) != SIZE_BOX_PUBLICKEY:
-            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR, SIZE_BOX_PUBLICKEY, len(pk))
 
         self._pk = pk
 
@@ -221,7 +248,6 @@ class PublicKey(BaseKey):
 class SecretKey(BaseKey):
     def __init__(self, sk: bytes = None):
         BaseKey.__init__(self)
-
         self._sk = sk
         self._pk = bytes(SIZE_BOX_PUBLICKEY)
 
@@ -232,7 +258,7 @@ class SecretKey(BaseKey):
             if crypto_scalarmult_base(self._pk, self._sk):
                 raise NaClError(*NaClError.KEY_COMPUTATION_ERROR)
         else:
-            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR, SIZE_BOX_SECRETKEY, len(sk))
 
 
 class DualSecret(BaseKey):
@@ -360,3 +386,168 @@ class ClientBox:
         fail = crypto_kx_client_session_keys(self._rx, self._tx, self._us.sk, self._us.pk, self._them.pk)
         if fail:
             raise CryptoFailure()
+
+
+class Backend_25519_ChaChaPoly_BLAKE2b:
+    """Noise protocol crypto functions using libsodium for backend."""
+
+    __slots__ = ("_hash_key", "_digest")
+
+    def __init__(self, hash_key_size: int = SIZE_HASH_KEY, hash_digest_size: int = SIZE_HASH_BYTES):
+        if SIZE_HASH_BYTES_MIN > hash_digest_size > SIZE_HASH_BYTES_MAX:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+        self._hash_key = hash_key_size
+
+        if SIZE_HASH_BYTES_MIN > hash_digest_size > SIZE_HASH_BYTES_MAX:
+            raise NaClError(*NaClError.HASH_LENGTH_BOUNDARIES)
+        self._digest = hash_digest_size
+
+    @property
+    def key_size(self) -> int:
+        return self._hash_key
+
+    @property
+    def digest_size(self) -> int:
+        return self._digest
+
+    @property
+    def dhlen(self):
+        return 32
+
+    @property
+    def hashlen(self):
+        return 64
+
+    @property
+    def blocklen(self):
+        return 128
+
+    def _generate(self) -> SecretKey:
+        """Generate a new Curve25519 keypair."""
+        sk = bytes(SIZE_BOX_SECRETKEY)
+        randombytes(sk, SIZE_BOX_SECRETKEY)
+        return SecretKey(sk)
+
+    def _hash(self, data: bytes) -> bytes:
+        digest = bytes(self._digest)
+        fail = crypto_generichash(digest, self._digest, data, len(data), NULL, 0)
+
+        if fail != 0:
+            raise HashFailure()
+
+        return digest
+
+    def _hkdf2(self, chaining_key: bytes, input_key_material: bytes) -> Tuple[bytes, bytes]:
+        if len(chaining_key) != self._hash_key:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+        if self._digest != self._hash_key:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+
+        temp_key = bytes(self._digest)
+        fail = crypto_generichash(
+            temp_key, self._digest, input_key_material, len(input_key_material), chaining_key, self._hash_key)
+        if fail != 0:
+            raise HashFailure()
+
+        output1 = bytes(self._digest)
+        fail = crypto_generichash(output1, self._digest, b"\x01", 1, temp_key, self._digest)
+        if fail != 0:
+            raise HashFailure()
+
+        output2 = bytes(self._digest)
+        fail = crypto_generichash(output2, self._digest, output1 + b"\x02", self._digest + 1, temp_key, self._digest)
+        if fail != 0:
+            raise HashFailure()
+
+        return output1, output2
+
+    def _hkdf3(self, chaining_key: bytes, input_key_material: bytes) -> Tuple[bytes, bytes, bytes]:
+        if len(chaining_key) != self._hash_key:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+        if self._digest != self._hash_key:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+
+        temp_key = bytes(self._digest)
+        fail = crypto_generichash(
+            temp_key, self._digest, input_key_material, len(input_key_material), chaining_key, self._hash_key)
+        if fail != 0:
+            raise HashFailure()
+
+        output1 = bytes(self._digest)
+        fail = crypto_generichash(output1, self._digest, b"\x01", 1, temp_key, self._digest)
+        if fail != 0:
+            raise HashFailure()
+
+        output2 = bytes(self._digest)
+        fail = crypto_generichash(output2, self._digest, output1 + b"\x02", self._digest + 1, temp_key, self._digest)
+        if fail != 0:
+            raise HashFailure()
+
+        output3 = bytes(self._digest)
+        fail = crypto_generichash(output3, self._digest, output2 + b"\x03", self._digest + 1, temp_key, self._digest)
+        if fail != 0:
+            raise HashFailure()
+
+        return output1, output2, output3
+
+    def _dh(self, our_secret: bytes, their_public: bytes) -> bytes:
+        if len(our_secret) != SIZE_SCALARMULT_SCALARBYTES or len(their_public) != SIZE_SCALARMULT_BYTES:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+
+        shared = bytes(SIZE_SCALARMULT_BYTES)
+        fail = crypto_scalarmult(shared, our_secret, their_public)
+
+        if fail != 0:
+            raise HashFailure()
+
+        return shared
+
+    def _encrypt(self, key: bytes, nonce: bytes, message: bytes, additional: bytes = None) -> bytes:
+        if len(key) != SIZE_AEAD_CCP_KEY:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+        if len(nonce) != SIZE_AEAD_CCP_NONCE:
+            raise NaClError(*NaClError.NONCE_LENGTH_ERROR)
+
+        msg_len = len(message)
+        cdef unsigned long long cipher_len
+        cdef unsigned long long *cipher_len_p = NULL
+        cipher_len_p = &cipher_len
+        cipher = bytes(SIZE_AEAD_CCP_BYTES + msg_len)
+
+        fail = 0
+        if additional:
+            fail = crypto_aead_chacha20poly1305_encrypt(
+                cipher, cipher_len_p, message, msg_len, additional, len(additional), NULL, nonce, key)
+        else:
+            fail = crypto_aead_chacha20poly1305_encrypt(
+                cipher, cipher_len_p, message, msg_len, NULL, 0, NULL, nonce, key)
+
+        if fail != 0:
+            raise CryptoFailure()
+
+        return cipher[:cipher_len]
+
+    def _decrypt(self, key: bytes, nonce: bytes, cipher: bytes, additional: bytes = None) -> bytes:
+        if len(key) != SIZE_AEAD_CCP_KEY:
+            raise NaClError(*NaClError.KEY_LENGTH_ERROR)
+        if len(nonce) != SIZE_AEAD_CCP_NONCE:
+            raise NaClError(*NaClError.NONCE_LENGTH_ERROR)
+
+        cipher_len = len(cipher)
+        cdef unsigned long long msg_len
+        cdef unsigned long long *msg_len_p = NULL
+        msg_len_p = &msg_len
+        message = bytes(cipher_len - SIZE_AEAD_CCP_BYTES)
+
+        fail = 0
+        if additional:
+            fail = crypto_aead_chacha20poly1305_decrypt(
+                message, msg_len_p, NULL, cipher, cipher_len, additional, len(additional), nonce, key)
+        else:
+            fail = crypto_aead_chacha20poly1305_decrypt(
+                message, msg_len_p, NULL, cipher, cipher_len, NULL, 0, nonce, key)
+
+        if fail != 0:
+            raise CryptoFailure()
+
+        return message[:msg_len]

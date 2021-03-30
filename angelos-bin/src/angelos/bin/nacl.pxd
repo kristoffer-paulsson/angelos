@@ -15,6 +15,9 @@
 #
 
 cdef extern from "sodium.h":
+    # Internals
+    int sodium_init()
+    # Crypto
     void randombytes(unsigned char *buf, const unsigned long long buf_len)
     size_t crypto_box_noncebytes()
     int crypto_secretbox(
@@ -61,3 +64,32 @@ cdef extern from "sodium.h":
     size_t crypto_aead_xchacha20poly1305_ietf_abytes()
     int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k)
     int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k)
+
+    # Generic hash
+    size_t crypto_generichash_bytes()
+    size_t crypto_generichash_bytes_min()
+    size_t crypto_generichash_bytes_max()
+    size_t crypto_generichash_keybytes()
+
+    cdef int crypto_generichash_KEYBYTES
+    void crypto_generichash_keygen(unsigned char k[64])
+    int crypto_generichash(unsigned char *out, size_t outlen, const unsigned char *inp, unsigned long long inplen, const unsigned char *key, size_t keylen)
+
+    # Base64
+    cdef int sodium_base64_VARIANT_URLSAFE = 5
+    char *sodium_bin2base64(const char * b64, const size_t b64_maxlen, const unsigned char * bin, const size_t bin_len, const int variant)
+    int sodium_base642bin(const unsigned char * bin, const size_t bin_maxlen, const char * b64, const size_t b64_len, const char * ignore, const size_t * bin_len, const char ** b64_end, const int variant)
+    size_t sodium_base64_encoded_len(const size_t bin_len, const int variant)
+
+    # Curve25519
+    void randombytes_buf(void * buf, const size_t size)
+    int crypto_scalarmult(unsigned char *q, const unsigned char *n, const unsigned char *p)
+    size_t  crypto_scalarmult_scalarbytes()
+    size_t  crypto_scalarmult_bytes()
+
+    # ChaChaPoly
+    int crypto_aead_chacha20poly1305_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k)
+    int crypto_aead_chacha20poly1305_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k)
+    size_t crypto_aead_chacha20poly1305_keybytes()
+    size_t crypto_aead_chacha20poly1305_npubbytes()
+    size_t crypto_aead_chacha20poly1305_abytes()
