@@ -40,6 +40,7 @@ class SubPackages:
         "angelos.bin": "angelos-bin",
         "angelos.document": "angelos-document",
         "angelos.archive7": "angelos-archive7",
+        "angelos.ctl": "angelos-ctl",
         "angelos.lib": "angelos-lib",
         "angelos.server": "angelos-server",
         "angelos.net": "angelos-net"

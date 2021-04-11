@@ -23,7 +23,8 @@ from angelos.common.misc import AsyncCallable, SyncCallable
 from angelos.common.utils import Util
 from angelos.facade.storage.portfolio_mixin import PortfolioNotFound
 from angelos.lib.policy.crypto import Crypto
-from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkSession
+from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkSession, \
+    Protocol
 from angelos.portfolio.utils import Groups
 
 AUTHENTICATION_VERSION = b"authentication-0.1"
@@ -57,7 +58,7 @@ class AuthenticationHandler(Handler):
     ST_CLIENT_SIGNATURE = 0x0C
     ST_CLIENT_TIME = 0x0D
 
-    def __init__(self, manager: "Protocol"):
+    def __init__(self, manager: Protocol):
         portfolio = manager.facade.data.portfolio
         keys = Crypto.latest_keys(portfolio.keys)
         specimen = NaCl.random_bytes(64)
@@ -81,7 +82,7 @@ class AuthenticationHandler(Handler):
 
 class AuthenticationClient(AuthenticationHandler):
 
-    def __init__(self, manager: "Protocol"):
+    def __init__(self, manager: Protocol):
         AuthenticationHandler.__init__(self, manager)
 
     async def _login(self, node: bool = False) -> bool:
@@ -163,7 +164,7 @@ class AuthenticationClient(AuthenticationHandler):
 
 class AuthenticationServer(AuthenticationHandler):
 
-    def __init__(self, manager: "Protocol"):
+    def __init__(self, manager: Protocol):
         AuthenticationHandler.__init__(self, manager)
         self._states[self.ST_VERSION].upgrade(SyncCallable(self._check_version))
         self._states[self.ST_LOGIN].upgrade(SyncCallable(self._check_login))

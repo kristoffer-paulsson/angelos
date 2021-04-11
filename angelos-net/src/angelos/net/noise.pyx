@@ -23,7 +23,7 @@ from typing import Any, Union, Callable
 from angelos.bin.nacl import PublicKey, SecretKey, Backend_25519_ChaChaPoly_BLAKE2b
 
 # TODO: Certify that this implementation of Noise_XX_25519_ChaChaPoly_BLAKE2b
-#  can is interoperable with other implementations.
+#  is interoperable with other implementations.
 
 
 class HandshakeError(RuntimeWarning):
@@ -220,7 +220,6 @@ class NoiseProtocol(Backend_25519_ChaChaPoly_BLAKE2b):
 
         message = await reader()
         buffer = bytearray()
-        # result = self._read_message(self._handshake_state, message, buffer)
         # READ False s
         if self._cipher_state_handshake.k is not None:
             temp = bytes(message[:self.dhlen + 16])

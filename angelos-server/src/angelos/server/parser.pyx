@@ -25,7 +25,7 @@ class Parser:
 
     def __init__(self):
         """Initialize parser."""
-        parser = self.parser()
+        parser = self.build_parser()
         self.args = parser.parse_args()
 
     def parser(self):

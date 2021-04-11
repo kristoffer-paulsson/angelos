@@ -16,7 +16,6 @@
 """Cython implementation of a libsodium wrapper."""
 from typing import Union, Tuple
 
-from libc.stdlib cimport malloc, free
 from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_box_boxzerobytes, crypto_box_open_afternm, crypto_secretbox, crypto_secretbox_open, \
     crypto_secretbox_noncebytes, crypto_secretbox_keybytes, crypto_secretbox_zerobytes, \
@@ -28,9 +27,9 @@ from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_kx_server_session_keys, crypto_aead_xchacha20poly1305_ietf_npubbytes, \
     crypto_aead_xchacha20poly1305_ietf_keybytes, crypto_aead_xchacha20poly1305_ietf_abytes, \
     crypto_aead_xchacha20poly1305_ietf_encrypt, crypto_aead_xchacha20poly1305_ietf_decrypt, \
-    crypto_generichash_keybytes, crypto_generichash_keygen, crypto_generichash, crypto_generichash_bytes, \
+    crypto_generichash_keybytes, crypto_generichash, crypto_generichash_bytes, \
     crypto_generichash_bytes_min, crypto_generichash_bytes_max, sodium_base64_VARIANT_URLSAFE, \
-    sodium_bin2base64, sodium_base642bin, sodium_base64_encoded_len, randombytes_buf, crypto_scalarmult, \
+    sodium_base64_encoded_len, crypto_scalarmult, \
     crypto_scalarmult_scalarbytes, crypto_scalarmult_bytes, sodium_init, crypto_aead_chacha20poly1305_encrypt, \
     crypto_aead_chacha20poly1305_decrypt, crypto_aead_chacha20poly1305_keybytes, \
     crypto_aead_chacha20poly1305_npubbytes, crypto_aead_chacha20poly1305_abytes
