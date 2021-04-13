@@ -30,6 +30,8 @@ class Const:
     A_TYPE_CHURCH_CLIENT    Archive type for ChurchClientFacade
     A_TYPE_CHURCH_SERVER    Archive type for ChurchServerFacade
 
+    A_TYPE_ADMIN_CLIENT     Mapping for type AdminClientFacade
+
     A_TYPE_BEARER           Archive type for courier data.
     A_TYPE_SEED             Archive type for seed data.
     A_TYPE_ARCHIVE          Archive type for general fs data.
@@ -61,6 +63,8 @@ class Const:
     A_TYPE_MINISTRY_SERVER = ord(b"M")
     A_TYPE_CHURCH_CLIENT = ord(b"c")
     A_TYPE_CHURCH_SERVER = ord(b"C")
+
+    A_TYPE_ADMIN_CLIENT = ord(b"A")
 
     A_TYPE_BEARER = ord(b"b")
     A_TYPE_SEED = ord(b"s")

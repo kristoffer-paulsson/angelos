@@ -24,6 +24,7 @@ from ipaddress import IPv4Address, IPv6Address
 from typing import Tuple, Union, Any
 
 import msgpack
+from angelos.bin.nacl import NaCl
 from angelos.common.misc import StateMachine, SyncCallable, AsyncCallable
 from angelos.common.utils import Util
 from angelos.document.domain import Node
@@ -59,7 +60,7 @@ from angelos.portfolio.collection import Portfolio
 # 2. Communicating states
 # 3. Begin and end sessions
 
-EMPTY_PAYLOAD = b"0101010101010101010101010101010101010101010101010101010101010101"
+EMPTY_PAYLOAD = NaCl.random_bytes(64)
 
 
 PUSH_ITEM_PACKET = 105

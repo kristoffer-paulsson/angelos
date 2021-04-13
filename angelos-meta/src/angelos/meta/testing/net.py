@@ -94,6 +94,12 @@ class FacadeContext:
         return cls(SetupPersonPortfolio().perform(
             PersonData(**Generate.person_data()[0]), server=False), False)
 
+    @classmethod
+    def create_admin(cls) -> "FacadeContext":
+        """Create a stub client."""
+        return cls(SetupPersonPortfolio().perform(
+            PersonData(**Generate.person_data()[0]), server=False), False)
+
 
 # FIXME:
 #    Implement this one somewhere.

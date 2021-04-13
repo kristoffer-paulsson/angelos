@@ -80,6 +80,13 @@ class AuthenticationHandler(Handler):
         })
 
 
+class AdminAuthMixin:
+
+    def pub_key_find(self, key: bytes) -> bool:
+        """Find sent public signing key from client in server."""
+        pass
+
+
 class AuthenticationClient(AuthenticationHandler):
 
     def __init__(self, manager: Protocol):

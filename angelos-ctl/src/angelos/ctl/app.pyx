@@ -26,7 +26,9 @@ import termios
 import tty
 from argparse import ArgumentParser, Namespace
 
+from angelos.bin.nacl import Signer
 from angelos.common.utils import Util
+from angelos.ctl.support import AdminFacade
 
 
 class Application:
@@ -34,8 +36,10 @@ class Application:
 
     def __init__(self):
         self._args = None
+        self._signer = None
         self._quiter = None
         self._task = None
+        self._facade = None
 
         self._tty = None
         self._echo = None
@@ -47,12 +51,16 @@ class Application:
         parser.add_argument("host", nargs=1, type=ipaddress.ip_address, help="IP address of server")
         parser.add_argument("-p", "--port", dest="port", default=443, type=int, help="Server port")
         parser.add_argument(
-            "-k", "--key", dest="key", default=False,
+            "-s", "--seed", dest="seed", required=True,
             type=lambda x: (re.match(r"^[0-9a-fA-F]{64}$", x), binascii.unhexlify(x))[1],
             help="Encryption key"
         )
 
         return parser.parse_args()
+
+    def _setup_facade(self):
+        self._signer = Signer(self._args.seed)
+        return AdminFacade.setup(self._signer)
 
     def _quit(self):
         self._quiter.set()
@@ -97,14 +105,22 @@ class Application:
     def _teardown_term(self):
         termios.tcsetattr(self._tty, termios.TCSADRAIN, self._echo)
 
+    def _setup_conn(self):
+        pass
+
+    def _teardown_conn(self):
+        pass
+
     async def _initialize(self):
         self._quiter = asyncio.Event()
         self._quiter.clear()
 
+        self._setup_conn()
         self._setup_term()
 
     async def _finalize(self):
         self._teardown_term()
+        self._teardown_conn()
 
     async def run(self):
         """Application main loop."""
@@ -116,7 +132,9 @@ class Application:
         """Start application main loop."""
         try:
             self._args = self._arguments()
-            asyncio.run(self.run())
+            self._facade = self._setup_facade()
+
+            # asyncio.run(self.run())
         except KeyboardInterrupt:
             print("Uncaught keyboard interrupt")
         except Exception as exc:

@@ -399,6 +399,7 @@ class Facade(metaclass=FacadeMeta):
             storage_cls = Util.klass(*pkg)
             if name != storage_cls.ATTRIBUTE[0]:
                 raise FacadeError(*FacadeError.EXTENSION_ATTRIBUTE_MISMATCH)
+            print(home_dir.joinpath(storage_cls.CONCEAL[0]), storage_cls)
             if home_dir.joinpath(storage_cls.CONCEAL[0]).is_file():
                 storages[name] = storage_cls(self, home_dir, secret)
             else:
@@ -600,6 +601,15 @@ class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
     """Final facade for Church entity as a server."""
 
 
+class AdminClientFacade(Facade):
+    """Administrator client facade."""
+
+    STORAGES = dict()
+    APIS = dict()
+    DATAS = dict()
+    TASKS = dict()
+
+
 CLASS_MAP = {
     Const.A_TYPE_PERSON_CLIENT: PersonClientFacade,
     Const.A_TYPE_PERSON_SERVER: PersonServerFacade,
@@ -607,4 +617,5 @@ CLASS_MAP = {
     Const.A_TYPE_MINISTRY_SERVER: MinistryServerFacade,
     Const.A_TYPE_CHURCH_CLIENT: ChurchClientFacade,
     Const.A_TYPE_CHURCH_SERVER: ChurchServerFacade,
+    Const.A_TYPE_ADMIN_CLIENT : AdminClientFacade,
 }
