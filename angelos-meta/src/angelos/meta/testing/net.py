@@ -19,6 +19,8 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 import asyncssh
+from angelos.bin.nacl import Signer, NaCl
+from angelos.ctl.support import AdminFacade
 from angelos.document.types import ChurchData, PersonData
 from angelos.facade.facade import Facade, Path
 from angelos.lib.const import Const
@@ -73,10 +75,13 @@ async def cross_authenticate(server: Facade, client: Facade) -> bool:
 class FacadeContext:
     """Environmental context for a facade."""
 
-    def __init__(self, portfolio: PrivatePortfolio, server: bool):
+    def __init__(self, portfolio: PrivatePortfolio, server: bool, admin: Signer = False):
         self.dir = TemporaryDirectory()
         self.secret = Generate.new_secret()
-        self.facade = Facade(Path(self.dir.name), self.secret, portfolio, Const.A_ROLE_PRIMARY, server)
+        if admin:
+            self.facade = AdminFacade.setup(admin)
+        else:
+            self.facade = Facade(Path(self.dir.name), self.secret, portfolio, Const.A_ROLE_PRIMARY, server)
 
     def __del__(self):
         self.facade.close()
@@ -95,10 +100,9 @@ class FacadeContext:
             PersonData(**Generate.person_data()[0]), server=False), False)
 
     @classmethod
-    def create_admin(cls) -> "FacadeContext":
-        """Create a stub client."""
-        return cls(SetupPersonPortfolio().perform(
-            PersonData(**Generate.person_data()[0]), server=False), False)
+    def create_admin(cls, signer: Signer = Signer(NaCl.random_bytes(32))) -> "FacadeContext":
+        """Create a stub admin."""
+        return cls(None, server=False, admin=signer)
 
 
 # FIXME:

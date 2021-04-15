@@ -63,7 +63,9 @@ class AdminFacade(Facade):
             vault_type: int, vault_role: int
     ) -> "VaultStorage":
         return SimpleNamespace(
-            facade=None, archive=SimpleNamespace(
+            facade=None,
+            close=lambda: None,
+            archive=SimpleNamespace(
                 stats=lambda: SimpleNamespace(
                     node=uuid.UUID(int=0),
                 )

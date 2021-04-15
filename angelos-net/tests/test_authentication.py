@@ -5,7 +5,7 @@ import tracemalloc
 from unittest import TestCase
 
 import angelos
-from angelos.bin.nacl import Signer
+from angelos.bin.nacl import Signer, NaCl
 from angelos.facade.facade import Facade
 from angelos.meta.testing import run_async
 from angelos.meta.testing.net import FacadeContext, cross_authenticate
@@ -16,12 +16,14 @@ from angelos.net.base import ConnectionManager, ServerProtoMixin, Protocol, Clie
 class StubServer(Protocol, ServerProtoMixin, AdminAuthMixin):
     """Stub protocol server."""
 
+    admin = b""
+
     def __init__(self, facade: Facade, manager: ConnectionManager):
         super().__init__(facade, True, manager)
         self._add_handler(AuthenticationServer(self))
 
     def pub_key_find(self, key: bytes) -> bool:
-        pass
+        return key == self.admin
 
 
 class StubClient(Protocol, ClientProtoMixin):
@@ -35,9 +37,6 @@ class StubClient(Protocol, ClientProtoMixin):
         """Start mail replication immediately."""
         Protocol.connection_made(self, transport)
         # self._ranges[MailClient.RANGE].start()
-
-
-{"given_name": "John", "names": ["John", "Admin"], "family_name": "Roe", "sex": "man", "born": datetime.date(1972, 1, 1)}
 
 
 class TestAuthenticationServer(TestCase):
@@ -56,6 +55,7 @@ class TestAuthenticationServer(TestCase):
         """Create client/server network nodes."""
         self.client = FacadeContext.create_client()
         self.server = FacadeContext.create_server()
+        self.admin = None
         self.manager = ConnectionManager()
 
     @run_async
@@ -72,13 +72,14 @@ class TestAuthenticationServer(TestCase):
 
     @run_async
     async def test_auth_admin(self):
-        seed = angelos.bin.nacl.random_bytes(32)
-        signer = Signer(seed)
+        signer = Signer(NaCl.random_bytes(32))
+        self.admin = FacadeContext.create_admin(signer)
+        StubServer.admin = signer.vk
 
         server = await StubServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
         task = asyncio.create_task(server.serve_forever())
         await asyncio.sleep(0)
 
-        client = await StubClient.connect(None, "127.0.0.1", 8080)
+        client = await StubClient.connect(self.admin.facade, "127.0.0.1", 8080)
         self.assertTrue(await client.get_handler(AuthenticationHandler.RANGE).auth_admin())
         await asyncio.sleep(.1)

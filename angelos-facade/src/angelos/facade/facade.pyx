@@ -399,7 +399,6 @@ class Facade(metaclass=FacadeMeta):
             storage_cls = Util.klass(*pkg)
             if name != storage_cls.ATTRIBUTE[0]:
                 raise FacadeError(*FacadeError.EXTENSION_ATTRIBUTE_MISMATCH)
-            print(home_dir.joinpath(storage_cls.CONCEAL[0]), storage_cls)
             if home_dir.joinpath(storage_cls.CONCEAL[0]).is_file():
                 storages[name] = storage_cls(self, home_dir, secret)
             else:
