@@ -32,7 +32,7 @@ ADMIN_ENTITY = PersonData(**{
     "names": ["John", "Admin"],
     "family_name": "Roe",
     "sex": "man",
-    "born": datetime.date(1972, 1, 1)
+    "born": datetime.date(1970, 1, 1)
 })
 
 

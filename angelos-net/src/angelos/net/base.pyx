@@ -893,7 +893,7 @@ class Handler:
 
                 pkt_cls = self._pkgs[self._pkt_type]
                 proc_name = self._procs[self._pkt_type]
-                # print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
+                print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
 
                 if proc_name in ("process_unknown", "process_error"):
                     self._silent = True  # Don't send error or unknown response packet.
@@ -1574,7 +1574,7 @@ class Protocol(asyncio.Protocol):
         self.check()
         await self._transport.wait()
 
-        # print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
+        print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
 
         data = bytes(packet)
         self._transport.write(
@@ -1588,7 +1588,7 @@ class Protocol(asyncio.Protocol):
         def done(fut):
             fut.result()
 
-        task = asyncio.create_task(pkt_type, pkt_level, packet)
+        task = asyncio.create_task(self.send_packet(pkt_type, pkt_level, packet))
         task.add_done_callback(done)
 
     def unknown(self, pkt_type: int, pkt_level: int, process: int = 0):

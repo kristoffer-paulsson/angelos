@@ -29,10 +29,46 @@ from argparse import ArgumentParser, Namespace
 from angelos.bin.nacl import Signer
 from angelos.common.utils import Util
 from angelos.ctl.support import AdminFacade
+from angelos.meta.testing.net import FacadeContext
+from angelos.net.authentication import AdminAuthMixin, AuthenticationHandler
+from angelos.net.base import ConnectionManager
+from angelos.net.broker import ServiceBrokerClient
+from angelos.net.net import Server, Client
+from angelos.net.tty import TTYServer, TTYClient, TTYHandler
+
+facade = None
+server = None
+
+
+class TestClient(Client):
+    """Stub protocol client."""
+
+    def connection_made(self, transport: asyncio.Transport):
+        """Start mail replication immediately."""
+        Client.connection_made(self, transport)
+        self._add_handler(TTYClient(self))
+
+
+class TestServer(Server, AdminAuthMixin):
+    """Stub protocol server."""
+
+    admin = b""
+
+    def pub_key_find(self, key: bytes) -> bool:
+        return key == self.admin
+
+    def connection_made(self, transport: asyncio.Transport):
+        """Start mail replication immediately."""
+        Server.connection_made(self, transport)
+        self._add_handler(TTYServer(self))
 
 
 class Application:
     """Application for terminal emulator."""
+
+    server = None
+    manager = None
+    task = None
 
     def __init__(self):
         self._args = None
@@ -40,6 +76,7 @@ class Application:
         self._quiter = None
         self._task = None
         self._facade = None
+        self._client = None
 
         self._tty = None
         self._echo = None
@@ -105,17 +142,32 @@ class Application:
     def _teardown_term(self):
         termios.tcsetattr(self._tty, termios.TCSADRAIN, self._echo)
 
-    def _setup_conn(self):
-        pass
+    async def _setup_conn(self):
+        TestServer.admin = self._signer.vk
+
+        self.manager = ConnectionManager()
+        self.server = FacadeContext.create_server()
+        self._server = await TestServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
+        self.task = asyncio.create_task(self._server.serve_forever())
+        await asyncio.sleep(0)
+
+        self._client = await TestClient.connect(self._facade, "127.0.0.1", 8080)
+        await self._client.get_handler(AuthenticationHandler.RANGE).auth_admin()
+        await asyncio.sleep(.1)
+        terminal_available = await self._client.get_handler(ServiceBrokerClient.RANGE).request(TTYHandler.RANGE)
+        if not terminal_available:
+            self._quit()
+        else:
+            terminal = await self._client.get_handler(TTYHandler.RANGE).pty()
 
     def _teardown_conn(self):
-        pass
+        self._client.close()
 
     async def _initialize(self):
         self._quiter = asyncio.Event()
         self._quiter.clear()
 
-        self._setup_conn()
+        await self._setup_conn()
         self._setup_term()
 
     async def _finalize(self):
@@ -134,7 +186,7 @@ class Application:
             self._args = self._arguments()
             self._facade = self._setup_facade()
 
-            # asyncio.run(self.run())
+            asyncio.run(self.run())
         except KeyboardInterrupt:
             print("Uncaught keyboard interrupt")
         except Exception as exc:

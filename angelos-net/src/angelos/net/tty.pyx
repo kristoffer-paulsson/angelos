@@ -73,7 +73,7 @@ AUTHENTICATION_VERSION = b"tty-0.1"
 
 class TTYHandler(Handler):
     LEVEL = 1
-    RANGE = 1
+    RANGE = 4
 
     ST_VERSION = 0x01
 
@@ -87,6 +87,9 @@ class TTYClient(TTYHandler):
 
     def __init__(self, manager: Protocol):
         TTYHandler.__init__(self, manager)
+
+    async def pty(self) -> bool:
+        pass
 
 
 class TTYServer(TTYHandler):

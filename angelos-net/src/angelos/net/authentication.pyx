@@ -152,7 +152,6 @@ class AuthenticationClient(AuthenticationHandler):
             return True
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure) as exc:
             Util.print_exception(exc)
-            print("FAILURE client")
             self._manager.close()
             return False
 
@@ -247,7 +246,6 @@ class AuthenticationServer(AuthenticationHandler):
             self._manager.authentication_made(portfolio, node)
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure, NetworkError) as exc:
             Util.print_exception(exc)
-            print("FAILURE server")
             asyncio.get_event_loop().call_soon(self._manager.close)
             return ConfirmCode.NO
         else:
