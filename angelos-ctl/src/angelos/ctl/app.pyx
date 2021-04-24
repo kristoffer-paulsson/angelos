@@ -155,6 +155,7 @@ class Application:
         await self._client.get_handler(AuthenticationHandler.RANGE).auth_admin()
         await asyncio.sleep(.1)
         terminal_available = await self._client.get_handler(ServiceBrokerClient.RANGE).request(TTYHandler.RANGE)
+
         if not terminal_available:
             self._quit()
         else:
@@ -168,10 +169,10 @@ class Application:
         self._quiter.clear()
 
         await self._setup_conn()
-        self._setup_term()
+        # self._setup_term()
 
     async def _finalize(self):
-        self._teardown_term()
+        # self._teardown_term()
         self._teardown_conn()
 
     async def run(self):

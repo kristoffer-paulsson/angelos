@@ -671,6 +671,11 @@ class IteratorInconsistencyWarning(RuntimeWarning):
     """Iterator session out of order."""
 
 
+class ChunkError(RuntimeWarning):
+    """Block data digest mismatch."""
+    pass
+
+
 class NetworkIterator(NetworkSession):
 
     ST_COUNT = 0x01

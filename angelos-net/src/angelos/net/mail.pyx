@@ -24,9 +24,10 @@ from angelos.archive7.fs import FileObject, EntryRecord
 from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.document.utils import Helper, Definitions
 from angelos.net.base import Handler, NetworkIterator, PullItemIterator, PullChunkIterator, \
-    PushItemIterator, PushChunkIterator, StateMode, NetworkState, ConfirmCode
+    PushItemIterator, PushChunkIterator, StateMode, NetworkState, ConfirmCode, ChunkError
 
 MAIL_VERSION = b"mail-0.1"
+
 
 SESH_TYPE_RECEIVE = 0x01
 SESH_TYPE_DOWNLOAD = 0x02
@@ -40,11 +41,6 @@ class MailError(RuntimeError):
     FD_ALREADY_OPEN = ("File descriptor already open", 101)
     STREAM_UNSYNCED = ("Stream block index out of sync.", 102)
     NOT_AUTHENTICATED = ("The client is not authenticated", 103)
-
-
-class ChunkError(RuntimeWarning):
-    """Block data digest mismatch."""
-    pass
 
 
 class ReceiveIterator(PullItemIterator):
