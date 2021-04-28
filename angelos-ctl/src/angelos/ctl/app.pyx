@@ -82,6 +82,8 @@ class Application:
         self._echo = None
         self._no_echo = None
 
+        self._terminal = None
+
     def _arguments(self) -> Namespace:
         """Build argument parser."""
         parser = ArgumentParser("Angelos Admin Utility")
@@ -111,7 +113,9 @@ class Application:
         self.on_resize(size.columns, size.lines)
 
     def _input_handler(self):
-        self.on_input(sys.stdin.buffer.read1())
+        data = sys.stdin.buffer.read1()
+        if self._terminal:
+            self._terminal.send(data)
 
     def on_quit(self):
         """Override this method to act upon program quit."""
@@ -120,10 +124,6 @@ class Application:
     def on_resize(self, columns: int, lines: int):
         """Override this method to act upon terminal resize."""
         print(columns, lines)
-
-    def on_input(self, text: bytes):
-        """Override this method to act upon user keypress."""
-        print("Seq:", text)
 
     def _setup_term(self):
         self._tty = sys.stdin.fileno()
@@ -137,6 +137,7 @@ class Application:
         asyncio.get_event_loop().add_signal_handler(signal.SIGWINCH, self._sigwinch_handler)
 
         asyncio.get_event_loop().add_reader(sys.stdin, self._input_handler)
+        # Don't use, destroys typing handling.
         # termios.tcsetattr(self._tty, termios.TCSADRAIN, self._no_echo)
 
     def _teardown_term(self):
@@ -159,7 +160,7 @@ class Application:
         if not terminal_available:
             self._quit()
         else:
-            terminal = await self._client.get_handler(TTYHandler.RANGE).pty()
+            self._terminal = await self._client.get_handler(TTYHandler.RANGE).pty()
 
     def _teardown_conn(self):
         self._client.close()
@@ -169,10 +170,10 @@ class Application:
         self._quiter.clear()
 
         await self._setup_conn()
-        # self._setup_term()
+        self._setup_term()
 
     async def _finalize(self):
-        # self._teardown_term()
+        self._teardown_term()
         self._teardown_conn()
 
     async def run(self):

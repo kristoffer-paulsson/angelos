@@ -187,7 +187,6 @@ class AuthenticationClient(AuthenticationHandler):
 
         return keys, portfolio.__init__(portfolio.documents() | {keys}), False
 
-
     async def auth_user(self) -> bool:
         """Authenticate a user against a network."""
         self._states[self.ST_LOGIN].update(LoginTypeCode.LOGIN_USER)

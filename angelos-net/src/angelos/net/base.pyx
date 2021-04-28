@@ -898,7 +898,7 @@ class Handler:
 
                 pkt_cls = self._pkgs[self._pkt_type]
                 proc_name = self._procs[self._pkt_type]
-                print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
+                # print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
 
                 if proc_name in ("process_unknown", "process_error"):
                     self._silent = True  # Don't send error or unknown response packet.
@@ -1579,7 +1579,7 @@ class Protocol(asyncio.Protocol):
         self.check()
         await self._transport.wait()
 
-        print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
+        # print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
 
         data = bytes(packet)
         self._transport.write(
@@ -1629,7 +1629,8 @@ class ClientProtoMixin:
     @classmethod
     async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int, key: bytes = None) -> "Protocol":
         """Connect to server."""
-        _, protocol = await asyncio.get_running_loop().create_connection(lambda: NoiseTransportProtocol(cls(facade), server=False, key=key), str(host), port)
+        _, protocol = await asyncio.get_running_loop().create_connection(
+            lambda: NoiseTransportProtocol(cls(facade), server=False, key=key), str(host), port)
         return protocol.get_protocol()
 
 
@@ -1660,7 +1661,8 @@ class ServerProtoMixin:
             port: int, manager: "ConnectionManager" = None, key: bytes = None
     ) -> asyncio.base_events.Server:
         """Start a listening server."""
-        return await asyncio.get_running_loop().create_server(lambda: NoiseTransportProtocol(cls(facade, manager), server=True, key=key), host, port)
+        return await asyncio.get_running_loop().create_server(
+            lambda: NoiseTransportProtocol(cls(facade, manager), server=True, key=key), host, port)
 
 
 class ConnectionManager:
