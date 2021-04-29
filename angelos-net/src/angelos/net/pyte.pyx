@@ -211,8 +211,6 @@ import warnings
 from collections import namedtuple, deque, defaultdict
 from struct import Struct
 
-from angelos.ctl.wcwidth import wcwidth
-
 #: A mapping of ANSI text style codes to style names, "+" means the:
 #: attribute is set, "-" -- reset; example:
 #:
@@ -220,6 +218,8 @@ from angelos.ctl.wcwidth import wcwidth
 #: '+bold'
 #: >>> text[9]
 #: '+strikethrough'
+from angelos.net.wcwidth import wcwidth
+
 TEXT = {
     1: "+bold",
     3: "+italics",
@@ -1518,8 +1518,7 @@ class Screen(object):
                 # A two-cell character has a stub slot after it.
                 line[self.cursor.x] = self.cursor.attrs._replace(data=char)
                 if self.cursor.x + 1 < self.columns:
-                    line[self.cursor.x + 1] = self.cursor.attrs \
-                        ._replace(data="")
+                    line[self.cursor.x + 1] = self.cursor.attrs._replace(data="")
             elif char_width == 0 and unicodedata.combining(char):
                 # A zero-cell character is combined with the previous
                 # character either on this or preceding line.

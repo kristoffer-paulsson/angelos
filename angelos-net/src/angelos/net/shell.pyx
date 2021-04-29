@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# cython: language_level=3
 #
 # Copyright (c) 2021 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
@@ -13,8 +13,10 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-from angelos.ctl.app import Application
+"""Terminal shell."""
 
 
-if __name__ == "__main__":
-    Application().start()
+class Shell:
+
+    def write(self, data: bytes):
+        pass

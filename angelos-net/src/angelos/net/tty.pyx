@@ -23,11 +23,16 @@
 import asyncio
 import hashlib
 import re
+import sys
 import typing
+from struct import Struct
+
+import msgpack
 from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
     NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator
 from angelos.net.pyte import HistoryScreen, LNM, ByteStream
+from angelos.net.shell import Shell
 
 """# Change terminal window size from python.
 import sys
@@ -69,101 +74,50 @@ os.get_terminal_size(fd=)
 """
 
 
-class Terminal:
+FG_ANSI = {
+    "black": 30,
+    "red": 31,
+    "green": 31,
+    "brown": 33,
+    "blue": 34,
+    "magenta": 35,
+    "cyan": 36,
+    "white": 37,
+    "default": 39  # white.
+}
 
-    TTY_SEQ = b"""(\x1B\[[\x20-\x2F]*[\x30-\x7E]|\x1B[\x20-\x2F]*[\x40-\x7E]|[\x00-\x1F])"""
-
-    def __init__(self):
-        self._regex = re.compile(self.TTY_SEQ)
-
-    def handle(self, data: bytes):
-        """Receive data that parses and then is handled by sequencer."""
-        while bool(data):
-            parsed, data, seq = self.parse(data)
-            if seq:
-                self._sequence(parsed)
-            else:
-                self._text(parsed)
-
-    def parse(self, data: bytes):
-        """Parses incoming text for control and escape sequences.
-        Returns a tuple of text/sequence, rest thereof and bool to indicate if first is sequence.
-
-        (str, str, bool)
-        """
-        match = self._regex.search(data)
-        if not match:
-            return data, b"", False
-        elif match:
-            groups = match.groups()
-            if match.start() == 0:
-                return groups[0], data[match.end():], True
-            else:
-                return data[match.pos: match.start()], data[match.start(): match.endpos], False
-
-    def send(self, data: bytes):
-        """Send data and sequences to other side."""
-
-    def _sequence(self, seq: bytes):
-        if seq != b"\x00":
-            print("SEQ", seq)
-
-    def _text(self, text: bytes):
-        print("TEXT", text)
+BG_ANSI = {
+    "black": 40,
+    "red": 41,
+    "green": 42,
+    "brown": 43,
+    "blue": 44,
+    "magenta": 45,
+    "cyan": 46,
+    "white": 47,
+    "default": 49  # black.
+}
 
 
-class TerminalClient(Terminal):
+class TerminalClient:
     """Client side terminal emulator."""
 
     def __init__(self, client: "TTYClient"):
-        Terminal.__init__(self)
         self._client = client
+
+    def handle(self, data: bytes):
+        """Receive terminal output information."""
+        info = msgpack.unpackb(data, raw=False)
+        if isinstance(info, dict):
+            if info["type"] == "cursor":
+                print("\x1b[{cols};{lines}H".format(info["cursor"][1],info["cursor"][0]))
+            if info["type"] == "row":
+                line = "\x1b[{};0H{}".format(info["y"], info["row"])
+                print(line.rstrip())
 
     def send(self, data: bytes):
         """Send text and sequences to server."""
         self._client.send(data)
-
-
-class TerminalServer(Terminal):
-    """Server side terminal emulator."""
-
-    def __init__(self, server: "TTYServer"):
-        Terminal.__init__(self)
-        self._server = server
-
-        self._screen = None
-        self._stream = None
-
-    def setup(self, columns: int, lines: int, p_in):
-        self._screen = HistoryScreen(columns, lines)
-        self._screen.set_mode(LNM)
-        # Set the input to the shell.
-        # self._screen.write_process_input = lambda data: p_in.write(data.encode())
-        self._stream = ByteStream()
-        self._stream.attach(self._screen)
-
-    def handle(self, data: bytes):
-        """Receive data that parses and then is handled by sequencer."""
-        self._stream.feed(data)
-
-    def send(self, data: bytes):
-        """Send text and sequences to client."""
-        self._server.send(data)
-
-    def feed(self, data):
-
-
-    def dumps(self):
-        cursor = self._screen.cursor
-        lines = []
-        for y in self._screen.dirty:
-            line = self._screen.buffer[y]
-            data = [(c.data, c.reverse, c.fg, c.bg) for c in (line[x] for x in range(self._screen.columns))]
-            lines.append((y, data))
-
-        self._screen.dirty.clear()
-        return json.dumps({"c": (cursor.x, cursor.y), "lines": lines})
-
 
 
 TERMINAL_VERSION = b"tty-0.1"
@@ -202,17 +156,27 @@ class UpstreamIterator(PushChunkIterator):
         PushChunkIterator.__init__(self, handler, server, SESH_TYPE_UPSTREAM, session, {
             # self.ST_SIZE: (StateMode.ONCE, b""),
         }, 0, check)
-        self._teminal = None
+        self._tty = None
 
     async def push_chunk(self, chunk: bytes, digest: bytes):
         """Handle pushed chunk from client."""
         if hashlib.sha1(chunk).digest() != digest:
             raise ChunkError()
-        self._terminal.handle(chunk)
+        self._tty.handle(chunk)
 
-    def source(self, terminal: TerminalServer):
+    def source(self, tty: "TTYServer"):
         """Set chunk handle callable."""
-        self._terminal = terminal
+        self._tty = tty
+
+
+class TTYScreen(HistoryScreen):
+
+    def __init__(self, columns: int, lines: int, shell: Shell):
+        HistoryScreen.__init__(self, columns, lines, history=100, ratio=.5)
+        self._shell = shell
+
+    def write_process_input(self, data: bytes):
+        self._shell.write(data)
 
 
 class TTYHandler(Handler):
@@ -309,7 +273,10 @@ class TTYServer(TTYHandler):
         self._states[self.ST_VERSION].upgrade(SyncCallable(self._check_version))
         self._sessions[self.SESH_UPSTREAM][1]["check"] = AsyncCallable(self._receive_chunks)
         self._sessions[self.SESH_DOWNSTREAM][1]["check"] = AsyncCallable(self._send_chunks)
-        self._terminal = TerminalServer(self)
+
+        self._screen = None
+        self._stream = None
+        self._shell = None
 
     def _check_version(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Negotiate protocol version."""
@@ -317,7 +284,13 @@ class TTYServer(TTYHandler):
 
     async def _receive_chunks(self, state: NetworkState, sesh: UpstreamIterator) -> int:
         """Prepare DownloadIterator with file information and chunk count."""
-        sesh.source(self._terminal)
+        self._shell = Shell()
+        self._screen = TTYScreen(80, 24, self._shell)
+        self._screen.set_mode(LNM)
+        self._stream = ByteStream()
+        self._stream.attach(self._screen)
+
+        sesh.source(self)
         return ConfirmCode.YES
 
     async def _send_chunks(self, state: NetworkState, sesh: DownstreamIterator) -> int:
@@ -325,3 +298,17 @@ class TTYServer(TTYHandler):
         sesh.source(self._seq)
         self._idle = asyncio.create_task(self._idler())
         return ConfirmCode.YES
+
+    def handle(self, data: bytes):
+        """Receive input from client, process and send output screen information."""
+        self._stream.feed(data)
+
+        lines = self._screen.display
+        for y in self._screen.dirty:
+            self.send(msgpack.packb(
+                {"type": "row", "y": y, "row": lines[y].rstrip()}, use_bin_type=True))
+
+        cursor = self._screen.cursor
+        self.send(msgpack.packb({"type": "cursor", "cursor": (cursor.x, cursor.y)}, use_bin_type=True))
+
+        self._screen.dirty.clear()

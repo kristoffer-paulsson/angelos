@@ -110,7 +110,8 @@ class Application:
 
     def _sigwinch_handler(self):
         size = os.get_terminal_size()
-        self.on_resize(size.columns, size.lines)
+        if self._terminal:
+            self._terminal.send("\x1b[8;{cols};{lines}t".format(cols=size.columns, lines=size.lines).encode())
 
     def _input_handler(self):
         data = sys.stdin.buffer.read1()
@@ -120,10 +121,6 @@ class Application:
     def on_quit(self):
         """Override this method to act upon program quit."""
         pass
-
-    def on_resize(self, columns: int, lines: int):
-        """Override this method to act upon terminal resize."""
-        print(columns, lines)
 
     def _setup_term(self):
         self._tty = sys.stdin.fileno()
@@ -171,6 +168,7 @@ class Application:
 
         await self._setup_conn()
         self._setup_term()
+        print("LOADED")
 
     async def _finalize(self):
         self._teardown_term()
