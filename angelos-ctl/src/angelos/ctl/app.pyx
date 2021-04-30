@@ -74,7 +74,7 @@ class Application:
         self._args = None
         self._signer = None
         self._quiter = None
-        self._task = None
+        self._task_resize = None
         self._facade = None
         self._client = None
 
@@ -105,22 +105,26 @@ class Application:
         self._quiter.set()
 
     def _sigint_handler(self):
-        self.on_quit()
         self._quit()
 
     def _sigwinch_handler(self):
         size = os.get_terminal_size()
-        if self._terminal:
-            self._terminal.send("\x1b[8;{cols};{lines}t".format(cols=size.columns, lines=size.lines).encode())
+        if self._terminal and not self._task_resize:
+            self._task_resize = asyncio.create_task(self._terminal.resize(
+                max(80, min(240, size.columns)), max(8, min(72, size.lines))
+            ))
+            def done(fut):
+                self._task_resize = None
+            self._task_resize.add_done_callback(done)
 
     def _input_handler(self):
         data = sys.stdin.buffer.read1()
+
         if self._terminal:
             self._terminal.send(data)
 
-    def on_quit(self):
-        """Override this method to act upon program quit."""
-        pass
+        if b'\x03' in data:
+            self._quit()
 
     def _setup_term(self):
         self._tty = sys.stdin.fileno()
@@ -157,7 +161,10 @@ class Application:
         if not terminal_available:
             self._quit()
         else:
-            self._terminal = await self._client.get_handler(TTYHandler.RANGE).pty()
+            size = os.get_terminal_size()
+            self._terminal = await self._client.get_handler(TTYHandler.RANGE).pty(
+                max(80, min(240, size.columns)), max(8, min(72, size.lines))
+            )
 
     def _teardown_conn(self):
         self._client.close()

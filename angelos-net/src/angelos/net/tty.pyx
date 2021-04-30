@@ -74,31 +74,6 @@ os.get_terminal_size(fd=)
 """
 
 
-FG_ANSI = {
-    "black": 30,
-    "red": 31,
-    "green": 31,
-    "brown": 33,
-    "blue": 34,
-    "magenta": 35,
-    "cyan": 36,
-    "white": 37,
-    "default": 39  # white.
-}
-
-BG_ANSI = {
-    "black": 40,
-    "red": 41,
-    "green": 42,
-    "brown": 43,
-    "blue": 44,
-    "magenta": 45,
-    "cyan": 46,
-    "white": 47,
-    "default": 49  # black.
-}
-
-
 class TerminalClient:
     """Client side terminal emulator."""
 
@@ -110,7 +85,7 @@ class TerminalClient:
         info = msgpack.unpackb(data, raw=False)
         if isinstance(info, dict):
             if info["type"] == "cursor":
-                print("\x1b[{cols};{lines}H".format(info["cursor"][1],info["cursor"][0]))
+                print("\x1b[{cols};{lines}H".format(cols=info["cursor"][1], lines=info["cursor"][0]))
             if info["type"] == "row":
                 line = "\x1b[{};0H{}".format(info["y"], info["row"])
                 print(line.rstrip())
@@ -119,11 +94,19 @@ class TerminalClient:
         """Send text and sequences to server."""
         self._client.send(data)
 
+    async def resize(self, cols: int, lines: int):
+        """Resize terminal window at server."""
+        await self._client.resize(cols, lines)
+
 
 TERMINAL_VERSION = b"tty-0.1"
 
 SESH_TYPE_DOWNSTREAM = 0x01
 SESH_TYPE_UPSTREAM = 0x02
+
+
+class TerminalResizeError(RuntimeError):
+    """Terminal window new size refused."""
 
 
 class DownstreamIterator(PullChunkIterator):
@@ -132,9 +115,7 @@ class DownstreamIterator(PullChunkIterator):
     ST_SIZE = 0x02
 
     def __init__(self, handler: "Handler", server: bool, session: int, check: SyncCallable = None):
-        PullChunkIterator.__init__(self, handler, server, SESH_TYPE_DOWNSTREAM, session, {
-            # self.ST_SIZE: (StateMode.FACT, b""),
-        }, 0, check)
+        PullChunkIterator.__init__(self, handler, server, SESH_TYPE_DOWNSTREAM, session, dict(), 0, check)
         self._queue = None
 
     async def pull_chunk(self) -> typing.Tuple[bytes, bytes]:
@@ -153,9 +134,7 @@ class UpstreamIterator(PushChunkIterator):
     ST_SIZE = 0x02
 
     def __init__(self, handler: "Handler", server: bool, session: int, check: SyncCallable = None):
-        PushChunkIterator.__init__(self, handler, server, SESH_TYPE_UPSTREAM, session, {
-            # self.ST_SIZE: (StateMode.ONCE, b""),
-        }, 0, check)
+        PushChunkIterator.__init__(self, handler, server, SESH_TYPE_UPSTREAM, session, dict(), 0, check)
         self._tty = None
 
     async def push_chunk(self, chunk: bytes, digest: bytes):
@@ -184,6 +163,7 @@ class TTYHandler(Handler):
     RANGE = 4
 
     ST_VERSION = 0x01
+    ST_SIZE = 0x02
 
     SESH_DOWNSTREAM = SESH_TYPE_DOWNSTREAM
     SESH_UPSTREAM = SESH_TYPE_UPSTREAM
@@ -191,6 +171,7 @@ class TTYHandler(Handler):
     def __init__(self, manager: Protocol):
         Handler.__init__(self, manager, states={
             self.ST_VERSION: (StateMode.MEDIATE, TERMINAL_VERSION),
+            self.ST_SIZE: (StateMode.REPRISE, b""),
         },
         sessions = {
            self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
@@ -222,7 +203,7 @@ class TTYClient(TTYHandler):
         self._down = None
         self._terminal = None
 
-    async def pty(self) -> TerminalClient:
+    async def pty(self, cols: int = 80, lines: int = 24) -> TerminalClient:
         """Start a new PTY session."""
         await self._manager.ready()
 
@@ -230,12 +211,21 @@ class TTYClient(TTYHandler):
         if version is None:
             raise ProtocolNegotiationError()
 
+        await self.resize(cols, lines)
+
         self._terminal = TerminalClient(self)
         self._up = asyncio.create_task(self._upstream())
         self._idle = asyncio.create_task(self._idler())
         self._down = asyncio.create_task(self._downstream())
 
         return self._terminal
+
+    async def resize(self, cols: int, lines: int):
+        """Send text and sequences to server."""
+        self._states[self.ST_SIZE].update("{cols};{lines}".format(cols=cols, lines=lines).encode())
+        resize = await self._call_tell(self.ST_SIZE)
+        if not resize:
+            raise TerminalResizeError()
 
     async def _upstream(self):
         """Upload sent mail."""
@@ -271,8 +261,11 @@ class TTYServer(TTYHandler):
     def __init__(self, manager: Protocol):
         TTYHandler.__init__(self, manager)
         self._states[self.ST_VERSION].upgrade(SyncCallable(self._check_version))
+        self._states[self.ST_SIZE].upgrade(SyncCallable(self._do_resize))
         self._sessions[self.SESH_UPSTREAM][1]["check"] = AsyncCallable(self._receive_chunks)
         self._sessions[self.SESH_DOWNSTREAM][1]["check"] = AsyncCallable(self._send_chunks)
+
+        self._resize_timer = None
 
         self._screen = None
         self._stream = None
@@ -282,10 +275,39 @@ class TTYServer(TTYHandler):
         """Negotiate protocol version."""
         return ConfirmCode.YES if value == TERMINAL_VERSION else ConfirmCode.NO
 
+    def _do_resize(self, value: bytes, sesh: NetworkSession = None) -> int:
+        """Resize terminal."""
+        cols, lines = self._check_resize(value)
+
+        if not (cols and lines):
+            return ConfirmCode.NO
+
+        if self._screen:
+            if self._resize_timer:
+                self._resize_timer.cancel()
+            self._resize_timer = asyncio.get_event_loop().call_later(.25, self._resize_later, cols, lines)
+
+        return ConfirmCode.YES
+
+    def _resize_later(self, cols: int, lines: int):
+        self._screen.resize(lines, cols)
+        self._display()
+        self._resize_timer = None
+
+    def _check_resize(self, value: bytes) -> typing.Tuple[int, int]:
+        cols, lines = value.split(b";")
+        lines = int(lines)
+        cols = int(cols)
+
+        if (80 <= cols <= 240) and (8 <= lines <= 72):
+            return cols, lines
+        return None, None
+
     async def _receive_chunks(self, state: NetworkState, sesh: UpstreamIterator) -> int:
         """Prepare DownloadIterator with file information and chunk count."""
+        cols, lines = self._check_resize(self._states[self.ST_SIZE].value)
         self._shell = Shell()
-        self._screen = TTYScreen(80, 24, self._shell)
+        self._screen = TTYScreen(cols, lines, self._shell)
         self._screen.set_mode(LNM)
         self._stream = ByteStream()
         self._stream.attach(self._screen)
@@ -299,16 +321,18 @@ class TTYServer(TTYHandler):
         self._idle = asyncio.create_task(self._idler())
         return ConfirmCode.YES
 
+    def _display(self):
+        """Send display update to client."""
+        for y in range(self._screen.columns):
+            self.send(msgpack.packb(
+                {"type": "row", "y": y, "row": self._screen.render_line(y).rstrip()}, use_bin_type=True))
+
     def handle(self, data: bytes):
         """Receive input from client, process and send output screen information."""
         self._stream.feed(data)
-
-        lines = self._screen.display
         for y in self._screen.dirty:
             self.send(msgpack.packb(
-                {"type": "row", "y": y, "row": lines[y].rstrip()}, use_bin_type=True))
-
+                {"type": "row", "y": y, "row": self._screen.render_line(y).rstrip()}, use_bin_type=True))
         cursor = self._screen.cursor
         self.send(msgpack.packb({"type": "cursor", "cursor": (cursor.x, cursor.y)}, use_bin_type=True))
-
         self._screen.dirty.clear()

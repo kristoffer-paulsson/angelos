@@ -491,13 +491,14 @@ class IntermediateTransportProtocol(Transport, Protocol):
         if self._mode is not self.DIVERT:
             data = self._on_received(data)
             self._protocol.data_received(data)
+
         if self._mode is not self.PASSTHROUGH:
             self._read.set_result(data)
 
     def eof_received(self) -> None:
         """Eof is interrupted and can be managed before forwarding to overlaying protocol."""
         self._on_eof()
-        self._protocol.eof_recieved()
+        self._protocol.eof_received()
 
 
 class NoiseTransportProtocol(IntermediateTransportProtocol):

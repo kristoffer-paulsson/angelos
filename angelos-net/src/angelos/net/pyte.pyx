@@ -218,6 +218,8 @@ from struct import Struct
 #: '+bold'
 #: >>> text[9]
 #: '+strikethrough'
+from types import SimpleNamespace
+
 from angelos.net.wcwidth import wcwidth
 
 TEXT = {
@@ -1271,6 +1273,56 @@ class Screen(object):
                 yield char
 
         return ["".join(render(self.buffer[y])) for y in range(self.lines)]
+
+    def render_line(self, y: int) -> str:
+        fg = dict(zip(FG.values(), FG.keys()))
+        bg = dict(zip(BG.values(), BG.keys()))
+        text = dict(zip(TEXT.values(), TEXT.keys()))
+        line = ""
+        is_wide_char = False
+
+        m = SimpleNamespace(**self.default_char._asdict())
+        row = self.buffer[y]
+        for x in range(self.columns):
+            if is_wide_char:  # Skip stub
+                is_wide_char = False
+                continue
+
+            c = row[x]
+            attr = list()
+            if c.fg != m.fg:
+                m.fg = c.fg
+                attr.append(fg[c.fg])
+            if c.bg != m.bg:
+                m.bg = c.bg
+                attr.append(bg[c.bg])
+
+            if c.bold != m.bold:
+                m.bold = c.bold
+                attr.append(text["+bold"] if c.bold else text["-bold"])
+            if c.italics != m.italics:
+                m.italics = c.italics
+                attr.append(text["+italics"] if c.italics else text["-italics"])
+            if c.underscore != m.underscore:
+                m.underscore = c.underscore
+                attr.append(text["+underscore"] if c.underscore else text["-underscore"])
+            if c.strikethrough != m.strikethrough:
+                m.strikethrough = c.strikethrough
+                attr.append(text["+strikethrough"] if c.strikethrough else text["-strikethrough"])
+            if c.reverse != m.reverse:
+                m.reverse = c.reverse
+                attr.append(text["+reverse"] if c.reverse else text["-reverse"])
+            if c.blink != m.blink:
+                m.blink = c.blink
+                attr.append(text["+blink"] if c.blink else text["-blink"])
+
+            if attr:
+                line += "\x1b[{}m".format(";".join(*attr))
+
+            is_wide_char = wcwidth(c.data[0]) == 2
+            line += c.data
+        line += "\x1b[0m"
+        return line
 
     def reset(self):
         """Reset the terminal to its initial state.
