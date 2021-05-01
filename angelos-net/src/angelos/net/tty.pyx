@@ -22,22 +22,14 @@
 # https://espterm.github.io/docs/VT100%20escape%20codes.html
 import asyncio
 import hashlib
-import re
-import sys
 import typing
-from struct import Struct
 
 import msgpack
 from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
-    NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator
+    NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator, ErrorCode
 from angelos.net.pyte import HistoryScreen, LNM, ByteStream
 from angelos.net.shell import Shell
-
-"""# Change terminal window size from python.
-import sys
-sys.stdout.write("\x1b[8;{rows};{cols}t".format(rows=32, cols=100))
-"""
 
 """# Signal handlers.
 def init_signals(self) -> None:
@@ -67,36 +59,35 @@ def init_signals(self) -> None:
         signal.siginterrupt(signal.SIGUSR1, False)
 """
 
-"""# Check for terminal session.
-sys.stdout.isatty()
-os.isatty(fd)
-os.get_terminal_size(fd=)
-"""
-
 
 class TerminalClient:
     """Client side terminal emulator."""
 
     def __init__(self, client: "TTYClient"):
         self._client = client
+        self._x = 0
+        self._y = 0
 
     def handle(self, data: bytes):
         """Receive terminal output information."""
         info = msgpack.unpackb(data, raw=False)
         if isinstance(info, dict):
             if info["type"] == "cursor":
-                print("\x1b[{cols};{lines}H".format(cols=info["cursor"][1], lines=info["cursor"][0]))
+                self._x = info["cursor"][0]
+                self._y = info["cursor"][1]
+                print("\x1b[{};{}H".format(self._y, self._x))
             if info["type"] == "row":
-                line = "\x1b[{};0H{}".format(info["y"], info["row"])
+                line = "\x1b[{};0H{}\x1b[{};{}H".format(info["y"], info["row"], self._y, self._x)
                 print(line.rstrip())
 
     def send(self, data: bytes):
         """Send text and sequences to server."""
-        self._client.send(data)
+        self._client.send(msgpack.packb({"type": "seq", "data": data}, use_bin_type=True))
 
-    async def resize(self, cols: int, lines: int):
+    def resize(self, cols: int, lines: int):
         """Resize terminal window at server."""
-        await self._client.resize(cols, lines)
+        self._client.send(msgpack.packb(
+            {"type": "resize", "cols": cols, "lines": lines}, use_bin_type=True))
 
 
 TERMINAL_VERSION = b"tty-0.1"
@@ -121,6 +112,7 @@ class DownstreamIterator(PullChunkIterator):
     async def pull_chunk(self) -> typing.Tuple[bytes, bytes]:
         """Pull chunk from queue on server and send it."""
         chunk = await self._queue.get()
+        self._queue.task_done()
         return chunk, hashlib.sha1(chunk).digest()
 
     def source(self, queue: asyncio.Queue):
@@ -171,28 +163,24 @@ class TTYHandler(Handler):
     def __init__(self, manager: Protocol):
         Handler.__init__(self, manager, states={
             self.ST_VERSION: (StateMode.MEDIATE, TERMINAL_VERSION),
-            self.ST_SIZE: (StateMode.REPRISE, b""),
+            self.ST_SIZE: (StateMode.ONCE, b""),
         },
-        sessions = {
-           self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
-           self.SESH_UPSTREAM: (UpstreamIterator, dict()),
-        }, max_sesh = 2)
+         sessions={
+             self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
+             self.SESH_UPSTREAM: (UpstreamIterator, dict()),
+         }, max_sesh=2)
         self._quit = asyncio.Event()
         self._seq = asyncio.Queue()
         self._idle = None
 
     async def _idler(self):
         while not self._quit.is_set():
-            self._seq.put_nowait(b"\x00")
+            self._seq.put_nowait(msgpack.packb({"type": "seq", "data": b"\x00"}, use_bin_type=True))
             await asyncio.sleep(.5)
 
     def send(self, data: bytes):
         """Send commands to PTY."""
         self._seq.put_nowait(data)
-
-    async def _handle(self, data: bytes):
-        """Handle incoming sequences."""
-        pass
 
 
 class TTYClient(TTYHandler):
@@ -211,7 +199,10 @@ class TTYClient(TTYHandler):
         if version is None:
             raise ProtocolNegotiationError()
 
-        await self.resize(cols, lines)
+        self._states[self.ST_SIZE].update("{cols};{lines}".format(cols=cols, lines=lines).encode())
+        resize = await self._call_tell(self.ST_SIZE)
+        if not resize:
+            raise TerminalResizeError()
 
         self._terminal = TerminalClient(self)
         self._up = asyncio.create_task(self._upstream())
@@ -219,13 +210,6 @@ class TTYClient(TTYHandler):
         self._down = asyncio.create_task(self._downstream())
 
         return self._terminal
-
-    async def resize(self, cols: int, lines: int):
-        """Send text and sequences to server."""
-        self._states[self.ST_SIZE].update("{cols};{lines}".format(cols=cols, lines=lines).encode())
-        resize = await self._call_tell(self.ST_SIZE)
-        if not resize:
-            raise TerminalResizeError()
 
     async def _upstream(self):
         """Upload sent mail."""
@@ -239,6 +223,7 @@ class TTYClient(TTYHandler):
         """Iterate over a queue of chunks."""
         while not self._quit.is_set():
             chunk = await self._seq.get()
+            self._seq.task_done()
             yield chunk, hashlib.sha1(chunk).digest()
 
     async def _downstream(self):
@@ -253,6 +238,8 @@ class TTYClient(TTYHandler):
                         self._terminal.handle(chunk)
             except ChunkError:
                 pass
+            except KeyError:
+                self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
             self._quit.set()
 
 
@@ -261,7 +248,6 @@ class TTYServer(TTYHandler):
     def __init__(self, manager: Protocol):
         TTYHandler.__init__(self, manager)
         self._states[self.ST_VERSION].upgrade(SyncCallable(self._check_version))
-        self._states[self.ST_SIZE].upgrade(SyncCallable(self._do_resize))
         self._sessions[self.SESH_UPSTREAM][1]["check"] = AsyncCallable(self._receive_chunks)
         self._sessions[self.SESH_DOWNSTREAM][1]["check"] = AsyncCallable(self._send_chunks)
 
@@ -275,37 +261,12 @@ class TTYServer(TTYHandler):
         """Negotiate protocol version."""
         return ConfirmCode.YES if value == TERMINAL_VERSION else ConfirmCode.NO
 
-    def _do_resize(self, value: bytes, sesh: NetworkSession = None) -> int:
-        """Resize terminal."""
-        cols, lines = self._check_resize(value)
-
-        if not (cols and lines):
-            return ConfirmCode.NO
-
-        if self._screen:
-            if self._resize_timer:
-                self._resize_timer.cancel()
-            self._resize_timer = asyncio.get_event_loop().call_later(.25, self._resize_later, cols, lines)
-
-        return ConfirmCode.YES
-
-    def _resize_later(self, cols: int, lines: int):
-        self._screen.resize(lines, cols)
-        self._display()
-        self._resize_timer = None
-
-    def _check_resize(self, value: bytes) -> typing.Tuple[int, int]:
-        cols, lines = value.split(b";")
-        lines = int(lines)
-        cols = int(cols)
-
-        if (80 <= cols <= 240) and (8 <= lines <= 72):
-            return cols, lines
-        return None, None
-
     async def _receive_chunks(self, state: NetworkState, sesh: UpstreamIterator) -> int:
         """Prepare DownloadIterator with file information and chunk count."""
-        cols, lines = self._check_resize(self._states[self.ST_SIZE].value)
+        cols, lines = self._states[self.ST_SIZE].value.split(b";")
+        cols = max(80, min(240, int(cols)))
+        lines = max(8, min(72, int(lines)))
+
         self._shell = Shell()
         self._screen = TTYScreen(cols, lines, self._shell)
         self._screen.set_mode(LNM)
@@ -318,6 +279,7 @@ class TTYServer(TTYHandler):
     async def _send_chunks(self, state: NetworkState, sesh: DownstreamIterator) -> int:
         """Prepare UploadIterator with file information and chunk count."""
         sesh.source(self._seq)
+        asyncio.get_event_loop().call_soon(self._display)
         self._idle = asyncio.create_task(self._idler())
         return ConfirmCode.YES
 
@@ -329,10 +291,113 @@ class TTYServer(TTYHandler):
 
     def handle(self, data: bytes):
         """Receive input from client, process and send output screen information."""
-        self._stream.feed(data)
-        for y in self._screen.dirty:
-            self.send(msgpack.packb(
-                {"type": "row", "y": y, "row": self._screen.render_line(y).rstrip()}, use_bin_type=True))
-        cursor = self._screen.cursor
-        self.send(msgpack.packb({"type": "cursor", "cursor": (cursor.x, cursor.y)}, use_bin_type=True))
-        self._screen.dirty.clear()
+        info = msgpack.unpackb(data, raw=False)
+        if isinstance(info, dict):
+            try:
+                if info["type"] == "seq":
+                    self._stream.feed(info["data"])
+                    cursor = self._screen.cursor
+                    self.send(msgpack.packb({"type": "cursor", "cursor": (cursor.x, cursor.y)}, use_bin_type=True))
+                    for y in self._screen.dirty:
+                        self.send(msgpack.packb(
+                            {"type": "row", "y": y, "row": self._screen.render_line(y).rstrip()}, use_bin_type=True))
+                    self._screen.dirty.clear()
+
+                if info["type"] == "resize":
+                    if self._screen:
+                        if self._resize_timer:
+                            self._resize_timer.cancel()
+                        self._resize_timer = asyncio.get_event_loop().call_later(
+                            .25, self._resize_later, max(80, min(240, info["cols"])), max(8, min(72, info["lines"])))
+            except KeyError:
+                self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
+
+    def _resize_later(self, cols: int, lines: int):
+        self._screen.resize(lines, cols)
+        self._display()
+        self._resize_timer = None
+
+
+class BaseShell:
+    """Shell base class that handles input and writes output."""
+
+    SEQUENCES = (
+        b"\n", b"\r", b"\x1bOM", b"\x04", b"\x08", b"\x7f", b"\x1b[3~", b"\x15", b"\x0b", b"\x10", b"\x1b[A",
+        b"\x1bOA", b"\x0e", b"\x1b[B", b"\x1bOB", b"\x02", b"\x1b[D", b"\x1bOD", b"\x06", b"\x1b[C", b"\x1bOC",
+        b"\x01", b"\x1b[H", b"\x1b[1~", b"\x05", b"\x1b[F", b"\x1b[4~", b"\x12", b"\x19",  b"\x03", b"\x1b[33~"
+    )
+
+    def _end_line(self):
+        pass
+
+    def _eof_or_delete(self):
+        pass
+
+    def _erase_left(self):
+        pass
+
+    def _erase_right(self):
+        pass
+
+    def _erase_line(self):
+        pass
+
+    def _erase_to_end(self):
+        pass
+
+    def _history_prev(self):
+        pass
+
+    def _history_next(self):
+        pass
+
+    def _move_left(self):
+        pass
+
+    def _move_right(self):
+        pass
+
+    def _move_to_start(self):
+        pass
+
+    def _move_to_end(self):
+        pass
+
+    def _redraw(self):
+        pass
+
+    def _insert_erased(self):
+        pass
+
+    def _send_break(self):
+        pass
+
+    def _print(self, chr: str):
+        pass
+
+    KEY_MAP = {
+        b"\n": _end_line,  b"\r": _end_line, b"\x1bOM": _end_line,
+        b"\x04": _eof_or_delete,
+        b"\x08": _erase_left, b"\x7f": _erase_left,
+        b"\x1b[3~": _erase_right,
+        b"\x15": _erase_line,
+        b"\x0b": _erase_to_end,
+        b"\x10": _history_prev, b"\x1b[A": _history_prev, b"\x1bOA": _history_prev,
+        b"\x0e": _history_next, b"\x1b[B": _history_next, b"\x1bOB": _history_next,
+        b"\x02": _move_left, b"\x1b[D": _move_left, b"\x1bOD": _move_left,
+        b"\x06": _move_right, b"\x1b[C": _move_right, b"\x1bOC": _move_right,
+        b"\x01": _move_to_start, b"\x1b[H": _move_to_start, b"\x1b[1~": _move_to_start,
+        b"\x05": _move_to_end, b"\x1b[F": _move_to_end, b"\x1b[4~": _move_to_end,
+        b"\x12": _redraw,
+        b"\x19": _insert_erased,
+        b"\x03": _send_break, b"\x1b[33~": _send_break
+    }
+
+    def feed(self, data: bytes):
+        """Printable characters are printed, others are executed."""
+        if data in self.KEY_MAP.keys():
+            self.KEY_MAP[data]()
+        else:
+            value = data.decode()[0]
+            if value.isprintable():
+                self._print(value)

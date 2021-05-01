@@ -396,7 +396,8 @@ class IntermediateTransportProtocol(Transport, Protocol):
 
         def done(fut):
             fut.result()
-            self._transport.close(self)
+            # self._transport.close(self)
+            self._transport.close()
 
         self._task_close = asyncio.create_task(self._on_close())
         self._task_close.add_done_callback(done)

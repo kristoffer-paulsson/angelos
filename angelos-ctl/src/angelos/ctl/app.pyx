@@ -18,6 +18,7 @@ import asyncio
 import binascii
 import copy
 import ipaddress
+import logging
 import os
 import re
 import signal
@@ -74,7 +75,6 @@ class Application:
         self._args = None
         self._signer = None
         self._quiter = None
-        self._task_resize = None
         self._facade = None
         self._client = None
 
@@ -109,13 +109,8 @@ class Application:
 
     def _sigwinch_handler(self):
         size = os.get_terminal_size()
-        if self._terminal and not self._task_resize:
-            self._task_resize = asyncio.create_task(self._terminal.resize(
-                max(80, min(240, size.columns)), max(8, min(72, size.lines))
-            ))
-            def done(fut):
-                self._task_resize = None
-            self._task_resize.add_done_callback(done)
+        if self._terminal:
+            self._terminal.resize(max(80, min(240, size.columns)), max(8, min(72, size.lines)))
 
     def _input_handler(self):
         data = sys.stdin.buffer.read1()
@@ -190,6 +185,11 @@ class Application:
     def start(self):
         """Start application main loop."""
         try:
+            logging.basicConfig(
+                filename="angelosctl.log",
+                level=logging.DEBUG,
+                format="%(relativeCreated)6d %(threadName)s %(message)s"
+            )
             self._args = self._arguments()
             self._facade = self._setup_facade()
 

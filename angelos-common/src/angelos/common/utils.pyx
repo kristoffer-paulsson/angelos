@@ -116,7 +116,8 @@ class Util:
     @staticmethod
     def print_exception(exc: Exception):
         """Print exception and traceback using the python print() method."""
-        traceback.print_exception(type(exc), exc, exc.__traceback__)
+        # print(traceback.print_exception(type(exc), exc, exc.__traceback__))
+        logging.log(level=logging.FATAL, msg=traceback.print_exception(type(exc), exc, exc.__traceback__))
 
     @staticmethod
     def log_exception(exc: Exception):
