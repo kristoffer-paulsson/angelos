@@ -20,16 +20,17 @@
 # cmd2 https://github.com/python-cmd2/cmd2
 # https://github.com/ronf/asyncssh/blob/875330da4bb0322d872f702dbb1f44c7e6137c48/asyncssh/editor.py#L273
 # https://espterm.github.io/docs/VT100%20escape%20codes.html
+# https://github.com/helgefmi/ansiterm/blob/master/ansiterm.py
 import asyncio
 import hashlib
 import typing
+from asyncio.log import logger
 
 import msgpack
 from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
     NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator, ErrorCode
-from angelos.net.pyte import HistoryScreen, LNM, ByteStream
-from angelos.net.shell import Shell
+from angelos.net.pyte import HistoryScreen, LNM, ByteStream, Stream, Screen
 
 """# Signal handlers.
 def init_signals(self) -> None:
@@ -90,6 +91,145 @@ class TerminalClient:
             {"type": "resize", "cols": cols, "lines": lines}, use_bin_type=True))
 
 
+class BaseShell:
+    """Shell base class that handles input and writes output."""
+
+    SEQUENCES = (
+        b"\n", b"\r", b"\x1bOM", b"\x04", b"\x08", b"\x7f", b"\x1b[3~", b"\x15", b"\x0b", b"\x10", b"\x1b[A",
+        b"\x1bOA", b"\x0e", b"\x1b[B", b"\x1bOB", b"\x02", b"\x1b[D", b"\x1bOD", b"\x06", b"\x1b[C", b"\x1bOC",
+        b"\x01", b"\x1b[H", b"\x1b[1~", b"\x05", b"\x1b[F", b"\x1b[4~", b"\x12", b"\x19",  b"\x03", b"\x1b[33~"
+    )
+
+    KEY_MAP = {
+        b"\n": "_end_line", b"\r": "_end_line", b"\x1bOM": "_end_line",
+        b"\x04": "_eof_or_delete",
+        b"\x08": "_erase_left", b"\x7f": "_erase_left",
+        b"\x1b[3~": "_erase_right",
+        b"\x15": "_erase_line",
+        b"\x0b": "_erase_to_end",
+        b"\x10": "_history_prev", b"\x1b[A": "_history_prev", b"\x1bOA": "_history_prev",
+        b"\x0e": "_history_next", b"\x1b[B": "_history_next", b"\x1bOB": "_history_next",
+        b"\x02": "_move_left", b"\x1b[D": "_move_left", b"\x1bOD": "_move_left",
+        b"\x06": "_move_right", b"\x1b[C": "_move_right", b"\x1bOC": "_move_right",
+        b"\x01": "_move_to_start", b"\x1b[H": "_move_to_start", b"\x1b[1~": "_move_to_start",
+        b"\x05": "_move_to_end", b"\x1b[F": "_move_to_end", b"\x1b[4~": "_move_to_end",
+        b"\x12": "_redraw",
+        b"\x19": "_insert_erased",
+        b"\x03": "_send_break", b"\x1b[33~": "_send_break"
+    }
+
+    def __init__(self, stream: Stream, screen: Screen):
+        self._stream = stream
+        self._screen = screen
+        self._key_map = dict()
+
+        for key, values in self.KEY_MAP.items():
+            self._key_map[key] = getattr(self, values, self._noop)
+
+    def feed(self, data: bytes):
+        """Printable characters are printed, others are executed."""
+        logger.info(data)
+        if data in self.KEY_MAP.keys():
+            self._key_map[data]()
+        else:
+            for value in data.decode():
+                if value.isprintable():
+                    self._print(value)
+
+    def _noop(self):
+        pass
+
+    def _print(self, chr: str):
+        pass
+
+    def _end_line(self):
+        pass
+
+    def _eof_or_delete(self):
+        pass
+
+    def _erase_left(self):
+        pass
+
+    def _erase_right(self):
+        pass
+
+    def _erase_line(self):
+        pass
+
+    def _erase_to_end(self):
+        pass
+
+    def _history_prev(self):
+        pass
+
+    def _history_next(self):
+        pass
+
+    def _move_left(self):
+        pass
+
+    def _move_right(self):
+        pass
+
+    def _move_to_start(self):
+        pass
+
+    def _move_to_end(self):
+        pass
+
+    def _redraw(self):
+        pass
+
+    def _insert_erased(self):
+        pass
+
+    def _send_break(self):
+        pass
+
+
+class Shell(BaseShell):
+    """Angelos server command line interface."""
+
+    def __init__(self, stream: Stream, screen: Screen, prompt: str = "> "):
+        BaseShell.__init__(self, stream, screen)
+
+        self._prompt = prompt
+        self._line = ""
+        self._pos = 0
+        self._offset = 0
+
+    def _end_line(self):
+        logger.info("END LINE")
+        self._line += "\n"
+        self._pos = 0
+
+    def _erase_left(self):
+        if self._pos < 0:
+            self._line = self._line[:self._pos-1] + self._line[self._pos:]
+            self._pos -= 1
+            self._stream.feed("\x08")
+
+    def _erase_right(self):
+        if self._pos < len(self._line) - 1:
+            self._line = self._line[:self._pos] + self._line[self._pos+1:]
+
+    def _move_left(self):
+        if self._pos > 0:
+            self._pos -= 1
+            self._stream.feed("\x1b[D")
+
+    def _move_right(self):
+        if self._pos < len(self._line):
+            self._pos += 1
+            self._stream.feed("\x1b[C")
+
+    def _print(self, chr: str):
+        self._line = self._line[:self._pos] + chr + self._line[self._pos:]
+        self._pos += 1
+        self._stream.feed(chr.encode())
+
+
 TERMINAL_VERSION = b"tty-0.1"
 
 SESH_TYPE_DOWNSTREAM = 0x01
@@ -142,8 +282,11 @@ class UpstreamIterator(PushChunkIterator):
 
 class TTYScreen(HistoryScreen):
 
-    def __init__(self, columns: int, lines: int, shell: Shell):
+    def __init__(self, columns: int, lines: int, shell: Shell = None):
         HistoryScreen.__init__(self, columns, lines, history=100, ratio=.5)
+        self._shell = shell
+
+    def attach(self, shell: Shell):
         self._shell = shell
 
     def write_process_input(self, data: bytes):
@@ -267,11 +410,11 @@ class TTYServer(TTYHandler):
         cols = max(80, min(240, int(cols)))
         lines = max(8, min(72, int(lines)))
 
-        self._shell = Shell()
-        self._screen = TTYScreen(cols, lines, self._shell)
+        self._screen = TTYScreen(cols, lines)
         self._screen.set_mode(LNM)
-        self._stream = ByteStream()
-        self._stream.attach(self._screen)
+        self._stream = ByteStream(self._screen)
+        self._shell = Shell(self._stream, self._screen)
+        self._screen.attach(self._shell)
 
         sesh.source(self)
         return ConfirmCode.YES
@@ -295,7 +438,7 @@ class TTYServer(TTYHandler):
         if isinstance(info, dict):
             try:
                 if info["type"] == "seq":
-                    self._stream.feed(info["data"])
+                    self._shell.feed(info["data"])
                     cursor = self._screen.cursor
                     self.send(msgpack.packb({"type": "cursor", "cursor": (cursor.x, cursor.y)}, use_bin_type=True))
                     for y in self._screen.dirty:
@@ -318,86 +461,3 @@ class TTYServer(TTYHandler):
         self._resize_timer = None
 
 
-class BaseShell:
-    """Shell base class that handles input and writes output."""
-
-    SEQUENCES = (
-        b"\n", b"\r", b"\x1bOM", b"\x04", b"\x08", b"\x7f", b"\x1b[3~", b"\x15", b"\x0b", b"\x10", b"\x1b[A",
-        b"\x1bOA", b"\x0e", b"\x1b[B", b"\x1bOB", b"\x02", b"\x1b[D", b"\x1bOD", b"\x06", b"\x1b[C", b"\x1bOC",
-        b"\x01", b"\x1b[H", b"\x1b[1~", b"\x05", b"\x1b[F", b"\x1b[4~", b"\x12", b"\x19",  b"\x03", b"\x1b[33~"
-    )
-
-    def _end_line(self):
-        pass
-
-    def _eof_or_delete(self):
-        pass
-
-    def _erase_left(self):
-        pass
-
-    def _erase_right(self):
-        pass
-
-    def _erase_line(self):
-        pass
-
-    def _erase_to_end(self):
-        pass
-
-    def _history_prev(self):
-        pass
-
-    def _history_next(self):
-        pass
-
-    def _move_left(self):
-        pass
-
-    def _move_right(self):
-        pass
-
-    def _move_to_start(self):
-        pass
-
-    def _move_to_end(self):
-        pass
-
-    def _redraw(self):
-        pass
-
-    def _insert_erased(self):
-        pass
-
-    def _send_break(self):
-        pass
-
-    def _print(self, chr: str):
-        pass
-
-    KEY_MAP = {
-        b"\n": _end_line,  b"\r": _end_line, b"\x1bOM": _end_line,
-        b"\x04": _eof_or_delete,
-        b"\x08": _erase_left, b"\x7f": _erase_left,
-        b"\x1b[3~": _erase_right,
-        b"\x15": _erase_line,
-        b"\x0b": _erase_to_end,
-        b"\x10": _history_prev, b"\x1b[A": _history_prev, b"\x1bOA": _history_prev,
-        b"\x0e": _history_next, b"\x1b[B": _history_next, b"\x1bOB": _history_next,
-        b"\x02": _move_left, b"\x1b[D": _move_left, b"\x1bOD": _move_left,
-        b"\x06": _move_right, b"\x1b[C": _move_right, b"\x1bOC": _move_right,
-        b"\x01": _move_to_start, b"\x1b[H": _move_to_start, b"\x1b[1~": _move_to_start,
-        b"\x05": _move_to_end, b"\x1b[F": _move_to_end, b"\x1b[4~": _move_to_end,
-        b"\x12": _redraw,
-        b"\x19": _insert_erased,
-        b"\x03": _send_break, b"\x1b[33~": _send_break
-    }
-
-    def feed(self, data: bytes):
-        """Printable characters are printed, others are executed."""
-        if data in self.KEY_MAP.keys():
-            self.KEY_MAP[data]()
-        else:
-            value = data.decode()[0]
-            if value.isprintable():
-                self._print(value)
