@@ -14,11 +14,10 @@
 #
 from unittest import TestCase
 
-from angelos.bin.term import Terminal, Screen
+from angelos.bin.term import Stream
 
 
 class TestTerminal(TestCase):
     def test_run(self):
-        term = Terminal()
-        screen = Screen()
-        print(screen)
+        term = Stream()
+        print(term)
