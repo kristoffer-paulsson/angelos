@@ -17,7 +17,16 @@
 Implemented mostly according to https://en.wikipedia.org/wiki/ANSI_escape_code
 and this too https://en.wikipedia.org/wiki/ASCII
 """
+from unicodedata import east_asian_width
 
+cdef inline long long imax(long long a, long long b) nogil:
+    """Maximum integer is returned."""
+    return a if a > b else b
+
+
+cdef inline long long imin(long long a, long long b) nogil:
+    """Minimum integer is returned. """
+    return a if a < b else b
 
 cdef class ByteList:
     """Bytes object with read/write access."""
@@ -31,10 +40,15 @@ cdef class ByteList:
         self.length = len(data)
         self._view = <unsigned char*>data
 
+        # self.reset()
+
     @property
     def data(self) -> bytes:
         """Access data buffer."""
         return self._data
+
+    def __len__(self):
+        return self.length
 
     cdef inline unsigned char get(self, unsigned int index) nogil:
         """Get value at given index or zero."""
@@ -46,6 +60,13 @@ cdef class ByteList:
         """Get value at given index."""
         if index < self.length:
             self._view[index] = value
+
+    cdef inline void reset(self, unsigned char value = 0) nogil:
+        """Get value at given index."""
+        cdef unsigned long index = 0
+        while index < self.length:
+            self._view[index] = value
+            index += 1
 
 
 cdef class ByteIterator:
@@ -62,7 +83,7 @@ cdef class ByteIterator:
         self._index = 0
         self.length = len(data)
         self._view = <unsigned char*>data
-        self.empty = not bool(self.length)
+        self.end = not bool(self.length)
 
     @property
     def data(self) -> bytes:
@@ -143,9 +164,12 @@ cdef enum EscCodes:
     escSS2 = 0x8E  # Single Shift Two
     escSS3 = 0x8F  # Single Shift Three
     escDCS = 0x90  # Device Control String
-    escSCI = 0x9B  # Control Sequence Introducer
-    escST = 0x9C  # String Terminator
-    escOSC = 0x9D  # Operating System Command
+    escCSI = 0x5B  # Control Sequence Introducer C0
+    escCSI1 = 0x9B  # Control Sequence Introducer C1
+    escST = 0xfC  # String Terminator C0
+    escST1 = 0x9C  # String Terminator C1
+    escOSC = 0x5D  # Operating System Command C0
+    escOSC1 = 0x9D  # Operating System Command C1
     escSOS = 0x98  # Start of String
     escPM = 0x9E  # Privacy Message
     escAPC = 0x9F  # Application Program Command
@@ -225,6 +249,12 @@ cdef enum VtCodes:
 
 ctypedef struct Glyph:
     unsigned char[4] units
+
+
+ctypedef struct Dirty:
+    bint updated
+    unsigned short begin
+    unsigned short end
 
 
 cdef class TerminalInterface:
@@ -557,32 +587,43 @@ cdef class Screen:
     cdef unsigned char _bg;  # Current background color
     cdef unsigned char _attr;  # Current cell attributes
 
-    cdef bytes _empty
-    cdef list _buffer
-    cdef ByteList _current
-    cdef str _line
-    cdef list _history
+    cdef Dirty *_modified;
 
-    def __cinit__(self, cols: int = 80, lines: int = 24):
+    cdef bytes _empty;
+    cdef list _buffer;
+    cdef ByteList _current;
+    cdef str _line;
+    cdef list _history;
+
+    cdef bytes _modified_bytes;
+
+    def __cinit__(self):
         self._x = 1
         self._y = 1
-        self._cols = cols
-        self._lines = lines
+        self._cols = 1
+        self._lines = 1
 
         self._fg = fgDEFAULT
         self._bg = bgDEFAULT
         self._attr = 0
 
-    def __init__(self):
+        self._modified = NULL
+
+    def __init__(self, cols: int, lines: int):
         self._empty = self._tileplate()     # Template cell
         self._buffer = list()               # Buffer of cells
         self._current = None                # Current selected line from buffer
         self._line = ""                     # Editorial string
         self._history = list()              # List of historical lines
 
+        self._cols = cols
+        self._lines = lines
+
         for _ in range(self._lines):
             self._buffer.append(self._new_line(self._cols))
+
         self._current_line()
+        self._new_modified()
 
     @property
     def x(self) -> int:
@@ -604,32 +645,98 @@ cdef class Screen:
         """Height of the PTY."""
         return self._lines
 
-    def _tileplate(
-            self,
-            bytes glyph = b" \x00\x00\x00", unsigned char fg = fgDEFAULT,
-            unsigned char bg = bgDEFAULT, unsigned char attr = 0x00
-        ) -> bytes:
+    def _tileplate(self) -> bytes:
         """Templates a tile from input data and returns it as bytes."""
-        return bytes([*glyph[:4], fg, bg, attr])
+        return bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
 
-    def _new_line(self, unsigned int cols) -> ByteList:
+    cdef ByteList _new_line(self, unsigned int cols):
         """Create a new line for the buffer, returns a tuple of bytes data and cython Tile memoryview."""
-        return ByteList(bytes(cols*self._empty))
+        cdef unsigned long idx = 0
+        cdef Glyph glyph
+        cdef ByteList byte_list = ByteList(bytes(cols*7))
 
-    def _resize_line(self, unsigned int y, unsigned int cols) -> ByteList:
+        glyph.units[0] = 32
+        glyph.units[1] = 0
+        glyph.units[2] = 0
+        glyph.units[3] = 0
+
+        while idx < self._cols:
+            self._print(byte_list, idx, &glyph)
+            idx += 1
+
+        return byte_list
+
+    cdef ByteList _resize_line(self, unsigned int y, unsigned int cols):
         """Resizes an existing line buffer preserving data."""
-        byte_list = self._buffer[y]
-        cdef unsigned int size = len(byte_list.length) // 7
+        cdef ByteList byte_list = self._buffer[y]
+        cdef unsigned int size = byte_list.length // 7
 
         if size > cols:
             return ByteList(byte_list.data[:cols*7])
         elif size < cols:
-            return ByteList(bytes((cols-size)*self._empty))
+            return ByteList(byte_list.data + bytes((cols-size)*7))
+        else:
+            return byte_list
+
+    def _resize(self, unsigned short lines, unsigned short cols):
+        """Resize screen."""
+        if self._lines > lines:
+            self._buffer = self._buffer[-lines:]
+            for y in range(lines):
+                self._buffer[y] = self._resize_line(y, cols)
+        elif self._lines < lines:
+            for y in range(self._lines):
+                self._buffer[y] = self._resize_line(y, cols)
+            for _ in range(lines - self._lines):
+                self._buffer.append(self._new_line(cols))
+
+        self._lines = lines
+        self._cols = cols
+        self._current_line()
+        self._new_modified()
 
     cdef inline void _current_line(self) nogil:
         """Prepare current line when cursor changes vertically."""
         with gil:
             self._current = self._buffer[self._y-1]
+
+    def _new_modified(self):
+        """Create a buffer of dirty screen information."""
+        cdef Dirty *modified_array = NULL
+        modified = bytes(self._lines*sizeof(Dirty))
+        self._modified_bytes = modified
+        modified_array = <Dirty*>modified
+        self._modified = modified_array
+
+    cdef inline void _update(self) nogil:
+        """Mark tiles as modified."""
+        cdef unsigned short y = self._y-1
+
+        if self._modified[y].updated:
+            self._modified[y].begin = imin(self._modified[y].begin, self._x-1)
+            self._modified[y].end = imax(self._modified[y].end, self._x)
+        else:
+            self._modified[y].updated = True
+            self._modified[y].begin = self._x-1
+            self._modified[y].end = self._x
+
+    cdef inline void _clear(self) nogil:
+        """Clears all marks of modification."""
+        cdef unsigned short idx = 0
+
+        while idx < self._lines:
+            self._modified[idx].updated = False
+            idx += 1
+
+    cdef inline void _smear(self) nogil:
+        """Marks all tiles as modified."""
+        cdef unsigned short idx = 0
+
+        while idx < self._lines:
+            self._modified[idx].updated = True
+            self._modified[idx].begin = 0
+            self._modified[idx].end = self._cols
+            idx += 1
 
     cdef inline void _print(self, ByteList view, unsigned short x, Glyph *glyph) nogil:
         """Print a glyph to the buffer using colors and attributes."""
@@ -691,7 +798,9 @@ cdef class Screen:
 
     cdef inline void print_glyph(self, Glyph *glyph) nogil:
         """Print glyph to console."""
-        pass
+        self._print(self._current, self._x-1, glyph)
+        self._update()
+        self._move_right(1)
 
     cdef inline void bell(self) nogil:
         """Executes the BEL control character."""
@@ -1081,19 +1190,39 @@ cdef class Screen:
 
 
 cdef class Stream(Screen):
-    """TTY Stream handler that processes whatever it's fed."""
+    """Stream handler that processes whatever it's fed."""
 
-    def __init__(self):
-        Screen.__init__(self)
+    def __init__(self, cols: int = 80, lines: int = 24):
+        Screen.__init__(self, cols, lines)
 
-    cdef void feed(self, data: bytes) nogil:
+    def display(self) -> None:
+        """Extract all modified buffer data."""
+        for y in range(self._lines):
+            if not self._modified[y].updated:
+                continue
+            yield y+1, self._modified[y].begin+1, self._modified[y].end+1, \
+                  self._buffer[y].data[self._modified[y].begin*7:self._modified[y].end*7]
+
+    def smear(self) -> None:
+        self._smear()
+
+    def clear(self) -> None:
+        self._clear()
+
+    def feed(self, data: bytes) -> None:
+        self._feed(data)
+
+    def resize(self, lines: int, cols: int):
+        self._resize(lines, cols)
+        self._smear()
+
+    cdef void _feed(self, data: bytes) nogil:
         """Process input to the terminal."""
         cdef unsigned char byte = 0, rest = 0
         cdef Glyph glyph
 
         with gil:
             biter = ByteIterator(data)
-
 
         while not biter.end or rest:
             if rest:
@@ -1120,7 +1249,7 @@ cdef class Stream(Screen):
 
     cdef inline bint is_utf8(self, unsigned char byte) nogil:
         """Is byte an UTF-8 code unit?"""
-        return byte >> 6 == 2 or byte >> 5 == 6 or byte >> 4 == 14 or byte >> 3 == 30
+        return 0x20 <= byte <= 0x7E or byte >> 6 == 2 or byte >> 5 == 6 or byte >> 4 == 14 or byte >> 3 == 30
 
     cdef inline bint _utf8_characters(self, unsigned char byte, ByteIterator iterator, Glyph *glyph) nogil:
         """Process a UTF-8 character and returns false on failure."""
@@ -1215,11 +1344,11 @@ cdef class Stream(Screen):
             pass
         elif byte == escDCS:
             pass
-        elif byte == escSCI:
+        elif byte in (escCSI, escCSI1):
             rest = self._csi_sequence(iterator)
-        elif byte == escST:
+        elif byte in (escST, escST1):
             pass
-        elif byte == escOSC:
+        elif byte in (escOSC, escOSC1):
             pass
         elif byte == escPM:
             pass
@@ -1230,11 +1359,16 @@ cdef class Stream(Screen):
 
     cdef inline unsigned char _csi_sequence(self, ByteIterator iterator) nogil:
         """Parse CSI sequence."""
-        cdef unsigned char byte = 0, final_byte
-        cdef unsigned int value, idx = 1, vlen = 16,
+        cdef unsigned char byte = 0, final_byte = 0
+        cdef unsigned int value = 0, idx = 1, vlen = 16,
         cdef unsigned int params[10], plen = 0
         cdef unsigned char param_text[16]
         cdef unsigned char inter_text[16]
+        cdef unsigned int tmp = 0
+
+        while tmp < 10:  # Reset array, seems Cython don't automatically.
+            params[0] = 0
+            tmp += 1
 
         if not iterator.end:
             byte = iterator.next()
@@ -1329,6 +1463,7 @@ cdef class Stream(Screen):
 
     cdef inline void _sgr_parameters(self, unsigned char param) nogil:
         """Select graphic rendition."""
+
         if param == sgrRESET:  # Reset or normal
             self.attr_reset()
         elif param == sgrBOLD_ON:  # Bold or increased intensity
@@ -1364,6 +1499,7 @@ cdef class Stream(Screen):
 
     cdef inline void _vt_sequence(self, unsigned int keycode) nogil:
         """Key codes for special keys."""
+
         if keycode == vtHome:
             self.key_home()
         elif keycode == vtInsert:
@@ -1431,3 +1567,65 @@ cdef class Stream(Screen):
 
 class Terminal(Stream):
     pass
+
+
+def print_line(y: int, begin: int, end: int, data: bytes) -> str:
+    """Convert line of bytes into ANSI escape codes."""
+    if len(data) != (end - begin) * 7:
+        raise RuntimeWarning("Data length arbitrary.")
+
+    line = ""
+    code = ""
+    cdef bint is_wide_char = False
+
+    cdef unsigned char fg_b = fgDEFAULT
+    cdef unsigned char bg_b = bgDEFAULT
+    cdef unsigned char attr_b = 0
+    cdef unsigned char attr[9]
+
+    cdef short jdx = 0
+
+    for x in range(0, (end - begin)*7, 7):
+        if is_wide_char:  # Skip stub
+            is_wide_char = False
+            continue
+
+        if fg_b != data[x + 4]:
+            fg_b = data[x + 4]
+            attr[0] = fg_b
+        if bg_b != data[x + 5]:
+            bg_b = data[x + 5]
+            attr[1] = bg_b
+
+        if attr_b & attrBOLD != data[x + 6] & attrBOLD:
+            attr[2] = sgrBOLD_ON if data[x + 6] & attrBOLD else sgrBOLD_OFF
+        if attr_b & attrDIM != data[x + 6] & attrDIM:
+            attr[3] = sgrDIM_ON if data[x + 6] & attrDIM else sgrDIM_OFF
+        if attr_b & attrITALIC != data[x + 6] & attrITALIC:
+            attr[4] = sgrITALIC_ON if data[x + 6] & attrITALIC else sgrITALIC_OFF
+        if attr_b & attrUNDER != data[x + 6] & attrUNDER:
+            attr[5] = sgrUNDERLINE_ON if data[x + 6] & attrUNDER else sgrUNDERLINE_OFF
+        if attr_b & attrSTRIKE != data[x + 6] & attrSTRIKE:
+            attr[6] = sgrSTRIKE_ON if data[x + 6] & attrSTRIKE else sgrSTRIKE_OFF
+        if attr_b & attrINVERT != data[x + 6] & attrINVERT:
+            attr[7] = sgrINVERT_ON if data[x + 6] & attrINVERT else sgrINVERT_OFF
+        if attr_b & attrBLINK != data[x + 6] & attrBLINK:
+            attr[8] = sgrBLINK_ON if data[x + 6] & attrBLINK else sgrBLINK_OFF
+        attr_b = data[x + 6]
+
+        while jdx < 9:
+            if attr[jdx]:
+                code += ";{}".format(attr[jdx])
+                attr[jdx] = 0
+            jdx += 1
+
+        if code:
+            line += "\x1b[{}m".format(code[:])
+            code = ""
+
+        glyph = data[x:x + 4].decode()[:1]
+        is_wide_char = east_asian_width(glyph) in "WF"
+        line += glyph
+
+    line += "\x1b[0m"
+    return line

@@ -27,10 +27,11 @@ import typing
 from asyncio.log import logger
 
 import msgpack
+from angelos.bin.term import Stream, print_line
 from angelos.common.misc import SyncCallable, AsyncCallable
+from angelos.common.utils import Util
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
     NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator, ErrorCode
-from angelos.net.pyte import HistoryScreen, LNM, ByteStream, Stream, Screen
 
 """# Signal handlers.
 def init_signals(self) -> None:
@@ -77,18 +78,23 @@ class TerminalClient:
                 self._x = info["cursor"][0]
                 self._y = info["cursor"][1]
                 print("\x1b[{};{}H".format(self._y, self._x))
+
             if info["type"] == "row":
-                line = "\x1b[{};0H{}\x1b[{};{}H".format(info["y"], info["row"], self._y, self._x)
-                print(line.rstrip())
+                line = "\x1b[{};{}H{}\x1b[{};{}H".format(
+                    info["y"], info["begin"],
+                    print_line(info["y"], info["begin"], info["end"], info["row"]),
+                    self._y, self._x
+                )
+                print(line)
 
     def send(self, data: bytes):
         """Send text and sequences to server."""
+        # print(data)
         self._client.send(msgpack.packb({"type": "seq", "data": data}, use_bin_type=True))
 
     def resize(self, cols: int, lines: int):
         """Resize terminal window at server."""
-        self._client.send(msgpack.packb(
-            {"type": "resize", "cols": cols, "lines": lines}, use_bin_type=True))
+        self._client.send(msgpack.packb({"type": "resize", "cols": cols, "lines": lines}, use_bin_type=True))
 
 
 class BaseShell:
@@ -118,7 +124,7 @@ class BaseShell:
         b"\x03": "_send_break", b"\x1b[33~": "_send_break"
     }
 
-    def __init__(self, stream: Stream, screen: Screen):
+    def __init__(self, stream, screen):
         self._stream = stream
         self._screen = screen
         self._key_map = dict()
@@ -188,48 +194,6 @@ class BaseShell:
         pass
 
 
-class Shell(BaseShell):
-    """Angelos server command line interface."""
-
-    def __init__(self, stream: Stream, screen: Screen, prompt: str = "> "):
-        BaseShell.__init__(self, stream, screen)
-
-        self._prompt = prompt
-        self._line = ""
-        self._pos = 0
-        self._offset = 0
-
-    def _end_line(self):
-        logger.info("END LINE")
-        self._line += "\n"
-        self._pos = 0
-
-    def _erase_left(self):
-        if self._pos < 0:
-            self._line = self._line[:self._pos-1] + self._line[self._pos:]
-            self._pos -= 1
-            self._stream.feed("\x08")
-
-    def _erase_right(self):
-        if self._pos < len(self._line) - 1:
-            self._line = self._line[:self._pos] + self._line[self._pos+1:]
-
-    def _move_left(self):
-        if self._pos > 0:
-            self._pos -= 1
-            self._stream.feed("\x1b[D")
-
-    def _move_right(self):
-        if self._pos < len(self._line):
-            self._pos += 1
-            self._stream.feed("\x1b[C")
-
-    def _print(self, chr: str):
-        self._line = self._line[:self._pos] + chr + self._line[self._pos:]
-        self._pos += 1
-        self._stream.feed(chr.encode())
-
-
 TERMINAL_VERSION = b"tty-0.1"
 
 SESH_TYPE_DOWNSTREAM = 0x01
@@ -278,19 +242,6 @@ class UpstreamIterator(PushChunkIterator):
     def source(self, tty: "TTYServer"):
         """Set chunk handle callable."""
         self._tty = tty
-
-
-class TTYScreen(HistoryScreen):
-
-    def __init__(self, columns: int, lines: int, shell: Shell = None):
-        HistoryScreen.__init__(self, columns, lines, history=100, ratio=.5)
-        self._shell = shell
-
-    def attach(self, shell: Shell):
-        self._shell = shell
-
-    def write_process_input(self, data: bytes):
-        self._shell.write(data)
 
 
 class TTYHandler(Handler):
@@ -396,9 +347,7 @@ class TTYServer(TTYHandler):
 
         self._resize_timer = None
 
-        self._screen = None
-        self._stream = None
-        self._shell = None
+        self._terminal = None
 
     def _check_version(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Negotiate protocol version."""
@@ -410,11 +359,8 @@ class TTYServer(TTYHandler):
         cols = max(80, min(240, int(cols)))
         lines = max(8, min(72, int(lines)))
 
-        self._screen = TTYScreen(cols, lines)
-        self._screen.set_mode(LNM)
-        self._stream = ByteStream(self._screen)
-        self._shell = Shell(self._stream, self._screen)
-        self._screen.attach(self._shell)
+        self._terminal = Stream(cols, lines)
+        self._terminal.smear()
 
         sesh.source(self)
         return ConfirmCode.YES
@@ -428,9 +374,10 @@ class TTYServer(TTYHandler):
 
     def _display(self):
         """Send display update to client."""
-        for y in range(self._screen.columns):
+        for y, b, e, d in self._terminal.display():
             self.send(msgpack.packb(
-                {"type": "row", "y": y, "row": self._screen.render_line(y).rstrip()}, use_bin_type=True))
+                {"type": "row", "y": y, "begin": b, "end": e, "row": d}, use_bin_type=True))
+        self._terminal.clear()
 
     def handle(self, data: bytes):
         """Receive input from client, process and send output screen information."""
@@ -438,16 +385,13 @@ class TTYServer(TTYHandler):
         if isinstance(info, dict):
             try:
                 if info["type"] == "seq":
-                    self._shell.feed(info["data"])
-                    cursor = self._screen.cursor
-                    self.send(msgpack.packb({"type": "cursor", "cursor": (cursor.x, cursor.y)}, use_bin_type=True))
-                    for y in self._screen.dirty:
-                        self.send(msgpack.packb(
-                            {"type": "row", "y": y, "row": self._screen.render_line(y).rstrip()}, use_bin_type=True))
-                    self._screen.dirty.clear()
+                    self._terminal.feed(info["data"])
+                    self.send(msgpack.packb(
+                        {"type": "cursor", "cursor": (self._terminal.x, self._terminal.y)}, use_bin_type=True))
+                    self._display()
 
                 if info["type"] == "resize":
-                    if self._screen:
+                    if self._terminal:
                         if self._resize_timer:
                             self._resize_timer.cancel()
                         self._resize_timer = asyncio.get_event_loop().call_later(
@@ -456,7 +400,7 @@ class TTYServer(TTYHandler):
                 self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
 
     def _resize_later(self, cols: int, lines: int):
-        self._screen.resize(lines, cols)
+        self._terminal.resize(lines, cols)
         self._display()
         self._resize_timer = None
 
