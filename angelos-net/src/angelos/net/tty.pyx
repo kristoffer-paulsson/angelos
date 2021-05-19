@@ -27,7 +27,7 @@ import typing
 from asyncio.log import logger
 
 import msgpack
-from angelos.bin.term import Stream, print_line
+from angelos.bin.term import print_line, Stream
 from angelos.common.misc import SyncCallable, AsyncCallable
 from angelos.common.utils import Util
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
@@ -67,10 +67,10 @@ class TerminalClient:
 
     def __init__(self, client: "TTYClient"):
         self._client = client
-        self._x = 0
-        self._y = 0
+        self._x = 1
+        self._y = 1
 
-    def handle(self, data: bytes):
+    async def handle(self, data: bytes):
         """Receive terminal output information."""
         info = msgpack.unpackb(data, raw=False)
         if isinstance(info, dict):
@@ -80,16 +80,19 @@ class TerminalClient:
                 print("\x1b[{};{}H".format(self._y, self._x))
 
             if info["type"] == "row":
-                line = "\x1b[{};{}H{}\x1b[{};{}H".format(
-                    info["y"], info["begin"],
-                    print_line(info["y"], info["begin"], info["end"], info["row"]),
-                    self._y, self._x
-                )
-                print(line)
+                # try:
+                    # print("TEST", info["y"], print_line(info["y"], info["begin"], info["end"], info["row"]))
+                # except Exception as exc:
+                #    Util.print_exception(exc)
+                # line = "\x1b[{};{}H{}".format(
+                #    info["y"], info["begin"],
+                #    print_line(info["y"], info["begin"], info["end"], info["row"]).decode(),
+                #)
+                # print(line)
+                print(print_line(info["y"], info["begin"], info["end"], info["row"]))
 
     def send(self, data: bytes):
         """Send text and sequences to server."""
-        # print(data)
         self._client.send(msgpack.packb({"type": "seq", "data": data}, use_bin_type=True))
 
     def resize(self, cols: int, lines: int):
@@ -237,7 +240,7 @@ class UpstreamIterator(PushChunkIterator):
         """Handle pushed chunk from client."""
         if hashlib.sha1(chunk).digest() != digest:
             raise ChunkError()
-        self._tty.handle(chunk)
+        await self._tty.handle(chunk)
 
     def source(self, tty: "TTYServer"):
         """Set chunk handle callable."""
@@ -329,7 +332,7 @@ class TTYClient(TTYHandler):
                     if hashlib.sha1(chunk).digest() != digest:
                         raise ChunkError()
                     else:
-                        self._terminal.handle(chunk)
+                        await self._terminal.handle(chunk)
             except ChunkError:
                 pass
             except KeyError:
@@ -346,8 +349,8 @@ class TTYServer(TTYHandler):
         self._sessions[self.SESH_DOWNSTREAM][1]["check"] = AsyncCallable(self._send_chunks)
 
         self._resize_timer = None
-
         self._terminal = None
+        self._lock = asyncio.Lock()
 
     def _check_version(self, value: bytes, sesh: NetworkSession = None) -> int:
         """Negotiate protocol version."""
@@ -379,29 +382,33 @@ class TTYServer(TTYHandler):
                 {"type": "row", "y": y, "begin": b, "end": e, "row": d}, use_bin_type=True))
         self._terminal.clear()
 
-    def handle(self, data: bytes):
+    async def handle(self, data: bytes):
         """Receive input from client, process and send output screen information."""
         info = msgpack.unpackb(data, raw=False)
         if isinstance(info, dict):
             try:
                 if info["type"] == "seq":
-                    self._terminal.feed(info["data"])
-                    self.send(msgpack.packb(
-                        {"type": "cursor", "cursor": (self._terminal.x, self._terminal.y)}, use_bin_type=True))
-                    self._display()
+                    if self._terminal:
+                        async with self._lock:
+                            self._terminal.feed(info["data"])
+                            self.send(msgpack.packb(
+                                {"type": "cursor", "cursor": (self._terminal.x, self._terminal.y)}, use_bin_type=True))
+                            self._display()
 
                 if info["type"] == "resize":
                     if self._terminal:
                         if self._resize_timer:
                             self._resize_timer.cancel()
-                        self._resize_timer = asyncio.get_event_loop().call_later(
-                            .25, self._resize_later, max(80, min(240, info["cols"])), max(8, min(72, info["lines"])))
+                        self._resize_timer = asyncio.create_task(
+                            self._resize_later(max(80, min(240, info["cols"])), max(8, min(72, info["lines"])))
+                        )
             except KeyError:
                 self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
 
-    def _resize_later(self, cols: int, lines: int):
-        self._terminal.resize(lines, cols)
-        self._display()
+    async def _resize_later(self, cols: int, lines: int):
+        asyncio.sleep(.25)
+        async with self._lock:
+            self._terminal.resize(lines, cols)
+            self._display()
         self._resize_timer = None
-
 

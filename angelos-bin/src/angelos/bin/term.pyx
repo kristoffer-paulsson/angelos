@@ -17,7 +17,20 @@
 Implemented mostly according to https://en.wikipedia.org/wiki/ANSI_escape_code
 and this too https://en.wikipedia.org/wiki/ASCII
 """
+from asyncio import Lock
 from unicodedata import east_asian_width
+
+cdef inline int utf8_len(unsigned char byte) nogil:
+    if 0x20 <= byte <= 0x7E:
+        return 1
+    if byte >> 5 == 6:
+        return 2
+    if byte >> 4 == 14:
+        return 3
+    if byte >> 3 == 30:
+        return 4
+    return 0
+
 
 cdef inline long long imax(long long a, long long b) nogil:
     """Maximum integer is returned."""
@@ -628,12 +641,12 @@ cdef class Screen:
     @property
     def x(self) -> int:
         """Cursor X position, zero-indexed."""
-        return self._x - 1
+        return self._x-1
 
     @property
     def y(self) -> int:
         """Cursor Y position, zero-indexed."""
-        return self._y - 1
+        return self._y-1
 
     @property
     def columns(self) -> int:
@@ -712,6 +725,14 @@ cdef class Screen:
         """Mark tiles as modified."""
         cdef unsigned short y = self._y-1
 
+        # if self._modified[y].updated:
+        #    self._modified[y].begin = imax(0, imin(self._modified[y].begin, self._x-1))
+        #    self._modified[y].end = imin(self._cols-1, imax(self._modified[y].end, self._x))
+        # else:
+        #    self._modified[y].updated = True
+        #    self._modified[y].begin = imax(0, self._x-1)
+        #    self._modified[y].end = imin(self._cols-1, self._x-1)
+
         if self._modified[y].updated:
             self._modified[y].begin = imin(self._modified[y].begin, self._x-1)
             self._modified[y].end = imax(self._modified[y].end, self._x)
@@ -735,7 +756,7 @@ cdef class Screen:
         while idx < self._lines:
             self._modified[idx].updated = True
             self._modified[idx].begin = 0
-            self._modified[idx].end = self._cols
+            self._modified[idx].end = self._cols-1
             idx += 1
 
     cdef inline void _print(self, ByteList view, unsigned short x, Glyph *glyph) nogil:
@@ -1198,10 +1219,10 @@ cdef class Stream(Screen):
     def display(self) -> None:
         """Extract all modified buffer data."""
         for y in range(self._lines):
-            if not self._modified[y].updated:
-                continue
-            yield y+1, self._modified[y].begin+1, self._modified[y].end+1, \
-                  self._buffer[y].data[self._modified[y].begin*7:self._modified[y].end*7]
+            if self._modified[y].updated:
+                yield y + 1, self._modified[y].begin + 1, self._modified[y].end + 1, \
+                      self._buffer[y].data[self._modified[y].begin * 7:self._modified[y].end * 7]
+                # yield y + 1, 1, self._cols, self._buffer[y].data[:(self._cols-1) * 7]
 
     def smear(self) -> None:
         self._smear()
@@ -1256,7 +1277,7 @@ cdef class Stream(Screen):
         cdef unsigned char one = 0, two = 0, three = 0, four = 0
 
         if byte & 0b10000000 == 0:  # One byte character
-            one = byte % 0b01111111
+            one = byte
 
             if not (0x20 <= byte <= 0x7E):  # Printable?
                 return False
@@ -1267,19 +1288,19 @@ cdef class Stream(Screen):
                 glyph.units[3] = four
 
         elif byte >> 5 == 6:  # Two byte character
-            one = byte & 0b00011111
+            one = byte
             two = iterator.next()
 
             if two >> 6 != 2:  # True code units?
                 return False
             else:
                 glyph.units[0] = one
-                glyph.units[1] = two & 0b00111111
+                glyph.units[1] = two
                 glyph.units[2] = three
                 glyph.units[3] = four
 
         elif byte >> 4 == 14:  # Three byte character
-            one = byte & 0b00001111
+            one = byte
             two = iterator.next()
             three = iterator.next()
 
@@ -1287,12 +1308,12 @@ cdef class Stream(Screen):
                 return False
             else:
                 glyph.units[0] = one
-                glyph.units[1] = two & 0b00111111
-                glyph.units[2] = three & 0b00111111
+                glyph.units[1] = two
+                glyph.units[2] = three
                 glyph.units[3] = four
 
         elif byte >> 3 == 30:  # Four byte character
-            one = byte & 0b00000111
+            one = byte
             two = iterator.next()
             three = iterator.next()
             four = iterator.next()
@@ -1301,9 +1322,9 @@ cdef class Stream(Screen):
                 return False
             else:
                 glyph.units[0] = one
-                glyph.units[1] = two & 0b00111111
-                glyph.units[2] = three & 0b00111111
-                glyph.units[3] = four & 0b00111111
+                glyph.units[1] = two
+                glyph.units[2] = three
+                glyph.units[3] = four
 
         else:
             return False
@@ -1366,9 +1387,9 @@ cdef class Stream(Screen):
         cdef unsigned char inter_text[16]
         cdef unsigned int tmp = 0
 
-        while tmp < 10:  # Reset array, seems Cython don't automatically.
-            params[0] = 0
-            tmp += 1
+        # while tmp < 10:  # Reset array, seems Cython don't automatically.
+        #    params[0] = 0
+        #    tmp += 1
 
         if not iterator.end:
             byte = iterator.next()
@@ -1569,19 +1590,21 @@ class Terminal(Stream):
     pass
 
 
-def print_line(y: int, begin: int, end: int, data: bytes) -> str:
+def print_line(short y, short begin, short end, bytes data) -> bytearray:
     """Convert line of bytes into ANSI escape codes."""
     if len(data) != (end - begin) * 7:
         raise RuntimeWarning("Data length arbitrary.")
 
-    line = ""
-    code = ""
+    cdef bytearray line = bytearray()
+    cdef bytearray code = bytearray()
+    cdef bytes glyph = None
     cdef bint is_wide_char = False
 
     cdef unsigned char fg_b = fgDEFAULT
     cdef unsigned char bg_b = bgDEFAULT
     cdef unsigned char attr_b = 0
     cdef unsigned char attr[9]
+    cdef unsigned short glyph_len = 0
 
     cdef short jdx = 0
 
@@ -1613,19 +1636,22 @@ def print_line(y: int, begin: int, end: int, data: bytes) -> str:
             attr[8] = sgrBLINK_ON if data[x + 6] & attrBLINK else sgrBLINK_OFF
         attr_b = data[x + 6]
 
+        jdx = 0
         while jdx < 9:
             if attr[jdx]:
-                code += ";{}".format(attr[jdx])
+                code += str(attr[jdx]).encode() + b";"
                 attr[jdx] = 0
             jdx += 1
 
         if code:
-            line += "\x1b[{}m".format(code[:])
-            code = ""
+            line += b"\x1b[" + code[:-1] + b"m"
+            code.clear()
 
-        glyph = data[x:x + 4].decode()[:1]
-        is_wide_char = east_asian_width(glyph) in "WF"
-        line += glyph
+        glyph_len = utf8_len(data[x])
+        if glyph_len > 0:
+            glyph = data[x:x + glyph_len]
+            is_wide_char = east_asian_width(glyph.decode()) in "WF"
+            line += glyph
 
-    line += "\x1b[0m"
+    line += b"\x1b[0m"
     return line
