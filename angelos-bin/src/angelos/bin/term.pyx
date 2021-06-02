@@ -17,8 +17,9 @@
 Implemented mostly according to https://en.wikipedia.org/wiki/ANSI_escape_code
 and this too https://en.wikipedia.org/wiki/ASCII
 """
-from asyncio import Lock
 from unicodedata import east_asian_width
+
+from libc.stdlib cimport malloc, free
 
 cdef inline int utf8_len(unsigned char byte) nogil:
     if 0x20 <= byte <= 0x7E:
@@ -31,11 +32,9 @@ cdef inline int utf8_len(unsigned char byte) nogil:
         return 4
     return 0
 
-
 cdef inline long long imax(long long a, long long b) nogil:
     """Maximum integer is returned."""
     return a if a > b else b
-
 
 cdef inline long long imin(long long a, long long b) nogil:
     """Minimum integer is returned. """
@@ -45,13 +44,13 @@ cdef class ByteList:
     """Bytes object with read/write access."""
 
     cdef readonly unsigned long length;
-    cdef unsigned char * _view;
+    cdef unsigned char *_view;
     cdef bytes _data
 
     def __init__(self, data: bytes):
         self._data = data
         self.length = len(data)
-        self._view = <unsigned char*>data
+        self._view = <unsigned char*> data
 
         # self.reset()
 
@@ -81,21 +80,20 @@ cdef class ByteList:
             self._view[index] = value
             index += 1
 
-
 cdef class ByteIterator:
     """Bytes object iterator with close to C speed."""
 
     cdef readonly bint end;
     cdef readonly unsigned long length;
     cdef unsigned long _index;
-    cdef unsigned char * _view;
+    cdef unsigned char *_view;
     cdef bytes _data
 
     def __init__(self, data: bytes):
         self._data = data
         self._index = 0
         self.length = len(data)
-        self._view = <unsigned char*>data
+        self._view = <unsigned char*> data
         self.end = not bool(self.length)
 
     @property
@@ -110,8 +108,7 @@ cdef class ByteIterator:
         self._index += 1
         if self._index == self.length:
             self.end = True
-        return self._view[self._index-1]
-
+        return self._view[self._index - 1]
 
 cdef enum CellAttributeCodes:
     attrBOLD = 1 << 0  # Flag for bold bit
@@ -121,7 +118,6 @@ cdef enum CellAttributeCodes:
     attrBLINK = 1 << 4  # Flag for blink bit
     attrINVERT = 1 << 5  # Flag for invert bit
     attrSTRIKE = 1 << 6  # Flag for strike bit
-
 
 cdef enum ForegroundCodes:
     fgBLACK = 30
@@ -142,7 +138,6 @@ cdef enum ForegroundCodes:
     fgBRIGHT_CYAN = 96
     fgBRIGHT_WHITE = 97
 
-
 cdef enum BackgroundCodes:
     bgBLACK = 40
     bgRED = 41
@@ -162,7 +157,6 @@ cdef enum BackgroundCodes:
     bgBRIGHT_CYAN = 106
     bgBRIGHT_WHITE = 107
 
-
 cdef enum CtrlCodes:
     ctrlBEL = 0x07  # Bell
     ctrlBS = 0x08  # Backspace
@@ -171,7 +165,6 @@ cdef enum CtrlCodes:
     ctrlFF = 0x0C  # Form Feed
     ctrlCR = 0x0D  # Carriage Return
     ctrlESC = 0x1B  # Escape
-
 
 cdef enum EscCodes:
     escSS2 = 0x8E  # Single Shift Two
@@ -186,7 +179,6 @@ cdef enum EscCodes:
     escSOS = 0x98  # Start of String
     escPM = 0x9E  # Privacy Message
     escAPC = 0x9F  # Application Program Command
-
 
 cdef enum CsiCodes:
     csiCUU = 0x41  # Cursor Up
@@ -209,7 +201,6 @@ cdef enum CsiCodes:
     csiRCP = 0x75  #  Restore Saved Cursor Position
     csiVT = 0x7E  # VT Sequences
 
-
 cdef enum SgrCodes:
     sgrRESET = 0  # Reset or normal
     sgrBOLD_ON = 1  # Bold or increased intensity
@@ -226,7 +217,6 @@ cdef enum SgrCodes:
     sgrBLINK_OFF = 25  # Not blinking
     sgrINVERT_OFF = 27  # Not reversed
     sgrSTRIKE_OFF = 29  # Not crossed out
-
 
 cdef enum VtCodes:
     vtHome = 1
@@ -259,10 +249,8 @@ cdef enum VtCodes:
     vtF19 = 33
     vtF20 = 34
 
-
 ctypedef struct Glyph:
     unsigned char[4] units
-
 
 ctypedef struct Dirty:
     bint updated
@@ -270,316 +258,8 @@ ctypedef struct Dirty:
     unsigned short end
 
 
-cdef class TerminalInterface:
-    """The API of a terminal screen."""
-
-    cdef inline bint print_glyph(self, bytes glyph):
-        """Print glyph to console."""
-        pass
-
-    cdef inline bint bell(self):
-        """Executes the BEL control character."""
-        pass
-
-    cdef inline bint backspace(self):
-        """Executes the BS control character."""
-        pass
-
-    cdef inline bint tab(self):
-        """Executes the HT control character."""
-        pass
-
-    cdef inline bint line_feed(self):
-        """Executes the LF control character."""
-        pass
-
-    cdef inline bint form_feed(self):
-        """Executes the FF control character."""
-        pass
-
-    cdef inline bint carriage_return(self):
-        """Executes the CR control character."""
-        pass
-
-    cdef inline bint escape(self):
-        """Executes the ESC control character."""
-        pass
-
-    cdef inline bint cursor_up(self, unsigned short steps):
-        """
-        Moves the cursor n (default 1) cells up. 
-        If the cursor is already at the edge of the screen, this has no effect.
-        """
-        pass
-
-    cdef inline bint cursor_down(self, unsigned short steps):
-        """
-        Moves the cursor n (default 1) cells down. 
-        If the cursor is already at the edge of the screen, this has no effect.
-        """
-        pass
-
-    cdef inline bint cursor_forward(self, unsigned short steps):
-        """
-        Moves the cursor n (default 1) cells forward. 
-        If the cursor is already at the edge of the screen, this has no effect.
-        """
-        pass
-
-    cdef inline bint cursor_back(self, unsigned short steps):
-        """
-        Moves the cursor n (default 1) cells previous. 
-        If the cursor is already at the edge of the screen, this has no effect.
-        """
-        pass
-
-    cdef inline bint cursor_next_line(self, unsigned short downs):
-        """Moves cursor to beginning of the line n (default 1) lines down."""
-        pass
-
-    cdef inline bint cursor_previous_line(self, unsigned short ups):
-        """Moves cursor to beginning of the line n (default 1) lines up."""
-        pass
-
-    cdef inline bint cursor_horizontal_absolute(self, unsigned short y):
-        """Moves the cursor to column n (default 1)."""
-        pass
-
-    cdef inline bint cursor_position(self, unsigned short y, unsigned short x):
-        """
-        Moves the cursor to row n, column m. The values are 1-based, and default to 1 (top left corner) if omitted. 
-        A sequence such as CSI ;5H is a synonym for CSI 1;5H as well as CSI 17;H is the same as CSI 17H and CSI 17;1H
-        """
-        pass
-
-    cdef inline bint erase_in_display(self, unsigned short alt):
-        """
-        Clears part of the screen. If n is 0 (or missing), clear from cursor to end of screen. 
-        If n is 1, clear from cursor to beginning of the screen. 
-        If n is 2, clear entire screen (and moves cursor to upper left on DOS ANSI.SYS). 
-        If n is 3, clear entire screen and delete all lines saved in the scrollback buffer 
-        (this feature was added for xterm and is supported by other terminal applications).
-        """
-        pass
-
-    cdef inline bint erase_in_line(self, unsigned short alt):
-        """
-        Erases part of the line. If n is 0 (or missing), clear from cursor to the end of the line. 
-        If n is 1, clear from cursor to beginning of the line. If n is 2, clear entire line. 
-        Cursor position does not change.
-        """
-        pass
-
-    cdef inline bint scroll_up(self, unsigned short ups):
-        """Scroll whole page up by n (default 1) lines. New lines are added at the bottom."""
-        pass
-
-    cdef inline bint scroll_down(self, unsigned short downs):
-        """Scroll whole page down by n (default 1) lines. New lines are added at the top."""
-        pass
-
-    cdef inline bint horizontal_vertical_position(self, unsigned short y, unsigned short x):
-        """
-        Same as CUP, but counts as a format effector function (like CR or LF) 
-        rather than an editor function (like CUD or CNL). 
-        This can lead to different handling in certain terminal modes.
-        """
-        pass
-
-    cdef inline bint aux_port(self, unsigned short alt):
-        """Enable or disable aux serial port usually for local serial printer."""
-        pass
-
-    cdef inline bint device_status_report(self, unsigned short alt):
-        """Reports the cursor position (CPR) by transmitting ESC[n;mR, where n is the row and m is the column.)"""
-        pass
-
-    cdef inline bint save_cursor(self):
-        """
-        Saves the cursor position/state in SCO console mode. 
-        In vertical split screen mode, instead used to set (as CSI n ; n s) or reset left and right margins.
-        """
-        pass
-
-    cdef inline bint restore_cursor(self):
-        """Restores the cursor position/state in SCO console mode."""
-        pass
-
-    cdef inline bint attr_reset(self):
-        """Reset tile attributes."""
-        pass
-
-    cdef inline bint attr_bold_on(self):
-        """Make glyphs bold."""
-        pass
-
-    cdef inline bint attr_dim_on(self):
-        """Make glyphs dim."""
-        pass
-
-    cdef inline bint attr_italic_on(self):
-        """Make glyphs italic."""
-        pass
-
-    cdef inline bint attr_underline_on(self):
-        """Make glyphs underline."""
-        pass
-
-    cdef inline bint attr_blink_on(self):
-        """Make tile blink."""
-        pass
-
-    cdef inline bint attr_invert_on(self):
-        """Invert foreground and background on a tile."""
-        pass
-
-    cdef inline bint attr_strike_on(self):
-        """Make glyphs strikethrough."""
-        pass
-
-    cdef inline bint attr_bold_dim_off(self):
-        """Make glyphs non-bold and non-dim."""
-        pass
-
-    cdef inline bint attr_italic_off(self):
-        """Turn off italic for glyphs."""
-        pass
-
-    cdef inline bint attr_underline_off(self):
-        """Turn off underline for glyphs."""
-        pass
-
-    cdef inline bint attr_blink_off(self):
-        """Make tile stop blink."""
-        pass
-
-    cdef inline bint attr_invert_off(self):
-        """Reverse invert of tile foreground and background."""
-        pass
-
-    cdef inline bint attr_strike_off(self):
-        """Make glyphs not strikethrough."""
-        pass
-
-    cdef inline bint color_foreground(self, unsigned char color):
-        """Set foreground."""
-        pass
-
-    cdef inline bint color_background(self, unsigned char color):
-        """Set background."""
-        pass
-
-    cdef inline bint key_home(self):
-        """Home key pressed."""
-        pass
-
-    cdef inline bint key_insert(self):
-        """Insert key pressed."""
-        pass
-
-    cdef inline bint key_delete(self):
-        """Delete key pressed."""
-        pass
-
-    cdef inline bint key_end(self):
-        """End key pressed."""
-        pass
-
-    cdef inline bint key_pgup(self):
-        """PgUp key pressed."""
-        pass
-
-    cdef inline bint key_pgdn(self):
-        """PgDn key pressed."""
-        pass
-
-    cdef inline bint key_f0(self):
-        """F0 key pressed."""
-        pass
-
-    cdef inline bint key_f1(self):
-        """F1 key pressed."""
-        pass
-
-    cdef inline bint key_f2(self):
-        """F2 key pressed."""
-        pass
-
-    cdef inline bint key_f3(self):
-        """F3 key pressed."""
-        pass
-
-    cdef inline bint key_f4(self):
-        """F4 key pressed."""
-        pass
-
-    cdef inline bint key_f5(self):
-        """F5 key pressed."""
-        pass
-
-    cdef inline bint key_f6(self):
-        """F6 key pressed."""
-        pass
-
-    cdef inline bint key_f7(self):
-        """F7 key pressed."""
-        pass
-
-    cdef inline bint key_f8(self):
-        """F8 key pressed."""
-        pass
-
-    cdef inline bint key_f9(self):
-        """F9 key pressed."""
-        pass
-
-    cdef inline bint key_f10(self):
-        """F10 key pressed."""
-        pass
-
-    cdef inline bint key_f11(self):
-        """F11 key pressed."""
-        pass
-
-    cdef inline bint key_f12(self):
-        """F12 key pressed."""
-        pass
-
-    cdef inline bint key_f13(self):
-        """F13 key pressed."""
-        pass
-
-    cdef inline bint key_f14(self):
-        """F14 key pressed."""
-        pass
-
-    cdef inline bint key_f15(self):
-        """F15 key pressed."""
-        pass
-
-    cdef inline bint key_f16(self):
-        """F16 key pressed."""
-        pass
-
-    cdef inline bint key_f17(self):
-        """F17 key pressed."""
-        pass
-
-    cdef inline bint key_f18(self):
-        """F18 key pressed."""
-        pass
-
-    cdef inline bint key_f19(self):
-        """F19 key pressed."""
-        pass
-
-    cdef inline bint key_f20(self):
-        """F20 key pressed."""
-        pass
-
-    cdef inline bint short_command(self, unsigned short keycode, bint meta, bint ctrl, bint alt, bint shift):
-        """Short command."""
-        pass
+import logging
+logger = logging.getLogger()
 
 
 cdef class Screen:
@@ -623,11 +303,11 @@ cdef class Screen:
         self._modified = NULL
 
     def __init__(self, cols: int, lines: int):
-        self._empty = self._tileplate()     # Template cell
-        self._buffer = list()               # Buffer of cells
-        self._current = None                # Current selected line from buffer
-        self._line = ""                     # Editorial string
-        self._history = list()              # List of historical lines
+        self._empty = self._tileplate()  # Template cell
+        self._buffer = list()  # Buffer of cells
+        self._current = None  # Current selected line from buffer
+        self._line = ""  # Editorial string
+        self._history = list()  # List of historical lines
 
         self._cols = cols
         self._lines = lines
@@ -641,12 +321,12 @@ cdef class Screen:
     @property
     def x(self) -> int:
         """Cursor X position, zero-indexed."""
-        return self._x-1
+        return self._x - 1
 
     @property
     def y(self) -> int:
         """Cursor Y position, zero-indexed."""
-        return self._y-1
+        return self._y - 1
 
     @property
     def columns(self) -> int:
@@ -665,8 +345,8 @@ cdef class Screen:
     cdef ByteList _new_line(self, unsigned int cols):
         """Create a new line for the buffer, returns a tuple of bytes data and cython Tile memoryview."""
         cdef unsigned long idx = 0
-        cdef Glyph glyph
-        cdef ByteList byte_list = ByteList(bytes(cols*7))
+        cdef Glyph * glyph = <Glyph *> malloc(sizeof(Glyph))
+        cdef ByteList byte_list = ByteList(bytes(cols * 7))
 
         glyph.units[0] = 32
         glyph.units[1] = 0
@@ -674,9 +354,10 @@ cdef class Screen:
         glyph.units[3] = 0
 
         while idx < self._cols:
-            self._print(byte_list, idx, &glyph)
+            self._print(byte_list, idx, glyph)
             idx += 1
 
+        free(glyph)
         return byte_list
 
     cdef ByteList _resize_line(self, unsigned int y, unsigned int cols):
@@ -685,9 +366,9 @@ cdef class Screen:
         cdef unsigned int size = byte_list.length // 7
 
         if size > cols:
-            return ByteList(byte_list.data[:cols*7])
+            return ByteList(byte_list.data[:cols * 7])
         elif size < cols:
-            return ByteList(byte_list.data + bytes((cols-size)*7))
+            return ByteList(byte_list.data + bytes((cols - size) * 7))
         else:
             return byte_list
 
@@ -711,19 +392,19 @@ cdef class Screen:
     cdef inline void _current_line(self) nogil:
         """Prepare current line when cursor changes vertically."""
         with gil:
-            self._current = self._buffer[self._y-1]
+            self._current = self._buffer[self._y - 1]
 
     def _new_modified(self):
         """Create a buffer of dirty screen information."""
         cdef Dirty *modified_array = NULL
-        modified = bytes(self._lines*sizeof(Dirty))
+        modified = bytes(self._lines * sizeof(Dirty))
         self._modified_bytes = modified
-        modified_array = <Dirty*>modified
+        modified_array = <Dirty*> modified
         self._modified = modified_array
 
     cdef inline void _update(self) nogil:
         """Mark tiles as modified."""
-        cdef unsigned short y = self._y-1
+        cdef unsigned short y = self._y - 1
 
         # if self._modified[y].updated:
         #    self._modified[y].begin = imax(0, imin(self._modified[y].begin, self._x-1))
@@ -734,11 +415,11 @@ cdef class Screen:
         #    self._modified[y].end = imin(self._cols-1, self._x-1)
 
         if self._modified[y].updated:
-            self._modified[y].begin = imin(self._modified[y].begin, self._x-1)
+            self._modified[y].begin = imin(self._modified[y].begin, self._x - 1)
             self._modified[y].end = imax(self._modified[y].end, self._x)
         else:
             self._modified[y].updated = True
-            self._modified[y].begin = self._x-1
+            self._modified[y].begin = self._x - 1
             self._modified[y].end = self._x
 
     cdef inline void _clear(self) nogil:
@@ -756,20 +437,20 @@ cdef class Screen:
         while idx < self._lines:
             self._modified[idx].updated = True
             self._modified[idx].begin = 0
-            self._modified[idx].end = self._cols-1
+            self._modified[idx].end = self._cols - 1
             idx += 1
 
     cdef inline void _print(self, ByteList view, unsigned short x, Glyph *glyph) nogil:
         """Print a glyph to the buffer using colors and attributes."""
-        cdef unsigned long pos = x*7
+        cdef unsigned long pos = x * 7
 
         view.set(pos, glyph.units[0])
-        view.set(pos+1, glyph.units[1])
-        view.set(pos+2, glyph.units[2])
-        view.set(pos+3, glyph.units[3])
-        view.set(pos+4, self._fg)
-        view.set(pos+5, self._bg)
-        view.set(pos+6, self._attr)
+        view.set(pos + 1, glyph.units[1])
+        view.set(pos + 2, glyph.units[2])
+        view.set(pos + 3, glyph.units[3])
+        view.set(pos + 4, self._fg)
+        view.set(pos + 5, self._bg)
+        view.set(pos + 6, self._attr)
 
     cdef inline void _move_up(self, unsigned short steps) nogil:
         """Move the cursor position up Y steps."""
@@ -819,7 +500,7 @@ cdef class Screen:
 
     cdef inline void print_glyph(self, Glyph *glyph) nogil:
         """Print glyph to console."""
-        self._print(self._current, self._x-1, glyph)
+        self._print(self._current, self._x - 1, glyph)
         self._update()
         self._move_right(1)
 
@@ -918,9 +599,9 @@ cdef class Screen:
         cdef unsigned short start = 0, end = self._lines
 
         if alt == 0:
-            start = self._y-1
+            start = self._y - 1
         elif alt == 1:
-            end = self._y-1
+            end = self._y - 1
         elif alt == 2:
             self._goto_x(1)
             self._goto_y(1)
@@ -931,7 +612,7 @@ cdef class Screen:
 
         with gil:
             self._empty = bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
-            for y in range(0, self._y-1):
+            for y in range(0, self._y - 1):
                 self._buffer[y] = self._new_line(self._cols)
         self._current_line()
 
@@ -944,21 +625,27 @@ cdef class Screen:
         Cursor position does not change.
         """
         cdef unsigned short start = 0, end = self._cols
-        cdef Glyph glyph
+        cdef Glyph *glyph = <Glyph *> malloc(sizeof(Glyph))
 
         if alt == 0:
-            start = self._x-1
+            start = self._x - 1
         elif alt == 1:
-            end = self._x-1
+            end = self._x - 1
         elif alt == 2:
             pass
         else:
             return
 
         glyph.units[0] = 32
+        glyph.units[1] = 0
+        glyph.units[2] = 0
+        glyph.units[3] = 0
+
         with gil:
             for x in range(start, end):
-                self._print(self._current, x, &glyph)
+                self._print(self._current, x, glyph)
+
+        free(glyph)
 
     cdef inline void scroll_up(self, unsigned short ups) nogil:
         """Scroll whole page up by n (default 1) lines. New lines are added at the bottom."""
@@ -982,7 +669,7 @@ cdef class Screen:
 
         with gil:
             for _ in range(downs):
-                self._buffer.pop(self._lines-1)
+                self._buffer.pop(self._lines - 1)
                 self._buffer.insert(0, self._new_line(self._cols))
         self._current_line()
 
@@ -1220,7 +907,7 @@ cdef class Stream(Screen):
         """Extract all modified buffer data."""
         for y in range(self._lines):
             if self._modified[y].updated:
-                yield y + 1, self._modified[y].begin + 1, self._modified[y].end + 1, \
+                yield y, self._modified[y].begin + 1, self._modified[y].end + 1, \
                       self._buffer[y].data[self._modified[y].begin * 7:self._modified[y].end * 7]
                 # yield y + 1, 1, self._cols, self._buffer[y].data[:(self._cols-1) * 7]
 
@@ -1240,7 +927,7 @@ cdef class Stream(Screen):
     cdef void _feed(self, data: bytes) nogil:
         """Process input to the terminal."""
         cdef unsigned char byte = 0, rest = 0
-        cdef Glyph glyph
+        cdef Glyph * glyph = <Glyph *> malloc(sizeof(Glyph))
 
         with gil:
             biter = ByteIterator(data)
@@ -1255,10 +942,12 @@ cdef class Stream(Screen):
             if self.is_control(byte):
                 self._control_characters(byte, biter)
             elif self.is_utf8(byte):
-                if self._utf8_characters(byte, biter, &glyph):
-                    self.print_glyph(&glyph)
+                if self._utf8_characters(byte, biter, glyph):
+                    self.print_glyph(glyph)
             else:
                 pass
+
+        free(glyph)
 
     cdef inline bint is_printable(self, unsigned char byte) nogil:
         """Is byte a printable ASCII character?"""
@@ -1381,15 +1070,11 @@ cdef class Stream(Screen):
     cdef inline unsigned char _csi_sequence(self, ByteIterator iterator) nogil:
         """Parse CSI sequence."""
         cdef unsigned char byte = 0, final_byte = 0
-        cdef unsigned int value = 0, idx = 1, vlen = 16,
-        cdef unsigned int params[10], plen = 0
-        cdef unsigned char param_text[16]
-        cdef unsigned char inter_text[16]
+        cdef unsigned int value = 0, idx = 1, vlen = 16, plen = 0
+        cdef unsigned int *params = <unsigned int *> malloc(10 * sizeof(unsigned int))
+        cdef unsigned char * param_text = <unsigned char *> malloc(16 * sizeof(unsigned char))
+        cdef unsigned char * inter_text = <unsigned char *> malloc(16 * sizeof(unsigned char))
         cdef unsigned int tmp = 0
-
-        # while tmp < 10:  # Reset array, seems Cython don't automatically.
-        #    params[0] = 0
-        #    tmp += 1
 
         if not iterator.end:
             byte = iterator.next()
@@ -1436,6 +1121,9 @@ cdef class Stream(Screen):
         if 0x40 <= byte <= 0x7E:  # Scan final byte
             final_byte = byte
         else:
+            free(params)
+            free(param_text)
+            free(inter_text)
             return byte
 
         if final_byte == csiCUU:  # Cursor Up
@@ -1450,7 +1138,7 @@ cdef class Stream(Screen):
             self.cursor_next_line(params[0] if params[0] else 1)
         elif final_byte == csiCPL:  # Cursor Previous Line
             self.cursor_previous_line(params[0] if params[0] else 1)
-        elif final_byte == csiCHA: # Cursor Horizontal Absolute
+        elif final_byte == csiCHA:  # Cursor Horizontal Absolute
             self.cursor_horizontal_absolute(params[0] if params[0] else 1)
         elif final_byte == csiCUP:  # Cursor Position
             self.cursor_position(params[0] if params[0] else 1, params[1] if params[1] else 1)
@@ -1466,9 +1154,9 @@ cdef class Stream(Screen):
             self.horizontal_vertical_position(params[0] if params[0] else 1, params[1] if params[1] else 1)
         elif final_byte == csiSGR:  # Select Graphic Rendition
             self._sgr_parameters(params[0])
-        elif final_byte == csiAUX: # AUX Port
+        elif final_byte == csiAUX:  # AUX Port
             self.aux_port(params[0])
-        elif final_byte == csiDSR: # Device Status Report
+        elif final_byte == csiDSR:  # Device Status Report
             self.device_status_report(params[0])
         elif final_byte == csiVT:  # VT Sequences
             if plen == 1:
@@ -1479,6 +1167,10 @@ cdef class Stream(Screen):
             self.save_cursor()
         elif final_byte == csiRCP:  #  Restore Saved Cursor Position
             self.restore_cursor()
+
+        free(params)
+        free(param_text)
+        free(inter_text)
 
         return 0
 
@@ -1600,41 +1292,44 @@ def print_line(short y, short begin, short end, bytes data) -> bytearray:
     cdef bytes glyph = None
     cdef bint is_wide_char = False
 
-    cdef unsigned char fg_b = fgDEFAULT
-    cdef unsigned char bg_b = bgDEFAULT
-    cdef unsigned char attr_b = 0
-    cdef unsigned char attr[9]
+    cdef unsigned char fg_a = fgDEFAULT, fg_b = fgDEFAULT
+    cdef unsigned char bg_a = bgDEFAULT, bg_b = bgDEFAULT
+    cdef unsigned char attr_a = 0, attr_b = 0
+    cdef unsigned char * attr = <unsigned char *> malloc(9 * sizeof(unsigned char))
     cdef unsigned short glyph_len = 0
 
     cdef short jdx = 0
 
-    for x in range(0, (end - begin)*7, 7):
+    for x in range(0, (end - begin) * 7, 7):
         if is_wide_char:  # Skip stub
             is_wide_char = False
             continue
 
-        if fg_b != data[x + 4]:
-            fg_b = data[x + 4]
+        fg_a = data[x + 4]
+        if fg_b != fg_a:
+            fg_b = fg_a
             attr[0] = fg_b
-        if bg_b != data[x + 5]:
-            bg_b = data[x + 5]
+        bg_a = data[x + 5]
+        if bg_b != bg_a:
+            bg_b = bg_a
             attr[1] = bg_b
 
-        if attr_b & attrBOLD != data[x + 6] & attrBOLD:
-            attr[2] = sgrBOLD_ON if data[x + 6] & attrBOLD else sgrBOLD_OFF
-        if attr_b & attrDIM != data[x + 6] & attrDIM:
-            attr[3] = sgrDIM_ON if data[x + 6] & attrDIM else sgrDIM_OFF
-        if attr_b & attrITALIC != data[x + 6] & attrITALIC:
-            attr[4] = sgrITALIC_ON if data[x + 6] & attrITALIC else sgrITALIC_OFF
-        if attr_b & attrUNDER != data[x + 6] & attrUNDER:
-            attr[5] = sgrUNDERLINE_ON if data[x + 6] & attrUNDER else sgrUNDERLINE_OFF
-        if attr_b & attrSTRIKE != data[x + 6] & attrSTRIKE:
-            attr[6] = sgrSTRIKE_ON if data[x + 6] & attrSTRIKE else sgrSTRIKE_OFF
-        if attr_b & attrINVERT != data[x + 6] & attrINVERT:
-            attr[7] = sgrINVERT_ON if data[x + 6] & attrINVERT else sgrINVERT_OFF
-        if attr_b & attrBLINK != data[x + 6] & attrBLINK:
-            attr[8] = sgrBLINK_ON if data[x + 6] & attrBLINK else sgrBLINK_OFF
-        attr_b = data[x + 6]
+        attr_a = data[x + 6]
+        if attr_b & attrBOLD != attr_a & attrBOLD:
+            attr[2] = sgrBOLD_ON if attr_a & attrBOLD == 1 else sgrBOLD_OFF
+        if attr_b & attrDIM != attr_a & attrDIM:
+            attr[3] = sgrDIM_ON if attr_a & attrDIM == 2 else sgrDIM_OFF
+        if attr_b & attrITALIC != attr_a & attrITALIC:
+            attr[4] = sgrITALIC_ON if attr_a & attrITALIC == 4 else sgrITALIC_OFF
+        if attr_b & attrUNDER != attr_a & attrUNDER:
+            attr[5] = sgrUNDERLINE_ON if attr_a & attrUNDER == 8 else sgrUNDERLINE_OFF
+        if attr_b & attrSTRIKE != attr_a & attrSTRIKE:
+            attr[6] = sgrSTRIKE_ON if attr_a & attrSTRIKE == 64 else sgrSTRIKE_OFF
+        if attr_b & attrINVERT != attr_a & attrINVERT:
+            attr[7] = sgrINVERT_ON if attr_a & attrINVERT == 32 else sgrINVERT_OFF
+        if attr_b & attrBLINK != attr_a & attrBLINK:
+            attr[8] = sgrBLINK_ON if attr_a & attrBLINK == 16 else sgrBLINK_OFF
+        attr_b = attr_a
 
         jdx = 0
         while jdx < 9:
@@ -1654,4 +1349,5 @@ def print_line(short y, short begin, short end, bytes data) -> bytearray:
             line += glyph
 
     line += b"\x1b[0m"
+    free(attr)
     return line

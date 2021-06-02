@@ -29,7 +29,6 @@ from asyncio.log import logger
 import msgpack
 from angelos.bin.term import print_line, Stream
 from angelos.common.misc import SyncCallable, AsyncCallable
-from angelos.common.utils import Util
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
     NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator, ErrorCode
 
@@ -80,16 +79,12 @@ class TerminalClient:
                 print("\x1b[{};{}H".format(self._y, self._x))
 
             if info["type"] == "row":
-                # try:
-                    # print("TEST", info["y"], print_line(info["y"], info["begin"], info["end"], info["row"]))
-                # except Exception as exc:
-                #    Util.print_exception(exc)
-                # line = "\x1b[{};{}H{}".format(
-                #    info["y"], info["begin"],
-                #    print_line(info["y"], info["begin"], info["end"], info["row"]).decode(),
-                #)
-                # print(line)
-                print(print_line(info["y"], info["begin"], info["end"], info["row"]))
+                line = "\x1b[{};{}H{}".format(
+                    info["y"], info["begin"],
+                    print_line(info["y"], info["begin"], info["end"], info["row"]).decode(),
+                )
+                print(line)
+                # print(print_line(info["y"], info["begin"], info["end"], info["row"]))
 
     def send(self, data: bytes):
         """Send text and sequences to server."""
@@ -106,7 +101,7 @@ class BaseShell:
     SEQUENCES = (
         b"\n", b"\r", b"\x1bOM", b"\x04", b"\x08", b"\x7f", b"\x1b[3~", b"\x15", b"\x0b", b"\x10", b"\x1b[A",
         b"\x1bOA", b"\x0e", b"\x1b[B", b"\x1bOB", b"\x02", b"\x1b[D", b"\x1bOD", b"\x06", b"\x1b[C", b"\x1bOC",
-        b"\x01", b"\x1b[H", b"\x1b[1~", b"\x05", b"\x1b[F", b"\x1b[4~", b"\x12", b"\x19",  b"\x03", b"\x1b[33~"
+        b"\x01", b"\x1b[H", b"\x1b[1~", b"\x05", b"\x1b[F", b"\x1b[4~", b"\x12", b"\x19", b"\x03", b"\x1b[33~"
     )
 
     KEY_MAP = {
@@ -262,10 +257,10 @@ class TTYHandler(Handler):
             self.ST_VERSION: (StateMode.MEDIATE, TERMINAL_VERSION),
             self.ST_SIZE: (StateMode.ONCE, b""),
         },
-         sessions={
-             self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
-             self.SESH_UPSTREAM: (UpstreamIterator, dict()),
-         }, max_sesh=2)
+                         sessions={
+                             self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
+                             self.SESH_UPSTREAM: (UpstreamIterator, dict()),
+                         }, max_sesh=2)
         self._quit = asyncio.Event()
         self._seq = asyncio.Queue()
         self._idle = None
@@ -411,4 +406,3 @@ class TTYServer(TTYHandler):
             self._terminal.resize(lines, cols)
             self._display()
         self._resize_timer = None
-
