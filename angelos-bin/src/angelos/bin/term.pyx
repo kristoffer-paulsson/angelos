@@ -40,6 +40,7 @@ cdef inline long long imin(long long a, long long b) nogil:
     """Minimum integer is returned. """
     return a if a < b else b
 
+
 cdef class ByteList:
     """Bytes object with read/write access."""
 
@@ -51,8 +52,6 @@ cdef class ByteList:
         self._data = data
         self.length = len(data)
         self._view = <unsigned char*> data
-
-        # self.reset()
 
     @property
     def data(self) -> bytes:
@@ -79,6 +78,7 @@ cdef class ByteList:
         while index < self.length:
             self._view[index] = value
             index += 1
+
 
 cdef class ByteIterator:
     """Bytes object iterator with close to C speed."""
@@ -109,6 +109,7 @@ cdef class ByteIterator:
         if self._index == self.length:
             self.end = True
         return self._view[self._index - 1]
+
 
 cdef enum CellAttributeCodes:
     attrBOLD = 1 << 0  # Flag for bold bit
@@ -267,8 +268,7 @@ cdef class Screen:
     Pseudo terminal screen.
 
     The lines and columns in the ANSI escape code de facto standard seems to be 1-indexed instead of zero-indexed.
-    However the screen uses _x and _y as 1-indexed, therefore the print function should be adjusted to zero-indexed
-    from 1-indexed.
+    However the screen uses _x and _y as zero-indexed.
     """
 
     cdef unsigned short _cols;  # Terminal width
@@ -291,8 +291,8 @@ cdef class Screen:
     cdef bytes _modified_bytes;
 
     def __cinit__(self):
-        self._x = 1
-        self._y = 1
+        self._x = 0
+        self._y = 0
         self._cols = 1
         self._lines = 1
 
@@ -320,13 +320,13 @@ cdef class Screen:
 
     @property
     def x(self) -> int:
-        """Cursor X position, zero-indexed."""
-        return self._x - 1
+        """Cursor X position, 1-indexed."""
+        return self._x + 1
 
     @property
     def y(self) -> int:
-        """Cursor Y position, zero-indexed."""
-        return self._y - 1
+        """Cursor Y position, 1-indexed."""
+        return self._y
 
     @property
     def columns(self) -> int:
@@ -390,7 +390,7 @@ cdef class Screen:
 
     cdef inline void _current_line(self):
         """Prepare current line when cursor changes vertically."""
-        self._current = self._buffer[self._y - 1]
+        self._current = self._buffer[self._y]
 
     def _new_modified(self):
         """Create a buffer of dirty screen information."""
@@ -402,7 +402,7 @@ cdef class Screen:
 
     cdef inline void _update(self):
         """Mark tiles as modified."""
-        cdef unsigned short y = self._y - 1
+        cdef unsigned short y = self._y
 
         # if self._modified[y].updated:
         #    self._modified[y].begin = imax(0, imin(self._modified[y].begin, self._x-1))
@@ -413,12 +413,12 @@ cdef class Screen:
         #    self._modified[y].end = imin(self._cols-1, self._x-1)
 
         if self._modified[y].updated:
-            self._modified[y].begin = imin(self._modified[y].begin, self._x - 1)
-            self._modified[y].end = imax(self._modified[y].end, self._x)
+            self._modified[y].begin = imin(self._modified[y].begin, self._x)
+            self._modified[y].end = imax(self._modified[y].end, self._x + 1)
         else:
             self._modified[y].updated = True
-            self._modified[y].begin = self._x - 1
-            self._modified[y].end = self._x
+            self._modified[y].begin = self._x
+            self._modified[y].end = self._x + 1
 
     cpdef _clear(self):
         """Clears all marks of modification."""
@@ -455,53 +455,53 @@ cdef class Screen:
 
     cdef inline void _move_up(self, unsigned short steps):
         """Move the cursor position up Y steps."""
-        if (self._y - steps) < 1:
-            self._y = 1
+        if (self._y - steps) < 0:
+            self._y = 0
         else:
             self._y -= steps
 
     cdef inline void _move_down(self, unsigned short steps):
         """Move the cursor position down Y steps."""
-        if (self._y + steps) > self._lines:
-            self._y = self._lines
+        if (self._y + steps) > (self._lines - 1):
+            self._y = self._lines - 1
         else:
             self._y += steps
 
     cdef inline void _move_left(self, unsigned short steps):
         """Move the cursor position left X steps."""
-        if (self._x - steps) < 1:
-            self._x = 1
+        if (self._x - steps) < 0:
+            self._x = 0
         else:
             self._x -= steps
 
     cdef inline void _move_right(self, unsigned short steps):
         """Move the cursor position right X steps."""
-        if (self._x + steps) > self._cols:
-            self._x = self._cols
+        if (self._x + steps) > (self._cols - 1):
+            self._x = self._cols - 1
         else:
             self._x += steps
 
     cdef inline void _goto_x(self, unsigned short pos):
         """Move the cursor to position X."""
-        if pos < 1:
-            self._x = 1
-        elif pos > self._cols:
-            self._x = self._cols
+        if pos < 0:
+            self._x = 0
+        elif pos > (self._cols - 1):
+            self._x = self._cols - 1
         else:
             self._x = pos
 
     cdef inline void _goto_y(self, unsigned short pos):
         """Move the cursor to position Y."""
-        if pos < 1:
-            self._y = 1
-        elif pos > self._lines:
-            self._y = self._lines
+        if pos < 0:
+            self._y = 0
+        elif pos > (self._lines - 1):
+            self._y = self._lines - 1
         else:
             self._y = pos
 
     cdef inline void print_glyph(self, Glyph *glyph):
         """Print glyph to console."""
-        self._print(self._current, self._x - 1, glyph)
+        self._print(self._current, self._x, glyph)
         self._update()
         self._move_right(1)
 
@@ -566,13 +566,13 @@ cdef class Screen:
     cdef inline void cursor_next_line(self, unsigned short downs):
         """Moves cursor to beginning of the line n (default 1) lines down."""
         self._move_down(downs if downs > 1 else 1)
-        self._goto_x(1)
+        self._goto_x(0)
         self._current_line()
 
     cdef inline void cursor_previous_line(self, unsigned short ups):
         """Moves cursor to beginning of the line n (default 1) lines up."""
         self._move_down(ups if ups > 1 else 1)
-        self._goto_x(1)
+        self._goto_x(0)
         self._current_line()
 
     cdef inline void cursor_horizontal_absolute(self, unsigned short x):
@@ -600,19 +600,19 @@ cdef class Screen:
         cdef unsigned short start = 0, end = self._lines
 
         if alt == 0:
-            start = self._y - 1
+            start = self._y
         elif alt == 1:
-            end = self._y - 1
+            end = self._y
         elif alt == 2:
-            self._goto_x(1)
-            self._goto_y(1)
+            self._goto_x(0)
+            self._goto_y(0)
         elif alt == 3:
             pass  # Empty backbuffer history
         else:
             return
 
             # self._empty = bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
-        for y in range(0, self._y - 1):
+        for y in range(0, self._y):
             self._buffer[y] = self._new_line(self._cols)
         self._current_line()
 
@@ -628,9 +628,9 @@ cdef class Screen:
         cdef Glyph glyph
 
         if alt == 0:
-            start = self._x - 1
+            start = self._x
         elif alt == 1:
-            end = self._x - 1
+            end = self._x
         elif alt == 2:
             pass
         else:
@@ -902,7 +902,7 @@ cdef class Stream(Screen):
         """Extract all modified buffer data."""
         for y in range(self._lines):
             if self._modified[y].updated:
-                yield y, self._modified[y].begin + 1, self._modified[y].end + 1, \
+                yield y + 1, self._modified[y].begin + 1, self._modified[y].end + 1, \
                       self._buffer[y].data[self._modified[y].begin * 7:self._modified[y].end * 7]
                 # yield y + 1, 1, self._cols, self._buffer[y].data[:(self._cols-1) * 7]
 
@@ -1053,7 +1053,6 @@ cdef class Stream(Screen):
         cdef unsigned int[10] params = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         cdef unsigned char[16] param_text = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         cdef unsigned char[16] inter_text = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        cdef unsigned int tmp = 0
 
         if not iterator.end:
             byte = iterator.next()
@@ -1268,7 +1267,7 @@ def print_line(short y, short begin, short end, bytes data) -> bytearray:
     cdef unsigned char fg_a = fgDEFAULT, fg_b = fgDEFAULT
     cdef unsigned char bg_a = bgDEFAULT, bg_b = bgDEFAULT
     cdef unsigned char attr_a = 0, attr_b = 0
-    cdef unsigned char[9] attr = [0,0,0,0,0,0,0,0,0]
+    cdef unsigned char[9] attr = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     cdef unsigned short glyph_len = 0
 
     cdef short jdx = 0
