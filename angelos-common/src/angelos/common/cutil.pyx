@@ -15,6 +15,8 @@
 #
 """Collection of utilities implemented fast in Cython.
 The goal is to implement a version of all native python types separately in cython."""
+import functools
+
 from libc.stdlib cimport malloc, free
 
 ctypedef signed char int8_t

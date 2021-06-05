@@ -24,11 +24,10 @@
 import asyncio
 import hashlib
 import typing
-from asyncio.log import logger
 
 import msgpack
-from angelos.bin.term import print_line, Stream
-from angelos.common.misc import SyncCallable, AsyncCallable
+from angelos.bin.term import print_line, Terminal
+from angelos.common.misc import SyncCallable, AsyncCallable, SharedResource, shared
 from angelos.net.base import Handler, StateMode, Protocol, PullChunkIterator, PushChunkIterator, ChunkError, \
     NetworkState, ConfirmCode, ProtocolNegotiationError, NetworkSession, NetworkIterator, ErrorCode
 
@@ -95,101 +94,35 @@ class TerminalClient:
         self._client.send(msgpack.packb({"type": "resize", "cols": cols, "lines": lines}, use_bin_type=True))
 
 
-class BaseShell:
-    """Shell base class that handles input and writes output."""
+class TerminalServer(SharedResource, Terminal):
+    """Pseudo terminal with sync."""
 
-    SEQUENCES = (
-        b"\n", b"\r", b"\x1bOM", b"\x04", b"\x08", b"\x7f", b"\x1b[3~", b"\x15", b"\x0b", b"\x10", b"\x1b[A",
-        b"\x1bOA", b"\x0e", b"\x1b[B", b"\x1bOB", b"\x02", b"\x1b[D", b"\x1bOD", b"\x06", b"\x1b[C", b"\x1bOC",
-        b"\x01", b"\x1b[H", b"\x1b[1~", b"\x05", b"\x1b[F", b"\x1b[4~", b"\x12", b"\x19", b"\x03", b"\x1b[33~"
-    )
+    def __init__(self, cols: int = 80, lines: int = 24):
+        # super().__init__(cols=cols, lines=lines)
+        SharedResource.__init__(self)
+        Terminal.__init__(self, cols, lines)
 
-    KEY_MAP = {
-        b"\n": "_end_line", b"\r": "_end_line", b"\x1bOM": "_end_line",
-        b"\x04": "_eof_or_delete",
-        b"\x08": "_erase_left", b"\x7f": "_erase_left",
-        b"\x1b[3~": "_erase_right",
-        b"\x15": "_erase_line",
-        b"\x0b": "_erase_to_end",
-        b"\x10": "_history_prev", b"\x1b[A": "_history_prev", b"\x1bOA": "_history_prev",
-        b"\x0e": "_history_next", b"\x1b[B": "_history_next", b"\x1bOB": "_history_next",
-        b"\x02": "_move_left", b"\x1b[D": "_move_left", b"\x1bOD": "_move_left",
-        b"\x06": "_move_right", b"\x1b[C": "_move_right", b"\x1bOC": "_move_right",
-        b"\x01": "_move_to_start", b"\x1b[H": "_move_to_start", b"\x1b[1~": "_move_to_start",
-        b"\x05": "_move_to_end", b"\x1b[F": "_move_to_end", b"\x1b[4~": "_move_to_end",
-        b"\x12": "_redraw",
-        b"\x19": "_insert_erased",
-        b"\x03": "_send_break", b"\x1b[33~": "_send_break"
-    }
+    def display(self, sender: typing.Callable) -> None:
+        for y, b, e, d in self._display():
+            sender(y, b, e, d)
+        self._clear()
 
-    def __init__(self, stream, screen):
-        self._stream = stream
-        self._screen = screen
-        self._key_map = dict()
+    @shared
+    def smear(self) -> None:
+        self._smear()
 
-        for key, values in self.KEY_MAP.items():
-            self._key_map[key] = getattr(self, values, self._noop)
+    @shared
+    def clear(self) -> None:
+        self._clear()
 
-    def feed(self, data: bytes):
-        """Printable characters are printed, others are executed."""
-        logger.info(data)
-        if data in self.KEY_MAP.keys():
-            self._key_map[data]()
-        else:
-            for value in data.decode():
-                if value.isprintable():
-                    self._print(value)
+    @shared
+    def feed(self, data: bytes) -> None:
+        self._feed(data)
 
-    def _noop(self):
-        pass
-
-    def _print(self, chr: str):
-        pass
-
-    def _end_line(self):
-        pass
-
-    def _eof_or_delete(self):
-        pass
-
-    def _erase_left(self):
-        pass
-
-    def _erase_right(self):
-        pass
-
-    def _erase_line(self):
-        pass
-
-    def _erase_to_end(self):
-        pass
-
-    def _history_prev(self):
-        pass
-
-    def _history_next(self):
-        pass
-
-    def _move_left(self):
-        pass
-
-    def _move_right(self):
-        pass
-
-    def _move_to_start(self):
-        pass
-
-    def _move_to_end(self):
-        pass
-
-    def _redraw(self):
-        pass
-
-    def _insert_erased(self):
-        pass
-
-    def _send_break(self):
-        pass
+    @shared
+    def resize(self, lines: int, cols: int) -> None:
+        self._resize(lines, cols)
+        self._smear()
 
 
 TERMINAL_VERSION = b"tty-0.1"
@@ -344,6 +277,7 @@ class TTYServer(TTYHandler):
         self._sessions[self.SESH_DOWNSTREAM][1]["check"] = AsyncCallable(self._send_chunks)
 
         self._resize_timer = None
+        self._display_task = None
         self._terminal = None
         self._lock = asyncio.Lock()
 
@@ -357,8 +291,8 @@ class TTYServer(TTYHandler):
         cols = max(80, min(240, int(cols)))
         lines = max(8, min(72, int(lines)))
 
-        self._terminal = Stream(cols, lines)
-        self._terminal.smear()
+        self._terminal = TerminalServer(cols, lines)
+        await self._terminal.smear()
 
         sesh.source(self)
         return ConfirmCode.YES
@@ -366,43 +300,46 @@ class TTYServer(TTYHandler):
     async def _send_chunks(self, state: NetworkState, sesh: DownstreamIterator) -> int:
         """Prepare UploadIterator with file information and chunk count."""
         sesh.source(self._seq)
-        asyncio.get_event_loop().call_soon(self._display)
+        if self._terminal:
+            # async with self._lock:
+            #    self._terminal.display(self._display)
+            self._display_task = asyncio.create_task(self._display_later())
         self._idle = asyncio.create_task(self._idler())
         return ConfirmCode.YES
 
-    def _display(self):
+    def _display(self, y: int, b: int, e: int, d: bytes):
         """Send display update to client."""
-        for y, b, e, d in self._terminal.display():
-            self.send(msgpack.packb(
-                {"type": "row", "y": y, "begin": b, "end": e, "row": d}, use_bin_type=True))
-        self._terminal.clear()
+        self.send(msgpack.packb(
+            {"type": "row", "y": y, "begin": b, "end": e, "row": d}, use_bin_type=True))
 
     async def handle(self, data: bytes):
         """Receive input from client, process and send output screen information."""
         info = msgpack.unpackb(data, raw=False)
-        if isinstance(info, dict):
+        if isinstance(info, dict) and self._terminal:
             try:
                 if info["type"] == "seq":
-                    if self._terminal:
-                        async with self._lock:
-                            self._terminal.feed(info["data"])
-                            self.send(msgpack.packb(
-                                {"type": "cursor", "cursor": (self._terminal.x, self._terminal.y)}, use_bin_type=True))
-                            self._display()
-
+                    async with self._lock:
+                        await self._terminal.feed(info["data"])
+                        self.send(msgpack.packb(
+                            {"type": "cursor", "cursor": (self._terminal.x, self._terminal.y)}, use_bin_type=True))
+                        self._terminal.display(self._display)
                 if info["type"] == "resize":
-                    if self._terminal:
-                        if self._resize_timer:
-                            self._resize_timer.cancel()
-                        self._resize_timer = asyncio.create_task(
-                            self._resize_later(max(80, min(240, info["cols"])), max(8, min(72, info["lines"])))
-                        )
+                    if self._resize_timer:
+                        self._resize_timer.cancel()
+                    self._resize_timer = asyncio.create_task(
+                        self._resize_later(max(80, min(240, info["cols"])), max(8, min(72, info["lines"])))
+                    )
             except KeyError:
                 self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
 
     async def _resize_later(self, cols: int, lines: int):
-        asyncio.sleep(.25)
+        await asyncio.sleep(.25)
         async with self._lock:
-            self._terminal.resize(lines, cols)
-            self._display()
+            await self._terminal.resize(lines, cols)
+            self._terminal.display(self._display)
         self._resize_timer = None
+
+    async def _display_later(self):
+        async with self._lock:
+            self._terminal.display(self._display)
+        self._display_task = None

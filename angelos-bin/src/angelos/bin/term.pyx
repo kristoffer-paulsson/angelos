@@ -19,7 +19,7 @@ and this too https://en.wikipedia.org/wiki/ASCII
 """
 from unicodedata import east_asian_width
 
-from libc.stdlib cimport malloc, free
+# from libc.stdlib cimport malloc, free
 
 cdef inline int utf8_len(unsigned char byte) nogil:
     if 0x20 <= byte <= 0x7E:
@@ -303,7 +303,7 @@ cdef class Screen:
         self._modified = NULL
 
     def __init__(self, cols: int, lines: int):
-        self._empty = self._tileplate()  # Template cell
+        # self._empty = self._tileplate()  # Template cell
         self._buffer = list()  # Buffer of cells
         self._current = None  # Current selected line from buffer
         self._line = ""  # Editorial string
@@ -338,14 +338,14 @@ cdef class Screen:
         """Height of the PTY."""
         return self._lines
 
-    def _tileplate(self) -> bytes:
-        """Templates a tile from input data and returns it as bytes."""
-        return bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
+    # def _tileplate(self) -> bytes:
+    #    """Templates a tile from input data and returns it as bytes."""
+    #    return bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
 
     cdef ByteList _new_line(self, unsigned int cols):
         """Create a new line for the buffer, returns a tuple of bytes data and cython Tile memoryview."""
         cdef unsigned long idx = 0
-        cdef Glyph * glyph = <Glyph *> malloc(sizeof(Glyph))
+        cdef Glyph glyph
         cdef ByteList byte_list = ByteList(bytes(cols * 7))
 
         glyph.units[0] = 32
@@ -354,10 +354,9 @@ cdef class Screen:
         glyph.units[3] = 0
 
         while idx < self._cols:
-            self._print(byte_list, idx, glyph)
+            self._print(byte_list, idx, &glyph)
             idx += 1
 
-        free(glyph)
         return byte_list
 
     cdef ByteList _resize_line(self, unsigned int y, unsigned int cols):
@@ -389,10 +388,9 @@ cdef class Screen:
         self._current_line()
         self._new_modified()
 
-    cdef inline void _current_line(self) nogil:
+    cdef inline void _current_line(self):
         """Prepare current line when cursor changes vertically."""
-        with gil:
-            self._current = self._buffer[self._y - 1]
+        self._current = self._buffer[self._y - 1]
 
     def _new_modified(self):
         """Create a buffer of dirty screen information."""
@@ -402,7 +400,7 @@ cdef class Screen:
         modified_array = <Dirty*> modified
         self._modified = modified_array
 
-    cdef inline void _update(self) nogil:
+    cdef inline void _update(self):
         """Mark tiles as modified."""
         cdef unsigned short y = self._y - 1
 
@@ -422,25 +420,28 @@ cdef class Screen:
             self._modified[y].begin = self._x - 1
             self._modified[y].end = self._x
 
-    cdef inline void _clear(self) nogil:
+    cpdef _clear(self):
         """Clears all marks of modification."""
         cdef unsigned short idx = 0
 
-        while idx < self._lines:
-            self._modified[idx].updated = False
-            idx += 1
+        with nogil:
+            while idx < self._lines:
+                self._modified[idx].updated = False
+                idx += 1
 
-    cdef inline void _smear(self) nogil:
+    cpdef void _smear(self):
         """Marks all tiles as modified."""
         cdef unsigned short idx = 0
 
-        while idx < self._lines:
-            self._modified[idx].updated = True
-            self._modified[idx].begin = 0
-            self._modified[idx].end = self._cols - 1
-            idx += 1
+        with nogil:
 
-    cdef inline void _print(self, ByteList view, unsigned short x, Glyph *glyph) nogil:
+            while idx < self._lines:
+                self._modified[idx].updated = True
+                self._modified[idx].begin = 0
+                self._modified[idx].end = self._cols - 1
+                idx += 1
+
+    cdef inline void _print(self, ByteList view, unsigned short x, Glyph *glyph):
         """Print a glyph to the buffer using colors and attributes."""
         cdef unsigned long pos = x * 7
 
@@ -452,35 +453,35 @@ cdef class Screen:
         view.set(pos + 5, self._bg)
         view.set(pos + 6, self._attr)
 
-    cdef inline void _move_up(self, unsigned short steps) nogil:
+    cdef inline void _move_up(self, unsigned short steps):
         """Move the cursor position up Y steps."""
         if (self._y - steps) < 1:
             self._y = 1
         else:
             self._y -= steps
 
-    cdef inline void _move_down(self, unsigned short steps) nogil:
+    cdef inline void _move_down(self, unsigned short steps):
         """Move the cursor position down Y steps."""
         if (self._y + steps) > self._lines:
             self._y = self._lines
         else:
             self._y += steps
 
-    cdef inline void _move_left(self, unsigned short steps) nogil:
+    cdef inline void _move_left(self, unsigned short steps):
         """Move the cursor position left X steps."""
         if (self._x - steps) < 1:
             self._x = 1
         else:
             self._x -= steps
 
-    cdef inline void _move_right(self, unsigned short steps) nogil:
+    cdef inline void _move_right(self, unsigned short steps):
         """Move the cursor position right X steps."""
         if (self._x + steps) > self._cols:
             self._x = self._cols
         else:
             self._x += steps
 
-    cdef inline void _goto_x(self, unsigned short pos) nogil:
+    cdef inline void _goto_x(self, unsigned short pos):
         """Move the cursor to position X."""
         if pos < 1:
             self._x = 1
@@ -489,7 +490,7 @@ cdef class Screen:
         else:
             self._x = pos
 
-    cdef inline void _goto_y(self, unsigned short pos) nogil:
+    cdef inline void _goto_y(self, unsigned short pos):
         """Move the cursor to position Y."""
         if pos < 1:
             self._y = 1
@@ -498,41 +499,41 @@ cdef class Screen:
         else:
             self._y = pos
 
-    cdef inline void print_glyph(self, Glyph *glyph) nogil:
+    cdef inline void print_glyph(self, Glyph *glyph):
         """Print glyph to console."""
         self._print(self._current, self._x - 1, glyph)
         self._update()
         self._move_right(1)
 
-    cdef inline void bell(self) nogil:
+    cdef inline void bell(self):
         """Executes the BEL control character."""
         pass
 
-    cdef inline void backspace(self) nogil:
+    cdef inline void backspace(self):
         """Executes the BS control character."""
         pass
 
-    cdef inline void tab(self) nogil:
+    cdef inline void tab(self):
         """Executes the HT control character."""
         pass
 
-    cdef inline void line_feed(self) nogil:
+    cdef inline void line_feed(self):
         """Executes the LF control character."""
         pass
 
-    cdef inline void form_feed(self) nogil:
+    cdef inline void form_feed(self):
         """Executes the FF control character."""
         pass
 
-    cdef inline void carriage_return(self) nogil:
+    cdef inline void carriage_return(self):
         """Executes the CR control character."""
         pass
 
-    cdef inline void escape(self) nogil:
+    cdef inline void escape(self):
         """Executes the ESC control character."""
         pass
 
-    cdef inline void cursor_up(self, unsigned short steps) nogil:
+    cdef inline void cursor_up(self, unsigned short steps):
         """
         Moves the cursor n (default 1) cells up. 
         If the cursor is already at the edge of the screen, this has no effect.
@@ -540,7 +541,7 @@ cdef class Screen:
         self._move_up(steps if steps > 1 else 1)
         self._current_line()
 
-    cdef inline void cursor_down(self, unsigned short steps) nogil:
+    cdef inline void cursor_down(self, unsigned short steps):
         """
         Moves the cursor n (default 1) cells down. 
         If the cursor is already at the edge of the screen, this has no effect.
@@ -548,37 +549,37 @@ cdef class Screen:
         self._move_down(steps if steps > 1 else 1)
         self._current_line()
 
-    cdef inline void cursor_forward(self, unsigned short steps) nogil:
+    cdef inline void cursor_forward(self, unsigned short steps):
         """
         Moves the cursor n (default 1) cells forward. 
         If the cursor is already at the edge of the screen, this has no effect.
         """
         self._move_right(steps if steps > 1 else 1)
 
-    cdef inline void cursor_back(self, unsigned short steps) nogil:
+    cdef inline void cursor_back(self, unsigned short steps):
         """
         Moves the cursor n (default 1) cells previous. 
         If the cursor is already at the edge of the screen, this has no effect.
         """
         self._move_left(steps if steps > 1 else 1)
 
-    cdef inline void cursor_next_line(self, unsigned short downs) nogil:
+    cdef inline void cursor_next_line(self, unsigned short downs):
         """Moves cursor to beginning of the line n (default 1) lines down."""
         self._move_down(downs if downs > 1 else 1)
         self._goto_x(1)
         self._current_line()
 
-    cdef inline void cursor_previous_line(self, unsigned short ups) nogil:
+    cdef inline void cursor_previous_line(self, unsigned short ups):
         """Moves cursor to beginning of the line n (default 1) lines up."""
         self._move_down(ups if ups > 1 else 1)
         self._goto_x(1)
         self._current_line()
 
-    cdef inline void cursor_horizontal_absolute(self, unsigned short x) nogil:
+    cdef inline void cursor_horizontal_absolute(self, unsigned short x):
         """Moves the cursor to column n (default 1)."""
         self._goto_x(x)
 
-    cdef inline void cursor_position(self, unsigned short y, unsigned short x) nogil:
+    cdef inline void cursor_position(self, unsigned short y, unsigned short x):
         """
         Moves the cursor to row n, column m. The values are 1-based, and default to 1 (top left corner) if omitted. 
         A sequence such as CSI ;5H is a synonym for CSI 1;5H as well as CSI 17;H is the same as CSI 17H and CSI 17;1H
@@ -587,7 +588,7 @@ cdef class Screen:
         self._goto_x(x)
         self._current_line()
 
-    cdef inline void erase_in_display(self, unsigned short alt) nogil:
+    cdef inline void erase_in_display(self, unsigned short alt):
         """
         Clears part of the screen. 
         If n is 0 (or missing), clear from cursor to end of screen. 
@@ -610,13 +611,12 @@ cdef class Screen:
         else:
             return
 
-        with gil:
-            self._empty = bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
-            for y in range(0, self._y - 1):
-                self._buffer[y] = self._new_line(self._cols)
+            # self._empty = bytes([32, 0, 0, 0, self._fg, self._bg, self._attr])
+        for y in range(0, self._y - 1):
+            self._buffer[y] = self._new_line(self._cols)
         self._current_line()
 
-    cdef inline void erase_in_line(self, unsigned short alt) nogil:
+    cdef inline void erase_in_line(self, unsigned short alt):
         """
         Erases part of the line. 
         If n is 0 (or missing), clear from cursor to the end of the line. 
@@ -625,7 +625,7 @@ cdef class Screen:
         Cursor position does not change.
         """
         cdef unsigned short start = 0, end = self._cols
-        cdef Glyph *glyph = <Glyph *> malloc(sizeof(Glyph))
+        cdef Glyph glyph
 
         if alt == 0:
             start = self._x - 1
@@ -641,39 +641,34 @@ cdef class Screen:
         glyph.units[2] = 0
         glyph.units[3] = 0
 
-        with gil:
-            for x in range(start, end):
-                self._print(self._current, x, glyph)
+        for x in range(start, end):
+            self._print(self._current, x, &glyph)
 
-        free(glyph)
-
-    cdef inline void scroll_up(self, unsigned short ups) nogil:
+    cdef inline void scroll_up(self, unsigned short ups):
         """Scroll whole page up by n (default 1) lines. New lines are added at the bottom."""
         if ups < 1:
             ups = 1
         elif ups > self._lines:
             ups = self._lines
 
-        with gil:
-            for _ in range(ups):
-                self._buffer.pop(0)
-                self._buffer.append(self._new_line(self._cols))
+        for _ in range(ups):
+            self._buffer.pop(0)
+            self._buffer.append(self._new_line(self._cols))
         self._current_line()
 
-    cdef inline void scroll_down(self, unsigned short downs) nogil:
+    cdef inline void scroll_down(self, unsigned short downs):
         """Scroll whole page down by n (default 1) lines. New lines are added at the top."""
         if downs < 1:
             downs = 1
         elif downs > self._lines:
             downs = self._lines
 
-        with gil:
-            for _ in range(downs):
-                self._buffer.pop(self._lines - 1)
-                self._buffer.insert(0, self._new_line(self._cols))
+        for _ in range(downs):
+            self._buffer.pop(self._lines - 1)
+            self._buffer.insert(0, self._new_line(self._cols))
         self._current_line()
 
-    cdef inline void horizontal_vertical_position(self, unsigned short y, unsigned short x) nogil:
+    cdef inline void horizontal_vertical_position(self, unsigned short y, unsigned short x):
         """
         Same as CUP, but counts as a format effector function (like CR or LF) 
         rather than an editor function (like CUD or CNL). 
@@ -683,216 +678,216 @@ cdef class Screen:
         self._goto_x(x)
         self._current_line()
 
-    cdef inline void aux_port(self, unsigned short alt) nogil:
+    cdef inline void aux_port(self, unsigned short alt):
         """Enable or disable aux serial port usually for local serial printer."""
         if alt == 5:
             pass
         elif alt == 4:
             pass
 
-    cdef inline void device_status_report(self, unsigned short alt) nogil:
+    cdef inline void device_status_report(self, unsigned short alt):
         """Reports the cursor position (CPR) by transmitting ESC[n;mR, where n is the row and m is the column.)"""
         pass
 
-    cdef inline void save_cursor(self) nogil:
+    cdef inline void save_cursor(self):
         """
         Saves the cursor position/state in SCO console mode. 
         In vertical split screen mode, instead used to set (as CSI n ; n s) or reset left and right margins.
         """
         pass
 
-    cdef inline void restore_cursor(self) nogil:
+    cdef inline void restore_cursor(self):
         """Restores the cursor position/state in SCO console mode."""
         pass
 
-    cdef inline void attr_reset(self) nogil:
+    cdef inline void attr_reset(self):
         """Reset tile attributes."""
         self._fg = fgDEFAULT
         self._bg = bgDEFAULT
         self._attr = 0
 
-    cdef inline void attr_bold_on(self) nogil:
+    cdef inline void attr_bold_on(self):
         """Make glyphs bold."""
         if not self._attr & attrBOLD:
             self._attr ^= attrBOLD
 
-    cdef inline void attr_dim_on(self) nogil:
+    cdef inline void attr_dim_on(self):
         """Make glyphs dim."""
         if not self._attr & attrDIM:
             self._attr ^= attrDIM
 
-    cdef inline void attr_italic_on(self) nogil:
+    cdef inline void attr_italic_on(self):
         """Make glyphs italic."""
         if not self._attr & attrITALIC:
             self._attr ^= attrITALIC
 
-    cdef inline void attr_underline_on(self) nogil:
+    cdef inline void attr_underline_on(self):
         """Make glyphs underline."""
         if not self._attr & attrITALIC:
             self._attr ^= attrITALIC
 
-    cdef inline void attr_blink_on(self) nogil:
+    cdef inline void attr_blink_on(self):
         """Make tile blink."""
         if not self._attr & attrBLINK:
             self._attr ^= attrBLINK
 
-    cdef inline void attr_invert_on(self) nogil:
+    cdef inline void attr_invert_on(self):
         """Invert foreground and background on a tile."""
         if not self._attr & attrINVERT:
             self._attr ^= attrINVERT
 
-    cdef inline void attr_strike_on(self) nogil:
+    cdef inline void attr_strike_on(self):
         """Make glyphs strikethrough."""
         if not self._attr & attrSTRIKE:
             self._attr ^= attrSTRIKE
 
-    cdef inline void attr_bold_dim_off(self) nogil:
+    cdef inline void attr_bold_dim_off(self):
         """Make glyphs non-bold and non-dim."""
         if self._attr & attrDIM:
             self._attr ^= attrDIM
 
-    cdef inline void attr_italic_off(self) nogil:
+    cdef inline void attr_italic_off(self):
         """Turn off italic for glyphs."""
         if self._attr & attrITALIC:
             self._attr ^= attrITALIC
 
-    cdef inline void attr_underline_off(self) nogil:
+    cdef inline void attr_underline_off(self):
         """Turn off underline for glyphs."""
         if self._attr & attrITALIC:
             self._attr ^= attrITALIC
 
-    cdef inline void attr_blink_off(self) nogil:
+    cdef inline void attr_blink_off(self):
         """Make tile stop blink."""
         if self._attr & attrBLINK:
             self._attr ^= attrBLINK
 
-    cdef inline void attr_invert_off(self) nogil:
+    cdef inline void attr_invert_off(self):
         """Reverse invert of tile foreground and background."""
         if self._attr & attrINVERT:
             self._attr ^= attrINVERT
 
-    cdef inline void attr_strike_off(self) nogil:
+    cdef inline void attr_strike_off(self):
         """Make glyphs not strikethrough."""
         if self._attr & attrSTRIKE:
             self._attr ^= attrSTRIKE
 
-    cdef inline void color_foreground(self, unsigned char color) nogil:
+    cdef inline void color_foreground(self, unsigned char color):
         """Set foreground color."""
         self._fg = color
 
-    cdef inline void color_background(self, unsigned char color) nogil:
+    cdef inline void color_background(self, unsigned char color):
         """Set background color."""
         self._bg = color
 
-    cdef inline void key_home(self) nogil:
+    cdef inline void key_home(self):
         """Home key pressed."""
         pass
 
-    cdef inline void key_insert(self) nogil:
+    cdef inline void key_insert(self):
         """Insert key pressed."""
         pass
 
-    cdef inline void key_delete(self) nogil:
+    cdef inline void key_delete(self):
         """Delete key pressed."""
         pass
 
-    cdef inline void key_end(self) nogil:
+    cdef inline void key_end(self):
         """End key pressed."""
         pass
 
-    cdef inline void key_pgup(self) nogil:
+    cdef inline void key_pgup(self):
         """PgUp key pressed."""
         pass
 
-    cdef inline void key_pgdn(self) nogil:
+    cdef inline void key_pgdn(self):
         """PgDn key pressed."""
         pass
 
-    cdef inline void key_f0(self) nogil:
+    cdef inline void key_f0(self):
         """F0 key pressed."""
         pass
 
-    cdef inline void key_f1(self) nogil:
+    cdef inline void key_f1(self):
         """F1 key pressed."""
         pass
 
-    cdef inline void key_f2(self) nogil:
+    cdef inline void key_f2(self):
         """F2 key pressed."""
         pass
 
-    cdef inline void key_f3(self) nogil:
+    cdef inline void key_f3(self):
         """F3 key pressed."""
         pass
 
-    cdef inline void key_f4(self) nogil:
+    cdef inline void key_f4(self):
         """F4 key pressed."""
         pass
 
-    cdef inline void key_f5(self) nogil:
+    cdef inline void key_f5(self):
         """F5 key pressed."""
         pass
 
-    cdef inline void key_f6(self) nogil:
+    cdef inline void key_f6(self):
         """F6 key pressed."""
         pass
 
-    cdef inline void key_f7(self) nogil:
+    cdef inline void key_f7(self):
         """F7 key pressed."""
         pass
 
-    cdef inline void key_f8(self) nogil:
+    cdef inline void key_f8(self):
         """F8 key pressed."""
         pass
 
-    cdef inline void key_f9(self) nogil:
+    cdef inline void key_f9(self):
         """F9 key pressed."""
         pass
 
-    cdef inline void key_f10(self) nogil:
+    cdef inline void key_f10(self):
         """F10 key pressed."""
         pass
 
-    cdef inline void key_f11(self) nogil:
+    cdef inline void key_f11(self):
         """F11 key pressed."""
         pass
 
-    cdef inline void key_f12(self) nogil:
+    cdef inline void key_f12(self):
         """F12 key pressed."""
         pass
 
-    cdef inline void key_f13(self) nogil:
+    cdef inline void key_f13(self):
         """F13 key pressed."""
         pass
 
-    cdef inline void key_f14(self) nogil:
+    cdef inline void key_f14(self):
         """F14 key pressed."""
         pass
 
-    cdef inline void key_f15(self) nogil:
+    cdef inline void key_f15(self):
         """F15 key pressed."""
         pass
 
-    cdef inline void key_f16(self) nogil:
+    cdef inline void key_f16(self):
         """F16 key pressed."""
         pass
 
-    cdef inline void key_f17(self) nogil:
+    cdef inline void key_f17(self):
         """F17 key pressed."""
         pass
 
-    cdef inline void key_f18(self) nogil:
+    cdef inline void key_f18(self):
         """F18 key pressed."""
         pass
 
-    cdef inline void key_f19(self) nogil:
+    cdef inline void key_f19(self):
         """F19 key pressed."""
         pass
 
-    cdef inline void key_f20(self) nogil:
+    cdef inline void key_f20(self):
         """F20 key pressed."""
         pass
 
-    cdef inline void short_command(self, unsigned short keycode, bint meta, bint ctrl, bint alt, bint shift) nogil:
+    cdef inline void short_command(self, unsigned short keycode, bint meta, bint ctrl, bint alt, bint shift):
         """Short command."""
         pass
 
@@ -903,7 +898,7 @@ cdef class Stream(Screen):
     def __init__(self, cols: int = 80, lines: int = 24):
         Screen.__init__(self, cols, lines)
 
-    def display(self) -> None:
+    def _display(self) -> None:
         """Extract all modified buffer data."""
         for y in range(self._lines):
             if self._modified[y].updated:
@@ -911,26 +906,11 @@ cdef class Stream(Screen):
                       self._buffer[y].data[self._modified[y].begin * 7:self._modified[y].end * 7]
                 # yield y + 1, 1, self._cols, self._buffer[y].data[:(self._cols-1) * 7]
 
-    def smear(self) -> None:
-        self._smear()
-
-    def clear(self) -> None:
-        self._clear()
-
-    def feed(self, data: bytes) -> None:
-        self._feed(data)
-
-    def resize(self, lines: int, cols: int):
-        self._resize(lines, cols)
-        self._smear()
-
-    cdef void _feed(self, data: bytes) nogil:
+    cpdef _feed(self, data: bytes):
         """Process input to the terminal."""
         cdef unsigned char byte = 0, rest = 0
-        cdef Glyph * glyph = <Glyph *> malloc(sizeof(Glyph))
-
-        with gil:
-            biter = ByteIterator(data)
+        cdef Glyph glyph
+        cdef ByteIterator biter = ByteIterator(data)
 
         while not biter.end or rest:
             if rest:
@@ -942,12 +922,11 @@ cdef class Stream(Screen):
             if self.is_control(byte):
                 self._control_characters(byte, biter)
             elif self.is_utf8(byte):
-                if self._utf8_characters(byte, biter, glyph):
-                    self.print_glyph(glyph)
+                if self._utf8_characters(byte, biter, &glyph):
+                    self.print_glyph(&glyph)
             else:
                 pass
 
-        free(glyph)
 
     cdef inline bint is_printable(self, unsigned char byte) nogil:
         """Is byte a printable ASCII character?"""
@@ -1020,7 +999,7 @@ cdef class Stream(Screen):
 
         return True
 
-    cdef inline unsigned char _control_characters(self, unsigned char byte, ByteIterator iterator) nogil:
+    cdef inline unsigned char _control_characters(self, unsigned char byte, ByteIterator iterator):
         """Process a control character."""
         cdef unsigned char rest = 0
 
@@ -1041,7 +1020,7 @@ cdef class Stream(Screen):
 
         return rest
 
-    cdef inline unsigned char _escape_sequence(self, ByteIterator iterator) nogil:
+    cdef inline unsigned char _escape_sequence(self, ByteIterator iterator):
         """Process an escape sequence."""
         cdef unsigned char byte = iterator.next(), rest = 0
 
@@ -1067,13 +1046,13 @@ cdef class Stream(Screen):
 
         return rest
 
-    cdef inline unsigned char _csi_sequence(self, ByteIterator iterator) nogil:
+    cdef inline unsigned char _csi_sequence(self, ByteIterator iterator):
         """Parse CSI sequence."""
         cdef unsigned char byte = 0, final_byte = 0
         cdef unsigned int value = 0, idx = 1, vlen = 16, plen = 0
-        cdef unsigned int *params = <unsigned int *> malloc(10 * sizeof(unsigned int))
-        cdef unsigned char * param_text = <unsigned char *> malloc(16 * sizeof(unsigned char))
-        cdef unsigned char * inter_text = <unsigned char *> malloc(16 * sizeof(unsigned char))
+        cdef unsigned int[10] params = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        cdef unsigned char[16] param_text = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        cdef unsigned char[16] inter_text = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         cdef unsigned int tmp = 0
 
         if not iterator.end:
@@ -1121,9 +1100,6 @@ cdef class Stream(Screen):
         if 0x40 <= byte <= 0x7E:  # Scan final byte
             final_byte = byte
         else:
-            free(params)
-            free(param_text)
-            free(inter_text)
             return byte
 
         if final_byte == csiCUU:  # Cursor Up
@@ -1168,13 +1144,9 @@ cdef class Stream(Screen):
         elif final_byte == csiRCP:  #  Restore Saved Cursor Position
             self.restore_cursor()
 
-        free(params)
-        free(param_text)
-        free(inter_text)
-
         return 0
 
-    cdef inline void _sgr_parameters(self, unsigned char param) nogil:
+    cdef inline void _sgr_parameters(self, unsigned char param):
         """Select graphic rendition."""
 
         if param == sgrRESET:  # Reset or normal
@@ -1210,7 +1182,7 @@ cdef class Stream(Screen):
         elif 40 <= param <= 47 or param == 49 or 100 <= param <= 107:  # Background
             self.color_background(param)
 
-    cdef inline void _vt_sequence(self, unsigned int keycode) nogil:
+    cdef inline void _vt_sequence(self, unsigned int keycode):
         """Key codes for special keys."""
 
         if keycode == vtHome:
@@ -1272,14 +1244,15 @@ cdef class Stream(Screen):
         elif keycode == vtF20:
             self.key_f20()
 
-    cdef inline void _vt_modifer(self, unsigned int keycode, unsigned int modifier) nogil:
+    cdef inline void _vt_modifer(self, unsigned int keycode, unsigned int modifier):
         """Meta keys."""
         modifier -= 1
         self.short_command(keycode, modifier >> 3 & 1, modifier >> 2 & 1, modifier >> 1 & 1, modifier & 1)
 
 
 class Terminal(Stream):
-    pass
+    def __init__(self, cols: int = 80, lines: int = 24):
+        Stream.__init__(self, cols, lines)
 
 
 def print_line(short y, short begin, short end, bytes data) -> bytearray:
@@ -1295,7 +1268,7 @@ def print_line(short y, short begin, short end, bytes data) -> bytearray:
     cdef unsigned char fg_a = fgDEFAULT, fg_b = fgDEFAULT
     cdef unsigned char bg_a = bgDEFAULT, bg_b = bgDEFAULT
     cdef unsigned char attr_a = 0, attr_b = 0
-    cdef unsigned char * attr = <unsigned char *> malloc(9 * sizeof(unsigned char))
+    cdef unsigned char[9] attr = [0,0,0,0,0,0,0,0,0]
     cdef unsigned short glyph_len = 0
 
     cdef short jdx = 0
@@ -1349,5 +1322,4 @@ def print_line(short y, short begin, short end, bytes data) -> bytearray:
             line += glyph
 
     line += b"\x1b[0m"
-    free(attr)
     return line

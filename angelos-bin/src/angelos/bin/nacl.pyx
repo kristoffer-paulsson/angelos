@@ -34,7 +34,29 @@ from angelos.bin.nacl cimport crypto_box_beforenm, crypto_box_zerobytes, \
     crypto_aead_chacha20poly1305_decrypt, crypto_aead_chacha20poly1305_keybytes, \
     crypto_aead_chacha20poly1305_npubbytes, crypto_aead_chacha20poly1305_abytes
 
-sodium_init()
+
+class NaClError(RuntimeError):
+    """Error due to programmatic misuse."""
+    KEY_LENGTH_ERROR = ("Invalid key due to length.", 100)
+    KEY_COMPUTATION_ERROR = ("Key computation failed", 101)
+    KEY_GENERATION_ERROR = ("Failed generate key(s)", 102)
+    DATA_LENGTH_ERROR = ("Data is to long", 103)
+    HASH_LENGTH_BOUNDARIES = ("Hash length outside boundaries", 104)
+    NONCE_LENGTH_ERROR = ("Invalid nonce due to length", 105)
+    INITIALIZE_ERROR = ("Libsodium failed to initialize", 106)
+
+
+class CryptoFailure(RuntimeWarning):
+    """When crypto operation fail due to circumstantial reasons."""
+    pass
+
+class HashFailure(RuntimeWarning):
+    """When hash operation fail due to circumstantial reasons."""
+
+
+if sodium_init() == -1:
+    raise NaClError(*NaClError.INITIALIZE_ERROR)
+
 
 SIZE_BOX_NONCE = crypto_box_noncebytes()
 
@@ -75,24 +97,6 @@ SIZE_AEAD_CCP_KEY = crypto_aead_chacha20poly1305_keybytes()
 SIZE_AEAD_CCP_BYTES = crypto_aead_chacha20poly1305_abytes()
 
 BASE64_VARIANT_URLSAFE = sodium_base64_VARIANT_URLSAFE
-
-
-class NaClError(RuntimeError):
-    """Error due to programmatic misuse."""
-    KEY_LENGTH_ERROR = ("Invalid key due to length.", 100)
-    KEY_COMPUTATION_ERROR = ("Key computation failed", 101)
-    KEY_GENERATION_ERROR = ("Failed generate key(s)", 102)
-    DATA_LENGTH_ERROR = ("Data is to long", 103)
-    HASH_LENGTH_BOUNDARIES = ("Hash length outside boundaries", 104)
-    NONCE_LENGTH_ERROR = ("Invalid nonce due to length", 105)
-
-
-class CryptoFailure(RuntimeWarning):
-    """When crypto operation fail due to circumstantial reasons."""
-    pass
-
-class HashFailure(RuntimeWarning):
-    """When hash operation fail due to circumstantial reasons."""
 
 
 class NaCl:

@@ -127,36 +127,38 @@ class Fiber(ABC):
 
 
 class shared:
-    """Decorator that makes a method run within the pool executor"""
-    def __init__(self, exe):
-        self.__exe = exe
+    """Shared resource decorator. This decorator makes sure that decorated methods in a resource is not called
+    simultaneously."""
 
-    def __set_name__(self, owner, name):
-        self.__owner = owner
+    def __init__(self, exe):
+        self._exe = exe
 
     async def __call__(self, *args, **kwargs):
-        future = self.__owner.pool.submit(self.__exe, *args, **kwargs)
+        future = self._obj.pool.submit(self._exe, self._obj, *args, **kwargs)
         await asyncio.sleep(0)
         return future.result(1)
 
+    def __get__(self, instance, owner):
+        self._obj = instance
+        return self.__call__
+
 
 class SharedResource:
-    """Shared resource is a class that must be shared between threads but must be guaranteed synchronous
-    execution. This class is a mixin and all sensitive methods in the main class should be private to
-    the outside world, then be called via a public proxy function that calls the _run method. All calls
-    via the _run method is handled in a thread pool executor linearly.
+    """Shared resource is a class mixin that guarantees synchronious execution of sensitive methods in a separate
+    thread. It is meant to offload workload from an asyncio event loop and also provide that no class is writing to a
+    singleton resource simultaneously, but make sure that every task is performed in the right order.
     """
 
     def __init__(self):
-        self.__pool = ThreadPoolExecutor(max_workers=1)
+        self._pool = ThreadPoolExecutor(max_workers=1)
 
     @property
-    def pool(self):
+    def pool(self) -> ThreadPoolExecutor:
         """Expose the pool queue."""
-        return self.__pool
+        return self._pool
 
     def __del__(self):
-        self.__pool.shutdown()
+        self._pool.shutdown()
 
 
 class SharedResourceMixin:
