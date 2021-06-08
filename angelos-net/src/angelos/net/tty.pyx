@@ -23,6 +23,7 @@
 # https://github.com/helgefmi/ansiterm/blob/master/ansiterm.py
 import asyncio
 import hashlib
+import sys
 import typing
 
 import msgpack
@@ -75,14 +76,15 @@ class TerminalClient:
             if info["type"] == "cursor":
                 self._x = info["cursor"][0]
                 self._y = info["cursor"][1]
-                print("\x1b[{};{}H".format(self._y, self._x))
+                sys.stdout.write("\x1b[{};{}H".format(self._y, self._x))
 
             if info["type"] == "row":
                 line = "\x1b[{};{}H{}".format(
                     info["y"], info["begin"],
                     print_line(info["y"], info["begin"], info["end"], info["row"]).decode(),
                 )
-                print(line)
+                sys.stdout.write(line)
+                # print(line)
                 # print(print_line(info["y"], info["begin"], info["end"], info["row"]))
 
     def send(self, data: bytes):
@@ -190,10 +192,10 @@ class TTYHandler(Handler):
             self.ST_VERSION: (StateMode.MEDIATE, TERMINAL_VERSION),
             self.ST_SIZE: (StateMode.ONCE, b""),
         },
-                         sessions={
-                             self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
-                             self.SESH_UPSTREAM: (UpstreamIterator, dict()),
-                         }, max_sesh=2)
+         sessions={
+             self.SESH_DOWNSTREAM: (DownstreamIterator, dict()),
+             self.SESH_UPSTREAM: (UpstreamIterator, dict()),
+         }, max_sesh=2)
         self._quit = asyncio.Event()
         self._seq = asyncio.Queue()
         self._idle = None
@@ -301,8 +303,6 @@ class TTYServer(TTYHandler):
         """Prepare UploadIterator with file information and chunk count."""
         sesh.source(self._seq)
         if self._terminal:
-            # async with self._lock:
-            #    self._terminal.display(self._display)
             self._display_task = asyncio.create_task(self._display_later())
         self._idle = asyncio.create_task(self._idler())
         return ConfirmCode.YES

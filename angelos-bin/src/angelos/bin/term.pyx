@@ -904,7 +904,6 @@ cdef class Stream(Screen):
             if self._modified[y].updated:
                 yield y + 1, self._modified[y].begin + 1, self._modified[y].end + 1, \
                       self._buffer[y].data[self._modified[y].begin * 7:self._modified[y].end * 7]
-                # yield y + 1, 1, self._cols, self._buffer[y].data[:(self._cols-1) * 7]
 
     cpdef _feed(self, data: bytes):
         """Process input to the terminal."""
