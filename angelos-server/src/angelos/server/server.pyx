@@ -15,29 +15,28 @@
 #
 """Module docstring."""
 import asyncio
+import base64
 import collections
+import errno
 import functools
 import json
 import os
 import signal
 import socket
-import errno
 from typing import Any
 
-import asyncssh
+from angelos.bin.nacl import Signer
 from angelos.common.misc import Misc
 from angelos.common.utils import Event, Util
-
+from angelos.facade.facade import Facade
 from angelos.lib.automatic import Automatic, Platform, Runtime, Server as ServerDirs, Network
-from angelos.lib.facade.facade import Facade
-from angelos.lib.ioc import Container, Config, Handle, StaticHandle, LogAware
+from angelos.lib.ioc import Container, Config, StaticHandle, LogAware
 from angelos.lib.ssh.ssh import SessionManager
-from angelos.lib.starter import Starter
-from angelos.lib.worker import Worker
 from angelos.server.logger import Logger
+from angelos.server.network import ServerProtocolFile, Connections
 from angelos.server.parser import Parser
-from angelos.server.starter import ConsoleStarter
 from angelos.server.state import StateMachine
+from angelos.server.support import ServerFacade
 from angelos.server.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
 
 
@@ -73,14 +72,17 @@ class AdminKeys:
 
     def load(self):
         """Load admin keys."""
-        self.__key_list = asyncssh.read_public_key_list(self.__path_admin)
+        with open(self.__path_admin) as f:
+            self.__key_list = [x.strip() for x in f.readlines()]
 
         if not os.path.isfile(self.__path_server):
             print("Private key missing, generate new.")
-            self.__key_private = asyncssh.generate_private_key("ssh-rsa")
-            self.__key_private.write_private_key(self.__path_server)
+            self.__key_private = base64.b64encode(Signer().seed)
+            with open(self.__path_server, "w+") as f:
+                f.writelines([self.__key_private])
         else:
-            self.__key_private = asyncssh.read_private_key(self.__path_server)
+            with open(self.__path_server) as f:
+                self.__key_private = base64.b64decode(f.readline().strip())
 
     def list(self) -> list:
         """List admin keys."""
@@ -164,7 +166,6 @@ class Bootstrap:
         else:
             s.close()
 
-
     def match(self) -> bool:
         """Match all criteria for proceeding operations."""
 
@@ -198,7 +199,7 @@ class Configuration(Config, Container):
         return {
             "env": lambda self: collections.ChainMap(
                 ENV_IMMUTABLE,
-                {key:value for key, value in vars(self.opts).items() if value},
+                {key: value for key, value in vars(self.opts).items() if value},
                 self.__load("env.json"),
                 vars(self.auto),
                 ENV_DEFAULT,
@@ -214,13 +215,8 @@ class Configuration(Config, Container):
             "log": lambda self: Logger(self.facade.secret, self.env["logs_dir"]),
             "session": lambda self: SessionManager(),
             "facade": lambda self: StaticHandle(Facade),
-            "boot": lambda self: StaticHandle(asyncio.base_events.Server),
-            "admin": lambda self: StaticHandle(asyncio.base_events.Server),
-            "clients": lambda self: Handle(asyncio.base_events.Server),
-            "nodes": lambda self: Handle(asyncio.base_events.Server),
-            "hosts": lambda self: Handle(asyncio.base_events.Server),
             "opts": lambda self: Parser(),
-            "auto": lambda self: Auto("Angelos"),
+            "auto": lambda self: Auto("Angelos", self.opts),
             "quit": lambda self: Event(),
         }
 
@@ -230,33 +226,43 @@ class Server(LogAware):
 
     def __init__(self):
         """Initialize app logger."""
-        self.__return_code = 0
+        self._return_code = 0
+        self._connections = None
+        self._server = None
+        self._server_task = None
         LogAware.__init__(self, Configuration())
-        self._worker = Worker("server.main", self.ioc, executor=0, new=False)
 
     @property
     def return_code(self) -> int:
         """Server return code."""
-        return self.__return_code
+        return self._return_code
+
+    async def start(self):
+        """Start serving."""
+        self._connections = Connections()
+        self._server = await ServerProtocolFile.listen(
+            ServerFacade.setup(Signer(self.ioc.keys.server())),
+            self._listen(), self.ioc.env["port"], self._connections
+        )
+        self._server_task = asyncio.create_task(self._server.serve_forever())
+
+    async def stop(self):
+        """Wait for quit to stop serving."""
+        await self.ioc.quit.wait()
+        self._server.close()
+        await self._server.wait_closed()
 
     def _initialize(self):
-        loop = self._worker.loop
-
+        loop = asyncio.get_event_loop()
         loop.add_signal_handler(
             signal.SIGINT, functools.partial(self.quiter, signal.SIGINT)
         )
-
         loop.add_signal_handler(
             signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM)
         )
 
-        self._worker.run_coroutine(self.bootstrap())
-        self._worker.run_coroutine(self.boot_server())
-        self._worker.run_coroutine(self.admin_server())
-        self._worker.run_coroutine(self.clients_server())
-        self._worker.run_coroutine(self.hosts_server())
-        self._worker.run_coroutine(self.nodes_server())
-        self._worker.run_coroutine(self.boot_activator())
+        loop.create_task(self.start())
+        loop.create_task(self.stop())
 
         self.normal("Starting boot server.")
 
@@ -303,7 +309,7 @@ class Server(LogAware):
         except KeyboardInterrupt:
             pass
         except Exception as exc:
-            self.__return_code = 3
+            self._return_code = 3
             Util.print_exception(exc)
         self._finalize()
 
@@ -316,137 +322,7 @@ class Server(LogAware):
     async def bootstrap(self):
         """Bootstraps the Angelos server by performing checks before changing state into running."""
         if not self.ioc.bootstrap.match():
-            self.__return_code = 2
+            self._return_code = 2
             raise KeyboardInterrupt()
         else:
             self.ioc.state("running", True)
-
-    async def admin_server(self):
-        try:
-            first = True
-            while not self.ioc.quit.is_set():
-                if self.ioc.state.position("serving"):
-                    await self.ioc.state.off("serving")
-                    server = self.ioc.admin
-                    server.close()
-                    await self.ioc.session.unreg_server("admin")
-                    await server.wait_closed()
-                else:
-                    await self.ioc.state.on("serving")
-                    if first:
-                        self.ioc.admin = await ConsoleStarter().admin_server(
-                            self._listen(),
-                            port=self.ioc.env["port"],
-                            ioc=self.ioc,
-                            loop=self._worker.loop,
-                        )
-                        self.ioc.session.reg_server("admin", self.ioc.admin)
-                        first = False
-                    else:
-                        await self.ioc.admin.start_serving()
-        except Exception as exc:
-            Util.print_exception(exc)
-
-    async def boot_server(self):
-        try:
-            first = True
-            while not self.ioc.quit.is_set():
-                if self.ioc.state.position("boot"):
-                    await self.ioc.state.off("boot")
-                    self.normal("Boot server turned OFF")
-                    server = self.ioc.boot
-                    server.close()
-                    await self.ioc.session.unreg_server("boot")
-                    await server.wait_closed()
-                else:
-                    await self.ioc.state.on("boot")
-                    self.normal("Boot server turned ON")
-                    if first:
-                        self.ioc.boot = await ConsoleStarter().boot_server(
-                            self._listen(),
-                            port=self.ioc.env["port"],
-                            ioc=self.ioc,
-                            loop=self._worker.loop,
-                        )
-                        self.ioc.session.reg_server("boot", self.ioc.boot)
-                        first = False
-                    else:
-                        await self.ioc.boot.start_serving()
-        except Exception as exc:
-            Util.print_exception(exc)
-
-    async def clients_server(self):
-        try:
-            while not self.ioc.quit.is_set():
-                if self.ioc.state.position("clients"):
-                    await self.ioc.state.off("clients")
-                    self.normal("Clients server turned OFF")
-                    server = self.ioc.clients
-                    server.close()
-                    await self.ioc.session.unreg_server("clients")
-                    await server.wait_closed()
-                else:
-                    await self.ioc.state.on("clients")
-                    self.normal("Clients server turned ON")
-                    self.ioc.clients = await Starter().clients_server(
-                        self.ioc.facade.data.portfolio,
-                        self._listen(),
-                        port=self.ioc.config["ports"]["clients"],
-                        ioc=self.ioc,
-                        loop=self._worker.loop,
-                    )
-                    self.ioc.session.reg_server("clients", self.ioc.clients)
-        except Exception as exc:
-            Util.print_exception(exc)
-
-    async def hosts_server(self):
-        try:
-            while not self.ioc.quit.is_set():
-                if self.ioc.state.position("hosts"):
-                    await self.ioc.state.off("hosts")
-                    self.normal("Hosts server turned OFF")
-                    server = self.ioc.hosts
-                    server.close()
-                    await self.ioc.session.unreg_server("hosts")
-                    await server.wait_closed()
-                else:
-                    await self.ioc.state.on("hosts")
-                    self.normal("Hosts server turned ON")
-                    self.ioc.hosts = await ConsoleStarter().hosts_server(
-                        self.ioc.facade.data.portfolio,
-                        self._listen(),
-                        port=self.ioc.config["ports"]["hosts"],
-                        ioc=self.ioc,
-                        loop=self._worker.loop,
-                    )
-                    self.ioc.session.reg_server("hosts", self.ioc.hosts)
-        except Exception as exc:
-            Util.print_exception(exc)
-
-    async def nodes_server(self):
-        try:
-            while not self.ioc.quit.is_set():
-                if self.ioc.state.position("nodes"):
-                    self.normal("Nodes server turned OFF")
-                    await self.ioc.state.off("nodes")
-                    server = self.ioc.nodes
-                    server.close()
-                    await self.ioc.session.unreg_server("nodes")
-                    await server.wait_closed()
-                else:
-                    await self.ioc.state.on("nodes")
-                    self.normal("Nodes server turned ON")
-                    self.ioc.nodes = await Starter().nodes_server(
-                        self.ioc.facade.data.portfolio,
-                        self._listen(),
-                        port=self.ioc.config["ports"]["nodes"],
-                        ioc=self.ioc,
-                        loop=self._worker.loop,
-                    )
-                    self.ioc.session.reg_server("nodes", self.ioc.nodes)
-        except Exception as exc:
-            Util.print_exception(exc)
-
-    async def boot_activator(self):
-        await asyncio.sleep(1)
-        self.ioc.state("boot", True)

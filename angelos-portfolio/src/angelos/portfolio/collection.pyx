@@ -474,3 +474,11 @@ class Operations:
 
         if not all(check):
             raise PolicyException()
+
+    @classmethod
+    def write(cls, p: Portfolio) -> str:
+        """Write portfolio as text."""
+
+    @classmethod
+    def read(cls, text: str) -> Portfolio:
+        """Read text to parse into a portfolio."""

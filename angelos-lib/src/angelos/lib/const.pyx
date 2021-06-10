@@ -65,6 +65,7 @@ class Const:
     A_TYPE_CHURCH_SERVER = ord(b"C")
 
     A_TYPE_ADMIN_CLIENT = ord(b"A")
+    A_TYPE_BOOT_SERVER = ord(b"B")
 
     A_TYPE_BEARER = ord(b"b")
     A_TYPE_SEED = ord(b"s")

@@ -600,8 +600,8 @@ class ChurchServerFacade(Facade, ServerFacadeMixin, ChurchFacadeMixin):
     """Final facade for Church entity as a server."""
 
 
-class AdminClientFacade(Facade):
-    """Administrator client facade."""
+class NoOperationFacade(Facade):
+    """Used by impersonal administrators and boot mode."""
 
     STORAGES = dict()
     APIS = dict()
@@ -616,5 +616,7 @@ CLASS_MAP = {
     Const.A_TYPE_MINISTRY_SERVER: MinistryServerFacade,
     Const.A_TYPE_CHURCH_CLIENT: ChurchClientFacade,
     Const.A_TYPE_CHURCH_SERVER: ChurchServerFacade,
-    Const.A_TYPE_ADMIN_CLIENT : AdminClientFacade,
+
+    Const.A_TYPE_ADMIN_CLIENT : NoOperationFacade,
+    Const.A_TYPE_BOOT_SERVER : NoOperationFacade,
 }

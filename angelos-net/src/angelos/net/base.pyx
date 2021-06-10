@@ -40,8 +40,6 @@ from angelos.portfolio.collection import Portfolio
 # 2. Service
 # 3. Sub service
 
-# Template for custom transport.
-#  https://docs.zombofant.net/aioopenssl/devel/_modules/aioopenssl.html#STARTTLSTransport
 # There are 10 ranges reserved for services
 # 1. 0-127
 # 2. 128-255

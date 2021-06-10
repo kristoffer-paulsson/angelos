@@ -13,3 +13,5 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """PSI package documentation"""
+
+# TODO: Merge with angelos-bin package.

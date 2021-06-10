@@ -179,7 +179,7 @@ class AuthenticationClient(AuthenticationHandler):
             "names": ["Jane", "Server"],
             "family_name": "Roe",
             "sex": "man",
-            "born": datetime.date(1972, 1, 1)
+            "born": datetime.date(1970, 1, 1)
         }), role=Const.A_ROLE_PRIMARY, server=False)
 
         keys = Keys(nd={"issuer": portfolio.entity.id, "public": NaCl.random_bytes(32), "verify": vk})
@@ -277,7 +277,7 @@ class AuthenticationServer(AuthenticationHandler):
             "names": ["John", "Admin"],
             "family_name": "Roe",
             "sex": "man",
-            "born": datetime.date(1972, 1, 1)
+            "born": datetime.date(1970, 1, 1)
         }), role=Const.A_ROLE_PRIMARY, server=False)
 
         keys = Keys(nd={"issuer": portfolio.entity.id, "public": NaCl.random_bytes(32), "verify": vk})

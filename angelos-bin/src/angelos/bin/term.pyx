@@ -19,8 +19,6 @@ and this too https://en.wikipedia.org/wiki/ASCII
 """
 from unicodedata import east_asian_width
 
-# from libc.stdlib cimport malloc, free
-
 cdef inline int utf8_len(unsigned char byte) nogil:
     if 0x20 <= byte <= 0x7E:
         return 1

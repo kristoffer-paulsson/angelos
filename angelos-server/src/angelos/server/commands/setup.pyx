@@ -24,7 +24,7 @@ from angelos.lib.const import Const
 from angelos.document.entities import Person, Church, Ministry
 from angelos.document.entity_mixin import PersonMixin, MinistryMixin, ChurchMixin
 from angelos.lib.error import Error, ModelException
-from angelos.lib.facade.facade import Facade
+from angelos.facade.facade import Facade
 from angelos.bin.nacl import SecretBox
 from angelos.common.misc import Misc
 from angelos.lib.operation.setup import SetupPersonOperation, SetupMinistryOperation, SetupChurchOperation, PersonData, \

@@ -18,6 +18,7 @@
 @todo Add return types to Starter functions
 """
 import asyncio
+import warnings
 
 from angelos.document.entities import Keys
 from angelos.lib.ioc import Container
@@ -26,6 +27,10 @@ from angelos.lib.ssh.ssh import SSHClient, SSHServer
 
 from angelos.server.console import BootServer, AdminServer
 from angelos.lib.starter import Starter
+
+
+# TODO: Remove this module!
+warnings.warn("deprecated", DeprecationWarning("This module should be removed: %s" % __name__))
 
 
 class ConsoleStarter(Starter):

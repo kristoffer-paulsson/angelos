@@ -1,0 +1,6 @@
+# Development environment
+pytest
+coverage
+cython
+
+-e .

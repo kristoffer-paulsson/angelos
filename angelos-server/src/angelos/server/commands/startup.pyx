@@ -19,7 +19,7 @@ import logging
 
 from angelos.server.cmd import Command
 from angelos.lib.error import Error
-from angelos.lib.facade.facade import Facade
+from angelos.facade.facade import Facade
 from angelos.common.utils import Util
 
 
