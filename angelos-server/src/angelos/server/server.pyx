@@ -20,10 +20,12 @@ import collections
 import errno
 import functools
 import json
+import logging
 import os
 import signal
 import socket
-from typing import Any
+from asyncio import Task
+from typing import Any, Coroutine
 
 from angelos.bin.nacl import Signer
 from angelos.common.misc import Misc
@@ -73,7 +75,7 @@ class AdminKeys:
     def load(self):
         """Load admin keys."""
         with open(self.__path_admin) as f:
-            self.__key_list = [x.strip() for x in f.readlines()]
+            self.__key_list = [base64.b64decode(x) for x in f.readlines()]
 
         if not os.path.isfile(self.__path_server):
             print("Private key missing, generate new.")
@@ -211,7 +213,6 @@ class Configuration(Config, Container):
             ),
             "bootstrap": lambda self: Bootstrap(self.env, self.keys),
             "keys": lambda self: AdminKeys(self.env),
-            "state": lambda self: StateMachine(self.config["state"]),
             "log": lambda self: Logger(self.facade.secret, self.env["logs_dir"]),
             "session": lambda self: SessionManager(),
             "facade": lambda self: StaticHandle(Facade),
@@ -237,14 +238,22 @@ class Server(LogAware):
         """Server return code."""
         return self._return_code
 
+    def create_task(self, coro: Coroutine) -> Task:
+        """Create a task that reports error."""
+        task = asyncio.get_event_loop().create_task(coro)
+        def done(fut):
+            fut.result()
+        task.add_done_callback(done)
+        return task
+
     async def start(self):
         """Start serving."""
-        self._connections = Connections()
+        self._connections = Connections(self.ioc)
         self._server = await ServerProtocolFile.listen(
             ServerFacade.setup(Signer(self.ioc.keys.server())),
             self._listen(), self.ioc.env["port"], self._connections
         )
-        self._server_task = asyncio.create_task(self._server.serve_forever())
+        self._server_task = self.create_task(self._server.serve_forever())
 
     async def stop(self):
         """Wait for quit to stop serving."""
@@ -253,6 +262,15 @@ class Server(LogAware):
         await self._server.wait_closed()
 
     def _initialize(self):
+        if not self.ioc.bootstrap.match():
+            self._return_code = 2
+            raise KeyboardInterrupt()
+        print(self.ioc.keys.server(), self.ioc.keys.list())
+        logging.basicConfig(
+            filename="angelos.log",
+            level=logging.DEBUG,
+            format="%(relativeCreated)6d %(threadName)s %(message)s"
+        )
         loop = asyncio.get_event_loop()
         loop.add_signal_handler(
             signal.SIGINT, functools.partial(self.quiter, signal.SIGINT)
@@ -261,8 +279,8 @@ class Server(LogAware):
             signal.SIGTERM, functools.partial(self.quiter, signal.SIGTERM)
         )
 
-        loop.create_task(self.start())
-        loop.create_task(self.stop())
+        self.create_task(self.start())
+        self.create_task(self.stop())
 
         self.normal("Starting boot server.")
 
@@ -319,10 +337,3 @@ class Server(LogAware):
         print("\n".join(Misc.recurse_env(self.ioc.env)))
         print(Util.headline("Environment (END)"))
 
-    async def bootstrap(self):
-        """Bootstraps the Angelos server by performing checks before changing state into running."""
-        if not self.ioc.bootstrap.match():
-            self._return_code = 2
-            raise KeyboardInterrupt()
-        else:
-            self.ioc.state("running", True)

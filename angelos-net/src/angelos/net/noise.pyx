@@ -22,6 +22,7 @@ from typing import Any, Union, Callable
 
 from angelos.bin.nacl import PublicKey, SecretKey, Backend_25519_ChaChaPoly_BLAKE2b
 
+
 # TODO: Certify that this implementation of Noise_XX_25519_ChaChaPoly_BLAKE2b
 #  is interoperable with other implementations.
 
@@ -458,7 +459,7 @@ class IntermediateTransportProtocol(Transport, Protocol):
 
     def connection_made(self, transport: Transport) -> None:
         """Connection made on underlying transport. Flow is interrupted and operations can be
-        done before forwarded to teh overlaying protocol."""
+        done before forwarded to the overlaying protocol."""
         self._transport = transport
         if self._task_conn:
             raise BlockingIOError("Can only run one connection made at a time.")

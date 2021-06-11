@@ -31,3 +31,11 @@ Download source tree from Github.
 > 
 > &gt; python setup.py develop
 
+## Run in virtualenv
+
+Start server inside a virtual environment.
+> angelos-server/bin/angelos -l=localhost -p=1024 --root-dir=./dev_env/ --run-dir=./dev_env/ --state-dir=./dev_env/ --logs-dir=./dev_env/ --conf-dir=./dev_env/ &
+
+Start the control admin client.
+> angelos-ctl/bin/angelosctl 127.0.0.1 -p=1024 -s=a0d4968e2efb058b6f0091a4d5b21672c921e2aacfd6a3a1395deaa9a42c8418
+

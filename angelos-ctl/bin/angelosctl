@@ -13,8 +13,7 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-from angelos.ctl.app import Application
-
+from angelos.ctl.app import AngelosAdmin
 
 if __name__ == "__main__":
-    Application().start()
+    AngelosAdmin().run()

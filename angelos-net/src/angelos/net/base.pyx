@@ -1469,13 +1469,13 @@ class Handler:
 class Protocol(asyncio.Protocol):
     """Protocol for handling packages going from and to packet handlers."""
 
-    def __init__(self, facade: Facade, server: bool = False, manager: "ConnectionManager" = None):
+    def __init__(self, facade: Facade, server: bool = False, conn_mgr: "ConnectionManager" = None):
         self._server = server
         self._handlers = dict()
         self._ranges_available = set()
         self._ranges = dict()
         self._facade = facade
-        self._manager = manager
+        self._conn_mgr = conn_mgr
         self._transport = None
         self._portfolio = None
         self._node = None
@@ -1495,9 +1495,9 @@ class Protocol(asyncio.Protocol):
         return self._portfolio
 
     @property
-    def manager(self) -> "ConnectionManager":
+    def conn_mgr(self) -> "ConnectionManager":
         """Expose the connection manager."""
-        return self._mananger
+        return self._conn_mgr
 
     async def ready(self):
         """Wait for the underlying transport to be ready."""
@@ -1637,30 +1637,30 @@ class ServerProtoMixin:
 
     def eof_received(self):
         """End of communication."""
-        if self._manager:
-            self._manager.remove(self)
+        if self.conn_mgr:
+            self.conn_mgr.remove(self)
 
     def connection_lost(self, exc: Exception):
         """Clean up."""
-        if self._manager:
-            self._manager.remove(self)
+        if self.conn_mgr:
+            self.conn_mgr.remove(self)
         self.close()
         Util.print_exception(exc)
 
     def connection_made(self, transport: asyncio.Transport):
         """Add serving protocol to local dict and set."""
         Protocol.connection_made(self, transport)
-        if self._manager:
-            self._manager.add(self)
+        if self.conn_mgr:
+            self.conn_mgr.add(self)
 
     @classmethod
     async def listen(
             cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address],
-            port: int, manager: "ConnectionManager" = None, key: bytes = None
+            port: int, connections: "ConnectionManager" = None, key: bytes = None
     ) -> asyncio.base_events.Server:
         """Start a listening server."""
         return await asyncio.get_running_loop().create_server(
-            lambda: NoiseTransportProtocol(cls(facade, manager), server=True, key=key), host, port)
+            lambda: NoiseTransportProtocol(cls(facade, connections), server=True, key=key), host, port)
 
 
 class ConnectionManager:

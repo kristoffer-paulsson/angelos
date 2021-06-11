@@ -17,6 +17,7 @@
 import asyncio
 import binascii
 import copy
+import functools
 import ipaddress
 import logging
 import os
@@ -27,15 +28,14 @@ import termios
 import tty
 from argparse import ArgumentParser, Namespace
 
+from angelos.base.app import Application, Extension
 from angelos.bin.nacl import Signer
 from angelos.common.utils import Util
 from angelos.ctl.support import AdminFacade
-from angelos.meta.testing.net import FacadeContext
-from angelos.net.authentication import AdminAuthMixin, AuthenticationHandler
-from angelos.net.base import ConnectionManager
+from angelos.net.authentication import AuthenticationHandler
 from angelos.net.broker import ServiceBrokerClient
-from angelos.net.net import Server, Client
-from angelos.net.tty import TTYServer, TTYClient, TTYHandler
+from angelos.net.net import Client
+from angelos.net.tty import TTYClient, TTYHandler
 
 facade = None
 server = None
@@ -50,21 +50,7 @@ class TestClient(Client):
         self._add_handler(TTYClient(self))
 
 
-class TestServer(Server, AdminAuthMixin):
-    """Stub protocol server."""
-
-    admin = b""
-
-    def pub_key_find(self, key: bytes) -> bool:
-        return key == self.admin
-
-    def connection_made(self, transport: asyncio.Transport):
-        """Start mail replication immediately."""
-        Server.connection_made(self, transport)
-        self._add_handler(TTYServer(self))
-
-
-class Application:
+class Application_:
     """Application for terminal emulator."""
 
     server = None
@@ -140,20 +126,13 @@ class Application:
         termios.tcsetattr(self._tty, termios.TCSADRAIN, self._echo)
 
     async def _setup_conn(self):
-        TestServer.admin = self._signer.vk
-
-        self.manager = ConnectionManager()
-        self.server = FacadeContext.create_server()
-        self._server = await TestServer.listen(self.server.facade, "127.0.0.1", 8080, self.manager)
-        self.task = asyncio.create_task(self._server.serve_forever())
-        await asyncio.sleep(0)
-
-        self._client = await TestClient.connect(self._facade, "127.0.0.1", 8080)
+        self._client = await TestClient.connect(self._facade, self._args.host[0], self._args.port)
         await self._client.get_handler(AuthenticationHandler.RANGE).auth_admin()
         await asyncio.sleep(.1)
         terminal_available = await self._client.get_handler(ServiceBrokerClient.RANGE).request(TTYHandler.RANGE)
 
         if not terminal_available:
+            print("Terminal not available at host, exiting.")
             self._quit()
         else:
             size = os.get_terminal_size()
@@ -168,9 +147,8 @@ class Application:
         self._quiter = asyncio.Event()
         self._quiter.clear()
 
-        await self._setup_conn()
+        await asyncio.wait_for(self._setup_conn(), timeout=10)
         self._setup_term()
-        print("LOADED")
 
     async def _finalize(self):
         self._teardown_term()
@@ -198,3 +176,75 @@ class Application:
             print("Uncaught keyboard interrupt")
         except Exception as exc:
             Util.print_exception(exc)
+
+
+class Arguments(Extension):
+    """Argument parser from the command line."""
+
+    def __call__(self, *args):
+        parser = ArgumentParser(self._args.get("name", "Unkown program"))
+        parser.add_argument("host", nargs=1, type=ipaddress.ip_address, help="IP address of server")
+        parser.add_argument("-p", "--port", dest="port", default=443, type=int, help="Server port")
+        parser.add_argument(
+            "-s", "--seed", dest="seed", required=True,
+            type=lambda x: (re.match(r"^[0-9a-fA-F]{64}$", x), binascii.unhexlify(x))[1],
+            help="Encryption key"
+        )
+
+        return parser.parse_args()
+
+
+class Quit(Extension):
+    """Prepares a general quit/exit flag with an event."""
+
+    def __call__(self, *args):
+        event = asyncio.Event()
+        event.clear()
+        return event
+
+
+class Signal(Extension):
+    """Configure witch signals to be caught and how to handle them. Override to get custom handling."""
+
+    EXIT = signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
+    TERM = signal.SIGWINCH
+
+    def __call__(self, *args):
+        loop = asyncio.get_event_loop()
+
+        if self._args.get("quit", False):
+            loop.add_signal_handler(self.EXIT, functools.partial(self.quit, args[0]))
+
+        if self._args.get("term", False):
+            loop.add_signal_handler(self.TERM, functools.partial(self.size_chage, args[0]))
+
+    def quit(self, app: Application):
+        """Trigger the quit flag if Quit extension is used."""
+        try:
+            app.quit.set()
+        except NameError:
+            pass
+        else:
+            asyncio.get_event_loop().remove_signal_handler(self.EXIT)
+
+    def size_change(self, app: Application):
+        return NotImplemented
+
+
+class AngelosAdmin(Application):
+    """Angelos admin control client software program."""
+
+    CONFIG = {
+        "args": Arguments(name="Angelos Admin Utility"),
+        "quit": Quit(),
+        "signal": Signal(quit=True, term=True),
+    }
+
+    def _initialize(self):
+        print(self.args.seed)
+
+    def _finalize(self):
+        self.quit.set()  # Quit is set if external keyboard interruption is triggered.
+
+    async def stop(self):
+        await self.quit.wait()

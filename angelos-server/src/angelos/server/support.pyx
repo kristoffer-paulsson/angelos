@@ -37,7 +37,7 @@ SERVER_ENTITY = PersonData(**{
 
 
 class ServerFacade(Facade):
-    """Server unbooted facade to be used before the boot sequence."""
+    """Server prebooting facade to be used before the boot sequence."""
 
     @classmethod
     def setup(cls, signer: Signer):
