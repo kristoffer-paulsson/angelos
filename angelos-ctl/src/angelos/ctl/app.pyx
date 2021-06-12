@@ -27,10 +27,12 @@ import sys
 import termios
 import tty
 from argparse import ArgumentParser, Namespace
+from io import BufferedRWPair, DEFAULT_BUFFER_SIZE
 
-from angelos.base.app import Application, Extension
+from angelos.base.app import Application, Extension, OptimizedLogRecord
 from angelos.bin.nacl import Signer
 from angelos.common.utils import Util
+from angelos.ctl.network import ClientAdmin, AuthenticationFailure, ServiceNotAvailable
 from angelos.ctl.support import AdminFacade
 from angelos.net.authentication import AuthenticationHandler
 from angelos.net.broker import ServiceBrokerClient
@@ -178,12 +180,38 @@ class Application_:
             Util.print_exception(exc)
 
 
+class Logger(Extension):
+    """Sets up a logger."""
+
+    def __call__(self, *args):
+        ioc = args[0]
+        logging.setLogRecordFactory(OptimizedLogRecord)
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+
+        file = logging.FileHandler(self._args.get("name", "unknown") + ".log")
+        file.addFilter(self._filter_file)
+        logger.addHandler(file)
+
+        stream = logging.StreamHandler(sys.stderr)
+        stream.addFilter(self._filter_stream)
+        logger.addHandler(stream)
+
+        return logger
+
+    def _filter_file(self, rec: logging.LogRecord):
+        return rec.levelname != "INFO"
+
+    def _filter_stream(self, rec: logging.LogRecord):
+        return rec.levelname == "INFO"
+
+
 class Arguments(Extension):
     """Argument parser from the command line."""
 
-    def __call__(self, *args):
-        parser = ArgumentParser(self._args.get("name", "Unkown program"))
-        parser.add_argument("host", nargs=1, type=ipaddress.ip_address, help="IP address of server")
+    def prepare(self, *args):
+        parser = ArgumentParser(self._args.get("name", "Unknown program"))
+        parser.add_argument("host", type=ipaddress.ip_address, help="IP address of server")
         parser.add_argument("-p", "--port", dest="port", default=443, type=int, help="Server port")
         parser.add_argument(
             "-s", "--seed", dest="seed", required=True,
@@ -197,10 +225,14 @@ class Arguments(Extension):
 class Quit(Extension):
     """Prepares a general quit/exit flag with an event."""
 
-    def __call__(self, *args):
-        event = asyncio.Event()
-        event.clear()
-        return event
+    EVENT = asyncio.Event()
+
+    def __init__(self):
+        super().__init__()
+        self.EVENT.clear()
+
+    def prepare(self, *args):
+        return self.EVENT
 
 
 class Signal(Extension):
@@ -209,42 +241,105 @@ class Signal(Extension):
     EXIT = signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
     TERM = signal.SIGWINCH
 
-    def __call__(self, *args):
-        loop = asyncio.get_event_loop()
+    def prepare(self, *args):
+        loop = self.get_loop()
 
         if self._args.get("quit", False):
-            loop.add_signal_handler(self.EXIT, functools.partial(self.quit, args[0]))
+            loop.add_signal_handler(self.EXIT, functools.partial(self.quit))
 
         if self._args.get("term", False):
-            loop.add_signal_handler(self.TERM, functools.partial(self.size_chage, args[0]))
+            loop.add_signal_handler(self.TERM, functools.partial(self.size_change))
 
-    def quit(self, app: Application):
+    def quit(self):
         """Trigger the quit flag if Quit extension is used."""
-        try:
-            app.quit.set()
-        except NameError:
-            pass
-        else:
-            asyncio.get_event_loop().remove_signal_handler(self.EXIT)
+        q = self.get_quit()
+        if q:
+            q.set()
+        self.get_loop().remove_signal_handler(self.EXIT)
 
-    def size_change(self, app: Application):
+    def size_change(self):
         return NotImplemented
+
+
+class Network(Extension):
+    """Start a client or server.
+
+    Only call from within async start.
+
+    If you want to start a client, the "client" argument must be set with a client connection class.
+    If you need to use a signer facade the "helper" argument must be a special facade for boot or admin support.
+    """
+
+    async def prepare(self, *args):
+        loop = self.get_loop()
+
+        client_cls = self._args.get("client", None)
+        helper_cls = self._args.get("helper", None)
+
+        if helper_cls:
+            facade = helper_cls.setup(Signer(self._app.args.seed))
+        else:
+            facade = self._app.facade
+
+        return await client_cls.connect(facade, self._app.args.host, self._app.args.port)
+
+
+class Pipes(Extension):
+    """Pipe pairs to calling and called process."""
+
+    def prepare(self, *args):
+        loop = self.get_loop()
+
+        reader = self._args.get("reader", None)
+        writer = self._args.get("writer", None)
+
+        pair = BufferedRWPair(
+            reader=reader,
+            writer=writer,
+            buffer_size=self._args.get("size", DEFAULT_BUFFER_SIZE))
+
+        if self._args.get("inp_auto", False) and hasattr(self._app, "input_handler"):
+            loop.add_reader(reader, self._app.input_handler, pair)
+        if self._args.get("outp_auto", False) and hasattr(self._app, "output_handler"):
+            loop.add(writer, self._app.output_handler, pair)
+
+        return pair
 
 
 class AngelosAdmin(Application):
     """Angelos admin control client software program."""
 
     CONFIG = {
+        "log": Logger(name="angelosctl"),
         "args": Arguments(name="Angelos Admin Utility"),
         "quit": Quit(),
         "signal": Signal(quit=True, term=True),
+        "client": Network(client=ClientAdmin, helper=AdminFacade)
     }
 
     def _initialize(self):
-        print(self.args.seed)
+        self.log
+        self.args
+        logging.debug(Util.headline("Start"))
+        self.quit
+        # self.signal
 
     def _finalize(self):
         self.quit.set()  # Quit is set if external keyboard interruption is triggered.
+        logging.debug(Util.headline("Finish"))
+
+    async def start(self):
+        try:
+            client = await self.client  # Connect happens automagically.
+            await client.authenticate()
+            await asyncio.sleep(.1)
+            terminal = await client.open()
+        except (ConnectionRefusedError, AuthenticationFailure, ServiceNotAvailable) as exc:
+            logging.error("Connection refused: {}".format(exc))
+            logging.info("Connection refused to {}:{}".format(self.args.host, self.args.port))
+            self.quit.set()
 
     async def stop(self):
         await self.quit.wait()
+        self.client.close()
+        self._stop()

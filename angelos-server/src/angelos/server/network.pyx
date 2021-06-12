@@ -52,7 +52,6 @@ class ServerProtocolFile(Protocol, ServerProtoMixin, AdminsInFile):
 
     def __init__(self, facade: Facade, conn_mgr: ConnectionManager):
         super().__init__(facade, True, conn_mgr)
-        print("SERVER WORKS")
         self._add_handler(ServiceBrokerServer(self))
         self._add_handler(AuthenticationServer(self))
 

@@ -519,6 +519,10 @@ class NoiseTransportProtocol(IntermediateTransportProtocol):
         await self._noise.start_handshake(self._transport.write, self._reader)
         self._set_mode(IntermediateTransportProtocol.PASSTHROUGH)
 
+    async def _on_close(self) -> None:
+        """Clean up protocol."""
+        self._protocol.close()
+
     def _on_write(self, data: Union[bytes, bytearray, memoryview]) -> Union[bytes, bytearray, memoryview]:
         """Encrypt outgoing data with Noise."""
         cipher = self._noise.encrypt(data)

@@ -265,7 +265,6 @@ class Server(LogAware):
         if not self.ioc.bootstrap.match():
             self._return_code = 2
             raise KeyboardInterrupt()
-        print(self.ioc.keys.server(), self.ioc.keys.list())
         logging.basicConfig(
             filename="angelos.log",
             level=logging.DEBUG,
