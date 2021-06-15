@@ -17,7 +17,6 @@
 import asyncio
 import binascii
 import copy
-import functools
 import ipaddress
 import logging
 import os
@@ -29,12 +28,14 @@ import tty
 from argparse import ArgumentParser, Namespace
 from io import BufferedRWPair, DEFAULT_BUFFER_SIZE
 
-from angelos.base.app import Application, Extension, OptimizedLogRecord
+from angelos.base.app import Application, Extension
+from angelos.base.ext import Logger, Quit, Signal, Arguments
 from angelos.bin.nacl import Signer
 from angelos.common.utils import Util
 from angelos.ctl.network import ClientAdmin, AuthenticationFailure, ServiceNotAvailable
 from angelos.ctl.support import AdminFacade
 from angelos.net.authentication import AuthenticationHandler
+from angelos.net.base import Protocol, Packet
 from angelos.net.broker import ServiceBrokerClient
 from angelos.net.net import Client
 from angelos.net.tty import TTYClient, TTYHandler
@@ -180,37 +181,11 @@ class Application_:
             Util.print_exception(exc)
 
 
-class Logger(Extension):
-    """Sets up a logger."""
-
-    def __call__(self, *args):
-        ioc = args[0]
-        logging.setLogRecordFactory(OptimizedLogRecord)
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
-
-        file = logging.FileHandler(self._args.get("name", "unknown") + ".log")
-        file.addFilter(self._filter_file)
-        logger.addHandler(file)
-
-        stream = logging.StreamHandler(sys.stderr)
-        stream.addFilter(self._filter_stream)
-        logger.addHandler(stream)
-
-        return logger
-
-    def _filter_file(self, rec: logging.LogRecord):
-        return rec.levelname != "INFO"
-
-    def _filter_stream(self, rec: logging.LogRecord):
-        return rec.levelname == "INFO"
-
-
-class Arguments(Extension):
+class CustomArguments(Arguments):
     """Argument parser from the command line."""
 
-    def prepare(self, *args):
-        parser = ArgumentParser(self._args.get("name", "Unknown program"))
+    def arguments(self, parser: ArgumentParser):
+        """Custom program arguments."""
         parser.add_argument("host", type=ipaddress.ip_address, help="IP address of server")
         parser.add_argument("-p", "--port", dest="port", default=443, type=int, help="Server port")
         parser.add_argument(
@@ -218,47 +193,6 @@ class Arguments(Extension):
             type=lambda x: (re.match(r"^[0-9a-fA-F]{64}$", x), binascii.unhexlify(x))[1],
             help="Encryption key"
         )
-
-        return parser.parse_args()
-
-
-class Quit(Extension):
-    """Prepares a general quit/exit flag with an event."""
-
-    EVENT = asyncio.Event()
-
-    def __init__(self):
-        super().__init__()
-        self.EVENT.clear()
-
-    def prepare(self, *args):
-        return self.EVENT
-
-
-class Signal(Extension):
-    """Configure witch signals to be caught and how to handle them. Override to get custom handling."""
-
-    EXIT = signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
-    TERM = signal.SIGWINCH
-
-    def prepare(self, *args):
-        loop = self.get_loop()
-
-        if self._args.get("quit", False):
-            loop.add_signal_handler(self.EXIT, functools.partial(self.quit))
-
-        if self._args.get("term", False):
-            loop.add_signal_handler(self.TERM, functools.partial(self.size_change))
-
-    def quit(self):
-        """Trigger the quit flag if Quit extension is used."""
-        q = self.get_quit()
-        if q:
-            q.set()
-        self.get_loop().remove_signal_handler(self.EXIT)
-
-    def size_change(self):
-        return NotImplemented
 
 
 class Network(Extension):
@@ -271,8 +205,6 @@ class Network(Extension):
     """
 
     async def prepare(self, *args):
-        loop = self.get_loop()
-
         client_cls = self._args.get("client", None)
         helper_cls = self._args.get("helper", None)
 
@@ -281,7 +213,11 @@ class Network(Extension):
         else:
             facade = self._app.facade
 
-        return await client_cls.connect(facade, self._app.args.host, self._app.args.port)
+        client = await client_cls.connect(
+            facade, self._app.args.host, self._app.args.port,
+            emergency=getattr(self._app, "emergency", None))
+        self._app |= client
+        return client
 
 
 class Pipes(Extension):
@@ -311,7 +247,7 @@ class AngelosAdmin(Application):
 
     CONFIG = {
         "log": Logger(name="angelosctl"),
-        "args": Arguments(name="Angelos Admin Utility"),
+        "args": CustomArguments(name="Angelos Admin Utility"),
         "quit": Quit(),
         "signal": Signal(quit=True, term=True),
         "client": Network(client=ClientAdmin, helper=AdminFacade)
@@ -341,5 +277,24 @@ class AngelosAdmin(Application):
 
     async def stop(self):
         await self.quit.wait()
-        self.client.close()
+        if isinstance(self.client, Protocol):  # In case we are before real initialization.
+            transport = self.client.transport
+            if transport:
+                transport.write_eof()
+        # transport = self.client.transport
+        # if transport:
+        #    transport.write_eof()
+        #    asyncio.sleep(1.0)
+        #    if not transport.is_closing():
+        #        transport.abort()
+        # await asyncio.wait_for(asyncio.gather(*asyncio.all_tasks()), 10.0)
         self._stop()
+
+    async def emergency(self, severity: object, protocol: Protocol):
+        """Emergency button for network issues."""
+        if isinstance(severity, Packet):
+            logging.error("Emergency abort of connection because of panic!")
+        elif isinstance(severity, ConnectionError):
+            logging.error("Panic, connection refused: {}".format(severity), exc_info=severity)
+
+        self.quit.set()

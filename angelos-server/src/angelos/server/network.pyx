@@ -15,12 +15,16 @@
 #
 """Implementation of the network for the Angelos server."""
 import asyncio
+from typing import Union, Awaitable
 
+from angelos.document.domain import Node
 from angelos.facade.facade import Facade
 from angelos.lib.ioc import Container, ContainerAware
-from angelos.net.authentication import AuthenticationServer, AdminAuthMixin
+from angelos.net.authentication import AuthenticationServer, AdminAuthMixin, LoginTypeCode
 from angelos.net.base import Protocol, ServerProtoMixin, ConnectionManager
 from angelos.net.broker import ServiceBrokerServer
+from angelos.net.tty import TTYServer
+from angelos.portfolio.collection import Portfolio
 
 
 class AdminsInFile(AdminAuthMixin):
@@ -50,11 +54,19 @@ class Connections(ConnectionManager, ContainerAware):
 class ServerProtocolFile(Protocol, ServerProtoMixin, AdminsInFile):
     """Packet manager that gets admins from file of public keys."""
 
-    def __init__(self, facade: Facade, conn_mgr: ConnectionManager):
-        super().__init__(facade, True, conn_mgr)
+    def __init__(self, facade: Facade, conn_mgr: ConnectionManager, emergency: Awaitable = None):
+        super().__init__(facade, True, conn_mgr, emergency=emergency)
         self._add_handler(ServiceBrokerServer(self))
         self._add_handler(AuthenticationServer(self))
 
+    def authentication_made(self, portfolio: Portfolio, login_type: bytes, node: Union[bool, Node]):
+        Protocol.authentication_made(self, portfolio, login_type, node)
+
+        if self._login is LoginTypeCode.LOGIN_ADMIN:
+            self._add_handler(TTYServer(self))
+
     def connection_made(self, transport: asyncio.Transport):
-        """Add more handlers according to authentication."""
-        ServerProtoMixin.connection_made(self, transport)
+        super().connection_made(transport)
+
+    def connection_lost(self, exc: Exception):
+        super().connection_lost(exc)

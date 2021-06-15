@@ -16,7 +16,6 @@
 """Module docstring."""
 import asyncio
 import base64
-import collections
 import errno
 import functools
 import json
@@ -24,20 +23,27 @@ import logging
 import os
 import signal
 import socket
+from argparse import ArgumentParser
 from asyncio import Task
+from collections import namedtuple, ChainMap
+from pathlib import PurePath
 from typing import Any, Coroutine
 
+from angelos.base.app import Application, Extension
+from angelos.base.ext import Quit, Signal, Arguments, Logger
 from angelos.bin.nacl import Signer
 from angelos.common.misc import Misc
 from angelos.common.utils import Event, Util
 from angelos.facade.facade import Facade
 from angelos.lib.automatic import Automatic, Platform, Runtime, Server as ServerDirs, Network
+from angelos.lib.const import Const
 from angelos.lib.ioc import Container, Config, StaticHandle, LogAware
 from angelos.lib.ssh.ssh import SessionManager
-from angelos.server.logger import Logger
+from angelos.net.base import Protocol, Packet
+from angelos.psi.keyloader import KeyLoader, KeyLoadError
+from angelos.server.logger import Logger as Logga
 from angelos.server.network import ServerProtocolFile, Connections
 from angelos.server.parser import Parser
-from angelos.server.state import StateMachine
 from angelos.server.support import ServerFacade
 from angelos.server.vars import ENV_DEFAULT, ENV_IMMUTABLE, CONFIG_DEFAULT, CONFIG_IMMUTABLE
 
@@ -213,7 +219,7 @@ class Configuration(Config, Container):
             ),
             "bootstrap": lambda self: Bootstrap(self.env, self.keys),
             "keys": lambda self: AdminKeys(self.env),
-            "log": lambda self: Logger(self.facade.secret, self.env["logs_dir"]),
+            "log": lambda self: Logga(self.facade.secret, self.env["logs_dir"]),
             "session": lambda self: SessionManager(),
             "facade": lambda self: StaticHandle(Facade),
             "opts": lambda self: Parser(),
@@ -336,3 +342,136 @@ class Server(LogAware):
         print("\n".join(Misc.recurse_env(self.ioc.env)))
         print(Util.headline("Environment (END)"))
 
+
+class BootConfigurator(Extension):
+
+    def prepare(self, *args):
+        """Boot and configure everything related to program."""
+        bootleg = namedtuple("Bootleg", self._args.default.keys())
+        config = ChainMap(self._args.default)
+
+
+class CustomArguments(Arguments):
+    """Argument parser from the command line."""
+
+    def arguments(self, parser: ArgumentParser):
+        """Custom program arguments."""
+        parser.add_argument(
+            "-l", "--listen", choices=Const.OPT_LISTEN, dest="listen", default=None,
+            help="listen to a network interface. (localhost)")
+        parser.add_argument(
+            "-p", "--port", dest="port", default=None, type=int,
+            help="listen to a network port. (22)")
+        parser.add_argument(
+            "config", nargs="?", default=False, type=bool,
+            help="Print configuration")
+        parser.add_argument(
+            "-d", "--daemon", choices=["start", "stop", "restart"], dest="daemon", default=None,
+            help="Run server as background process.")
+        parser.add_argument(
+            "--root-dir", dest="root_dir", default=None, type=PurePath,
+            help="Server root directory. (/opt/angelos)")
+        parser.add_argument(
+            "--run-dir", dest="run_dir", default=None, type=PurePath,
+            help="Runtime directory. (/run/angelos)")
+        parser.add_argument(
+            "--state-dir", dest="state_dir", default=None, type=PurePath,
+            help="Server state directory. (/var/lib/angelos)")
+        parser.add_argument(
+            "--logs-dir", dest="logs_dir", default=None, type=PurePath,
+            help="Logs directory. (/var/log/angelos)")
+        parser.add_argument(
+            "--conf-dir", dest="conf_dir", default=None,
+            help="Configuration directory. (/etc/angelos)")
+
+
+class Network(Extension):
+    """Start a client or server.
+
+    Only call from within async start.
+
+    If you want to start a client, the "client" argument must be set with a client connection class.
+    If you need to use a signer facade the "helper" argument must be a special facade for boot or admin support.
+    """
+
+    async def prepare(self, *args):
+        server_cls = self._args.get("server", None)
+        manager_cls = self._args.get("manager", None)
+        helper_cls = self._args.get("helper", None)
+
+        if helper_cls:
+            facade = helper_cls.setup(Signer(self._app.args.seed))
+        else:
+            facade = self._app.facade
+
+        server = await server_cls.listen(
+            facade, self._app.args.listen, self._app.args.port, manager_cls(self._app),
+            emergency=getattr(self._app, "emergency", None))
+        self._app |= server
+        return server
+
+
+class Keys(Extension):
+    """Key loader from hard drive."""
+
+    def _system_key(self) -> bytes:
+        KeyLoader.SYSTEM = self._args.system
+        secret = KeyLoader.new()
+        try:
+            secret = KeyLoader.get()
+        except KeyLoadError:
+            try:
+                KeyLoader.set(secret)
+            except KeyLoadError:
+                raise RuntimeError("Could not save new secret key!")
+        return secret
+
+    def prepare(self, *args):
+        pass
+
+
+class AngelosServer(Application):
+    """Angelos server entry point"""
+
+    CONFIG = {
+        "log": Logger(name="angelos"),
+        "args": CustomArguments(name="Angelos™ Server"),
+        "boot": BootConfigurator(default={
+            "public": None,
+            "admins": list(),  # Administrator public keys
+        }),
+        "keys": Keys(system="Ἄγγελος"),
+        "quit": Quit(),
+        "signal": Signal(quit=True),
+        "server": Network(server=ServerProtocolFile, manager=Connections, helper=ServerFacade)
+    }
+
+    def _initialize(self):
+        self.log
+        self.args
+        logging.debug(Util.headline("Start"))
+        self.quit
+        self.boot
+        # self.signal
+
+    def _finalize(self):
+        self.quit.set()  # Quit is set if external keyboard interruption is triggered.
+        logging.debug(Util.headline("Finish"))
+
+    async def start(self):
+        server = await self.server  # Listen happens automagically.
+        task = asyncio.create_task(server.server_forever())
+
+    async def stop(self):
+        await self.quit.wait()
+        self.server.close()
+        self._stop()
+
+    async def emergency(self, severity: object, protocol: Protocol):
+        """Emergency button for network issues."""
+        if isinstance(severity, Packet):
+            logging.error("Emergency abort of connection because of panic!")
+        elif isinstance(severity, ConnectionError):
+            logging.error("Panic, connection refused: {}".format(severity), exc_info=severity)
+
+        self.quit.set()

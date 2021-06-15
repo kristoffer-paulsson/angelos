@@ -102,8 +102,8 @@ class ServerProcess(Process):
             return
 
         self.__pid_file.put(self.pid)
-        from angelos.server.server import Server
-        server = Server()
+        from angelos.server.server import AngelosServer
+        server = AngelosServer()
         server.run()
         self.__pid_file.remove()
 
@@ -139,8 +139,8 @@ def cmd_runner(pid_file) -> int:
         return
     try:
         pid_file.put(os.getpid())
-        from angelos.server.server import Server
-        server = Server()
+        from angelos.server.server import AngelosServer
+        server = AngelosServer()
         server.run()
         pid_file.remove()
     except Exception as exc:

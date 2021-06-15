@@ -18,15 +18,15 @@ import asyncio
 import contextlib
 import datetime
 import enum
+import logging
 import random
 import uuid
 from ipaddress import IPv4Address, IPv6Address
-from typing import Tuple, Union, Any
+from typing import Tuple, Union, Any, Awaitable
 
 import msgpack
 from angelos.bin.nacl import NaCl
 from angelos.common.misc import StateMachine, SyncCallable, AsyncCallable
-from angelos.common.utils import Util
 from angelos.document.domain import Node
 from angelos.facade.facade import Facade
 from angelos.net.noise import NoiseTransportProtocol
@@ -60,7 +60,6 @@ from angelos.portfolio.collection import Portfolio
 
 EMPTY_PAYLOAD = NaCl.random_bytes(64)
 
-
 PUSH_ITEM_PACKET = 105
 RECEIVED_ITEM_PACKET = 106
 PUSH_CHUNK_PACKET = 107
@@ -87,7 +86,7 @@ DONE_PACKET = 124  # Nothing more to do in session or request
 
 UNKNOWN_PACKET = 125  # Unrecognized packet
 ERROR_PACKET = 126  # Technical error
-NULL_PACKET = 127  # Technical error
+NULL_PACKET = 127  # Synchronous filler packet
 
 
 class ConfirmCode(enum.IntEnum):
@@ -113,6 +112,15 @@ class ErrorCode(enum.IntEnum):
     UNEXPECTED = 4  # Unexpected error
 
 
+ERROR_CODE_MSG = [
+    "None",
+    "Malformed packet",
+    "Aborted processing of packet",
+    "The server or client is busy",
+    "Unexpected error"
+]
+
+
 class NetworkError(RuntimeError):
     """Unrepairable network errors. """
     NO_TRANSPORT = ("Transport layer is missing.", 100)
@@ -121,6 +129,7 @@ class NetworkError(RuntimeError):
     SESSION_TYPE_INCONSISTENCY = ("Session type inconsistent.", 103)
     ATTEMPTED_ATTACK = ("Attempted attack with error/unknown packets.", 104)
     FALSE_CHECK_METHOD = ("State checker not set or of wrong type.", 105)
+    NO_PANIC_CORO = ("Panic happened but no emergency button fixed!", 106)
 
 
 class GotoStateError(RuntimeWarning):
@@ -129,10 +138,6 @@ class GotoStateError(RuntimeWarning):
 
 class NotAuthenticated(RuntimeWarning):
     """When there is not authenticated portfolio."""
-
-
-class ConnectionClosed(RuntimeWarning):
-    """When connection unexpectedly closed."""
 
 
 class ProtocolNegotiationError(RuntimeWarning):
@@ -278,12 +283,12 @@ class Packet:
 
 
 class EnquiryPacket(Packet, fields=("state", "type", "session"),
-                 fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
+                    fields_info=((DataType.UINT,), (DataType.UINT,), (DataType.UINT,))):
     """Enquire the fact of a state. From client to server."""
 
 
 class ResponsePacket(Packet, fields=("state", "value", "type", "session"),
-                 fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 1024), (DataType.UINT,), (DataType.UINT,))):
+                     fields_info=((DataType.UINT,), (DataType.BYTES_VAR, 1, 1024), (DataType.UINT,), (DataType.UINT,))):
     """Respond fact of state enquiry. From server to client."""
 
 
@@ -675,7 +680,6 @@ class ChunkError(RuntimeWarning):
 
 
 class NetworkIterator(NetworkSession):
-
     ST_COUNT = 0x01
 
     def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict):
@@ -714,7 +718,8 @@ class NetworkIterator(NetworkSession):
 
 
 class PullIterator(NetworkIterator):
-    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
+    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict, count: int = 0,
+                 check: SyncCallable = None):
         NetworkIterator.__init__(self, handler, server, type, id, {
             **states,
             self.ST_COUNT: (StateMode.FACT, count.to_bytes(4, byteorder="big", signed=False) if count else b"!", check)
@@ -722,7 +727,8 @@ class PullIterator(NetworkIterator):
 
 
 class PushIterator(NetworkIterator):
-    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict, count: int = 0, check: SyncCallable = None):
+    def __init__(self, handler: "Handler", server: bool, type: int, id: int, states: dict, count: int = 0,
+                 check: SyncCallable = None):
         NetworkIterator.__init__(self, handler, server, type, id, {
             **states,
             self.ST_COUNT: (StateMode.ONCE, count.to_bytes(4, byteorder="big", signed=False) if count else b"!", check)
@@ -756,6 +762,8 @@ class PushChunkIterator(PushIterator):
 class Handler:
     """Base handler of protocol source of services."""
 
+    logger = logging.getLogger("net.handler")
+
     LEVEL = 0
     RANGE = 0
 
@@ -783,7 +791,8 @@ class Handler:
     PKT_ERROR = ERROR_PACKET
     PKT_NULL = NULL_PACKET
 
-    def __init__(self, manager: "Protocol", states: dict = dict(), sessions: dict = dict(), max_sesh: int = 0):
+    def __init__(
+        self, manager: "Protocol", states: dict = dict(), sessions: dict = dict(), max_sesh: int = 0):
         self._queue = asyncio.Queue()
         self._r_start = r(self.RANGE)[0]
         self._pkt_type = None
@@ -840,7 +849,7 @@ class Handler:
             self.PKT_STOP_ITER: "process_stopiter",
             self.PKT_UNKNOWN: "process_unknown",
             self.PKT_ERROR: "process_error",
-            self.PKT_NULL: "process_null" # if server else None,
+            self.PKT_NULL: "process_null"  # if server else None,
         }
 
         self._processor = asyncio.create_task(self.packet_handler())
@@ -896,7 +905,8 @@ class Handler:
 
                 pkt_cls = self._pkgs[self._pkt_type]
                 proc_name = self._procs[self._pkt_type]
-                # print("HANDLE", "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name)
+                self.logger.debug("{} HANDLED {} {}".format(
+                    "Server" if self._manager.is_server() else "Client", self._pkt_type, proc_name))
 
                 if proc_name in ("process_unknown", "process_error"):
                     self._silent = True  # Don't send error or unknown response packet.
@@ -904,13 +914,13 @@ class Handler:
                 proc_func = getattr(self, proc_name)
                 await proc_func(pkt_cls.unpack(data))
             except (KeyError, AttributeError) as exc:
-                Util.print_exception(exc)
+                self.logger.exception(exc)
                 self._manager.unknown(self._pkt_type + self._r_start, self.LEVEL)
             except (ValueError, TypeError) as exc:
-                Util.print_exception(exc)
+                self.logger.exception(exc)
                 self._manager.error(ErrorCode.MALFORMED, self._pkt_type + self._r_start, self.LEVEL)
             except Exception as exc:
-                Util.print_exception(exc)
+                self.logger.exception(exc)
                 if not self._silent:
                     self._manager.error(ErrorCode.UNEXPECTED, self._pkt_type + self._r_start, self.LEVEL)
             finally:
@@ -984,7 +994,8 @@ class Handler:
         """
         machine = sesh.states[state] if sesh else self._states[state]
         with machine.us():
-            await self._package(self.PKT_ENQUIRY, EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
+            await self._package(self.PKT_ENQUIRY,
+                                EnquiryPacket(state, sesh.type if sesh else 0, sesh.id if sesh else 0))
             return await machine.wait()
 
     async def _sesh_open(self, type: int, **kwargs) -> NetworkSession:
@@ -1465,11 +1476,14 @@ class Handler:
                 True, EMPTY_PAYLOAD[:random.randrange(1, 64)], packet.type, packet.session))
 
 
-
 class Protocol(asyncio.Protocol):
     """Protocol for handling packages going from and to packet handlers."""
 
-    def __init__(self, facade: Facade, server: bool = False, conn_mgr: "ConnectionManager" = None):
+    logger = logging.getLogger("net.protocol")
+
+    def __init__(
+            self, facade: Facade, server: bool = False,
+            conn_mgr: "ConnectionManager" = None, emergency: Awaitable = None):
         self._server = server
         self._handlers = dict()
         self._ranges_available = set()
@@ -1478,7 +1492,10 @@ class Protocol(asyncio.Protocol):
         self._conn_mgr = conn_mgr
         self._transport = None
         self._portfolio = None
+        self._login = None
         self._node = None
+
+        self._emergency = emergency
 
         self._trans_fut = asyncio.get_event_loop().create_future()
 
@@ -1486,6 +1503,11 @@ class Protocol(asyncio.Protocol):
     def facade(self) -> Facade:
         """Expose the facade."""
         return self._facade
+
+    @property
+    def transport(self) -> asyncio.Transport:
+        """Expose underlying transport."""
+        return self._transport
 
     @property
     def portfolio(self) -> Portfolio:
@@ -1498,6 +1520,13 @@ class Protocol(asyncio.Protocol):
     def conn_mgr(self) -> "ConnectionManager":
         """Expose the connection manager."""
         return self._conn_mgr
+
+    def panic(self, severity: object):
+        """Handlers can trigger panic if something goes seriously wrong."""
+        if not self._emergency:
+            raise NetworkError(*NetworkError.NO_PANIC_CORO)
+        self.logger.error("Panic happened.")
+        asyncio.run_coroutine_threadsafe(self._emergency(severity, self), asyncio.get_running_loop())
 
     async def ready(self):
         """Wait for the underlying transport to be ready."""
@@ -1520,20 +1549,30 @@ class Protocol(asyncio.Protocol):
         self._ranges_available.add(service.RANGE)
         self._ranges[service.RANGE] = service
 
-    def authentication_made(self, portfolio: Portfolio, node: Union[bool, Node]):
+    def authentication_made(self, portfolio: Portfolio, login_type: bytes, node: Union[bool, Node]):
         """Indicate that authentication has taken place. Never call from outside, internal use only."""
         self._portfolio = portfolio
+        self._login = login_type
         self._node = node
+
+    def authorization_made(self):
+        """Indicate that authorization has been made after authentication.
+        This is called from the server only. Leave empty."""
+        pass
 
     def connection_made(self, transport: asyncio.Transport):
         """Connection is made."""
         self._transport = transport
         self._trans_fut.set_result(True)
 
-    def check(self):
-        """Raise exception if connection is closed."""
-        if self._transport.is_closing():
-            raise ConnectionClosed()
+    def connection_lost(self, exc: Exception):
+        """Clean up."""
+        self._cleanup()
+
+        if exc:
+            self.panic(exc)
+        else:
+            self.panic(True)
 
     def data_received(self, data: bytes):
         """Data received."""
@@ -1549,15 +1588,15 @@ class Protocol(asyncio.Protocol):
                 pkt_length = int.from_bytes(meta[2:5], "big")
                 pkt_level = int(meta[5])
 
-                chunk = data[0:(pkt_length-6)]
-                data = data[(pkt_length-6):]
+                chunk = data[0:(pkt_length - 6)]
+                data = data[(pkt_length - 6):]
 
                 pkt_range = ri(pkt_type)
                 handler = self._ranges[pkt_range]
             except KeyError as exc:
                 low = r(pkt_range)[0]
                 if pkt_type == low + UNKNOWN_PACKET or pkt_type == low + ERROR_PACKET:
-                    Util.print_exception(exc)  # Attempted attack
+                    self.logger.critical("Attempted attack: error package infinite loop.")  # Attempted attack
                     raise NetworkError(*NetworkError.ATTEMPTED_ATTACK)
                 else:
                     self.unknown(pkt_type, pkt_level)
@@ -1569,15 +1608,19 @@ class Protocol(asyncio.Protocol):
                 else:
                     handler.queue.put_nowait((pkt_type, chunk))
 
+    def eof_received(self) -> bool:
+        """Information of other side wanting to close."""
+        self._cleanup()
+        return False
+
     async def send_packet(self, pkt_type: int, pkt_level: int, packet: Packet):
         """Send packet over socket."""
         if not self._transport:
             raise NetworkError(*NetworkError.NO_TRANSPORT)
 
-        self.check()
         await self._transport.wait()
 
-        # print("SEND", "Server" if self.is_server() else "Client", pkt_type, packet)
+        self.logger.debug("{} SENT {} {}".format("Server" if self.is_server() else "Client", pkt_type, packet))
 
         data = bytes(packet)
         self._transport.write(
@@ -1608,10 +1651,9 @@ class Protocol(asyncio.Protocol):
             ErrorPacket(pkt_type, pkt_level, process, error)
         )
 
-    def close(self):
-        if not self._transport.is_closing():
-            self._transport.close()
-            for handler in self._ranges.values():
+    def _cleanup(self):
+        for handler in self._ranges.values():
+            if not handler.processor.done():
                 handler.queue.put_nowait(None)
 
 
@@ -1620,15 +1662,15 @@ class ClientProtoMixin:
 
     def connection_lost(self, exc: Exception):
         """Clean up."""
-        if exc:
-            Util.print_exception(exc)
         self.close()
 
     @classmethod
-    async def connect(cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int, key: bytes = None) -> "Protocol":
+    async def connect(
+            cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address], port: int,
+            emergency: Awaitable = None, key: bytes = None) -> "Protocol":
         """Connect to server."""
-        _, protocol = await asyncio.get_running_loop().create_connection(
-            lambda: NoiseTransportProtocol(cls(facade), server=False, key=key), str(host), port)
+        a, protocol = await asyncio.get_running_loop().create_connection(
+            lambda: NoiseTransportProtocol(cls(facade, emergency=emergency), server=False, key=key), str(host), port)
         return protocol.get_protocol()
 
 
@@ -1640,27 +1682,26 @@ class ServerProtoMixin:
         if self.conn_mgr:
             self.conn_mgr.remove(self)
 
+    def connection_made(self, transport: asyncio.Transport):
+        """Connection is made."""
+        if self._conn_mgr:
+            self._conn_mgr.add(self)
+
     def connection_lost(self, exc: Exception):
         """Clean up."""
         if self.conn_mgr:
             self.conn_mgr.remove(self)
         self.close()
-        Util.print_exception(exc)
-
-    def connection_made(self, transport: asyncio.Transport):
-        """Add serving protocol to local dict and set."""
-        Protocol.connection_made(self, transport)
-        if self.conn_mgr:
-            self.conn_mgr.add(self)
 
     @classmethod
     async def listen(
             cls, facade: Facade, host: Union[str, IPv4Address, IPv6Address],
-            port: int, connections: "ConnectionManager" = None, key: bytes = None
+            port: int, connections: "ConnectionManager" = None, emergency: Awaitable = None, key: bytes = None
     ) -> asyncio.base_events.Server:
         """Start a listening server."""
         return await asyncio.get_running_loop().create_server(
-            lambda: NoiseTransportProtocol(cls(facade, connections), server=True, key=key), host, port)
+            lambda: NoiseTransportProtocol(
+                cls(facade, connections, emergency=emergency), server=True, key=key), host, port)
 
 
 class ConnectionManager:

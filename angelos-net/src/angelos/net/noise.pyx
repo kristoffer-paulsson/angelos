@@ -15,7 +15,9 @@
 #
 """Implementation of intermediary transport and the standard noise protocol for Angelos."""
 import asyncio
+import logging
 import os
+from asyncio import CancelledError
 from asyncio.protocols import Protocol
 from asyncio.transports import Transport
 from typing import Any, Union, Callable
@@ -397,7 +399,6 @@ class IntermediateTransportProtocol(Transport, Protocol):
 
         def done(fut):
             fut.result()
-            # self._transport.close(self)
             self._transport.close()
 
         self._task_close = asyncio.create_task(self._on_close())
@@ -477,6 +478,11 @@ class IntermediateTransportProtocol(Transport, Protocol):
         self._on_lost()
         self._protocol.connection_lost(exc)
 
+        if self._task_conn:
+            self._task_conn.cancel()
+        if self._task_close:
+            self._task_close.cancel()
+
     def pause_writing(self) -> None:
         """Passthroughs to overlying protocol."""
         self._protocol.pause_writing()
@@ -497,10 +503,10 @@ class IntermediateTransportProtocol(Transport, Protocol):
         if self._mode is not self.PASSTHROUGH:
             self._read.set_result(data)
 
-    def eof_received(self) -> None:
+    def eof_received(self) -> bool:
         """Eof is interrupted and can be managed before forwarding to overlaying protocol."""
         self._on_eof()
-        self._protocol.eof_received()
+        return self._protocol.eof_received()
 
 
 class NoiseTransportProtocol(IntermediateTransportProtocol):
@@ -513,15 +519,18 @@ class NoiseTransportProtocol(IntermediateTransportProtocol):
         self._event.set()
         self._server = server
 
-    async def _on_connection(self) -> None:
+    async def _on_connection(self):
         """Perform noise protocol handshake before telling application protocol connection_made()."""
-        self._set_mode(IntermediateTransportProtocol.DIVERT)
-        await self._noise.start_handshake(self._transport.write, self._reader)
-        self._set_mode(IntermediateTransportProtocol.PASSTHROUGH)
+        try:
+            self._set_mode(IntermediateTransportProtocol.DIVERT)
+            await self._noise.start_handshake(self._transport.write, self._reader)
+            self._set_mode(IntermediateTransportProtocol.PASSTHROUGH)
+        except CancelledError:
+            pass
 
-    async def _on_close(self) -> None:
-        """Clean up protocol."""
-        self._protocol.close()
+    # async def _on_close(self) -> None:
+    #    """Clean up protocol."""
+    #    self._protocol.close()
 
     def _on_write(self, data: Union[bytes, bytearray, memoryview]) -> Union[bytes, bytearray, memoryview]:
         """Encrypt outgoing data with Noise."""

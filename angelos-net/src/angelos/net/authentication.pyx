@@ -29,7 +29,7 @@ from angelos.facade.storage.portfolio_mixin import PortfolioNotFound
 from angelos.lib.const import Const
 from angelos.lib.policy.crypto import Crypto
 from angelos.net.base import NetworkError, Handler, ConfirmCode, StateMode, ProtocolNegotiationError, NetworkSession, \
-    Protocol
+    Protocol, UnknownPacket, ErrorPacket, ERROR_CODE_MSG
 from angelos.portfolio.collection import Portfolio
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio, PersonData
 from angelos.portfolio.utils import Groups
@@ -148,7 +148,7 @@ class AuthenticationClient(AuthenticationHandler):
 
             Verifier(keys.verify).verify(
                 self._states[self.ST_CLIENT_SIGNATURE].value + self._states[self.ST_CLIENT_SPECIMEN].value)
-            self._manager.authentication_made(portfolio, node)
+            self._manager.authentication_made(portfolio, self._states[self.ST_LOGIN].value, node)
             return True
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure) as exc:
             Util.print_exception(exc)
@@ -207,6 +207,23 @@ class AuthenticationClient(AuthenticationHandler):
         self._states[self.ST_LOGIN].update(LoginTypeCode.LOGIN_ADMIN)
         return await self._login()
 
+    async def process_unknown(self, packet: UnknownPacket):
+        """Handle an unknown packet response from server."""
+        self.logger.warning("Server side of {} protocol doesn't know {}".format(
+            self._states[self.ST_VERSION].value.decode(),
+            str(packet)
+        ))
+        self._manager.panic(UnknownPacket)
+
+    async def process_error(self, packet: ErrorPacket):
+        """Handle an error packet response from server."""
+        self.logger.warning("Server side of {0} protocol had the error \"{1}\": {2}".format(
+            self._states[self.ST_VERSION].value.decode(),
+            ERROR_CODE_MSG[min(4, max(0, packet.error))],
+            str(packet)
+        ))
+        self._manager.panic(ErrorPacket)
+
 
 class AuthenticationServer(AuthenticationHandler):
 
@@ -242,7 +259,7 @@ class AuthenticationServer(AuthenticationHandler):
                 keys, portfolio, node = await self._admin_auth(identity)
 
             Verifier(keys.verify).verify(value + self._states[self.ST_SERVER_SPECIMEN].value)
-            self._manager.authentication_made(portfolio, node)
+            self._manager.authentication_made(portfolio, self._states[self.ST_LOGIN].value, node)
         except (ValueError, IndexError, PortfolioNotFound, CryptoFailure, NetworkError) as exc:
             Util.print_exception(exc)
             asyncio.get_event_loop().call_soon(self._manager.close)
