@@ -21,12 +21,14 @@ import functools
 import json
 import logging
 import os
+import platform
 import signal
 import socket
+import sys
 from argparse import ArgumentParser
 from asyncio import Task
 from collections import namedtuple, ChainMap
-from pathlib import PurePath
+from pathlib import PurePath, Path
 from typing import Any, Coroutine
 
 from angelos.base.app import Application, Extension
@@ -62,7 +64,7 @@ class Auto(Automatic, Platform, Runtime, ServerDirs, Network):
 class AdminKeys:
     """Load and list admin keys."""
 
-    def __init__(self, env: collections.ChainMap):
+    def __init__(self, env: ChainMap):
         self.__path_admin = os.path.join(str(env["state_dir"]), "admins.pub")
         self.__path_server = os.path.join(str(env["state_dir"]), "server")
         self.__key_list = None
@@ -103,7 +105,7 @@ class AdminKeys:
 
 class Bootstrap:
     """Bootstraps the server checks that all criteria match."""
-    def __init__(self, env: collections.ChainMap, keys: AdminKeys):
+    def __init__(self, env: ChainMap, keys: AdminKeys):
         self.__critical = False
         self.__env = env
         self.__keys = keys
@@ -205,14 +207,14 @@ class Configuration(Config, Container):
 
     def __config(self):
         return {
-            "env": lambda self: collections.ChainMap(
+            "env": lambda self: ChainMap(
                 ENV_IMMUTABLE,
                 {key: value for key, value in vars(self.opts).items() if value},
                 self.__load("env.json"),
                 vars(self.auto),
                 ENV_DEFAULT,
             ),
-            "config": lambda self: collections.ChainMap(
+            "config": lambda self: ChainMap(
                 CONFIG_IMMUTABLE,
                 self.__load("config.json"),
                 CONFIG_DEFAULT
@@ -345,10 +347,177 @@ class Server(LogAware):
 
 class BootConfigurator(Extension):
 
+    def criteria_state(self, config: ChainMap):
+        """Check that the root folder exists."""
+        state_dir = config.get("state_dir", "")
+
+        if not os.path.isdir(state_dir):
+            logging.info("No state directory. ({})".format(state_dir))
+            return True
+
+        if not os.access(state_dir, os.W_OK):
+            logging.info("State directory not writable. ({})".format(state_dir))
+            return True
+
+    def criteria_conf(self, config: ChainMap):
+        """Check that the root folder exists."""
+        conf_dir = config.get("conf_dir", "")
+
+        if not os.path.isdir(conf_dir):
+            logging.info("No configuration directory. ({})".format(conf_dir))
+            return True
+
+        if not os.access(conf_dir, os.W_OK):
+            logging.info("Configuration directory not writable. ({})".format(conf_dir))
+            return True
+
+    def criteria_admin_keys(self, config: ChainMap):
+        """Check that there are keys for admin."""
+        admins = config.get("admins", list())
+
+        if not(len(admins)):
+            logging.info("No admin public keys.")
+            return True
+
+    def criteria_public_key(self, config: ChainMap):
+        """Check that """
+        public = config.get("public", None)
+
+        if not public:
+            logging.info("No server public key.")
+            return True
+
+    def criteria_port_access(self, config: ChainMap):
+        """Try to listen to designated port."""
+        failure = False
+        port = config.get("port", 0)
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("127.0.0.1", port))
+            s.listen(1)
+            s.close()
+        except PermissionError:
+            logging.info("Permission denied to use port {}.".format(port))
+            failure = True
+        except socket.error as e:
+            if e.errno == errno.EADDRINUSE:
+                logging.info("Address with port {} already in use.".format(port))
+                failure = True
+        else:
+            s.close()
+
+        return failure
+
+    def args(self) -> dict:
+        try:
+            return {key: value for key, value in vars(self._app.args).items() if value is not None}
+        except NameError:
+            return dict()
+
     def prepare(self, *args):
         """Boot and configure everything related to program."""
-        bootleg = namedtuple("Bootleg", self._args.default.keys())
-        config = ChainMap(self._args.default)
+        default = self._args.get("default", dict())
+        keys = set(default.keys())
+        bootleg = namedtuple("Bootleg", keys)
+
+        config = ChainMap(default)
+        config.maps.insert(0, self._app.sys)  # Platform information
+        config.maps.insert(0, self._app.dirs)  # Automatic directories
+        config.maps.insert(0, self.args())  # Program CLI arguments
+
+        if any([
+            self.criteria_state(config),
+            self.criteria_conf(config),
+            self.criteria_admin_keys(config),
+            self.criteria_public_key(config),
+            self.criteria_port_access(config)
+        ]):
+            pass
+
+        return bootleg(**{key: value for key, value in config.items() if key in keys})
+
+
+class System(Extension):
+    """Collect information about the system."""
+
+    def prepare(self, *args):
+        """Map all system, platform and network properties."""
+        hostname = socket.gethostname()
+        system, node, _, _, machine, processor = platform.uname()
+        return {
+            "hostname": hostname.lower(),
+            "ip": Misc.ip()[0],
+            "domain": socket.getfqdn(),
+            "user": os.environ["USER"],
+            "pid": os.getpid(),
+            "ppid": os.getppid(),
+            "cpus": os.cpu_count(),
+            "platform": sys.platform,
+            "id": Misc.unique(),
+            "system": system,
+            "node": node,
+            "machine": machine,
+            "processor": processor,
+        }
+
+
+class Runtime(Extension):
+    """Decide program folders."""
+
+    def prepare(self, *args):
+        desktop = self._args.get("desktop", True)
+        name = self._args.get("name", None)
+        user = self._app.sys.get("user", "Unknown")
+        if sys.platform.startswith("darwin"):
+            app = name.capitalize()
+            if desktop:
+                root_dir = Path("/")
+                run_dir = None
+                state_dir = Path("~/Library/Application Support/{app}".format(app=app)).home()
+                logs_dir = Path("~/Library/Logs/{app}".format(app=app)).home()
+                conf_dir = Path("~/Library/Caches/{app}".format(app=app)).home()
+            else:
+                root_dir = Path("/")
+                run_dir = None
+                state_dir = Path("/Library/Application Support/{app}".format(app=app))
+                logs_dir = Path("/Library/Application Support/{app}/Logs".format(app=app))
+                conf_dir = Path("/Library/Application Support/{app}".format(app=app))
+        elif sys.platform.startswith("win32"):
+            app = name.capitalize()
+            if desktop:
+                root_dir = Path("C:/")
+                run_dir = None
+                state_dir = Path("C:/Users/{user}/AppData/Local/{author}/{app}".format(user=user, app=app, author=app))
+                logs_dir = Path("C:/Users/{user}/AppData/Local/{author}/{app}/Logs".format(user=user, app=app, author=app))
+                conf_dir = Path("C:/Users/{user}/AppData/Local/{author}/{app}".format(user=user, app=app, author=app))
+            else:
+                root_dir = Path("C:/")
+                run_dir = None
+                state_dir = Path("C:/ProgramData/{author}/{app}".format(app=app, author=app))
+                logs_dir = Path("C:/ProgramData/{author}/{app}/Logs".format(app=app, author=app))
+                conf_dir = Path("C:/ProgramData/{author}/{app}".format(app=app, author=app))
+        else:
+            app = name.lower()
+            if desktop:
+                root_dir = Path("/")
+                run_dir = Path(os.environ["XDG_RUNTIME_DIR"]).home()
+                state_dir = Path(os.environ["XDG_STATE_HOME"] or "~/.local/state/{app}".format(app=app)).home()
+                logs_dir = Path(os.environ["XDG_CACHE_HOME"] or "~/.cache/{app}/log".format(app=app)).home()
+                conf_dir = Path(os.environ["XDG_CONFIG_HOME"] or "~/.config/{app}".format(app=app)).home()
+            else:
+                root_dir = Path("/")
+                run_dir = Path("/run/{app}".format(app=app))
+                state_dir = Path("/var/lib/{app}".format(app=app))
+                logs_dir = Path("/var/log/{app}".format(app=app))
+                conf_dir = Path("/etc/{app}".format(app=app))
+
+        return {
+            "root_dir": root_dir,
+            "run_dir": run_dir,
+            "state_dir": state_dir,
+            "logs_dir": logs_dir,
+            "conf_dir": conf_dir,
+        }
 
 
 class CustomArguments(Arguments):
@@ -420,10 +589,7 @@ class Keys(Extension):
         try:
             secret = KeyLoader.get()
         except KeyLoadError:
-            try:
-                KeyLoader.set(secret)
-            except KeyLoadError:
-                raise RuntimeError("Could not save new secret key!")
+            KeyLoader.set(secret)
         return secret
 
     def prepare(self, *args):
@@ -436,11 +602,34 @@ class AngelosServer(Application):
     CONFIG = {
         "log": Logger(name="angelos"),
         "args": CustomArguments(name="Angelos™ Server"),
-        "boot": BootConfigurator(default={
+        "env": BootConfigurator(default={
             "public": None,
             "admins": list(),  # Administrator public keys
+            "prompt": "Angelos 0.1dX > ",
+            "terminal": "Ἄγγελος safe messaging server",
+            "listen": "localhost",
+            "port": 443,
+            "root_dir": None,
+            "run_dir": None,
+            "state_dir": None,
+            "logs_dir": None,
+            "conf_dir": None,
+            "hostname": None,
+            "domain": None,
+            "ip": None,
+            "user": None,
+            "cpus": None,
+            "platform": None,
+            "id": None,
+            "node": None,
+            "release": None,
+            "version": None,
+            "machine": None,
+            "processor": None,
         }),
         "keys": Keys(system="Ἄγγελος"),
+        "sys": System(),
+        "dirs": Runtime(name="angelos", desktop=False),
         "quit": Quit(),
         "signal": Signal(quit=True),
         "server": Network(server=ServerProtocolFile, manager=Connections, helper=ServerFacade)
@@ -448,11 +637,16 @@ class AngelosServer(Application):
 
     def _initialize(self):
         self.log
-        self.args
         logging.debug(Util.headline("Start"))
+        self.args
         self.quit
-        self.boot
+        self.env
         # self.signal
+        if self.args.config:
+            print(Util.headline("Environment (BEGIN)"))
+            print("\n".join(Misc.recurse_env(self.env._asdict())))
+            print(Util.headline("Environment (END)"))
+            exit(1)
 
     def _finalize(self):
         self.quit.set()  # Quit is set if external keyboard interruption is triggered.

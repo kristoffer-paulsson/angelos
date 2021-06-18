@@ -94,6 +94,12 @@ class Application(ContainerMixin):
 
     def __init__(self):
         ContainerMixin.__init__(self)
+        self._return_code = 0
+
+    @property
+    def return_code(self) -> int:
+        """Application return code."""
+        return self._return_code
 
     def _stop(self):
         asyncio.get_event_loop().stop()
@@ -108,11 +114,13 @@ class Application(ContainerMixin):
         except KeyboardInterrupt:
             logging.info("Exiting because of unknown reason.")
         except RuntimeError as exc:
+            self._return_code = 3
             logging.critical("Critical runtime error, CRASHED!", exc_info=exc)
         finally:
             loop.run_until_complete(loop.shutdown_asyncgens())
             loop.close()
         self._finalize()
+        return self._return_code
 
     async def start(self):
         """Initialize and start main program sequence."""

@@ -104,10 +104,10 @@ class ServerProcess(Process):
         self.__pid_file.put(self.pid)
         from angelos.server.server import AngelosServer
         server = AngelosServer()
-        server.run()
+        code = server.run()
         self.__pid_file.remove()
 
-        exit(server.return_code)
+        exit(code)
 
 
 def cmd_start(pid_file):
@@ -133,6 +133,7 @@ def cmd_stop(pid_file):
 
 def cmd_runner(pid_file) -> int:
     """Angelos foreground server process."""
+    code = 0
     if pid_file.running:
         print("Angelos is already running with pid {}, pid-file {}.".format(
             pid_file.pid, pid_file.file))
@@ -141,14 +142,14 @@ def cmd_runner(pid_file) -> int:
         pid_file.put(os.getpid())
         from angelos.server.server import AngelosServer
         server = AngelosServer()
-        server.run()
+        code = server.run()
         pid_file.remove()
     except Exception as exc:
         print("Critical error. ({})".format(exc))
         traceback.print_exception(type(exc), exc, exc.__traceback__)
         pid_file.remove()
 
-    return server.return_code
+    return code
 
 def start() -> int:
     """Start server application."""
