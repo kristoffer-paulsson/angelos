@@ -43,6 +43,7 @@ from angelos.lib.ioc import Container, Config, StaticHandle, LogAware
 from angelos.lib.ssh.ssh import SessionManager
 from angelos.net.base import Protocol, Packet
 from angelos.psi.keyloader import KeyLoader, KeyLoadError
+from angelos.psi.unique import UniqueIdentifier
 from angelos.server.logger import Logger as Logga
 from angelos.server.network import ServerProtocolFile, Connections
 from angelos.server.parser import Parser
@@ -453,7 +454,7 @@ class System(Extension):
             "ppid": os.getppid(),
             "cpus": os.cpu_count(),
             "platform": sys.platform,
-            "id": Misc.unique(),
+            "id": UniqueIdentifier.get(),
             "system": system,
             "node": node,
             "machine": machine,
@@ -468,42 +469,51 @@ class Runtime(Extension):
         desktop = self._args.get("desktop", True)
         name = self._args.get("name", None)
         user = self._app.sys.get("user", "Unknown")
+
         if sys.platform.startswith("darwin"):
             app = name.capitalize()
+
             if desktop:
                 root_dir = Path("/")
                 run_dir = None
                 state_dir = Path("~/Library/Application Support/{app}".format(app=app)).home()
                 logs_dir = Path("~/Library/Logs/{app}".format(app=app)).home()
                 conf_dir = Path("~/Library/Caches/{app}".format(app=app)).home()
+
             else:
                 root_dir = Path("/")
                 run_dir = None
                 state_dir = Path("/Library/Application Support/{app}".format(app=app))
                 logs_dir = Path("/Library/Application Support/{app}/Logs".format(app=app))
                 conf_dir = Path("/Library/Application Support/{app}".format(app=app))
+
         elif sys.platform.startswith("win32"):
             app = name.capitalize()
+
             if desktop:
                 root_dir = Path("C:/")
                 run_dir = None
                 state_dir = Path("C:/Users/{user}/AppData/Local/{author}/{app}".format(user=user, app=app, author=app))
                 logs_dir = Path("C:/Users/{user}/AppData/Local/{author}/{app}/Logs".format(user=user, app=app, author=app))
                 conf_dir = Path("C:/Users/{user}/AppData/Local/{author}/{app}".format(user=user, app=app, author=app))
+
             else:
                 root_dir = Path("C:/")
                 run_dir = None
                 state_dir = Path("C:/ProgramData/{author}/{app}".format(app=app, author=app))
                 logs_dir = Path("C:/ProgramData/{author}/{app}/Logs".format(app=app, author=app))
                 conf_dir = Path("C:/ProgramData/{author}/{app}".format(app=app, author=app))
+
         else:
             app = name.lower()
+
             if desktop:
                 root_dir = Path("/")
                 run_dir = Path(os.environ["XDG_RUNTIME_DIR"]).home()
                 state_dir = Path(os.environ["XDG_STATE_HOME"] or "~/.local/state/{app}".format(app=app)).home()
                 logs_dir = Path(os.environ["XDG_CACHE_HOME"] or "~/.cache/{app}/log".format(app=app)).home()
                 conf_dir = Path(os.environ["XDG_CONFIG_HOME"] or "~/.config/{app}".format(app=app)).home()
+
             else:
                 root_dir = Path("/")
                 run_dir = Path("/run/{app}".format(app=app))

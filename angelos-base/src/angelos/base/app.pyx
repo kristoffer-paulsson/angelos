@@ -69,6 +69,7 @@ class Extension(Module):
 
     def __call__(self, app: "Application", *args):
         self._app = app
+        print("Prepace", self.__class__.__name__)
         return self.prepare(*args)
 
     def prepare(self, *args):
