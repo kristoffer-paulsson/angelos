@@ -16,6 +16,7 @@
 """Multiplatform key loader mechanism."""
 import base64
 import sys
+import os
 from abc import ABC, abstractmethod
 
 from angelos.bin.nacl import SecretBox
@@ -154,6 +155,40 @@ elif sys.platform.startswith("win32"):
                 Type=win32cred.CRED_TYPE_GENERIC,
                 TargetName=cls.COMPOUND.format(username=getpass.getuser(), service=name)
             )
+
+elif "gnome" in os.environ.get("GDMSESSION", ""):
+
+    from subprocess import Popen, PIPE
+
+
+    class KeyLoader(BaseKeyLoader):
+        """Keyloader for the keychain in Linux/GNOME."""
+
+        @classmethod
+        def _get_key(cls, realm: str, name: str) -> bytes:
+            with Popen("secret-tool lookup password \"{n}\"".format(n=name), shell=True, stdout=PIPE) as proc:
+                if proc.returncode:
+                    raise KeyLoadError(
+                        "Get key '{}' failed: {}".format(name, proc.returncode))
+                else:
+                    return proc.stdout.read()
+
+        @classmethod
+        def _set_key(cls, realm: str, name: str, key: bytes):
+            with Popen("secret-tool store --label=\"{r} {n}\" password \"{n}\"".format(
+                    r=cls.SYSTEM, n=name), shell=True, stdout=PIPE, stdin=PIPE) as proc:
+                # proc.stdin.write(key)
+                proc.communicate(key, 2)
+                if proc.returncode:
+                    raise KeyLoadError(
+                        "Set key '{}' failed: {}".format(name, proc.returncode))
+
+        @classmethod
+        def _del_key(cls, realm: str, name: str) -> bytes:
+            with Popen("secret-tool clear password \"{n}\"".format(n=name), shell=True) as proc:
+                if proc.returncode:
+                    raise KeyLoadError(
+                        "Delete key '{}' failed: {}".format(name, proc.returncode))
 
 else:
 

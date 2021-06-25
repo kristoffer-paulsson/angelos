@@ -31,9 +31,9 @@ from collections import namedtuple, ChainMap
 from pathlib import PurePath, Path
 from typing import Any, Coroutine
 
-from angelos.base.app import Application, Extension
+from angelos.base.app import Application, Extension, Configurator
 from angelos.base.ext import Quit, Signal, Arguments, Logger
-from angelos.bin.nacl import Signer
+from angelos.bin.nacl import Signer, CryptoFailure, NaClError
 from angelos.common.misc import Misc
 from angelos.common.utils import Event, Util
 from angelos.facade.facade import Facade
@@ -346,7 +346,7 @@ class Server(LogAware):
         print(Util.headline("Environment (END)"))
 
 
-class BootConfigurator(Extension):
+class BootConfigurator(Configurator):
 
     def criteria_state(self, config: ChainMap):
         """Check that the root folder exists."""
@@ -381,10 +381,10 @@ class BootConfigurator(Extension):
             return True
 
     def criteria_public_key(self, config: ChainMap):
-        """Check that """
-        public = config.get("public", None)
+        """Check that the server has a public key generated"""
+        seed = config.get("seed", None)
 
-        if not public:
+        if not seed:
             logging.info("No server public key.")
             return True
 
@@ -415,16 +415,22 @@ class BootConfigurator(Extension):
         except NameError:
             return dict()
 
-    def prepare(self, *args):
+    def _map(self, default: dict) -> ChainMap:
+        config = ChainMap(default)
+        config.maps.insert(0, self._app.sys)  # Platform information
+        config.maps.insert(0, self._app.dirs)  # Automatic directories
+        config.maps.insert(0, self._app.keys)  # Loaded keys
+        config.maps.insert(0, self.args())  # Program CLI arguments
+
+        return config
+
+    def _execute(self, *args):
         """Boot and configure everything related to program."""
         default = self._args.get("default", dict())
         keys = set(default.keys())
         bootleg = namedtuple("Bootleg", keys)
 
-        config = ChainMap(default)
-        config.maps.insert(0, self._app.sys)  # Platform information
-        config.maps.insert(0, self._app.dirs)  # Automatic directories
-        config.maps.insert(0, self.args())  # Program CLI arguments
+        config = self._map(default)
 
         if any([
             self.criteria_state(config),
@@ -433,9 +439,19 @@ class BootConfigurator(Extension):
             self.criteria_public_key(config),
             self.criteria_port_access(config)
         ]):
-            pass
+            return
 
         return bootleg(**{key: value for key, value in config.items() if key in keys})
+
+    def _subroutine(self, *args):
+        default = self._args.get("default", dict())
+        keys = set(default.keys())
+
+        config = self._map(default)
+
+        print(Util.headline("Environment (BEGIN)"))
+        print("\n".join(Misc.recurse_env({key: value for key, value in config.items() if key in keys})))
+        print(Util.headline("Environment (END)"))
 
 
 class System(Extension):
@@ -548,19 +564,19 @@ class CustomArguments(Arguments):
             "-d", "--daemon", choices=["start", "stop", "restart"], dest="daemon", default=None,
             help="Run server as background process.")
         parser.add_argument(
-            "--root-dir", dest="root_dir", default=None, type=PurePath,
+            "--root-dir", dest="root_dir", default=None, type=lambda p: Path(p).resolve(),
             help="Server root directory. (/opt/angelos)")
         parser.add_argument(
-            "--run-dir", dest="run_dir", default=None, type=PurePath,
+            "--run-dir", dest="run_dir", default=None, type=lambda p: Path(p).resolve(),
             help="Runtime directory. (/run/angelos)")
         parser.add_argument(
-            "--state-dir", dest="state_dir", default=None, type=PurePath,
+            "--state-dir", dest="state_dir", default=None, type=lambda p: Path(p).resolve(),
             help="Server state directory. (/var/lib/angelos)")
         parser.add_argument(
-            "--logs-dir", dest="logs_dir", default=None, type=PurePath,
+            "--logs-dir", dest="logs_dir", default=None, type=lambda p: Path(p).resolve(),
             help="Logs directory. (/var/log/angelos)")
         parser.add_argument(
-            "--conf-dir", dest="conf_dir", default=None,
+            "--conf-dir", dest="conf_dir", default=None, type=lambda p: Path(p).resolve(),
             help="Configuration directory. (/etc/angelos)")
 
 
@@ -579,7 +595,7 @@ class Network(Extension):
         helper_cls = self._args.get("helper", None)
 
         if helper_cls:
-            facade = helper_cls.setup(Signer(self._app.args.seed))
+            facade = helper_cls.setup(Signer(self._app.keys.get("seed", None)))
         else:
             facade = self._app.facade
 
@@ -593,17 +609,21 @@ class Network(Extension):
 class Keys(Extension):
     """Key loader from hard drive."""
 
-    def _system_key(self) -> bytes:
-        KeyLoader.SYSTEM = self._args.system
-        secret = KeyLoader.new()
+    def _get_system_key(self) -> bytes:
         try:
-            secret = KeyLoader.get()
-        except KeyLoadError:
-            KeyLoader.set(secret)
-        return secret
+            return KeyLoader.get()
+        except (KeyLoadError, NaClError) as exc:
+            return None
+
+    def _new_system_key(self) -> bytes:
+        try:
+            return KeyLoader.set(KeyLoader.new())
+        except (KeyLoadError, NaClError) as exc:
+            return None
 
     def prepare(self, *args):
-        pass
+        KeyLoader.SYSTEM = self._args.get("system", "Unknown")
+        return {"seed": self._get_system_key() or self._new_system_key()}
 
 
 class AngelosServer(Application):
@@ -613,8 +633,7 @@ class AngelosServer(Application):
         "log": Logger(name="angelos"),
         "args": CustomArguments(name="Angelos™ Server"),
         "env": BootConfigurator(default={
-            "public": None,
-            "admins": list(),  # Administrator public keys
+            "seed": None,
             "prompt": "Angelos 0.1dX > ",
             "terminal": "Ἄγγελος safe messaging server",
             "listen": "localhost",
@@ -637,7 +656,7 @@ class AngelosServer(Application):
             "machine": None,
             "processor": None,
         }),
-        "keys": Keys(system="Ἄγγελος"),
+        "keys": Keys(system="Angelos"),  # "Ἄγγελος"),
         "sys": System(),
         "dirs": Runtime(name="angelos", desktop=False),
         "quit": Quit(),
@@ -645,26 +664,22 @@ class AngelosServer(Application):
         "server": Network(server=ServerProtocolFile, manager=Connections, helper=ServerFacade)
     }
 
-    def _initialize(self):
+    def _initialize(self) -> bool:
         self.log
         logging.debug(Util.headline("Start"))
         self.args
         self.quit
-        self.env
-        # self.signal
-        if self.args.config:
-            print(Util.headline("Environment (BEGIN)"))
-            print("\n".join(Misc.recurse_env(self.env._asdict())))
-            print(Util.headline("Environment (END)"))
-            exit(1)
+        if self.env is not None:
+            return True
 
-    def _finalize(self):
+    def _finalize(self) -> int:
         self.quit.set()  # Quit is set if external keyboard interruption is triggered.
         logging.debug(Util.headline("Finish"))
+        return self._return_code
 
     async def start(self):
         server = await self.server  # Listen happens automagically.
-        task = asyncio.create_task(server.server_forever())
+        task = asyncio.create_task(server.serve_forever())
 
     async def stop(self):
         await self.quit.wait()

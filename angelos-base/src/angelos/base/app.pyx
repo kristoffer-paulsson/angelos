@@ -69,7 +69,6 @@ class Extension(Module):
 
     def __call__(self, app: "Application", *args):
         self._app = app
-        print("Prepace", self.__class__.__name__)
         return self.prepare(*args)
 
     def prepare(self, *args):
@@ -90,6 +89,21 @@ class Extension(Module):
             return None
 
 
+class Configurator(Extension):
+
+    def _subroutine(self, *args):
+        raise NotImplementedError()
+
+    def _excute(self, *args):
+        raise NotImplementedError()
+
+    def prepare(self, *args):
+        if self._app.args.config is True:
+            return self._subroutine(*args)
+        else:
+            return self._excute(*args)
+
+
 class Application(ContainerMixin):
     """Application class to base a program on for pre-prepared initialization."""
 
@@ -106,7 +120,8 @@ class Application(ContainerMixin):
         asyncio.get_event_loop().stop()
 
     def run(self):
-        self._initialize()
+        if not self._initialize():
+            return self._finalize()
         try:
             loop = asyncio.get_event_loop()
             loop.create_task(self.start())
@@ -120,8 +135,7 @@ class Application(ContainerMixin):
         finally:
             loop.run_until_complete(loop.shutdown_asyncgens())
             loop.close()
-        self._finalize()
-        return self._return_code
+        return self._finalize()
 
     async def start(self):
         """Initialize and start main program sequence."""
@@ -130,3 +144,6 @@ class Application(ContainerMixin):
     async def stop(self):
         """Wait for quit signal and tear down program."""
         pass
+
+    def _finalize(self) -> int:
+        return self._return_code

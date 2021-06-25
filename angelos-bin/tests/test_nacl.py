@@ -15,10 +15,31 @@
 from unittest import TestCase
 from angelos.bin.nacl import BaseKey, SIZE_SECRETBOX_NONCE, SIZE_SECRETBOX_KEY, SecretBox, SIZE_SECRETBOX_ZERO, \
     SIZE_SECRETBOX_BOXZERO, Signer, SIZE_SIGN, Verifier, PublicKey, SIZE_BOX_PUBLICKEY, SecretKey, SIZE_BOX_SECRETKEY, \
-    DualSecret, SIZE_SIGN_PUBLICKEY, SIZE_SIGN_SEED, CryptoBox
-
+    DualSecret, SIZE_SIGN_PUBLICKEY, SIZE_SIGN_SEED, CryptoBox, NaCl, SIZE_AEAD_NPUB, NaClError, CryptoFailure
 
 MESSAGE = "I love you in Jesus name!".encode()
+
+
+class TestNaCl(TestCase):
+    def test_random_bytes(self):
+        rand = NaCl.random_bytes(32)
+        self.assertIsInstance(rand, bytes)
+        self.assertIs(len(rand), 32)
+
+    def test_random_nonce(self):
+        nonce = NaCl.random_nonce()
+        self.assertIsInstance(nonce, bytes)
+        self.assertIs(len(nonce), SIZE_SECRETBOX_NONCE)
+
+    def test_random_aead_nonce(self):
+        nonce = NaCl.random_aead_nonce()
+        self.assertIsInstance(nonce, bytes)
+        self.assertIs(len(nonce), SIZE_AEAD_NPUB)
+
+    def test_salsa_key(self):
+        salsa = NaCl.salsa_key()
+        self.assertIsInstance(salsa, bytes)
+        self.assertIs(len(salsa), SIZE_SECRETBOX_KEY)
 
 
 class TestBaseKey(TestCase):
@@ -37,22 +58,6 @@ class TestBaseKey(TestCase):
     def test_seed(self):
         key = BaseKey()
         self.assertIs(key.seed, None)
-
-    def test_randombytes(self):
-        rand = BaseKey.randombytes(32)
-        self.assertIsInstance(rand, bytes)
-        self.assertIs(len(rand), 32)
-
-    def test_rand_nonce(self):
-        nonce = BaseKey.rand_nonce()
-        self.assertIsInstance(nonce, bytes)
-        self.assertIs(len(nonce), SIZE_SECRETBOX_NONCE)
-
-    def test__salsa_key(self):
-        key = BaseKey()
-        salsa = key._salsa_key()
-        self.assertIsInstance(salsa, bytes)
-        self.assertIs(len(salsa), SIZE_SECRETBOX_KEY)
 
 
 class TestSecretBox(TestCase):
@@ -95,22 +100,22 @@ class TestVerifier(TestCase):
         verifier = Verifier(signer.vk)
         self.assertEqual(verifier.verify(signer.sign(MESSAGE)), MESSAGE)
         self.assertEqual(verifier.verify(signer.signature(MESSAGE) + MESSAGE), MESSAGE)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(CryptoFailure):
             verifier.verify(MESSAGE)
 
 
 class TestPublicKey(TestCase):
     def test_pk(self):
-        key = PublicKey(BaseKey.randombytes(SIZE_BOX_PUBLICKEY))
+        key = PublicKey(NaCl.random_bytes(SIZE_BOX_PUBLICKEY))
         self.assertIsInstance(key.pk, bytes)
         self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
-        with self.assertRaises(ValueError):
-            PublicKey(BaseKey.randombytes(SIZE_BOX_PUBLICKEY - 1))
+        with self.assertRaises(NaClError):
+            PublicKey(NaCl.random_bytes(SIZE_BOX_PUBLICKEY - 1))
 
 
 class TestSecretKey(TestCase):
     def test_sk(self):
-        key = SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY))
+        key = SecretKey(NaCl.random_bytes(SIZE_BOX_SECRETKEY))
         self.assertIsInstance(key.sk, bytes)
         self.assertIs(len(key.sk), SIZE_BOX_SECRETKEY)
 
@@ -118,11 +123,11 @@ class TestSecretKey(TestCase):
         self.assertIsInstance(key.sk, bytes)
         self.assertIs(len(key.sk), SIZE_BOX_SECRETKEY)
 
-        with self.assertRaises(ValueError):
-            SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY - 1))
+        with self.assertRaises(NaClError):
+            SecretKey(NaCl.random_bytes(SIZE_BOX_SECRETKEY - 1))
 
     def test_pk(self):
-        key = SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY))
+        key = SecretKey(NaCl.random_bytes(SIZE_BOX_SECRETKEY))
         self.assertIsInstance(key.pk, bytes)
         self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
 
@@ -130,8 +135,8 @@ class TestSecretKey(TestCase):
         self.assertIsInstance(key.pk, bytes)
         self.assertIs(len(key.pk), SIZE_BOX_PUBLICKEY)
 
-        with self.assertRaises(ValueError):
-            SecretKey(BaseKey.randombytes(SIZE_BOX_SECRETKEY - 1))
+        with self.assertRaises(NaClError):
+            SecretKey(NaCl.random_bytes(SIZE_BOX_SECRETKEY - 1))
 
 
 class TestDualSecret(TestCase):
@@ -194,3 +199,6 @@ class TestCryptoBox(TestCase):
         self.assertNotEqual(MESSAGE, encrypted)
         decrypted = evert_box.decrypt(encrypted)
         self.assertEqual(MESSAGE, decrypted)
+
+
+

@@ -32,12 +32,12 @@ class BaseIdentifier(ABC):
 
     @classmethod
     @abstractmethod
-    def _unique(cls) -> str:
+    def _unique(cls) -> bytes:
         pass
 
     @classmethod
     def get(cls) -> str:
-        return cls._unique()
+        return cls._unique().strip().decode()
 
 
 if sys.platform.startswith("darwin"):
@@ -46,7 +46,7 @@ if sys.platform.startswith("darwin"):
         """Unique ID identifier in Darwin/macOS."""
 
         @classmethod
-        def _unique(cls) -> str:
+        def _unique(cls) -> bytes:
             raise NotImplementedError("Not implemented on Darwin.")
 
 
@@ -56,7 +56,7 @@ elif sys.platform.startswith("win32"):
         """Unique ID identifier in Windows."""
 
         @classmethod
-        def _unique(cls) -> str:
+        def _unique(cls) -> bytes:
             raise NotImplementedError("Not implemented on Windows.")
 
 
@@ -69,7 +69,7 @@ else:
         """Unique ID identifier in Unix/Linux."""
 
         @classmethod
-        def _unique(cls) -> str:
+        def _unique(cls) -> bytes:
             with Popen("cat /sys/class/dmi/id/product_serial", shell=True, stdout=PIPE) as proc:
                 if proc.returncode:
                     raise UniqieIDError("Process failure finding unique ID: {}".format(proc.returncode))

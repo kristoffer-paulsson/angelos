@@ -100,8 +100,8 @@ BASE64_VARIANT_URLSAFE = sodium_base64_VARIANT_URLSAFE
 
 
 class NaCl:
-    @staticmethod
-    def random_bytes(unsigned int size) -> bytes:
+    @classmethod
+    def random_bytes(cls, unsigned int size) -> bytes:
         buffer = bytes(size)
         randombytes(buffer, size)
         return buffer
@@ -156,7 +156,7 @@ class SecretBox(BaseKey):
         self._sk = key
 
         if self._sk is None:
-            self._sk = self._salsa_key()
+            self._sk = NaCl.salsa_key()
         if len(self._sk) != SIZE_SECRETBOX_KEY:
             raise NaClError(*NaClError.KEY_LENGTH_ERROR)
 
