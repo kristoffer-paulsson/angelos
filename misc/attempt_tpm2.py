@@ -14,8 +14,27 @@
 #
 """Trusted platform module interaction set according to TPM 2.0."""
 import os
+import time
 from pathlib import PosixPath
 from struct import Struct
+from typing import Tuple
+
+
+class Capabilities:
+    """TPM2 Capability selectors."""
+    FIRST = 0x00000000
+    ALGS = 0x00000000
+    HANDLES = 0x00000001
+    COMMANDS = 0x00000002
+    PP_COMMANDS = 0x00000003
+    AUDIT_COMMANDS = 0x00000004
+    PCRS = 0x00000005
+    TPM_PROPERTIES = 0x00000006
+    PCR_PROPERTIES = 0x00000007
+    ECC_CURVES = 0x00000008
+    AUTH_POLICIES = 0x00000009
+    LAST = 0x00000009
+    VENDOR_PROPERTY = 0x00000100
 
 
 class StartupType:
@@ -26,8 +45,11 @@ class StartupType:
 
 class CommandCodes:
     """TPM2 Command Codes."""
+    FIRST = 0x0000011F
+    CLEAR = 0x00000126
     STARTUP = 0x00000144
     SHUTDOWN = 0x00000145
+    GET_CAPABILITY = 0x0000017A
     GET_RANDOM = 0x0000017B
 
 
@@ -72,10 +94,17 @@ class ResponseCodes:
     SENSITIVE = VER1 + 0x055
     MAX_FM0 = VER1 + 0x07F
     FMT1 = 0x080
+    INSUFFICIENT = FMT1 + 0x01A
     WARN = 0x900
 
 
 RESPONSE_CODES = dict((v, k) for k, v in vars(ResponseCodes).items())
+
+
+class PermanentHandles:  # TPM_RH_*
+    """TPM Permanent Handles."""
+    LOCKOUT = 0x4000000A
+    PLATFORM = 0x4000000C
 
 
 class StructureTags:
@@ -145,6 +174,14 @@ class BaseTPM2Operation:
             False, CommandCodes.SHUTDOWN, int(shutdown_type).to_bytes(2, "big", signed=False))
         device.validate(tag, response_code)
 
+    def get_random(self, bytes_requested: int) -> bytes:
+        device = TPM2Device()
+        tag, response_code, random_bytes = device.send(
+            False, CommandCodes.GET_RANDOM, int(bytes_requested).to_bytes(2, "big", signed=False))
+
+        device.validate(tag, response_code)
+        return random_bytes
+
 
 if os.name == "posix":
 
@@ -196,19 +233,127 @@ class TestOperation(BaseTPM2Operation):
         print("STARTUP")
         self.startup(StartupType.CLEAR)
 
-    def get_random(self, bytes_requested: int):
-        device = TPM2Device()
-        tag, response_code, random_bytes = device.send(
-            False, CommandCodes.GET_RANDOM, int(bytes_requested).to_bytes(2, "big", signed=False))
-
-        device.validate(tag, response_code)
-        self._print(tag, response_code)
-        print("RANDOM BYTES", random_bytes)
+    def provision(self):
+        blob = self.get_random(20)
 
     def _print(self, tag, response_code):
         print("TAG", tag)
         print("RESPONSE CODE", response_code)
 
+    def clear(self, auth_handle: int):
+        device = TPM2Device()
+        tag, response_code, _ = device.send(
+            True, CommandCodes.CLEAR, int(auth_handle).to_bytes(4, "big", signed=False))
+        device.validate(tag, response_code)
+
+    def get_capabilities(self, session: bool, capability: int, property: int, property_count: int) -> Tuple[bool, bytes]:
+        device = TPM2Device()
+        tag, response_code, data = device.send(
+            session, CommandCodes.GET_CAPABILITY,
+            int(capability).to_bytes(4, "big", signed=False) +
+            int(property).to_bytes(4, "big", signed=False) +
+            int(property_count).to_bytes(4, "big", signed=False)
+        )
+        device.validate(tag, response_code)
+        more_data = bool(data[:1])
+        capability_data = data[1:]
+        return more_data, capability_data
+        print("MORE_DATA", more_data)
+        print("CAPABILITY_DATA", capability_data)
+
+
+class PhysicalPresence:
+    """Physical Presence Interface scanner."""
+
+    PATH = PosixPath("/sys/class/tpm/tpm0/ppi/")
+
+    def __init__(self):
+        with self.PATH.joinpath("version").open("r") as fd:
+            self._version = fd.read().strip()
+        with self.PATH.joinpath("tcg_operations").open("r") as fd:
+            self._tcg_operations = fd.read()
+        with self.PATH.joinpath("vs_operations").open("r") as fd:
+            self._vs_operations = fd.read()
+
+        self._request = self.PATH.joinpath("request").open("w+")
+        self._response = self.PATH.joinpath("response").open("r")
+        self._transition_action = self.PATH.joinpath("transition_action").open("r")
+
+    @property
+    def version(self) -> str:
+        """TPM PPI version."""
+        return self._version
+
+    @property
+    def transition(self) -> str:
+        """Current transition action."""
+        return self._transition_action.read().strip()
+
+    @property
+    def tcg(self):
+        """TCG operations."""
+        return self._tcg_operations
+
+    @property
+    def vs(self):
+        "VS operations."
+        return self._vs_operations
+
+    def __del__(self):
+        self._request.close()
+        self._response.close()
+        self._transition_action.close()
+
+    def _call_ppi(self, command: str):
+        self._request.write(command)
+
+    def get_physical_presence_interface_version(self) -> str:
+        self._call_ppi("1")
+        time.sleep(1)
+        return self._request.read()
+
+    def submit_tpm_operation_request_to_preos_environment(self, operation_value: int) -> str:
+        self._call_ppi("2 {}".format(operation_value))
+        time.sleep(1)
+        return self._request.read()
+
+    def get_pending_tpm_operations_requested_by_the_os(self) -> str:
+        self._call_ppi("3")
+        time.sleep(1)
+        return self._request.read()
+
+    def get_platform_specific_action_to_transition_to_preos_environment(self) -> str:
+        self._call_ppi("4")
+        time.sleep(1)
+        return self._request.read()
+
+    def return_tpm_operation_response_to_os_environment(self) -> str:
+        self._call_ppi("5")
+        time.sleep(1)
+        return self._request.read()
+
+    def submit_tpm_operation_request_to_preos_environment2(
+            self, operation_value: int, argument_for_operation: int) -> str:
+        self._call_ppi("7 {} {}".format(operation_value, argument_for_operation))
+        time.sleep(1)
+        return self._request.read()
+
+    def get_user_confirmation_status_for_operation(self, operation_value: int) -> str:
+        self._call_ppi("8 {}".format(operation_value))
+        time.sleep(1)
+        return self._request.read()
+
+    def query_response(self) -> str:
+        return self._response.read()
+
 
 if __name__ == "__main__":
-    TestOperation().reset()
+    # TestOperation().get_capabilities(False, Capabilities.COMMANDS, CommandCodes.FIRST, 1024)
+    # TestOperation().clear(PermanentHandles.LOCKOUT)
+    pp = PhysicalPresence()
+    print(pp.get_user_confirmation_status_for_operation())
+    time.sleep(1)
+    print(pp.query_response())
+    # print(pp.version)
+    # print(pp.tcg)
+    # print(pp.vs)
