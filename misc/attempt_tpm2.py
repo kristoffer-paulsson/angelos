@@ -46,9 +46,14 @@ class StartupType:
 class CommandCodes:
     """TPM2 Command Codes."""
     FIRST = 0x0000011F
+    EVICT_CONTROL = 0x00000120
     CLEAR = 0x00000126
+    SET_PRIMARY_POLICY = 0x0000012E
     STARTUP = 0x00000144
     SHUTDOWN = 0x00000145
+    LOAD = 0x00000157
+    LOAD_EXTERNAL = 0x00000167
+    VERIFY_SIGNATURE = 0x00000177
     GET_CAPABILITY = 0x0000017A
     GET_RANDOM = 0x0000017B
 
@@ -103,7 +108,10 @@ RESPONSE_CODES = dict((v, k) for k, v in vars(ResponseCodes).items())
 
 class PermanentHandles:  # TPM_RH_*
     """TPM Permanent Handles."""
+    OWNER = 0x40000001
+    NULL = 0x40000007
     LOCKOUT = 0x4000000A
+    ENDORSEMENT = 0x4000000B
     PLATFORM = 0x4000000C
 
 
@@ -112,9 +120,60 @@ class StructureTags:
     NULL = 0x8000
     NO_SESSIONS = 0x8001
     SESSIONS = 0x8002
+    VERIFIED = 0x8022
 
 
 STRUCTURE_TAGS = dict((v, k) for k, v in vars(StructureTags).items())
+
+
+class AlgorithmConstants:
+    """TPM2 Algorithm constants."""
+    SHA256 = 0x000B  # Digest
+    NULL = 0x0010  # Null
+    ECDSA = 0x0018
+
+
+class TPM2Object:
+    """TPM object. TPMA_OBJECT"""
+
+    def __init__(self, fixed_tpm: bool, st_clear: bool, fixed_parent: bool, sensitive_data_origin: bool,
+                 user_with_auth: bool, admin_with_policy: bool, no_da: bool, encrypted_duplication: bool,
+                 restricted: bool, decrypt: bool, sign_encrypt: bool):
+        self._fixed_tpm = fixed_tpm
+        self._st_clear = st_clear
+        self._fixed_parent = fixed_parent
+        self._sensitive_data_origin = sensitive_data_origin
+        self._user_with_auth = user_with_auth
+        self._admin_with_policy = admin_with_policy
+        self._no_da = no_da
+        self._encrypted_duplication = encrypted_duplication
+        self._restricted = restricted
+        self._decrypt = decrypt
+        self._sign_encrypt = sign_encrypt
+
+    def __bytes__(self):
+        return int(int(self._fixed_tpm) << 1 + int(self._st_clear) << 2 + int(self._fixed_parent) << 4 + int(
+            self._sensitive_data_origin) << 5 + int(self._user_with_auth) << 6 + int(
+            self._admin_with_policy) << 7 + int(self._no_da) << 10 + int(self._encrypted_duplication) << 11 + int(
+            self._restricted) << 16 + int(self._decrypt) << 17 + int(self._sign_encrypt) << 18).to_bytes(
+            4, "big", signed=False)
+
+
+class TPM2Public:
+    """TPM public structure. TPMT_PUBLIC"""  # TPMU_PUBLIC_PARMS, TPMU_PUBLIC_ID
+    # TPMS_KEYEDHASH_PARMS, TPMS_SYMCIPHER_PARMS, TPMS_RSA_PARMS, TPMS_ECC_PARMS, TPMS_ASYM_PARMS
+
+    def __init__(self, type: int, name_alg, object_attributes: bytes, auth_policy: bytes, parameters, unique):
+        self._type = type
+        self._name_alg = name_alg
+        self._object_attributes = object_attributes
+        self._auth_policy = auth_policy
+
+    def __bytes__(self):
+        return int(self._type).to_bytes(2, "big", signed=False) + \
+               int(self._name_alg).to_bytes(2, "big", signed=False) + \
+               self._object_attributes + int(len(self._auth_policy)).to_bytes(
+            2, "big", signed=False) + self._auth_policy + \
 
 
 class BaseTPM2Device:
@@ -182,6 +241,78 @@ class BaseTPM2Operation:
         device.validate(tag, response_code)
         return random_bytes
 
+    def set_primary_policy(
+            self, auth_handle: int, auth_policy: bytes = b"\x00\x00", hash_alg: int = AlgorithmConstants.NULL):
+        """Set primary policy."""
+        device = TPM2Device()
+        tag, response_code, _ = device.send(
+            False, CommandCodes.SET_PRIMARY_POLICY,
+            int(auth_handle).to_bytes(4, "big", signed=False) +
+            int(len(auth_policy)).to_bytes(2, "big", signed=False) + auth_policy +
+            int(hash_alg).to_bytes(2, "big", signed=False)
+        )
+
+        device.validate(tag, response_code)
+
+    def verify_signature(self, key_handle: int, digest: bytes, signature: bytes) -> bool:
+        device = TPM2Device()
+        tag, response_code, validation = device.send(
+            False, CommandCodes.VERIFY_SIGNATURE,
+            int(key_handle).to_bytes(4, "big", signed=False) +
+            int(len(digest)).to_bytes(2, "big", signed=False) + digest +
+            int(len(signature)).to_bytes(2, "big", signed=False) + signature
+        )
+        device.validate(tag, response_code)
+        return True if validation[:2] == int(StructureTags.VERIFIED).to_bytes(2, "big", signed=False) else False
+
+    def load(self, session: bool, parent_handle: int, in_private: bytes, in_public: bytes) -> Tuple[bytes, bytes]:
+        device = TPM2Device()
+        tag, response_code, result = device.send(
+            session, CommandCodes.LOAD,
+            int(parent_handle).to_bytes(4, "big", signed=False) +
+            int(len(in_private)).to_bytes(2, "big", signed=False) + in_private +
+            int(len(in_public)).to_bytes(2, "big", signed=False) + in_public
+        )
+        device.validate(tag, response_code)
+        object_handle = result[:4]
+        length = int.from_bytes(result[4:6], "big", signed=False)
+        name = result[6:]
+        if len(name) != length:
+            raise ValueError("Object handle invalid length.")
+        return object_handle, name
+
+    def load_external(self, session: bool, in_private: bytes, in_public: bytes, hierarchy: int) -> Tuple[bytes, bytes]:
+        device = TPM2Device()
+        if in_private is None:
+            in_private = b"\x00\x00"
+        tag, response_code, result = device.send(
+            session, CommandCodes.LOAD_EXTERNAL,
+            # int(len(in_private)).to_bytes(2, "big", signed=False) + in_private +
+            int(len(in_public)).to_bytes(2, "big", signed=False) + in_public +
+            int(hierarchy).to_bytes(4, "big", signed=False)
+        )
+        device.validate(tag, response_code)
+        object_handle = result[:4]
+        length = int.from_bytes(result[4:6], "big", signed=False)
+        name = result[6:]
+        if len(name) != length:
+            raise ValueError("Object handle invalid length.")
+        return object_handle, name
+
+    def evict_control(self, platform: bool, object_handle: int, persistent_handle: int):
+        device = TPM2Device()
+        tag, response_code, _ = device.send(
+            True, CommandCodes.EVICT_CONTROL,
+            int(PermanentHandles.PLATFORM if platform else PermanentHandles.OWNER).to_bytes(4, "big", signed=False) +
+            int(object_handle).to_bytes(4, "big", signed=False) +
+            int(persistent_handle).to_bytes(4, "big", signed=False)
+        )
+        device.validate(tag, response_code)
+
+    # EK create and persist
+
+    # SRK create and persist
+
 
 if os.name == "posix":
 
@@ -211,6 +342,7 @@ elif os.name == "nt":
 
 class TPM2Session:
     """TPM2 Session context manager."""
+
     def __init__(self):
         self._device = None
 
@@ -246,7 +378,8 @@ class TestOperation(BaseTPM2Operation):
             True, CommandCodes.CLEAR, int(auth_handle).to_bytes(4, "big", signed=False))
         device.validate(tag, response_code)
 
-    def get_capabilities(self, session: bool, capability: int, property: int, property_count: int) -> Tuple[bool, bytes]:
+    def get_capabilities(self, session: bool, capability: int, property: int, property_count: int) -> Tuple[
+        bool, bytes]:
         device = TPM2Device()
         tag, response_code, data = device.send(
             session, CommandCodes.GET_CAPABILITY,
@@ -267,6 +400,14 @@ class PhysicalPresence:
 
     PATH = PosixPath("/sys/class/tpm/tpm0/ppi/")
 
+    PP_REQUIRED_FOR_TURN_ON = 1
+    PP_REQUIRED_FOR_TURN_OFF = 2
+    PP_REQUIRED_FOR_CLEAR = 3
+    PP_REQUIRED_FOR_CHANGE_PCRS = 4
+    PP_REQUIRED_FOR_CHANGE_EPS = 5
+    PP_REQUIRED_FOR_ENABLE_BLOCKSIDFUNC = 6
+    PP_REQUIRED_FOR_DISABLE_BLOCKSIDFUNC = 7
+
     def __init__(self):
         with self.PATH.joinpath("version").open("r") as fd:
             self._version = fd.read().strip()
@@ -275,9 +416,12 @@ class PhysicalPresence:
         with self.PATH.joinpath("vs_operations").open("r") as fd:
             self._vs_operations = fd.read()
 
-        self._request = self.PATH.joinpath("request").open("w+")
-        self._response = self.PATH.joinpath("response").open("r")
+        self._request_fd = self.PATH.joinpath("request").open("w+")
+        self._response_fd = self.PATH.joinpath("response").open("r")
         self._transition_action = self.PATH.joinpath("transition_action").open("r")
+
+        if self._version != "1.3":
+            raise OSError("Illegal PPI version, must be 1.3 but is: {}".format(self._version))
 
     @property
     def version(self) -> str:
@@ -300,60 +444,114 @@ class PhysicalPresence:
         return self._vs_operations
 
     def __del__(self):
-        self._request.close()
-        self._response.close()
+        self._request_fd.close()
+        self._response_fd.close()
         self._transition_action.close()
 
-    def _call_ppi(self, command: str):
-        self._request.write(command)
+    def _request(self, command: str):
+        self._request_fd.write("{}\n".format(command))
 
-    def get_physical_presence_interface_version(self) -> str:
-        self._call_ppi("1")
-        time.sleep(1)
-        return self._request.read()
+    def _response(self) -> str:
+        return self._response_fd.read()
 
-    def submit_tpm_operation_request_to_preos_environment(self, operation_value: int) -> str:
-        self._call_ppi("2 {}".format(operation_value))
-        time.sleep(1)
-        return self._request.read()
+    def _operation(self, cmd: str) -> str:
+        self._request(cmd)
+        time.sleep(2)
+        return self._response()
 
-    def get_pending_tpm_operations_requested_by_the_os(self) -> str:
-        self._call_ppi("3")
-        time.sleep(1)
-        return self._request.read()
+    def enable(self):
+        return self._operation("1")
 
-    def get_platform_specific_action_to_transition_to_preos_environment(self) -> str:
-        self._call_ppi("4")
-        time.sleep(1)
-        return self._request.read()
+    def disable(self):
+        return self._operation("2")
 
-    def return_tpm_operation_response_to_os_environment(self) -> str:
-        self._call_ppi("5")
-        time.sleep(1)
-        return self._request.read()
+    def clear(self):
+        return self._operation("5")
 
-    def submit_tpm_operation_request_to_preos_environment2(
-            self, operation_value: int, argument_for_operation: int) -> str:
-        self._call_ppi("7 {} {}".format(operation_value, argument_for_operation))
-        time.sleep(1)
-        return self._request.read()
+    def enable_clear(self):
+        return self._operation("14")
 
-    def get_user_confirmation_status_for_operation(self, operation_value: int) -> str:
-        self._call_ppi("8 {}".format(operation_value))
-        time.sleep(1)
-        return self._request.read()
+    def true_set_pp_required_for_clear(self):
+        return self._operation("17")
 
-    def query_response(self) -> str:
-        return self._response.read()
+    def false_set_pp_required_for_clear(self):
+        return self._operation("18")
+
+    def enable_clear2(self):
+        return self._operation("21")
+
+    def enable_clear3(self):
+        return self._operation("22")
+
+    def set_pcr_banks(self):
+        return self._operation("23")
+
+    def change_eps(self):
+        return self._operation("24")
+
+    def false_set_pp_required_for_change_pcrs(self):
+        return self._operation("25")
+
+    def true_set_pp_required_for_change_pcrs(self):
+        return self._operation("26")
+
+    def false_set_pp_required_for_turn_on(self):
+        return self._operation("27")
+
+    def true_set_pp_required_for_turn_on(self):
+        return self._operation("28")
+
+    def false_set_pp_required_for_turn_off(self):
+        return self._operation("29")
+
+    def true_set_pp_required_for_turn_off(self):
+        return self._operation("30")
+
+    def false_set_pp_required_for_change_eps(self):
+        return self._operation("31")
+
+    def true_set_pp_required_for_change_eps(self):
+        return self._operation("32")
+
+    def log_all_digests(self):
+        return self._operation("33")
+
+    def disable_endorsment_enable_storage_hierarchy(self):
+        return self._operation("34")
+
+    def enable_blocksidfunc(self):
+        return self._operation("96")
+
+    def disable_blocksidfunc(self):
+        return self._operation("97")
+
+    def true_set_pp_required_for_enable_blocksidfunc(self):
+        return self._operation("98")
+
+    def false_set_pp_required_for_enable_blocksidfunc(self):
+        return self._operation("99")
+
+    def true_set_pp_required_for_disable_blocksidfunc(self):
+        return self._operation("100")
+
+    def false_set_pp_required_for_disable_blocksidfunc(self):
+        return self._operation("101")
 
 
 if __name__ == "__main__":
     # TestOperation().get_capabilities(False, Capabilities.COMMANDS, CommandCodes.FIRST, 1024)
-    # TestOperation().clear(PermanentHandles.LOCKOUT)
-    pp = PhysicalPresence()
-    print(pp.get_user_confirmation_status_for_operation())
-    time.sleep(1)
-    print(pp.query_response())
+    public = TPM2Public(
+        AlgorithmConstants.ECDSA, AlgorithmConstants.NULL,
+        TPM2Object(False, False, False, False, False, False, False, False, True, False, False),
+        b"\x00\x00",
+    )
+    to = TestOperation()
+    handle, name = to.load_external(False, None, os.urandom(32), PermanentHandles.NULL)
+    to.evict_control(True, None, handle)
+    # pp = PhysicalPresence()
+    # # print(pp.true_set_pp_required_for_clear())
+    # print(pp.clear())
     # print(pp.version)
     # print(pp.tcg)
     # print(pp.vs)
+    # print(TestOperation().reset())
