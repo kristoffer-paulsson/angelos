@@ -98,9 +98,69 @@ class ResponseCodes:
     NO_RESULT = VER1 + 0x054
     SENSITIVE = VER1 + 0x055
     MAX_FM0 = VER1 + 0x07F
+
     FMT1 = 0x080
+    VALUE = FMT1 + 0x004
+    HIERARCHY = FMT1 + 0x005
+    KEY_SIZE = FMT1 + 0x007
+    MGF = FMT1 + 0x008
+    MODE = FMT1 + 0x009
+    TYPE = FMT1 + 0x00A
+    HANDLE = FMT1 + 0x00B
+    KDF = FMT1 + 0x00C
+    RANGE = FMT1 + 0x00D
+    AUTH_FAIL = FMT1 + 0x00E
+    NONCE = FMT1 + 0x00F
+    PP = FMT1 + 0x010
+    SCHEME = FMT1 + 0x012
+    SIZE = FMT1 + 0x015
+    SYMMETRIC = FMT1 + 0x016
+    TAG = FMT1 + 0x017
+    SELECTOR = FMT1 + 0x018
     INSUFFICIENT = FMT1 + 0x01A
+    SIGNATURE = FMT1 + 0x01B
+    KEY = FMT1 + 0x01C
+    POLICY_FAIL = FMT1 + 0x01D
+    INTEGRITY = FMT1 + 0x01F
+    TICKET = FMT1 + 0x020
+    RESERVED_BITS = FMT1 + 0x021
+    BAD_AUTH = FMT1 + 0x022
+    EXPIRED = FMT1 + 0x023
+    POLICY_CC = FMT1 + 0x024
+    BINDING = FMT1 + 0x025
+    CURVE = FMT1 + 0x026
+    ECC_POINT = FMT1 + 0x027
+
     WARN = 0x900
+    CONTEXT_GAP = WARN + 0x001
+    OBJECT_MEMORY = WARN + 0x002
+    SESSION_MEMORY = WARN + 0x003
+    MEMORY = WARN + 0x004
+    SESSION_HANDLES = WARN + 0x005
+    OBJECT_HANDLES = WARN + 0x006
+    LOCALITY = WARN + 0x007
+    YIELDED = WARN + 0x008
+    CANCELED = WARN + 0x009
+    TESTING = WARN + 0x00A
+    REFERENCE_H0 = WARN + 0x010
+    REFERENCE_H1 = WARN + 0x011
+    REFERENCE_H2 = WARN + 0x012
+    REFERENCE_H3 = WARN + 0x013
+    REFERENCE_H4 = WARN + 0x014
+    REFERENCE_H5 = WARN + 0x015
+    REFERENCE_H6 = WARN + 0x016
+    REFERENCE_S0 = WARN + 0x018
+    REFERENCE_S1 = WARN + 0x019
+    REFERENCE_S2 = WARN + 0x01A
+    REFERENCE_S3 = WARN + 0x01B
+    REFERENCE_S4 = WARN + 0x01C
+    REFERENCE_S5 = WARN + 0x01D
+    REFERENCE_S6 = WARN + 0x01E
+    NV_RATE = WARN + 0x020
+    LOCKOUT = WARN + 0x021
+    RETRY = WARN + 0x022
+    NV_UNAVAILABLE = WARN + 0x023
+    NOT_USED = WARN + 0x7F
 
 
 RESPONSE_CODES = dict((v, k) for k, v in vars(ResponseCodes).items())
@@ -133,6 +193,11 @@ class AlgorithmConstants:
     ECDSA = 0x0018
 
 
+class EccCurve:
+    """TPM2 Ecc curves."""
+    NIST_P256 = 0x0003
+
+
 class TPM2Object:
     """TPM object. TPMA_OBJECT"""
 
@@ -163,17 +228,38 @@ class TPM2Public:
     """TPM public structure. TPMT_PUBLIC"""  # TPMU_PUBLIC_PARMS, TPMU_PUBLIC_ID
     # TPMS_KEYEDHASH_PARMS, TPMS_SYMCIPHER_PARMS, TPMS_RSA_PARMS, TPMS_ECC_PARMS, TPMS_ASYM_PARMS
 
-    def __init__(self, type: int, name_alg, object_attributes: bytes, auth_policy: bytes, parameters, unique):
+    """
+    TPMU_PUBLIC_PARMS
+        eccDetail: TPMS_ECC_PARMS
+            symmetric: TPMT_SYM_DEF_OBJECT+
+                +TPMI_ALG_SYM_OBJECT
+                TPMU_SYM_KEY_BITS
+                TPMU_SYM_MODE
+                TPMU_SYM_DETAILS
+            scheme: TPMT_ECC_SCHEME+
+                +TPMI_ALG_ECC_SCHEME
+                TPMU_ASYM_SCHEME
+            curveID: TPMI_ECC_CURVE
+            kdf: TPMT_KDF_SCHEME+
+                +TPMI_ALG_KDF
+                TPMU_KDF_SCHEME
+        asymDetail: TPMS_ASYM_PARMS
+            symmetric: TPMT_SYM_DEF_OBJECT+
+            scheme: TPMT_ASYM_SCHEME+
+    """
+
+    def __init__(self, type: int, name_alg: int, object_attributes: bytes, auth_policy: bytes, parameters: bytes, unique):
         self._type = type
         self._name_alg = name_alg
         self._object_attributes = object_attributes
         self._auth_policy = auth_policy
+        self._parameters = parameters
+        self._unique = unique
 
     def __bytes__(self):
         return int(self._type).to_bytes(2, "big", signed=False) + \
                int(self._name_alg).to_bytes(2, "big", signed=False) + \
-               self._object_attributes + int(len(self._auth_policy)).to_bytes(
-            2, "big", signed=False) + self._auth_policy + \
+               self._object_attributes + self._auth_policy + self._parameters + self._unique
 
 
 class BaseTPM2Device:
@@ -284,10 +370,10 @@ class BaseTPM2Operation:
     def load_external(self, session: bool, in_private: bytes, in_public: bytes, hierarchy: int) -> Tuple[bytes, bytes]:
         device = TPM2Device()
         if in_private is None:
-            in_private = b"\x00\x00"
+            in_private = int(PermanentHandles.NULL).to_bytes(4, "big", signed=False)
         tag, response_code, result = device.send(
             session, CommandCodes.LOAD_EXTERNAL,
-            # int(len(in_private)).to_bytes(2, "big", signed=False) + in_private +
+            int(len(in_private)).to_bytes(2, "big", signed=False) + in_private +
             int(len(in_public)).to_bytes(2, "big", signed=False) + in_public +
             int(hierarchy).to_bytes(4, "big", signed=False)
         )
@@ -540,13 +626,23 @@ class PhysicalPresence:
 
 if __name__ == "__main__":
     # TestOperation().get_capabilities(False, Capabilities.COMMANDS, CommandCodes.FIRST, 1024)
+    x = os.urandom(32)
+    y = os.urandom(32)
     public = TPM2Public(
         AlgorithmConstants.ECDSA, AlgorithmConstants.NULL,
-        TPM2Object(False, False, False, False, False, False, False, False, True, False, False),
-        b"\x00\x00",
+        bytes(TPM2Object(False, False, False, False, False, False, False, False, False, False, False)),
+        int(PermanentHandles.NULL).to_bytes(4, "big", signed=False),
+        int(AlgorithmConstants.NULL).to_bytes(
+            2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(
+            2, "big", signed=False) + int(EccCurve.NIST_P256).to_bytes(
+            2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(
+            2, "big", signed=False),
+        # int(AlgorithmConstants.NULL).to_bytes(
+        #    2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False),
+        int(len(x)).to_bytes(2, "big", signed=False) + x + int(len(y)).to_bytes(2, "big", signed=False) + y
     )
     to = TestOperation()
-    handle, name = to.load_external(False, None, os.urandom(32), PermanentHandles.NULL)
+    handle, name = to.load_external(False, None, bytes(public), PermanentHandles.NULL)
     to.evict_control(True, None, handle)
     # pp = PhysicalPresence()
     # # print(pp.true_set_pp_required_for_clear())
