@@ -259,7 +259,7 @@ class LibraryBuilder(Command):
             glob_path = os.path.join(".", "lib", pattern)
             glob_result += glob(glob_path, recursive=True)
 
-        content = "# cython: language_level=3\n"
+        content = "# cython: language_level=3, linetrace=True\n"
         for src_file in glob_result:
             content += "include \"{}\"\n".format(src_file[6:])
 

@@ -1,4 +1,4 @@
-# cython: language_level=3
+# cython: language_level=3, linetrace=True
 from cpython import array
 from arithmetic cimport symbol_t, Probability, bit_t, char_t, CONST
 

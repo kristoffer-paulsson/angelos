@@ -61,6 +61,7 @@ config = {
         build_dir="build",
         compiler_directives={
             "language_level": 3,
+            "linetrace": True
         }
     ),
     "python_requires": ">=3.6, <4",

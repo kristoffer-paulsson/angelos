@@ -5,6 +5,8 @@
 Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."<br />
 Λόγῳ is a safe messenger client. Logo means "Word with an intent."
 
+![Codacy coverage](https://img.shields.io/codacy/coverage/https://github.com/kristoffer-paulsson/angelos)
+
 ## Online presence
 
 Visit us at [angelos-project.com](https://angelos-project.com).<br />

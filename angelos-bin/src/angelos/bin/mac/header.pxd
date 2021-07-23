@@ -1,4 +1,4 @@
-# cython: language_level=3
+# cython: language_level=3, linetrace=True
 #
 # Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
@@ -15,7 +15,7 @@
 #
 
 
-# cython: language_level=3
+# cython: language_level=3, linetrace=True
 #
 # Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
