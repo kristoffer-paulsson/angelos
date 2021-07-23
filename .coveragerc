@@ -1,0 +1,3 @@
+[run]
+# source = angelos-*/src
+plugins = Cython.Coverage
