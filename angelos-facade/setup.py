@@ -58,7 +58,7 @@ config = {
             "linetrace": True
         }
     ),
-    "python_requires": ">=3.6, <4",
+    "python_requires": ">=3.7, <4",
 }
 
 setup(**config)
