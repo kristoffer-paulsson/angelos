@@ -5,6 +5,7 @@
 Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."<br />
 Λόγῳ is a safe messenger client. Logo means "Word with an intent."
 
+[![Build Status](https://travis-ci.com/kristoffer-paulsson/angelos.svg?branch=master)](https://travis-ci.com/kristoffer-paulsson/angelos)
 ![Codacy coverage](https://img.shields.io/codacy/coverage/https://github.com/kristoffer-paulsson/angelos)
 
 ## Online presence
@@ -37,6 +38,8 @@ _On macOS make sure to run "Install Certificates.command" once in order for down
 > &gt; pip install -r requirements.txt
 > 
 > &gt; python setup.py develop
+> 
+> &gt; coverage run -m unittest discover
 
 ## Run in virtualenv
 
