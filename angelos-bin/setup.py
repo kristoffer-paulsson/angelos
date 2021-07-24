@@ -12,7 +12,6 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import os
 import sys
 from pathlib import Path
 

@@ -21,6 +21,9 @@ User interface follows [Material Design](https://material.io).
 
 ## Development
 Download source tree from Github.
+
+_On macOS make sure to run "Install Certificates.command" once in order for download to work._
+
 > &gt; pip list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  | xargs -n1 pip install -U
 >
 > &gt; git clone git://github.com/kristoffer-paulsson/angelos.git
