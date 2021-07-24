@@ -21,6 +21,8 @@ User interface follows [Material Design](https://material.io).
 
 ## Development
 Download source tree from Github.
+> &gt; pip list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  | xargs -n1 pip install -U
+>
 > &gt; git clone git://github.com/kristoffer-paulsson/angelos.git
 > 
 > &gt; cd angelos
