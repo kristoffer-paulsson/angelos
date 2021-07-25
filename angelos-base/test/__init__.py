@@ -15,4 +15,11 @@
 import sys
 from pathlib import PurePath
 
-sys.path.append(PurePath(__file__).parents[2].joinpath("test"))
+here = PurePath(__file__)
+sys.path.append(here.parents[2].joinpath("test"))
+
+def load_tests(loader, suite, pattern):
+    """Test loader for a certain package."""
+    tests = loader.discover(start_dir=here.parents[0], pattern=pattern)
+    suite.addTests(tests)
+    return suite
