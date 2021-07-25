@@ -12,7 +12,10 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import sys
-from pathlib import PurePath
+"""Only put fixtures in main projects test package."""
 
-sys.path.append(PurePath(__file__).parents[2].joinpath("test"))
+from test.fixture.util import run_async
+
+__all__ = [
+    "run_async"
+]

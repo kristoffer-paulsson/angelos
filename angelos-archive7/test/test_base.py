@@ -16,6 +16,7 @@ from unittest import TestCase
 
 
 class TestBaseFileObject(TestCase):
+
     def test_name(self):
         self.fail()
 

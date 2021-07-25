@@ -12,7 +12,4 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import sys
-from pathlib import PurePath
-
-sys.path.append(PurePath(__file__).parents[2].joinpath("test"))
+"""Implicitly load all globally expected fixtures and support methods and classes."""

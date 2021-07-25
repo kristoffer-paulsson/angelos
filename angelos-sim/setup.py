@@ -21,6 +21,9 @@ from setuptools import setup, find_namespace_packages, Extension
 from sphinx.setup_command import BuildDoc
 
 
+# TODO: Mitigate angelos-sim into test fixtures and scripts.
+
+
 ################################################################################
 
 

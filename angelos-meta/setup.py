@@ -17,6 +17,9 @@
 from setuptools import setup, find_namespace_packages
 
 
+# TODO: Mitigate angelos-meta into test fixtures and scripts.
+
+
 NAME = "angelos.meta"
 VERSION = "1.0.0b1"
 RELEASE = ""

@@ -12,7 +12,17 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import sys
-from pathlib import PurePath
+"""Project wide test utilities."""
+import asyncio
+import functools
 
-sys.path.append(PurePath(__file__).parents[2].joinpath("test"))
+
+def run_async(coro):
+    """Decorator for asynchronous test cases."""
+
+    @functools.wraps(coro)
+    def wrapper(*args, **kwargs):
+        """Execute the coroutine with asyncio.run()"""
+        return asyncio.run(coro(*args, **kwargs))
+
+    return wrapper
