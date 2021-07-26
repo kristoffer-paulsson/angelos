@@ -12,7 +12,21 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+from configparser import ConfigParser
+from pathlib import Path
+
+from Cython.Compiler.Options import get_directive_defaults
 from setuptools import setup, find_namespace_packages
+
+config = ConfigParser()
+config.read(Path(__file__).absolute().parents[1].joinpath("project.ini"))
+VERSION = config.get("common", "version")
+RELEASE = config.get("common", "release")
+PYTHON = config.get("common", "python")
+
+directive_defaults = get_directive_defaults()
+directive_defaults['language_level'] = config.getint("cython", "language_level")
+directive_defaults['linetrace'] = config.getboolean("cython", "linetrace")
 
 setup(name="angelos.eidon",
       version="1.0.0a1",

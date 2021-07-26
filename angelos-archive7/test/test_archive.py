@@ -22,13 +22,13 @@ from unittest.case import TestCase
 
 from angelos.archive7.archive import Archive7, Header
 
-from angelos.meta.testing import run_async
-from angelos.meta.fake.lipsum import LIPSUM_PATH
-from angelos.meta.fake import Generate
+from test import run_async
+from test.fixture.generate import Generate
+from test.fixture.lipsum import LIPSUM_PATH
 
 
 class TestArchive7(TestCase):
-    FILE_COUNT = 1024
+    FILE_COUNT = 128
     # TODO: Make archive7 stable with thousands of files.
 
     @classmethod

@@ -1,4 +1,3 @@
-# cython: language_level=3, linetrace=True
 #
 # Reference arithmetic coding
 # Copyright (c) Project Nayuki

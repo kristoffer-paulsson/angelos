@@ -17,15 +17,6 @@ import asyncio
 import functools
 
 
-def loader(this_dir):
-    """Generator for package test loader."""
-    def load_tests(loader, suite, pattern):
-        """Test loader for a certain package."""
-        tests = loader.discover(start_dir=this_dir, pattern=pattern)
-        suite.addTests(tests)
-        return suite
-
-
 def run_async(coro):
     """Decorator for asynchronous test cases."""
 

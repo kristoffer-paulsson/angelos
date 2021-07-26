@@ -1,3 +1,23 @@
-#[run]
-#source = angelos-bin/src
-#plugins = Cython.Coverage
+[report]
+show_missing = true
+omit = *test_*
+
+[run]
+plugins = Cython.Coverage
+omit = *test_*
+source =
+    angelos
+    angelos.archive7
+    angelos.base
+    angelos.bin
+    angelos.com
+    angelos.common
+    angelos.ctl
+    angelos.document
+    angelos.eidon
+    angelos.facade
+    angelos.lib
+    angelos.net
+    angelos.portfolio
+    angelos.psi
+    angelos.server

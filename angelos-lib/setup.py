@@ -12,15 +12,24 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+from configparser import ConfigParser
 from pathlib import Path
 
 from Cython.Build import cythonize
+from Cython.Compiler.Options import get_directive_defaults
 from angelos.meta.setup import LibraryScanner
 from setuptools import setup, find_namespace_packages
 
 NAME = "angelos.lib"
-VERSION = "1.0.0b1"
-RELEASE = ""
+config = ConfigParser()
+config.read(Path(__file__).absolute().parents[1].joinpath("project.ini"))
+VERSION = config.get("common", "version")
+RELEASE = config.get("common", "release")
+PYTHON = config.get("common", "python")
+
+directive_defaults = get_directive_defaults()
+directive_defaults['language_level'] = config.getint("cython", "language_level")
+directive_defaults['linetrace'] = config.getboolean("cython", "linetrace")
 
 scan = {
     "glob": [
@@ -68,12 +77,8 @@ config = {
     "ext_modules": cythonize(
         LibraryScanner(str(Path("./src")), **scan).scan(),
         build_dir="build",
-        compiler_directives={
-            "language_level": 3,
-            "linetrace": True
-        }
     ),
-    "python_requires": ">=3.7, <4",
+    "python_requires": PYTHON,
 }
 
 setup(**config)

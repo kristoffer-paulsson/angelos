@@ -14,8 +14,8 @@
 #
 """Only put fixtures in main projects test package."""
 
-from test.fixture.util import run_async
-
 __all__ = [
     "run_async"
 ]
+
+from test.fixture.util import run_async

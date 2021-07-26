@@ -13,16 +13,17 @@
 #     Kristoffer Paulsson - initial implementation
 #
 import sys
+from configparser import ConfigParser
 from pathlib import Path
 
 from Cython.Build import cythonize
+from Cython.Compiler.Options import get_directive_defaults
+from angelos.meta.setup import LibraryScanner, Vendor, VendorCompileNacl
 from angelos.meta.setup.vendor import VendorDownload
 from setuptools import setup, find_namespace_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 from wheel.bdist_wheel import bdist_wheel
-
-from angelos.meta.setup import LibraryScanner, Vendor, VendorCompileNacl
 
 
 class CustomDevelop(develop):
@@ -52,8 +53,15 @@ class CustomBDistWheel(bdist_wheel):
 
 
 NAME = "angelos.bin"
-VERSION = "1.0.0b1"
-RELEASE = ""
+config = ConfigParser()
+config.read(Path(__file__).absolute().parents[1].joinpath("project.ini"))
+VERSION = config.get("common", "version")
+RELEASE = config.get("common", "release")
+PYTHON = config.get("common", "python")
+
+directive_defaults = get_directive_defaults()
+directive_defaults['language_level'] = config.getint("cython", "language_level")
+directive_defaults['linetrace'] = config.getboolean("cython", "linetrace")
 
 scan = {
     "glob": [
@@ -126,12 +134,8 @@ config = {
     "ext_modules": cythonize(
         LibraryScanner(str(Path("src")), **scan).scan(),
         build_dir="build",
-        compiler_directives={
-            "language_level": 3,
-            "linetrace": True
-        }
     ),
-    "python_requires": ">=3.7, <4",
+    "python_requires": PYTHON,
 }
 
 setup(**config)
