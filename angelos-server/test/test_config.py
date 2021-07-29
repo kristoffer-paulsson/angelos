@@ -68,7 +68,9 @@ class TestConfig(TestCase):
 
         print(server.ioc.env)
         for key in server.ioc.env:
-            print("ENV;    {}: {}".format(key, server.ioc.env[key]))
+            pass
+            # print("ENV;    {}: {}".format(key, server.ioc.env[key]))
 
         for key in server.ioc.config:
-            print("CONFIG; {}: {}".format(key, server.ioc.config[key]))
+            pass
+            # print("CONFIG; {}: {}".format(key, server.ioc.config[key]))

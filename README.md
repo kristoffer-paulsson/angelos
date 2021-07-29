@@ -39,7 +39,7 @@ _On macOS make sure to run "Install Certificates.command" once in order for down
 > 
 > &gt; python setup.py develop
 > 
-> &gt; coverage run -m unittest discover
+> &gt; coverage run -m unittest  angelos-\*/test/test_\*
 
 ## Run in virtualenv
 

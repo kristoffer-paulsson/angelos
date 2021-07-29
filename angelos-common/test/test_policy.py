@@ -170,4 +170,4 @@ class Test_evaluate(TestCase):
 
 class Test_policy(TestCase):
     def test_policy(self):
-        self.fail()
+        policy("Hello", 2, 3)

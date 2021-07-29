@@ -42,7 +42,7 @@ class TestOwnerMixin(TestCase):
         self.assertTrue(self.instance.apply_rules())
 
 
-class ATestDocument(BaseDocument, IssueMixin, UpdatedMixin):
+class ATestDocument(Document, IssueMixin, UpdatedMixin):
     """Simulates fields: signature, issuer, updated, expires."""
     created = DateField()
     expires = DateField(

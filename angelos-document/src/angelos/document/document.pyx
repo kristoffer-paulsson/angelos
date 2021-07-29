@@ -280,7 +280,7 @@ class Document(IssueMixin, BaseDocument):
             Description of returned object.
 
         """
-        month = self.expires - datetime.timedelta(days=self.period())
+        month = self.expires - datetime.timedelta(days=30)
         today = datetime.date.today()
         return month <= today <= self.expires
 

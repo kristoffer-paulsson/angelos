@@ -20,4 +20,3 @@ from angelos.bin.term import Stream
 class TestTerminal(TestCase):
     def test_run(self):
         term = Stream()
-        print(term)
