@@ -59,6 +59,7 @@ scan = {
     "extra": {
     },
     "basic": {
+        "extra_compile_args": ["-DCYTHON_TRACE_NOGIL=1" if config.getboolean("cython", "linetrace") else ""],
     }
 }
 
