@@ -194,6 +194,8 @@ else:
     class KeyLoader(BaseKeyLoader):
         """Dummy implementation."""
 
+        dummy = True
+
         @classmethod
         def _get_key(cls, realm: str, name: str):
             raise NotImplementedError("Not implemented for platform: {}".format(sys.platform))

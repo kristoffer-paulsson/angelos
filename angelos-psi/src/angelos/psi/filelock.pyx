@@ -76,6 +76,8 @@ else:
     class FileLock(BaseFileLock):
         """Dummy file lock without implementation."""
 
+        dummy = True
+
         @classmethod
         def acquire(cls, fd):
             raise NotImplementedError("Not implemented for platform: {}".format(os.name))

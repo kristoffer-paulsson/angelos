@@ -66,7 +66,7 @@ class TestConfig(TestCase):
     def test_server(self):
         server = ServerStub()
 
-        print(server.ioc.env)
+        # print(server.ioc.env)
         for key in server.ioc.env:
             pass
             # print("ENV;    {}: {}".format(key, server.ioc.env[key]))
