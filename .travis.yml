@@ -8,3 +8,6 @@ os:
 script:
   - pip install -r requirements.txt
   - python setup.py develop
+  - coverage run --branch -m unittest angelos-*/test/test_*
+  - coverage xml
+  - bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.xml

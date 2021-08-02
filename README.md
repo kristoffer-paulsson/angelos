@@ -7,6 +7,7 @@
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ce492ea15eb2477caac227d422c3aae4)](https://www.codacy.com/gh/kristoffer-paulsson/angelos/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=kristoffer-paulsson/angelos&amp;utm_campaign=Badge_Grade)
 [![Build Status](https://travis-ci.com/kristoffer-paulsson/angelos.svg?branch=master)](https://travis-ci.com/kristoffer-paulsson/angelos)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/ce492ea15eb2477caac227d422c3aae4)](https://www.codacy.com/gh/kristoffer-paulsson/angelos/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=kristoffer-paulsson/angelos&amp;utm_campaign=Badge_Coverage)
 
 ## Online presence
 
@@ -39,7 +40,11 @@ _On macOS make sure to run "Install Certificates.command" once in order for down
 > 
 > &gt; python setup.py develop
 > 
-> &gt; coverage run -m unittest  angelos-\*/test/test_\*
+> &gt; coverage run --branch -m unittest angelos-\*/test/test_\*
+>
+> &gt; coverage report
+> 
+> &gt; coverage xml
 
 ## Run in virtualenv
 

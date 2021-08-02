@@ -1,15 +1,25 @@
+#
+# Copyright (c) 2021 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+#
+# This software is available under the terms of the MIT license. Parts are licensed under
+# different terms if stated. The legal terms are attached to the LICENSE file and are
+# made available on:
+#
+#     https://opensource.org/licenses/MIT
+#
+# SPDX-License-Identifier: MIT
+#
+# Contributors:
+#     Kristoffer Paulsson - initial implementation
+#
 import glob
 import os
 import re
-import sys
-from collections import defaultdict
 
-from coverage.files import canonical_filename
 from coverage.plugin import CoveragePlugin, FileTracer, FileReporter
 
 
 class Tracer(FileTracer):
-
     cache = dict()
 
     def __init__(self, filename, file, prefixes):
@@ -50,7 +60,7 @@ class Reporter(FileReporter):
         for prefix in self._sources:
             if filename.startswith(prefix):
                 prefix_len = len(prefix)
-                cfile = filename[:prefix_len-3] + "build/" + filename[prefix_len-3:-4] + ".c"
+                cfile = filename[:prefix_len - 3] + "build/" + filename[prefix_len - 3:-4] + ".c"
                 if os.path.isfile(cfile):
                     self._cfile = cfile
                 break
@@ -125,11 +135,11 @@ class Reporter(FileReporter):
 
 
 class Coverage(CoveragePlugin):
-
     _sources = list()
 
     def file_tracer(self, filename):
-        return Tracer(filename, filename.startswith(self._sources) and filename.endswith((".pyx", ".pxd")), self._sources)
+        return Tracer(filename, filename.startswith(self._sources) and filename.endswith((".pyx", ".pxd")),
+                      self._sources)
 
     def file_reporter(self, filename):
         return Reporter(filename, self._sources)
