@@ -18,8 +18,6 @@ from pathlib import PurePath
 here = PurePath(__file__)
 sys.path.append(here.parents[2].joinpath("test"))
 
-print(sys.path)
-
 def load_tests(loader, suite, pattern):
     """Test loader for a certain package."""
     tests = loader.discover(start_dir=here.parents[0], pattern=pattern)
