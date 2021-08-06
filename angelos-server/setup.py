@@ -12,16 +12,17 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+import os
+import subprocess
 from configparser import ConfigParser
 from pathlib import Path
 
 from Cython.Build import cythonize
 from Cython.Compiler.Options import get_directive_defaults
 from angelostools.pyxscanner import PyxScanner
-from angelostools.setup import Vendor
 from angelostools.setup.executable import Executable
 from angelostools.setup.script import Script
-from angelostools.setup.vendor import VendorCompile
+from angelostools.setup.vendor import Vendor, VendorCompile
 from setuptools import setup, find_namespace_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
