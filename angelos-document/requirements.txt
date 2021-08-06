@@ -1,5 +1,4 @@
 cython
-../angelos-meta
 
 msgpack
 

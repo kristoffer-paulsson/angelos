@@ -15,7 +15,7 @@
 import os
 from pathlib import Path
 
-from angelos.meta.scanner import NamespacePackageScanner
+from angelostools.nsscanner import NamespacePackageScanner
 
 
 TEMPLATE_PACKAGE = """
@@ -91,12 +91,14 @@ class DocGenerator:
             self.write_namespace(nspkg, "\n    ".join([pkg.replace(".", "_") + ".rst" for pkg in self._pkgs[nspkg]]))
             for module in self._pkgs[nspkg]:
                 self.write_module(module)
+        print("Run \033[92mpython setup.py build_sphinx\033[0m to generate html documentation.")
 
     def write_package(self, toc: str):
         with open(self._docs.joinpath(self._name + ".rst"), "w") as file:
             file.write(TEMPLATE_PACKAGE.format(self._name, toc, "="*len(self._name)))
 
     def write_namespace(self, pkg: str, toc: str):
+        print("Namespace:", pkg)
         with open(self._docs.joinpath(pkg.replace(".", "_") + ".rst"), "w") as file:
             file.write(TEMPLATE_NAMESPACE.format(pkg, toc, "="*len(pkg)))
 

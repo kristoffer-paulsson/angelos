@@ -18,11 +18,12 @@ from unittest import TestCase
 
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
-from angelos.meta.fake import Generate
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
 from angelos.portfolio.statement.accept import AcceptTrustedStatement, AcceptVerifiedStatement, \
     AcceptRevokedStatement
 from angelos.portfolio.statement.create import CreateTrustedStatement, CreateVerifiedStatement, CreateRevokedStatement
+
+from test.fixture.generate import Generate
 
 
 class TestAcceptTrustedStatement(TestCase):

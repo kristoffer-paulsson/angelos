@@ -17,10 +17,11 @@ from unittest import TestCase
 
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
-from angelos.meta.fake import Generate
 from angelos.portfolio.collection import FrozenPortfolioError
 from angelos.portfolio.domain.create import CreateDomain, DomainCreateException
 from angelos.portfolio.entity.create import CreatePersonEntity
+
+from test.fixture.generate import Generate
 
 
 class TestCreateDomain(TestCase):

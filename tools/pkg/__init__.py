@@ -12,21 +12,4 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-import asyncio
-import functools
-
-
-def run_async(coro):
-    """Decorator for asynchronous test cases."""
-
-    @functools.wraps(coro)
-    def wrapper(*args, **kwargs):
-        """Execute the coroutine with asyncio.run()"""
-        return asyncio.run(coro(*args, **kwargs))
-
-    return wrapper
-
-
-__all__ = [
-    "run_async"
-]
+"""Tool support for packaging distributions of the server."""

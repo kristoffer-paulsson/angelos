@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018-2021 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
+# Copyright (c) 2018-2020 by Kristoffer Paulsson <kristoffer.paulsson@talenten.se>.
 #
 # This software is available under the terms of the MIT license. Parts are licensed under
 # different terms if stated. The legal terms are attached to the LICENSE file and are
@@ -12,7 +12,6 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
-"""Generators for dummy data."""
 import datetime
 import ipaddress
 import os
@@ -20,12 +19,14 @@ import random
 import string
 import uuid
 
-from test.fixture.lipsum import MALE_NAMES, FEMALE_NAMES, SURNAMES, LIPSUM_WORDS, CHURCHES, LIPSUM_LINES
+from .lipsum import MALE_NAMES, FEMALE_NAMES, LIPSUM_WORDS, CHURCHES, LIPSUM_LINES, SURNAMES
 
 
 class Generate:
-    @staticmethod
-    def person_data(num=1):
+    """Generate proper fake data."""
+
+    @classmethod
+    def person_data(cls, num=1):
         """Generate random entity data for number of person entities."""
         identities = []
         for i in range(num):
@@ -45,18 +46,18 @@ class Generate:
                 days=random.randrange(4748, 29220)
             )
 
-            entity = object()
-            entity.given_name = names[0]
-            entity.names = names
-            entity.family_name = random.choices(SURNAMES, k=1)[0].capitalize()
-            entity.sex = sex
-            entity.born = born
+            entity = dict()
+            entity["given_name"] = names[0]
+            entity["names"] = names
+            entity["family_name"] = random.choices(SURNAMES, k=1)[0].capitalize()
+            entity["sex"] = sex
+            entity["born"] = born
             identities.append(entity)
 
         return identities
 
-    @staticmethod
-    def ministry_data(num=1):
+    @classmethod
+    def ministry_data(cls, num=1):
         """Generate random entity data for number of ministry entities."""
         ministries = []
         for i in range(num):
@@ -66,16 +67,16 @@ class Generate:
                 days=random.randrange(365, 29220)
             )
 
-            entity = object()
-            entity.ministry = " ".join(ministry).capitalize()
-            entity.vision = " ".join(vision).capitalize()
-            entity.founded = founded
+            entity = dict()
+            entity["ministry"] = " ".join(ministry).capitalize()
+            entity["vision"] = " ".join(vision).capitalize()
+            entity["founded"] = founded
             ministries.append(entity)
 
         return ministries
 
-    @staticmethod
-    def church_data(num=1):
+    @classmethod
+    def church_data(cls, num=1):
         """Generate random entity data for number of church entities."""
         churches = []
         for i in range(num):
@@ -84,31 +85,31 @@ class Generate:
                 days=random.randrange(730, 29220)
             )
 
-            entity = object()
-            entity.founded = founded
-            entity.city = church[0]
-            entity.region = church[1]
-            entity.country = church[2]
+            entity = dict()
+            entity["founded"] = founded
+            entity["city"] = church[0]
+            entity["region"] = church[1]
+            entity["country"] = church[2]
             churches.append(entity)
 
         return churches
 
-    @staticmethod
-    def lipsum() -> bytes:
+    @classmethod
+    def lipsum(cls, upper: int = 10) -> bytes:
         """Random lipsum data generator."""
         return (
-            "\n".join(random.choices(LIPSUM_LINES, k=random.randrange(1, 10)))
+            "\n".join(random.choices(LIPSUM_LINES, k=random.randrange(1, upper)))
         ).encode("utf-8")
 
-    @staticmethod
-    def lipsum_sentence() -> str:
+    @classmethod
+    def lipsum_sentence(cls, upper: int = 10) -> str:
         """Random sentence"""
         return (
-            " ".join(random.choices(LIPSUM_WORDS, k=random.randrange(3, 10)))
+            " ".join(random.choices(LIPSUM_WORDS, k=random.randrange(3, upper)))
         ).capitalize()
 
-    @staticmethod
-    def filename(postfix=".txt"):
+    @classmethod
+    def filename(cls, postfix=".txt"):
         """Random file name generator."""
         return (
                 "".join(
@@ -120,22 +121,20 @@ class Generate:
                 + postfix
         )
 
-    @staticmethod
-    def uuid():
+    @classmethod
+    def uuid(cls):
         """Random uuid."""
-        return uuid.UUID(bytes=os.urandom(16))
+        return uuid.uuid4()
 
-    @staticmethod
-    def ipv4():
+    @classmethod
+    def ipv4(cls):
         """Random uuid."""
         return ipaddress.IPv4Address(os.urandom(4))
 
-    @staticmethod
-    def new_secret() -> bytes:
+    @classmethod
+    def new_secret(cls) -> bytes:
         """Generate encryption key.
-
         Returns (bytes):
             Encryption key
-
         """
         return os.urandom(32)

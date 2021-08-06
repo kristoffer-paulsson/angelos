@@ -26,6 +26,7 @@ Download source tree from Github.
 
 _On macOS make sure to run "Install Certificates.command" once in order for download to work._
 
+### Create virtualenv
 > &gt; pip list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  | xargs -n1 pip install -U
 >
 > &gt; git clone git://github.com/kristoffer-paulsson/angelos.git
@@ -35,16 +36,27 @@ _On macOS make sure to run "Install Certificates.command" once in order for down
 > &gt; virtualenv -p /usr/bin/python3.7 venv
 > 
 > &gt; source venv/bin/activate
-> 
+
+
+### Setup in environment
 > &gt; pip install -r requirements.txt
 > 
 > &gt; python setup.py develop
-> 
+
+
+### Generate coverage 
 > &gt; coverage run --branch -m unittest angelos-\*/test/test_\*
 >
 > &gt; coverage report
 > 
 > &gt; coverage xml
+
+### Generate documentation
+> &gt; python tools/documenter.py
+> 
+> &gt; python setup.py build_sphinx
+
+The html is found in _build/sphinx/html_
 
 ## Run in virtualenv
 

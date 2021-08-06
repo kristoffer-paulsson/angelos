@@ -1,6 +1,4 @@
 # Runtime environment
-../angelos-meta/
-
 ../angelos-bin/
 
 -e .

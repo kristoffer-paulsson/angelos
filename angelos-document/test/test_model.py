@@ -24,7 +24,7 @@ from unittest import TestCase
 from angelos.document.model import Field, UuidField, BaseDocument, DocumentField, IPField, DateField, DateTimeField, \
     TypeField, BinaryField, SignatureField, StringField, ChoiceField, RegexField, EmailField, DocumentMeta, FieldError
 
-from angelos.meta.fake import Generate
+from test.fixture.generate import Generate
 
 
 class BaseTestField(TestCase):

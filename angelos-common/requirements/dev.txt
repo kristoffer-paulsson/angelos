@@ -2,6 +2,5 @@
 pytest
 coverage
 cython
-../angelos-meta/
 
 -e .

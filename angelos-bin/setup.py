@@ -12,14 +12,17 @@
 # Contributors:
 #     Kristoffer Paulsson - initial implementation
 #
+import platform
+import subprocess
 import sys
 from configparser import ConfigParser
 from pathlib import Path
 
 from Cython.Build import cythonize
 from Cython.Compiler.Options import get_directive_defaults
-from angelos.meta.setup import LibraryScanner, Vendor, VendorCompileNacl
-from angelos.meta.setup.vendor import VendorDownload
+from angelostools.pyxscanner import PyxScanner
+from angelostools.setup import Vendor
+from angelostools.setup.vendor import VendorDownload, VendorCompile
 from setuptools import setup, find_namespace_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
@@ -50,6 +53,24 @@ class CustomBDistWheel(bdist_wheel):
         """Carry out preparations and adaptions."""
         self.run_command("vendor")
         bdist_wheel.run(self)
+
+
+class VendorCompileNacl(VendorCompile):
+    """Compile libsodium."""
+
+    def build(self):
+        """Build sources."""
+        subprocess.check_call("./configure", cwd=self._work, shell=True)
+        # CFLAGS='-fPIC -O' CentOS specific only (?)
+        if platform.system() == "Linux":
+            subprocess.check_call("make CFLAGS='-fPIC -O' && make check", cwd=self._work, shell=True)
+        else:
+            subprocess.check_call("make && make check", cwd=self._work, shell=True)
+
+    def install(self):
+        """Install binaries."""
+        subprocess.check_call(
+            "make install DESTDIR=$(cd {0}; pwd)".format(Path(self._base)), cwd=self._work, shell=True)
 
 
 NAME = "angelos.bin"
@@ -133,7 +154,7 @@ config = {
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "namespace_packages": ["angelos"],
     "ext_modules": cythonize(
-        LibraryScanner(str(Path("src")), **scan).scan(),
+        PyxScanner(str(Path("src")), **scan).scan(),
         build_dir="build",
     ),
     "python_requires": PYTHON,

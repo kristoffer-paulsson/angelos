@@ -32,7 +32,6 @@ class SubPackages:
     """Subpackages to execute commands on."""
 
     NAMESPACES = {
-        "angelos.meta": "angelos-meta",
         "angelos.base": "angelos-base",
         "angelos.psi": "angelos-psi",
         "angelos.common": "angelos-common",

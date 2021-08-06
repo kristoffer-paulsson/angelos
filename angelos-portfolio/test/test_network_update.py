@@ -16,13 +16,14 @@
 from unittest import TestCase
 
 from angelos.common.policy import evaluate
-from angelos.meta.fake import Generate
 from angelos.portfolio.domain.create import CreateDomain
 from angelos.portfolio.entity.create import CreateChurchEntity
 from angelos.portfolio.network.create import CreateNetwork
 from angelos.portfolio.network.update import UpdateNetwork
 from angelos.portfolio.node.create import CreateNode, IPv4Address
 from angelos.portfolio.portfolio.setup import ChurchData
+
+from test.fixture.generate import Generate
 
 
 class TestUpdateNetwork(TestCase):

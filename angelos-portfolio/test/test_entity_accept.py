@@ -17,7 +17,6 @@ import copy
 
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
-from angelos.meta.fake import Generate
 from angelos.portfolio.entity.accept import AcceptEntity, AcceptUpdatedEntity, AcceptNewKeys
 from angelos.portfolio.entity.newkey import NewKeys
 from angelos.portfolio.entity.update import UpdatePersonEntity
@@ -25,6 +24,8 @@ from angelos.portfolio.entity.create import CreatePersonEntity
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio
 
 from unittest import TestCase
+
+from test.fixture.generate import Generate
 
 
 def new_data(first: dict, second: dict, changeables: tuple):

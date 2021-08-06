@@ -64,6 +64,7 @@ FILTER = [
     "/tests/",
     "/unittest/",
     "/test_",
+    "/check_",
     "/distutils/",
     "/angelos/meta/",
     "/tkinter/",

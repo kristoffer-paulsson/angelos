@@ -15,10 +15,11 @@
 """Security tests putting the policies to the test."""
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData, MinistryData, ChurchData
-from angelos.meta.fake import Generate
 from angelos.portfolio.portfolio.setup import SetupPersonPortfolio, SetupMinistryPortfolio, SetupChurchPortfolio
 
 from unittest import TestCase
+
+from test.fixture.generate import Generate
 
 
 class TestSetupPersonPortfolio(TestCase):

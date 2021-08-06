@@ -17,7 +17,7 @@ from pathlib import Path
 
 from Cython.Build import cythonize
 from Cython.Compiler.Options import get_directive_defaults
-from angelos.meta.setup import LibraryScanner
+from angelostools.pyxscanner import PyxScanner
 from setuptools import setup, find_namespace_packages
 
 NAME = "angelos.com"
@@ -60,7 +60,7 @@ config = {
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "namespace_packages": ["angelos"],
     "ext_modules": cythonize(
-        LibraryScanner(str(Path("./src")), **scan).scan(),
+        PyxScanner(str(Path("./src")), **scan).scan(),
         build_dir="build",
     ),
     "python_requires": PYTHON,

@@ -3,8 +3,6 @@ pytest
 coverage
 cython
 
-../angelos-meta/
-
 contextvars;python_version<"3.7"
 
 ../angelos-common/

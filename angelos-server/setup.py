@@ -17,9 +17,11 @@ from pathlib import Path
 
 from Cython.Build import cythonize
 from Cython.Compiler.Options import get_directive_defaults
-from angelos.meta.setup import LibraryScanner, Vendor, VendorCompilePython
-from angelos.meta.setup.executable import Executable
-from angelos.meta.setup.script import Script
+from angelostools.pyxscanner import PyxScanner
+from angelostools.setup import Vendor
+from angelostools.setup.executable import Executable
+from angelostools.setup.script import Script
+from angelostools.setup.vendor import VendorCompile
 from setuptools import setup, find_namespace_packages
 from setuptools.command.develop import develop
 from setuptools.command.install import install
@@ -38,6 +40,36 @@ class CustomInstall(install):
     def run(self):
         """Carry out preparations and adaptions."""
         install.run(self)
+
+
+class VendorCompilePython(VendorCompile):
+    """Compile and install Python binary."""
+
+    EXCLUDE = (
+        "PYCHARM_MATPLOTLIB_INTERACTIVE", "IPYTHONENABLE", "PYDEVD_LOAD_VALUES_ASYNC",
+        "__PYVENV_LAUNCHER__", "PYTHONUNBUFFERED", "PYTHONIOENCODING",
+        "VERSIONER_PYTHON_VERSION", "PYCHARM_MATPLOTLIB_INDEX", "PYCHARM_DISPLAY_PORT",
+        "PYTHONPATH"
+    )
+
+    _env = None
+
+    def build(self):
+        """Build sources."""
+        self._env = {k: os.environ[k] for k in os.environ.keys() if k not in self.EXCLUDE}
+
+        subprocess.run(
+            "./configure --enable-optimization --with-lto --prefix={}".format(self._prefix),
+            cwd=self._work, shell=True, env=self._env
+        )
+
+        subprocess.run("make", cwd=self._work, shell=True, env=self._env)
+        # subprocess.run("make test", cwd=self._work, shell=True, env=self._env)
+
+    def install(self):
+        """Install binaries."""
+        subprocess.run(
+            "make install".format(self._prefix), cwd=self._work, shell=True, env=self._env)
 
 
 NAME = "angelos.server"
@@ -121,7 +153,7 @@ config = {
     "packages": find_namespace_packages(where="src", include=["angelos.*"]),
     "namespace_packages": ["angelos"],
     "ext_modules": cythonize(
-        LibraryScanner(str(Path("./src")), **scan).scan(),
+        PyxScanner(str(Path("./src")), **scan).scan(),
         build_dir="build",
     ),
     "python_requires": PYTHON,

@@ -15,11 +15,14 @@
 """Security tests putting the policies to the test."""
 import copy
 
-import pyximport; pyximport.install()
+import pyximport;
+
+from test.fixture.generate import Generate
+
+pyximport.install()
 from angelos.portfolio.entity.newkey import NewKeys
 from angelos.common.policy import evaluate
 from angelos.lib.policy.types import PersonData
-from angelos.meta.fake import Generate
 from angelos.portfolio.entity.create import CreatePersonEntity
 
 from unittest import TestCase

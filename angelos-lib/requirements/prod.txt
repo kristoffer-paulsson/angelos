@@ -1,5 +1,5 @@
 # Runtime environment
-../angelos-meta/
+
 
 ../angelos-document/
 ../angelos-common/
