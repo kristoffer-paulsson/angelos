@@ -4,3 +4,4 @@ wheel
 coverage
 cython
 sphinx
+git+https://github.com/kristoffer-paulsson/angelostools.git
