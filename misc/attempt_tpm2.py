@@ -13,7 +13,10 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Trusted platform module interaction set according to TPM 2.0."""
+import ipaddress
+import itertools
 import os
+import socket
 import time
 from pathlib import PosixPath
 from struct import Struct
@@ -45,17 +48,121 @@ class StartupType:
 
 class CommandCodes:
     """TPM2 Command Codes."""
-    FIRST = 0x0000011F
+    NV_UNDEFINE_SPACE_SPECIAL = 0x0000011F
     EVICT_CONTROL = 0x00000120
+    HIERARCHY_CONTROL = 0x00000121
+    NV_UNDEFINE_SPACE = 0x00000122
+    CHANGE_EPS = 0x00000124
+    CHANGE_PPS = 0x00000125
     CLEAR = 0x00000126
+    CLEAR_CONTROL = 0x00000127
+    CLOCK_SET = 0x00000128
+    HIERARCHY_CHANGE_AUTH = 0x00000129
+    NV_DEFINE_SPACE = 0x0000012A
+    PCR_ALLOCATE = 0x0000012B
+    PCR_SET_AUTH_POLICY = 0x0000012C
+    PP_COMMANDS = 0x0000012D
     SET_PRIMARY_POLICY = 0x0000012E
+    FIELD_UPGRADE_START = 0x0000012F
+    CLOCK_RATE_ADJUST = 0x00000130
+    CREATE_PRIMARY = 0x00000131
+    NV_GLOBAL_WRITE_LOCK = 0x00000132
+    GET_COMMAND_AUDIT_DIGEST = 0x00000133
+    NV_INCREMENT = 0x00000134
+    NV_SET_BITS = 0x00000135
+    NV_EXTEND = 0x00000136
+    NV_WRITE = 0x00000137
+    NV_WRITE_LOCK = 0x00000138
+    DICTIONARY_ATTACK_LOCK_RESET = 0x00000139
+    DICTIONARY_ATTACK_PARAMETERS = 0x0000013A
+    NV_CHANGE_AUTH = 0x0000013B
+    PCR_EVENT = 0x0000013C
+    PCR_RESET = 0x0000013D
+    SEQUENCE_COMPLETE = 0x0000013E
+    SET_ALGORITHM_SET = 0x0000013
+    SET_COMMAND_CODE_AUDIT_STATUS = 0x00000140
+    FIELD_UPGRADE_DATA = 0x00000141
+    INCREMENTAL_SELF_TEST = 0x00000142
+    SELF_TEST = 0x00000143
     STARTUP = 0x00000144
     SHUTDOWN = 0x00000145
+    STIR_RANDOM = 0x00000146
+    ACTIVATE_CREDENTIAL = 0x00000147
+    CERTIFY = 0x00000148
+    POLICY_NV = 0x00000149
+    CERTIFY_CREATION = 0x0000014A
+    DUPLICATE = 0x0000014B
+    GET_TIME = 0x0000014C
+    GET_SESSION_AUDIT_DIGEST = 0x0000014D
+    NV_READ = 0x0000014E
+    NV_READ_LOCK = 0x0000014F
+    OBJECT_CHANGE_AUTH = 0x00000150
+    POLICY_SECRET = 0x00000151
+    REWRAP = 0x00000152
+    CREATE = 0x00000153
+    ECDH_ZGEN = 0x00000154
+    HMAC = 0x00000155
+    IMPORT = 0x00000156
     LOAD = 0x00000157
+    QUOTE = 0x00000158
+    RSA_DECRYPT = 0x00000159
+    HMAC_START = 0x0000015B
+    SEQUENCE_UPDATE = 0x0000015C
+    SIGN = 0x0000015D
+    UNSEAL = 0x0000015E
+    POLICY_SIGNED = 0x00000160
+    CONTEXT_LOAD = 0x00000161
+    CONTEXT_SAVE = 0x00000162
+    ECDH_KEY_GEN = 0x00000163
+    ENCRYPT_DECRYPT = 0x00000164
+    FLUSH_CONTEXT = 0x00000165
     LOAD_EXTERNAL = 0x00000167
+    MAKE_CREDENTIAL = 0x00000168
+    NV_READ_PUBLIC = 0x00000169
+    POLICY_AUTHORIZE = 0x0000016A
+    POLICY_AUTH_VALUE = 0x0000016B
+    POLICY_COMMAND_CODE = 0x0000016C
+    POLICY_COUNTER_TIMER = 0x0000016D
+    POLICY_CP_HASH = 0x0000016E
+    POLICY_LOCALITY = 0x0000016F
+    POLICY_NAME_HASH = 0x00000170
+    POLICY_OR = 0x00000171
+    POLICY_TICKET = 0x00000172
+    READ_PUBLIC = 0x00000173
+    RSA_ENCRYPT = 0x00000174
+    START_AUTH_SESSION = 0x00000176
     VERIFY_SIGNATURE = 0x00000177
+    ECC_PARAMETERS = 0x00000178
+    FIRMWARE_READ = 0x00000179
     GET_CAPABILITY = 0x0000017A
     GET_RANDOM = 0x0000017B
+    GET_TEST_RESULT = 0x0000017C
+    HASH = 0x0000017D
+    PCR_READ = 0x0000017E
+    POLICY_PCR = 0x0000017F
+    POLICY_RESTART = 0x00000180
+    READ_CLOCK = 0x00000181
+    PCR_EXTEND = 0x00000182
+    PCR_SET_AUTH_VALUE = 0x00000183
+    NV_CERTIFY = 0x00000184
+    EVENT_SEQUENCE_COMPLETE = 0x00000185
+    HASH_SEQUENCE_START = 0x00000186
+    POLICY_PHYSICAL_PRESENCE = 0x00000187
+    POLICY_DUPLICATION_SELECT = 0x00000188
+    POLICY_GET_DIGEST = 0x00000189
+    TEST_PARAMS = 0x0000018A
+    COMMIT = 0x0000018B
+    POLICY_PASSWORD = 0x0000018C
+    ZGEN_2PHASE = 0x0000018D
+    EC_EPHEMERAL = 0x0000018E
+    POLICY_NV_WRITTEN = 0x0000018F
+    POLICY_TEMPLATE = 0x00000190
+    CREATE_LOADED = 0x00000191
+    POLICY_AUTHORIZE_NV = 0x00000192
+    ENCRYPT_DECRYPT_2 = 0x00000193
+
+
+COMMAND_CODES = dict((v, k) for k, v in vars(CommandCodes).items())
 
 
 class ResponseCodes:
@@ -276,13 +383,10 @@ class BaseTPM2Device:
 
         if 1024 < len(payload) < 10:
             raise ValueError("Size of payload to large or small.")
-        if os.write(self._fd, payload) != len(payload):
-            raise OSError("Error at TPM module, failed writing.")
-
-        response = os.read(self._fd, 4096)
+        response = self._write(payload)
 
         if len(response) < 10:
-            raise OSError("Failed retrieving result from TPM module.")
+            raise OSError("Failed retrieving result from TPM module. Response: {}".format(response))
         tag, response_size, response_code, response_data = self.PACKER.unpack_from(response) + (response[10:],)
         if len(response) != response_size:
             raise OSError("Retrieved data size inconsistent.")
@@ -307,20 +411,23 @@ class BaseTPM2Device:
 class BaseTPM2Operation:
     """Base TPM module operations class"""
 
+    def __init__(self, device_cls):
+        self._device = device_cls
+
     def startup(self, startup_type: int):
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, _ = device.send(
             False, CommandCodes.STARTUP, int(startup_type).to_bytes(2, "big", signed=False))
         device.validate(tag, response_code)
 
     def shutdown(self, shutdown_type: int):
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, _ = device.send(
             False, CommandCodes.SHUTDOWN, int(shutdown_type).to_bytes(2, "big", signed=False))
         device.validate(tag, response_code)
 
     def get_random(self, bytes_requested: int) -> bytes:
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, random_bytes = device.send(
             False, CommandCodes.GET_RANDOM, int(bytes_requested).to_bytes(2, "big", signed=False))
 
@@ -330,7 +437,7 @@ class BaseTPM2Operation:
     def set_primary_policy(
             self, auth_handle: int, auth_policy: bytes = b"\x00\x00", hash_alg: int = AlgorithmConstants.NULL):
         """Set primary policy."""
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, _ = device.send(
             False, CommandCodes.SET_PRIMARY_POLICY,
             int(auth_handle).to_bytes(4, "big", signed=False) +
@@ -341,7 +448,7 @@ class BaseTPM2Operation:
         device.validate(tag, response_code)
 
     def verify_signature(self, key_handle: int, digest: bytes, signature: bytes) -> bool:
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, validation = device.send(
             False, CommandCodes.VERIFY_SIGNATURE,
             int(key_handle).to_bytes(4, "big", signed=False) +
@@ -352,7 +459,7 @@ class BaseTPM2Operation:
         return True if validation[:2] == int(StructureTags.VERIFIED).to_bytes(2, "big", signed=False) else False
 
     def load(self, session: bool, parent_handle: int, in_private: bytes, in_public: bytes) -> Tuple[bytes, bytes]:
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, result = device.send(
             session, CommandCodes.LOAD,
             int(parent_handle).to_bytes(4, "big", signed=False) +
@@ -368,7 +475,7 @@ class BaseTPM2Operation:
         return object_handle, name
 
     def load_external(self, session: bool, in_private: bytes, in_public: bytes, hierarchy: int) -> Tuple[bytes, bytes]:
-        device = TPM2Device()
+        device = self._device()
         if in_private is None:
             in_private = int(PermanentHandles.NULL).to_bytes(4, "big", signed=False)
         tag, response_code, result = device.send(
@@ -386,7 +493,7 @@ class BaseTPM2Operation:
         return object_handle, name
 
     def evict_control(self, platform: bool, object_handle: int, persistent_handle: int):
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, _ = device.send(
             True, CommandCodes.EVICT_CONTROL,
             int(PermanentHandles.PLATFORM if platform else PermanentHandles.OWNER).to_bytes(4, "big", signed=False) +
@@ -421,6 +528,29 @@ if os.name == "posix":
             return os.read(self._fd, 4096)
 
 
+    class TPM2Simulator(BaseTPM2Device):
+        """Representation of current TPM simulator."""
+
+        IP = ("127.0.0.1", 2321)
+        PACKER = Struct("!HII")
+
+        def __init__(self):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket.connect(self.IP)
+
+        def __del__(self):
+            if getattr(self, "_socket", None):
+                self._socket.close()
+
+        def _write(self, payload: bytes) -> bytes:
+            if self._socket.send(payload) != len(payload):
+                raise OSError("Error at TPM module, socket connection broken.")
+            chunk = self._socket.recv(4096)
+            if chunk == b"":
+                raise OSError("Error at TPM module, socket connection broken.")
+            return chunk
+
+
 elif os.name == "nt":
 
     pass
@@ -442,9 +572,6 @@ class TPM2Session:
 
 class TestOperation(BaseTPM2Operation):
 
-    def __init__(self):
-        pass
-
     def reset(self):
         print("SHUTDOWN")
         self.shutdown(StartupType.CLEAR)
@@ -459,14 +586,15 @@ class TestOperation(BaseTPM2Operation):
         print("RESPONSE CODE", response_code)
 
     def clear(self, auth_handle: int):
-        device = TPM2Device()
+        device = self._device()
         tag, response_code, _ = device.send(
             True, CommandCodes.CLEAR, int(auth_handle).to_bytes(4, "big", signed=False))
         device.validate(tag, response_code)
 
-    def get_capabilities(self, session: bool, capability: int, property: int, property_count: int) -> Tuple[
-        bool, bytes]:
-        device = TPM2Device()
+    def get_capabilities(
+            self, session: bool, capability: int, property: int, property_count: int
+    ) -> Tuple[bool, bytes]:
+        device = self._device()
         tag, response_code, data = device.send(
             session, CommandCodes.GET_CAPABILITY,
             int(capability).to_bytes(4, "big", signed=False) +
@@ -476,9 +604,23 @@ class TestOperation(BaseTPM2Operation):
         device.validate(tag, response_code)
         more_data = bool(data[:1])
         capability_data = data[1:]
+        if more_data and capability == Capabilities.COMMANDS:
+            self._capability_cc(capability_data)
         return more_data, capability_data
-        print("MORE_DATA", more_data)
-        print("CAPABILITY_DATA", capability_data)
+
+    def _capability_cc(self, capability_data: bytes):
+        if int.from_bytes(capability_data[:4], "big", signed=False) != Capabilities.COMMANDS:
+            raise TypeError("Requested command code capabilities but got different.")
+        count = int.from_bytes(capability_data[5:8], "big", signed=False)
+        data = capability_data[8:]
+        if (count * 4) != len(data):
+            raise TypeError("Capability data of wrong length")
+
+        print("="*80)
+        for step in range(count):
+            idx = step*4
+            command_index = int.from_bytes(data[idx+2: idx+4], "big", signed=False)
+            print(hex(command_index), COMMAND_CODES[command_index] if command_index in COMMAND_CODES else "N/A")
 
 
 class PhysicalPresence:
@@ -625,7 +767,10 @@ class PhysicalPresence:
 
 
 if __name__ == "__main__":
-    # TestOperation().get_capabilities(False, Capabilities.COMMANDS, CommandCodes.FIRST, 1024)
+    print("TPMA_OBJECT", bytes(TPM2Object(False, False, False, False, False, False, False, False, False, False, False)))
+    device_cls = TPM2Device
+    print("GET_RANDOM", TestOperation(device_cls).get_random(32))
+    TestOperation(device_cls).get_capabilities(False, Capabilities.COMMANDS, CommandCodes.NV_UNDEFINE_SPACE_SPECIAL, 1024)
     x = os.urandom(32)
     y = os.urandom(32)
     public = TPM2Public(
@@ -641,7 +786,7 @@ if __name__ == "__main__":
         #    2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False),
         int(len(x)).to_bytes(2, "big", signed=False) + x + int(len(y)).to_bytes(2, "big", signed=False) + y
     )
-    to = TestOperation()
+    to = TestOperation(device_cls)
     handle, name = to.load_external(False, None, bytes(public), PermanentHandles.NULL)
     to.evict_control(True, None, handle)
     # pp = PhysicalPresence()
