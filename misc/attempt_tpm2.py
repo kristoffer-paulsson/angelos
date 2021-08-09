@@ -13,6 +13,7 @@
 #     Kristoffer Paulsson - initial implementation
 #
 """Trusted platform module interaction set according to TPM 2.0."""
+import binascii
 import ipaddress
 import itertools
 import os
@@ -169,108 +170,124 @@ class ResponseCodes:
     """TPM2 Response Codes."""
     SUCCESS = 0x000
     BAD_TAG = 0x01E
+
     VER1 = 0x100
-    INITIALIZE = VER1 + 0x000
-    FAILURE = VER1 + 0x001
-    SEQUENCE = VER1 + 0x003
-    PRIVATE = VER1 + 0x00B
-    HMAC = VER1 + 0x019
-    DISABLED = VER1 + 0x020
-    EXCLUSIVE = VER1 + 0x021
-    AUTH_TYPE = VER1 + 0x024
-    AUTH_MISSING = VER1 + 0x025
-    POLICY = VER1 + 0x026
-    PCR = VER1 + 0x027
-    PCR_CHANGED = VER1 + 0x028
-    UPGRADE = VER1 + 0x02D
-    TOO_MANY_CONTEXTS = VER1 + 0x02E
-    UNAVAILABLE = VER1 + 0x02F
-    REBOOT = VER1 + 0x030
-    UNBALANCED = VER1 + 0x031
-    COMMAND_SIZE = VER1 + 0x042
-    COMMAND_CODE = VER1 + 0x043
-    AUTHSIZE = VER1 + 0x044
-    AUTH_CONTEXT = VER1 + 0x045
-    NV_RANGE = VER1 + 0x046
-    NV_SIZE = VER1 + 0x047
-    NV_LOCKED = VER1 + 0x048
-    NV_AUTHORIZATION = VER1 + 0x049
-    NV_UNINITIALIZED = VER1 + 0x04A
-    NV_SPACE = VER1 + 0x04B
-    NV_DEFINED = VER1 + 0x04C
-    BAD_CONTEXT = VER1 + 0x050
-    CPHASH = VER1 + 0x051
-    PARENT = VER1 + 0x052
-    NEEDS_TEST = VER1 + 0x053
-    NO_RESULT = VER1 + 0x054
-    SENSITIVE = VER1 + 0x055
-    MAX_FM0 = VER1 + 0x07F
+    class ver1:
+        VER1 = 0x100
+        INITIALIZE = VER1 + 0x000
+        FAILURE = VER1 + 0x001
+        SEQUENCE = VER1 + 0x003
+        PRIVATE = VER1 + 0x00B
+        HMAC = VER1 + 0x019
+        DISABLED = VER1 + 0x020
+        EXCLUSIVE = VER1 + 0x021
+        AUTH_TYPE = VER1 + 0x024
+        AUTH_MISSING = VER1 + 0x025
+        POLICY = VER1 + 0x026
+        PCR = VER1 + 0x027
+        PCR_CHANGED = VER1 + 0x028
+        UPGRADE = VER1 + 0x02D
+        TOO_MANY_CONTEXTS = VER1 + 0x02E
+        UNAVAILABLE = VER1 + 0x02F
+        REBOOT = VER1 + 0x030
+        UNBALANCED = VER1 + 0x031
+        COMMAND_SIZE = VER1 + 0x042
+        COMMAND_CODE = VER1 + 0x043
+        AUTHSIZE = VER1 + 0x044
+        AUTH_CONTEXT = VER1 + 0x045
+        NV_RANGE = VER1 + 0x046
+        NV_SIZE = VER1 + 0x047
+        NV_LOCKED = VER1 + 0x048
+        NV_AUTHORIZATION = VER1 + 0x049
+        NV_UNINITIALIZED = VER1 + 0x04A
+        NV_SPACE = VER1 + 0x04B
+        NV_DEFINED = VER1 + 0x04C
+        BAD_CONTEXT = VER1 + 0x050
+        CPHASH = VER1 + 0x051
+        PARENT = VER1 + 0x052
+        NEEDS_TEST = VER1 + 0x053
+        NO_RESULT = VER1 + 0x054
+        SENSITIVE = VER1 + 0x055
+        MAX_FM0 = VER1 + 0x07F
+
+    RC_VER1 = dict((v, k) for k, v in vars(ver1).items())
 
     FMT1 = 0x080
-    VALUE = FMT1 + 0x004
-    HIERARCHY = FMT1 + 0x005
-    KEY_SIZE = FMT1 + 0x007
-    MGF = FMT1 + 0x008
-    MODE = FMT1 + 0x009
-    TYPE = FMT1 + 0x00A
-    HANDLE = FMT1 + 0x00B
-    KDF = FMT1 + 0x00C
-    RANGE = FMT1 + 0x00D
-    AUTH_FAIL = FMT1 + 0x00E
-    NONCE = FMT1 + 0x00F
-    PP = FMT1 + 0x010
-    SCHEME = FMT1 + 0x012
-    SIZE = FMT1 + 0x015
-    SYMMETRIC = FMT1 + 0x016
-    TAG = FMT1 + 0x017
-    SELECTOR = FMT1 + 0x018
-    INSUFFICIENT = FMT1 + 0x01A
-    SIGNATURE = FMT1 + 0x01B
-    KEY = FMT1 + 0x01C
-    POLICY_FAIL = FMT1 + 0x01D
-    INTEGRITY = FMT1 + 0x01F
-    TICKET = FMT1 + 0x020
-    RESERVED_BITS = FMT1 + 0x021
-    BAD_AUTH = FMT1 + 0x022
-    EXPIRED = FMT1 + 0x023
-    POLICY_CC = FMT1 + 0x024
-    BINDING = FMT1 + 0x025
-    CURVE = FMT1 + 0x026
-    ECC_POINT = FMT1 + 0x027
+    class fmt1:
+        FMT1 = 0x080
+        ASYMMETRIC = FMT1 + 0x001
+        ATTRIBUTES = FMT1 + 0x002
+        HASH = FMT1 + 0x003
+        VALUE = FMT1 + 0x004
+        HIERARCHY = FMT1 + 0x005
+        KEY_SIZE = FMT1 + 0x007
+        MGF = FMT1 + 0x008
+        MODE = FMT1 + 0x009
+        TYPE = FMT1 + 0x00A
+        HANDLE = FMT1 + 0x00B
+        KDF = FMT1 + 0x00C
+        RANGE = FMT1 + 0x00D
+        AUTH_FAIL = FMT1 + 0x00E
+        NONCE = FMT1 + 0x00F
+        PP = FMT1 + 0x010
+        SCHEME = FMT1 + 0x012
+        SIZE = FMT1 + 0x015
+        SYMMETRIC = FMT1 + 0x016
+        TAG = FMT1 + 0x017
+        SELECTOR = FMT1 + 0x018
+        INSUFFICIENT = FMT1 + 0x01A
+        SIGNATURE = FMT1 + 0x01B
+        KEY = FMT1 + 0x01C
+        POLICY_FAIL = FMT1 + 0x01D
+        INTEGRITY = FMT1 + 0x01F
+        TICKET = FMT1 + 0x020
+        RESERVED_BITS = FMT1 + 0x021
+        BAD_AUTH = FMT1 + 0x022
+        EXPIRED = FMT1 + 0x023
+        POLICY_CC = FMT1 + 0x024
+        BINDING = FMT1 + 0x025
+        CURVE = FMT1 + 0x026
+        ECC_POINT = FMT1 + 0x027
+
+    RC_FMT1 = dict((v, k) for k, v in vars(fmt1).items())
 
     WARN = 0x900
-    CONTEXT_GAP = WARN + 0x001
-    OBJECT_MEMORY = WARN + 0x002
-    SESSION_MEMORY = WARN + 0x003
-    MEMORY = WARN + 0x004
-    SESSION_HANDLES = WARN + 0x005
-    OBJECT_HANDLES = WARN + 0x006
-    LOCALITY = WARN + 0x007
-    YIELDED = WARN + 0x008
-    CANCELED = WARN + 0x009
-    TESTING = WARN + 0x00A
-    REFERENCE_H0 = WARN + 0x010
-    REFERENCE_H1 = WARN + 0x011
-    REFERENCE_H2 = WARN + 0x012
-    REFERENCE_H3 = WARN + 0x013
-    REFERENCE_H4 = WARN + 0x014
-    REFERENCE_H5 = WARN + 0x015
-    REFERENCE_H6 = WARN + 0x016
-    REFERENCE_S0 = WARN + 0x018
-    REFERENCE_S1 = WARN + 0x019
-    REFERENCE_S2 = WARN + 0x01A
-    REFERENCE_S3 = WARN + 0x01B
-    REFERENCE_S4 = WARN + 0x01C
-    REFERENCE_S5 = WARN + 0x01D
-    REFERENCE_S6 = WARN + 0x01E
-    NV_RATE = WARN + 0x020
-    LOCKOUT = WARN + 0x021
-    RETRY = WARN + 0x022
-    NV_UNAVAILABLE = WARN + 0x023
-    NOT_USED = WARN + 0x7F
+    class warn:
+        WARN = 0x900
+        CONTEXT_GAP = WARN + 0x001
+        OBJECT_MEMORY = WARN + 0x002
+        SESSION_MEMORY = WARN + 0x003
+        MEMORY = WARN + 0x004
+        SESSION_HANDLES = WARN + 0x005
+        OBJECT_HANDLES = WARN + 0x006
+        LOCALITY = WARN + 0x007
+        YIELDED = WARN + 0x008
+        CANCELED = WARN + 0x009
+        TESTING = WARN + 0x00A
+        REFERENCE_H0 = WARN + 0x010
+        REFERENCE_H1 = WARN + 0x011
+        REFERENCE_H2 = WARN + 0x012
+        REFERENCE_H3 = WARN + 0x013
+        REFERENCE_H4 = WARN + 0x014
+        REFERENCE_H5 = WARN + 0x015
+        REFERENCE_H6 = WARN + 0x016
+        REFERENCE_S0 = WARN + 0x018
+        REFERENCE_S1 = WARN + 0x019
+        REFERENCE_S2 = WARN + 0x01A
+        REFERENCE_S3 = WARN + 0x01B
+        REFERENCE_S4 = WARN + 0x01C
+        REFERENCE_S5 = WARN + 0x01D
+        REFERENCE_S6 = WARN + 0x01E
+        NV_RATE = WARN + 0x020
+        LOCKOUT = WARN + 0x021
+        RETRY = WARN + 0x022
+        NV_UNAVAILABLE = WARN + 0x023
+        NOT_USED = WARN + 0x7F
+
+    RC_WARN = dict((v, k) for k, v in vars(warn).items())
 
 
-RESPONSE_CODES = dict((v, k) for k, v in vars(ResponseCodes).items())
+# RESPONSE_CODES = dict((v, k) for k, v in vars(ResponseCodes).items())
 
 
 class PermanentHandles:  # TPM_RH_*
@@ -295,14 +312,58 @@ STRUCTURE_TAGS = dict((v, k) for k, v in vars(StructureTags).items())
 
 class AlgorithmConstants:
     """TPM2 Algorithm constants."""
+    RSA = 0x0001
+    SHA1 = 0x0004
+    HMAC = 0x0005
+    AES = 0x0006
+    MGF1 = 0x0007
+    KEYEDHASH = 0x0008
+    XOR = 0x000A
     SHA256 = 0x000B  # Digest
+    SHA384 = 0x000C
+    SHA512 = 0x000D
     NULL = 0x0010  # Null
+    SM3_256 = 0x0012
+    SM4 = 0x0013
+    RSASSA = 0x0014
+    RSAES = 0x0015
+    RSAPSS = 0x0016
+    OAEP = 0x0017
     ECDSA = 0x0018
+    ECDH = 0x0019
+    ECDAA = 0x001A
+    SM2 = 0x001B
+    ECSCHNORR = 0x001C
+    ECMQV = 0x001D
+    KDF1_SP800_56A = 0x0020
+    KDF2 = 0x0021
+    KDF1_SP800_108 = 0x0022
+    ECC = 0x0023
+    SYMCIPHER = 0x0025
+    CAMELLIA = 0x0026
+    CTR = 0x0040
+    OFB = 0x0041
+    CBC = 0x0042
+    CFB = 0x0043
+    ECB = 0x0044
+
+
+ALGORITHM_CONSTANTS = dict((v, k) for k, v in vars(AlgorithmConstants).items())
 
 
 class EccCurve:
     """TPM2 Ecc curves."""
+    NIST_P192 = 0x0001
+    NIST_P224 = 0x0002
     NIST_P256 = 0x0003
+    NIST_P384 = 0x0004
+    NIST_P521 = 0x0005
+    BN_P256 = 0x0010
+    BN_P638 = 0x0011
+    SM2_P256 = 0x0020
+
+
+ECC_CURVE = dict((v, k) for k, v in vars(EccCurve).items())
 
 
 class TPM2Object:
@@ -355,7 +416,8 @@ class TPM2Public:
             scheme: TPMT_ASYM_SCHEME+
     """
 
-    def __init__(self, type: int, name_alg: int, object_attributes: bytes, auth_policy: bytes, parameters: bytes, unique):
+    def __init__(self, type: int, name_alg: int, object_attributes: bytes, auth_policy: bytes, parameters: bytes,
+                 unique):
         self._type = type
         self._name_alg = name_alg
         self._object_attributes = object_attributes
@@ -367,6 +429,100 @@ class TPM2Public:
         return int(self._type).to_bytes(2, "big", signed=False) + \
                int(self._name_alg).to_bytes(2, "big", signed=False) + \
                self._object_attributes + self._auth_policy + self._parameters + self._unique
+
+
+"""
+TPM2B_SENSITIVE
+    size:           UINT16
+    sensitiveArea:  TPMT_SENSITIVE
+        sensitiveType:              TPMI_ALG_PUBLIC
+            TPM_ALG_!ALG.o
+            #TPM_RC_TYPE
+        authValue:                  TPM2B_AUTH
+            TPM2B_DIGEST
+                size:                           UINT16
+                buffer[size]{:sizeof(TPMU_HA)}: BYTE
+        seedValue:                  TPM2B_DIGEST
+            size:                           UINT16
+            buffer[size]{:sizeof(TPMU_HA)}: BYTE
+        [sensitiveType]sensitive:   TPMU_SENSITIVE_COMPOSITE (rsa, ecc, bits, sym, any)
+            bits:   TPM2B_SENSITIVE_DATA (TPM_ALG_KEYEDHASH)
+                size:                                           UINT16
+                buffer[size]{: sizeof(TPMU_SENSITIVE_CREATE)}:  BYTE
+
+"""
+
+"""
+TPM2B_PUBLIC
+    size=:      UINT16
+    publicArea: TPMT_PUBLIC
+        type:               TPMI_ALG_PUBLIC
+            TPM_ALG_!ALG.o
+            #TPM_RC_TYPE
+        nameAlg:            +TPMI_ALG_HASH
+            TPM_ALG_!ALG.H
+            +TPM_ALG_NULL
+            #TPM_RC_HASH
+        objectAttributes:   TPMA_OBJECT
+        authPolicy:         TPM2B_DIGEST
+            size:                           UINT16
+            buffer[size]{:sizeof(TPMU_HA)}: BYTE
+        [type]parameters:   TPMU_PUBLIC_PARMS (keyedHashDetail, symDetail, rsaDetail, eccDetail, asymDetail)
+            eccDetail:      TPMS_ECC_PARMS
+                symmetric:  TPMT_SYM_DEF_OBJECT+, not decryption, (TPM_ALG_NULL)
+                scheme:     TPMT_ECC_SCHEME+
+                    scheme:             +TPMI_ALG_ECC_SCHEME
+                        TPM_ALG_!ALG.ax
+                        TPM_ALG_!ALG.am
+                        +TPM_ALG_NULL
+                        #TPM_RC_SCHEME
+                    [scheme]details:    TPMU_ASYM_SCHEME
+                        !ALG.am     TPMS_KEY_SCHEME_!ALG    TPM_ALG_!ALG
+                        !ALG.ax     TPMS_SIG_SCHEME_!ALG    TPM_ALG_!ALG    (TPMI_ALG_ASYM_SCHEME) TPMT_ECC_SCHEME TPMI_ALG_ECC_SCHEME TPMI_ECC_SCHEME
+                            TPMS_SCHEME_HASH
+                                hashAlg:    TPMI_ALG_HASH
+                curveID:    TPMI_ECC_CURVE
+                    $ECC_CURVES
+                    #TPM_RC_CURVE
+                kdf:        TPMT_KDF_SCHEME+, (TPM_ALG_NULL)
+            asymDetail:     TPMS_ASYM_PARMS
+                symmetric:      TPMT_SYM_DEF_OBJECT+, not decryption, (TPM_ALG_NULL)
+                scheme:         TPMT_ASYM_SCHEME+
+                    scheme:             +TPMI_ALG_ASYM_SCHEME
+                        TPM_ALG_!ALG.am
+                        TPM_ALG_!ALG.ax (probable)
+                        TPM_ALG_!ALG.ae
+                        +TPM_ALG_NULL
+                        #TPM_RC_VALUE
+                    [scheme]details:    TPMU_ASYM_SCHEME
+                        !ALG.ax     TPMS_SIG_SCHEME_!ALG    TPM_ALG_!ALG
+                            TPMS_SCHEME_HASH
+                                hashAlg:    TPMI_ALG_HASH
+                                    TPM_ALG_!ALG.H
+                                    +TPM_ALG_NULL
+                                    #TPM_RC_HASH
+        [type]unique:        TPMU_PUBLIC_ID (keyedHash, sym, rsa, ecc, derive)
+            ecc:    TPMS_ECC_POINT (TPM_ALG_ECC)
+                x:      TPM2B_ECC_PARAMETER
+                    size:                               UINT16
+                    buffer[size] {:MAX_ECC_KEY_BYTES}:  BYTE
+                y:      TPM2B_ECC_PARAMETER
+                    size:                               UINT16
+                    buffer[size] {:MAX_ECC_KEY_BYTES}:  BYTE
+"""
+
+"""
+TPMI_RH_HIERARCHY+
+    TPM_RH_OWNER
+    TPM_RH_PLATFORM
+    TPM_RH_ENDORSEMENT
+    +TPM_RH_NULL
+    #TPM_RC_VALUE
+"""
+
+
+class TPMWarning(RuntimeWarning):
+    pass
 
 
 class BaseTPM2Device:
@@ -400,12 +556,29 @@ class BaseTPM2Device:
 
         if response_code == ResponseCodes.SUCCESS:
             return
-        elif response_code in RESPONSE_CODES.keys():
-            error = "TPM2 Call failed with response code: {}, {}".format(response_code, RESPONSE_CODES[response_code])
-        else:
-            error = "Unknown response code: {}".format(response_code)
 
-        raise TypeError(error)
+        F = bool(response_code & 0B00000000000000000000000010000000)
+
+        if F:  # Format-One
+            E = response_code & 0B00000000000000000000000000111111
+            P = bool(response_code & 0B00000000000000000000000001000000)
+            N = (response_code >> 8) & 0B00000000000000000000000000001111
+            err_code = E + ResponseCodes.FMT1
+            err_msg = ResponseCodes.RC_FMT1[err_code] if err_code in ResponseCodes.RC_FMT1 else "N/A"
+            error = f"\033[31m\nError: 0x{err_code:x} {err_msg}\nType: {'parameter' if P else 'handle' if N < 16 else 'session'}\nNumber: {N & 0B111}\033[0m"
+        else:  # Format-Zero
+            E = response_code & 0B00000000000000000000000001111111
+            V = bool(response_code & 0B00000000000000000000000100000000)
+            T = bool(response_code & 0B00000000000000000000010000000000)
+            S = bool(response_code & 0B00000000000000000000100000000000)
+            err_code = E + (ResponseCodes.WARN if S else ResponseCodes.VER1)
+            if S:
+                err_msg = ResponseCodes.RC_WARN[err_code] if err_code in ResponseCodes.RC_WARN else "N/A"
+            else:
+                err_msg = ResponseCodes.RC_VER1[err_code] if err_code in ResponseCodes.RC_VER1 else "N/A"
+            error = f"\033[31m\nError: 0x{err_code:x} {err_msg}\nVersion: {'2.0' if V else '<2.0'}\nImplementation: {'Vendor' if T else 'Specification'}\nSeverity: {'WARN' if S else 'ERR'}\033[0m"
+
+        raise TPMWarning(error)
 
 
 class BaseTPM2Operation:
@@ -480,9 +653,7 @@ class BaseTPM2Operation:
             in_private = int(PermanentHandles.NULL).to_bytes(4, "big", signed=False)
         tag, response_code, result = device.send(
             session, CommandCodes.LOAD_EXTERNAL,
-            int(len(in_private)).to_bytes(2, "big", signed=False) + in_private +
-            int(len(in_public)).to_bytes(2, "big", signed=False) + in_public +
-            int(hierarchy).to_bytes(4, "big", signed=False)
+            in_private + in_public + hierarchy
         )
         device.validate(tag, response_code)
         object_handle = result[:4]
@@ -591,7 +762,7 @@ class TestOperation(BaseTPM2Operation):
             True, CommandCodes.CLEAR, int(auth_handle).to_bytes(4, "big", signed=False))
         device.validate(tag, response_code)
 
-    def get_capabilities(
+    def get_capability(
             self, session: bool, capability: int, property: int, property_count: int
     ) -> Tuple[bool, bytes]:
         device = self._device()
@@ -604,9 +775,41 @@ class TestOperation(BaseTPM2Operation):
         device.validate(tag, response_code)
         more_data = bool(data[:1])
         capability_data = data[1:]
-        if more_data and capability == Capabilities.COMMANDS:
+        if capability == Capabilities.ALGS:
+            self._capability_algs(capability_data)
+        elif capability == Capabilities.ECC_CURVES:
+            self._capability_ecc(capability_data)
+        elif capability == Capabilities.COMMANDS:
             self._capability_cc(capability_data)
         return more_data, capability_data
+
+    def _capability_algs(self, capability_data: bytes):
+        if int.from_bytes(capability_data[:4], "big", signed=False) != Capabilities.ALGS:
+            raise TypeError("Requested algorithm capabilities but got different.")
+        count = int.from_bytes(capability_data[5:8], "big", signed=False)
+        data = capability_data[8:]
+        if (count * 6) != len(data):
+            raise TypeError("Capability data of wrong length")
+
+        print("=" * 80)
+        for step in range(count):
+            idx = step * 6
+            index = int.from_bytes(data[idx: idx + 2], "big", signed=False)
+            print(hex(index), ALGORITHM_CONSTANTS[index] if index in ALGORITHM_CONSTANTS else "N/A")
+
+    def _capability_ecc(self, capability_data: bytes):
+        if int.from_bytes(capability_data[:4], "big", signed=False) != Capabilities.ECC_CURVES:
+            raise TypeError("Requested algorithm capabilities but got different.")
+        count = int.from_bytes(capability_data[5:8], "big", signed=False)
+        data = capability_data[8:]
+        if (count * 2) != len(data):
+            raise TypeError("Capability data of wrong length")
+
+        print("=" * 80)
+        for step in range(count):
+            idx = step * 2
+            index = int.from_bytes(data[idx: idx + 2], "big", signed=False)
+            print(hex(index), ECC_CURVE[index] if index in ECC_CURVE else "N/A")
 
     def _capability_cc(self, capability_data: bytes):
         if int.from_bytes(capability_data[:4], "big", signed=False) != Capabilities.COMMANDS:
@@ -616,10 +819,10 @@ class TestOperation(BaseTPM2Operation):
         if (count * 4) != len(data):
             raise TypeError("Capability data of wrong length")
 
-        print("="*80)
+        print("=" * 80)
         for step in range(count):
-            idx = step*4
-            command_index = int.from_bytes(data[idx+2: idx+4], "big", signed=False)
+            idx = step * 4
+            command_index = int.from_bytes(data[idx + 2: idx + 4], "big", signed=False)
             print(hex(command_index), COMMAND_CODES[command_index] if command_index in COMMAND_CODES else "N/A")
 
 
@@ -766,28 +969,57 @@ class PhysicalPresence:
         return self._operation("101")
 
 
+PRIVKEY = """10:59:7d:ef:62:6c:db:83:5f:f5:9d:f4:67:e0:3e:30:9f:41:96:26:28:50:e6:09:45:8e:93:9c:11:e0:53:2c"""
+PUBKEY = """04:7c:d7:1a:16:6c:e4:ee:69:ac:58:b1:49:f8:b8:ac:05:2a:11:ad:38:03:cb:b3:28:5a:fc:ac:91:e4:f2:79:ae:f3:00:03:54:b9:a3:86:5a:88:da:6e:1a:b2:fd:30:87:8b:1f:77:19:05:df:01:a1:bc:62:e6:97:0d:c4:b3:6d"""
+
+
+def xy_from_pubkey(pubkey: str):
+    code = "".join(pubkey.split(":")).encode()
+    return binascii.unhexlify(code[2:66]), binascii.unhexlify(code[66:])
+
+
 if __name__ == "__main__":
-    print("TPMA_OBJECT", bytes(TPM2Object(False, False, False, False, False, False, False, False, False, False, False)))
     device_cls = TPM2Device
-    print("GET_RANDOM", TestOperation(device_cls).get_random(32))
-    TestOperation(device_cls).get_capabilities(False, Capabilities.COMMANDS, CommandCodes.NV_UNDEFINE_SPACE_SPECIAL, 1024)
-    x = os.urandom(32)
-    y = os.urandom(32)
-    public = TPM2Public(
-        AlgorithmConstants.ECDSA, AlgorithmConstants.NULL,
-        bytes(TPM2Object(False, False, False, False, False, False, False, False, False, False, False)),
-        int(PermanentHandles.NULL).to_bytes(4, "big", signed=False),
-        int(AlgorithmConstants.NULL).to_bytes(
-            2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(
-            2, "big", signed=False) + int(EccCurve.NIST_P256).to_bytes(
-            2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(
-            2, "big", signed=False),
-        # int(AlgorithmConstants.NULL).to_bytes(
-        #    2, "big", signed=False) + int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False),
-        int(len(x)).to_bytes(2, "big", signed=False) + x + int(len(y)).to_bytes(2, "big", signed=False) + y
-    )
+
+    # ERROR 458 = INVALID ALGORITHM
+    # ERROR 469 = INVALID LENGTH
+    # ERROR 707 = INVALID HASH ALGORITHM
+    # ERROR 714 = [maybe] INVALID LENGTH in_private
+    # ERROR 722 = [maybe] INVALID scheme ALGORITHM
+
+    TestOperation(device_cls).get_capability(False, Capabilities.ECC_CURVES, 0, 1024)
+
+    auth = b""
+    seed = b""
+    bits = b""  # binascii.unhexlify("".join(PRIVKEY.split(":")).encode())
+    sensitive_type = int(AlgorithmConstants.ECC).to_bytes(2, "big", signed=False)
+    auth_value = int(len(auth)).to_bytes(2, "big", signed=False) + auth
+    seed_value = int(len(seed)).to_bytes(2, "big", signed=False) + seed
+    sensitive = int(len(bits)).to_bytes(2, "big", signed=False) + bits
+    sensitive_area = sensitive_type + auth_value + seed_value + sensitive
+    in_private = int(len(sensitive_area)).to_bytes(2, "big", signed=False) + sensitive_area
+
+    x, y = xy_from_pubkey(PUBKEY)
+    policy = b"\x00\x00\x00\x00"
+    public_type = sensitive_type
+    name_alg = int(AlgorithmConstants.SHA256).to_bytes(2, "big", signed=False)
+    object_attributes = bytes(TPM2Object(False, False, False, False, False, False, False, False, False, False, False))
+    auth_policy = int(len(policy)).to_bytes(2, "big", signed=False) + policy
+    symmetric = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    scheme = int(AlgorithmConstants.ECDSA).to_bytes(2, "big", signed=False)
+    hash_alg = int(AlgorithmConstants.SHA256).to_bytes(2, "big", signed=False)
+    curve_id = int(EccCurve.NIST_P256).to_bytes(2, "big", signed=False)
+    kdf = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    ecc_detail = symmetric + scheme + hash_alg + curve_id + kdf
+    parameters = ecc_detail
+    unique = int(len(x)).to_bytes(2, "big", signed=False) + x + int(len(y)).to_bytes(2, "big", signed=False) + y
+    public_area = public_type + name_alg + object_attributes + auth_policy + parameters + unique
+    in_public = int(len(public_area)).to_bytes(2, "big", signed=False) + public_area
+
+    hierarchy = int(PermanentHandles.ENDORSEMENT).to_bytes(4, "big", signed=False)
+
     to = TestOperation(device_cls)
-    handle, name = to.load_external(False, None, bytes(public), PermanentHandles.NULL)
+    handle, name = to.load_external(False, in_private, in_public, hierarchy)
     to.evict_control(True, None, handle)
     # pp = PhysicalPresence()
     # # print(pp.true_set_pp_required_for_clear())
