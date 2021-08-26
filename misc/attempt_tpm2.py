@@ -470,6 +470,13 @@ TPM2B_PUBLIC
         [type]parameters:   TPMU_PUBLIC_PARMS (keyedHashDetail, symDetail, rsaDetail, eccDetail, asymDetail)
             eccDetail:      TPMS_ECC_PARMS
                 symmetric:  TPMT_SYM_DEF_OBJECT+, not decryption, (TPM_ALG_NULL)
+                    algorithm:              +TPMI_ALG_SYM_OBJECT (TPM_ALG_NULL)
+                    [algorithm]keyBits:     TPMU_SYM_KEY_BITS
+                        null:   TPM_ALG_NULL
+                    [algorithm]mode:        TPMU_SYM_MODE
+                        null:   TPM_ALG_NULL (?)
+                    //[algorithm]details:   TPMU_SYM_DETAILS
+                        null:   TPM_ALG_NULL (?)
                 scheme:     TPMT_ECC_SCHEME+
                     scheme:             +TPMI_ALG_ECC_SCHEME
                         TPM_ALG_!ALG.ax
@@ -485,6 +492,12 @@ TPM2B_PUBLIC
                     $ECC_CURVES
                     #TPM_RC_CURVE
                 kdf:        TPMT_KDF_SCHEME+, (TPM_ALG_NULL)
+                    scheme:             +TPMI_ALG_KDF
+                        TPM_ALG_!ALG.HM
+                        +TPM_ALG_NULL
+                    [scheme]details:    TPMU_KDF_SCHEME
+                        TPMS_SCHEME_!ALG.HM
+                        TPM_ALG_NULL
             asymDetail:     TPMS_ASYM_PARMS
                 symmetric:      TPMT_SYM_DEF_OBJECT+, not decryption, (TPM_ALG_NULL)
                 scheme:         TPMT_ASYM_SCHEME+
@@ -969,6 +982,7 @@ class PhysicalPresence:
         return self._operation("101")
 
 
+# > openssl ec -in $HOME/mykey-prime256v1.pem -text -noout
 PRIVKEY = """10:59:7d:ef:62:6c:db:83:5f:f5:9d:f4:67:e0:3e:30:9f:41:96:26:28:50:e6:09:45:8e:93:9c:11:e0:53:2c"""
 PUBKEY = """04:7c:d7:1a:16:6c:e4:ee:69:ac:58:b1:49:f8:b8:ac:05:2a:11:ad:38:03:cb:b3:28:5a:fc:ac:91:e4:f2:79:ae:f3:00:03:54:b9:a3:86:5a:88:da:6e:1a:b2:fd:30:87:8b:1f:77:19:05:df:01:a1:bc:62:e6:97:0d:c4:b3:6d"""
 
@@ -989,6 +1003,7 @@ if __name__ == "__main__":
 
     TestOperation(device_cls).get_capability(False, Capabilities.ECC_CURVES, 0, 1024)
 
+    # 1# Parameter
     auth = b""
     seed = b""
     bits = b""  # binascii.unhexlify("".join(PRIVKEY.split(":")).encode())
@@ -999,24 +1014,32 @@ if __name__ == "__main__":
     sensitive_area = sensitive_type + auth_value + seed_value + sensitive
     in_private = int(len(sensitive_area)).to_bytes(2, "big", signed=False) + sensitive_area
 
+    # 2# Parameter
     x, y = xy_from_pubkey(PUBKEY)
     policy = b"\x00\x00\x00\x00"
     public_type = sensitive_type
     name_alg = int(AlgorithmConstants.SHA256).to_bytes(2, "big", signed=False)
     object_attributes = bytes(TPM2Object(False, False, False, False, False, False, False, False, False, False, False))
     auth_policy = int(len(policy)).to_bytes(2, "big", signed=False) + policy
-    symmetric = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    algorithm = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    algorithm_key_bits = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    algorithm_mode = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    algorithm_details = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    symmetric = algorithm + algorithm_key_bits + algorithm_mode + algorithm_details
     scheme = int(AlgorithmConstants.ECDSA).to_bytes(2, "big", signed=False)
     hash_alg = int(AlgorithmConstants.SHA256).to_bytes(2, "big", signed=False)
     curve_id = int(EccCurve.NIST_P256).to_bytes(2, "big", signed=False)
-    kdf = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    kdf_scheme = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    kdf_scheme_detail = int(AlgorithmConstants.NULL).to_bytes(2, "big", signed=False)
+    kdf = kdf_scheme + kdf_scheme_detail
     ecc_detail = symmetric + scheme + hash_alg + curve_id + kdf
     parameters = ecc_detail
     unique = int(len(x)).to_bytes(2, "big", signed=False) + x + int(len(y)).to_bytes(2, "big", signed=False) + y
     public_area = public_type + name_alg + object_attributes + auth_policy + parameters + unique
     in_public = int(len(public_area)).to_bytes(2, "big", signed=False) + public_area
 
-    hierarchy = int(PermanentHandles.ENDORSEMENT).to_bytes(4, "big", signed=False)
+    # 3# Parameter
+    hierarchy = int(PermanentHandles.NULL).to_bytes(4, "big", signed=False)
 
     to = TestOperation(device_cls)
     handle, name = to.load_external(False, in_private, in_public, hierarchy)
