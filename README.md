@@ -1,5 +1,7 @@
 # Angelos / Logo
 
+This project serves as a PoC, the sharp code is written in Kotlin/Multiplatform, see: [github.com/angelos-project](https://github.com/angelos-project)
+
 <img height="256" src="https://angelos-project.com/images/angelos.png"/>
 
 Ἄγγελος is a safe messenger system. Angelos means "Carrier of a divine message."<br />
